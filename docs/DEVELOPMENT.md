@@ -65,10 +65,25 @@ It is not implemented yet. Create `deploy/` only when a deployment task explicit
 
 ## Local Checks
 
-At this stage, verification is documentation-focused:
+At this stage, verification includes the backend skeleton and migration setup:
 
 - Confirm new documentation links resolve.
 - Confirm wording does not claim unimplemented features already work.
-- Confirm no backend, web, Android, or deployment business code was added early.
+- Confirm no web, Android, deployment business code, or backend business features were added early.
+- From `backend/`, run `python -m alembic current` with `DATABASE_URL` pointing at a reachable PostgreSQL database to verify Alembic can read configuration and connect.
 
 Future tasks will add technology-specific checks for backend, web, Android, migrations, Docker Compose, and deployment.
+
+## Database Migrations
+
+Backend migrations use Alembic with SQLAlchemy. The migration environment reads `DATABASE_URL` through the same backend settings used by the FastAPI application, so local runs should set `DATABASE_URL` instead of editing `backend/alembic.ini`.
+
+Local migration workflow:
+
+1. Start PostgreSQL with the credentials from `.env.example` or provide an equivalent `DATABASE_URL`.
+2. Change into `backend/`.
+3. Run `python -m alembic current` to check connectivity and the current revision.
+4. After future model tasks add ORM models, create revisions with `python -m alembic revision --autogenerate -m "describe change"`.
+5. Apply migrations with `python -m alembic upgrade head`.
+
+Phase 0 Task 6 intentionally adds only the shared declarative base, database session setup, and Alembic infrastructure. It does not define business tables.
