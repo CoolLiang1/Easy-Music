@@ -18,6 +18,8 @@ The first version contains:
 
 ## 2. High-Level Architecture
 
+This document describes the intended system shape. Phase 0 is documentation and planning only; it does not implement backend services, Web UI, Android app, Recommendation, or AI Assistant behavior.
+
 ```mermaid
 flowchart LR
     Android["Android App\nKotlin + Compose + Media3"]
@@ -41,7 +43,35 @@ flowchart LR
     Worker --> AI
 ```
 
-## 3. Deployment
+## 3. Repository Structure Plan
+
+Implementation directories are planned but should be created only when their corresponding task starts. Until then, keep the repository focused on documentation and task planning.
+
+Planned top-level structure:
+
+- `backend/`: FastAPI backend service, Alembic migrations, backend tests, media-processing integration, and worker entry points.
+- `web/`: React/Vite web management console source, web tests, static assets, and frontend build configuration.
+- `android/`: Kotlin, Jetpack Compose, and Media3 Android app source, Android tests, and Android build configuration.
+- `deploy/`: Docker Compose deployment assets, reverse proxy configuration, host setup notes, and production hardening material when those tasks begin.
+- `docs/`: product, architecture, development, environment, deployment, and task documentation.
+
+Phase 0 must not create placeholder source trees for `backend/`, `web/`, `android/`, or `deploy/`. Each directory should appear in the repository only as part of the task that starts real work for that area.
+
+### 3.1 Backend Module Boundaries
+
+The future backend should keep these modules separated at a high level:
+
+- Auth: authentication, token/session handling, password hashing, and access control.
+- Users: user records, ownership boundaries, and single-user-to-future-multi-user compatibility.
+- Tracks: library metadata, playback file references, status, and track updates.
+- Tags: tag taxonomy, tag groups, and track-tag assignment.
+- Uploads: audio upload validation, original file persistence, and upload lifecycle state.
+- Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
+- Worker: background job execution for media processing and future asynchronous backend jobs.
+
+Phase 0 explicitly excludes Web UI implementation, Android app implementation, Recommendation implementation, and AI Assistant implementation. Those areas may remain visible in target architecture notes, but Phase 0 should not add code, runtime configuration, detailed new API design, or provider integration for them.
+
+## 4. Deployment
 
 Target environment:
 
@@ -66,9 +96,9 @@ Recommended mounted paths:
 - `/srv/easy-music/media/covers`
 - `/srv/easy-music/postgres`
 
-## 4. Backend
+## 5. Backend
 
-### 4.1 Technology
+### 5.1 Technology
 
 - Python
 - FastAPI
@@ -78,7 +108,7 @@ Recommended mounted paths:
 - FFmpeg
 - AI provider abstraction
 
-### 4.2 Core Backend Modules
+### 5.2 Core Backend Modules
 
 - Auth
 - Users
@@ -92,9 +122,9 @@ Recommended mounted paths:
 - AI assistant
 - Android cache sync
 
-## 5. Android App
+## 6. Android App
 
-### 5.1 Technology
+### 6.1 Technology
 
 - Kotlin
 - Jetpack Compose
@@ -103,7 +133,7 @@ Recommended mounted paths:
 - WorkManager for background sync
 - DataStore for settings and auth token
 
-### 5.2 Responsibilities
+### 6.2 Responsibilities
 
 - Login
 - Recommendation home
@@ -115,7 +145,7 @@ Recommended mounted paths:
 - Offline playback for cached tracks
 - Playback and feedback sync
 
-### 5.3 Local Data
+### 6.3 Local Data
 
 Android should store:
 
@@ -125,16 +155,16 @@ Android should store:
 - Unsynced playback events
 - Unsynced feedback events
 
-## 6. Web App
+## 7. Web App
 
-### 6.1 Technology
+### 7.1 Technology
 
 - React
 - TypeScript
 - Vite
 - TanStack Query or similar server-state library
 
-### 6.2 Responsibilities
+### 7.2 Responsibilities
 
 - Login
 - Audio upload
@@ -146,9 +176,9 @@ Android should store:
 - Web playback
 - Playback history
 
-## 7. Data Model Draft
+## 8. Data Model Draft
 
-### 7.1 User
+### 8.1 User
 
 - `id`
 - `username`
@@ -157,7 +187,7 @@ Android should store:
 
 Version 1 is single-user, but tables should still include `user_id`.
 
-### 7.2 Track
+### 8.2 Track
 
 - `id`
 - `user_id`
@@ -185,7 +215,7 @@ Possible statuses:
 - ready
 - failed
 
-### 7.3 Tag
+### 8.3 Tag
 
 - `id`
 - `user_id`
@@ -200,7 +230,7 @@ Possible groups:
 - type
 - attribute
 
-### 7.4 TrackTag
+### 8.4 TrackTag
 
 - `track_id`
 - `tag_id`
@@ -213,7 +243,7 @@ Possible sources:
 - ai
 - system
 
-### 7.5 PlaybackEvent
+### 8.5 PlaybackEvent
 
 - `id`
 - `user_id`
@@ -233,7 +263,7 @@ Possible event types:
 - complete
 - seek
 
-### 7.6 FeedbackEvent
+### 8.6 FeedbackEvent
 
 - `id`
 - `user_id`
@@ -252,7 +282,7 @@ Possible feedback types:
 - not_suitable_for_context
 - skip_recommendation
 
-### 7.7 RecommendationRequest
+### 8.7 RecommendationRequest
 
 - `id`
 - `user_id`
@@ -260,7 +290,7 @@ Possible feedback types:
 - `parsed_context_json`
 - `created_at`
 
-### 7.8 RecommendationResult
+### 8.8 RecommendationResult
 
 - `id`
 - `request_id`
@@ -269,9 +299,9 @@ Possible feedback types:
 - `score`
 - `reason`
 
-## 8. Media Processing
+## 9. Media Processing
 
-### 8.1 Upload
+### 9.1 Upload
 
 Supported upload formats:
 
@@ -281,7 +311,7 @@ Supported upload formats:
 - WAV
 - OGG
 
-### 8.2 Processing Pipeline
+### 9.2 Processing Pipeline
 
 1. Save original file.
 2. Extract metadata.
@@ -291,26 +321,26 @@ Supported upload formats:
 6. Ask AI for tag suggestions.
 7. Mark track as ready or failed.
 
-### 8.3 Playback Format
+### 9.3 Playback Format
 
 Version 1 uses MP3 playback files for compatibility.
 
 Original files are preserved for future reprocessing.
 
-## 9. Recommendation System
+## 10. Recommendation System
 
 Version 1 uses hybrid recommendation:
 
 > LLM intent parsing + rule-based ranking + feedback adjustment.
 
-### 9.1 LLM Responsibilities
+### 10.1 LLM Responsibilities
 
 - Parse natural language into structured context
 - Suggest tags for new tracks
 - Generate short recommendation reasons
 - Suggest library organization improvements
 
-### 9.2 Rule Ranking Inputs
+### 10.2 Rule Ranking Inputs
 
 - Scenario tag match
 - State tag match
@@ -324,7 +354,7 @@ Version 1 uses hybrid recommendation:
 - Not-suitable feedback for current context
 - Cached status on Android, if relevant
 
-### 9.3 Recommendation Output
+### 10.3 Recommendation Output
 
 The API should return:
 
@@ -332,7 +362,7 @@ The API should return:
 - Two alternatives
 - Reason for each result
 
-## 10. API Draft
+## 11. API Draft
 
 ### Auth
 
@@ -373,7 +403,7 @@ The API should return:
 - `POST /api/ai/suggest-tags`
 - `POST /api/ai/organize-library`
 
-## 11. Security
+## 12. Security
 
 Version 1 is single-user but public-facing.
 
@@ -388,7 +418,7 @@ Minimum requirements:
 - API rate limits for AI endpoints
 - Configured secret keys through environment variables
 
-## 12. Future Architecture Hooks
+## 13. Future Architecture Hooks
 
 Reserve fields and modules for:
 
@@ -400,4 +430,3 @@ Reserve fields and modules for:
 - Embedding-based recommendation
 - Android packaged web features, if useful
 - Windows desktop client, if needed later
-
