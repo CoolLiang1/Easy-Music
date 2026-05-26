@@ -87,3 +87,14 @@ Local migration workflow:
 5. Apply migrations with `python -m alembic upgrade head`.
 
 Phase 0 Task 6 intentionally adds only the shared declarative base, database session setup, and Alembic infrastructure. It does not define business tables.
+
+## Initial User
+
+After applying the user migration, create the first local user with a password supplied through an environment variable:
+
+```powershell
+$env:EASY_MUSIC_INITIAL_PASSWORD = "replace-with-a-local-password"
+python -m app.auth.initial_user --username admin
+```
+
+The command refuses to create another user if any user already exists, and it does not define a default password.
