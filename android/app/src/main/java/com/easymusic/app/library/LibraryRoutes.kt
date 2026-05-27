@@ -1,16 +1,16 @@
 package com.easymusic.app.library
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import com.easymusic.app.auth.data.AuthTokenStore
+import com.easymusic.app.core.config.AppConfig
+import com.easymusic.app.core.network.ApiClient
+import com.easymusic.app.library.data.TrackApi
+import com.easymusic.app.library.domain.TrackRepository
+import com.easymusic.app.library.ui.LibraryScreen
+import com.easymusic.app.library.ui.LibraryViewModel
 
 object LibraryRoutes {
     const val LIBRARY = "library"
@@ -21,26 +21,23 @@ fun LibraryRoute(
     onOpenNowPlaying: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = "Library",
-            style = MaterialTheme.typography.headlineMedium,
+    val context = LocalContext.current
+    val tokenStore = remember(context) { AuthTokenStore(context) }
+    val viewModel = remember(context) {
+        LibraryViewModel(
+            trackRepository = TrackRepository(
+                TrackApi(
+                    ApiClient(AppConfig.default()),
+                ),
+            ),
+            bearerTokenProvider = tokenStore::readToken,
         )
-        Text(
-            text = "Track list behavior will be added in a later task.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Button(
-            modifier = Modifier.padding(top = 24.dp),
-            onClick = onOpenNowPlaying,
-        ) {
-            Text("Now Playing")
-        }
     }
+
+    LibraryScreen(
+        modifier = modifier,
+        uiState = viewModel.uiState,
+        onRefresh = viewModel::refresh,
+        onTrackSelected = { onOpenNowPlaying() },
+    )
 }
