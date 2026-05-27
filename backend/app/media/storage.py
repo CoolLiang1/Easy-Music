@@ -31,6 +31,10 @@ class MediaStorage:
             "playback.mp3",
         )
 
+    def relative_media_path(self, path: Path) -> str:
+        root = Path(self.settings.media_root).resolve(strict=False)
+        return path.resolve(strict=False).relative_to(root).as_posix()
+
 
 def get_media_storage() -> MediaStorage:
     return MediaStorage()
