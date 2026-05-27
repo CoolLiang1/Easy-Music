@@ -400,6 +400,8 @@ Process one uploaded Track from original file to ready playback MP3.
   - Marks failure as `failed`.
 - Re-running the same track does not corrupt database state.
 - Docker Compose worker has a runnable entrypoint.
+- Worker supports one-shot processing by default and an optional loop mode for
+  polling pending jobs in Docker Compose.
 
 ### Do Not
 
@@ -524,6 +526,8 @@ Make Phase 1 backend behavior repeatably verifiable through automated tests and 
   - Run the worker.
   - Stream a ready track.
 - Docker Compose local flow is documented.
+- Docker image includes FFmpeg/ffprobe and Alembic migration files so container
+  smoke tests can run media processing and `alembic upgrade head`.
 
 ### Do Not
 

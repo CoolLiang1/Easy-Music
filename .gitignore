@@ -57,12 +57,12 @@ logs/
 *.log
 
 # Local media storage and generated audio artifacts
-media/
-storage/
-uploads/
-originals/
-playback/
-covers/
+/media/
+/storage/
+/uploads/
+/originals/
+/playback/
+/covers/
 *.mp3
 *.flac
 *.m4a
