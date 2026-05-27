@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
@@ -15,8 +15,9 @@ export function LibraryPage() {
   const [libraryState, setLibraryState] = useState<LibraryState>({
     name: "loading",
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
+  const loadTracks = useCallback(async (showLoading: boolean) => {
     if (!accessToken) {
       setLibraryState({
         name: "error",
@@ -25,32 +26,43 @@ export function LibraryPage() {
       return;
     }
 
-    let isActive = true;
-    setLibraryState({ name: "loading" });
+    if (showLoading) {
+      setLibraryState({ name: "loading" });
+    } else {
+      setIsRefreshing(true);
+    }
 
-    listTracks(accessToken)
-      .then((tracks) => {
-        if (!isActive) {
-          return;
-        }
-
-        setLibraryState({ name: "ready", tracks });
-      })
-      .catch((error: unknown) => {
-        if (!isActive) {
-          return;
-        }
-
-        setLibraryState({
-          name: "error",
-          message: getErrorMessage(error),
-        });
+    try {
+      const tracks = await listTracks(accessToken);
+      setLibraryState({ name: "ready", tracks });
+    } catch (error: unknown) {
+      setLibraryState({
+        name: "error",
+        message: getErrorMessage(error),
       });
-
-    return () => {
-      isActive = false;
-    };
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [accessToken]);
+
+  useEffect(() => {
+    void loadTracks(true);
+  }, [loadTracks]);
+
+  useEffect(() => {
+    if (
+      libraryState.name !== "ready" ||
+      !libraryState.tracks.some((track) => isProcessingStatus(track.status))
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadTracks(false);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [libraryState, loadTracks]);
 
   return (
     <section className="page-panel" aria-labelledby="library-title">
@@ -59,6 +71,16 @@ export function LibraryPage() {
       <p className="page-copy">
         Browse every uploaded track, including items still processing or failed.
       </p>
+      <div className="login-actions">
+        <button
+          className="button secondary"
+          disabled={libraryState.name === "loading" || isRefreshing}
+          onClick={() => void loadTracks(false)}
+          type="button"
+        >
+          {isRefreshing ? "Refreshing..." : "Refresh status"}
+        </button>
+      </div>
 
       {libraryState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
@@ -81,6 +103,11 @@ export function LibraryPage() {
       ) : null}
     </section>
   );
+}
+
+function isProcessingStatus(status: string) {
+  const normalizedStatus = status.toLowerCase();
+  return normalizedStatus === "processing" || normalizedStatus === "uploaded";
 }
 
 function getErrorMessage(error: unknown) {
