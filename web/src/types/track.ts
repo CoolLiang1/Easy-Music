@@ -44,3 +44,5 @@ export type TrackMetadataUpdate = Pick<
   | "source_url"
   | "title"
 >;
+
+export type TrackTagUpdate = Pick<TrackUpdate, "tag_ids">;

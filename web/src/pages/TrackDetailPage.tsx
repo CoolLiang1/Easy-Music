@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { listTags } from "../api/tags";
 import { getTrack, updateTrack } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
-import type { Track, TrackMetadataUpdate } from "../types/track";
+import { TrackTagEditor } from "../components/TrackTagEditor";
+import type { Tag } from "../types/tag";
+import type { Track, TrackMetadataUpdate, TrackTagUpdate } from "../types/track";
 
 type TrackDetailPageProps = {
   trackId: string;
@@ -12,7 +15,7 @@ type TrackDetailPageProps = {
 
 type TrackDetailState =
   | { name: "loading" }
-  | { name: "ready"; track: Track }
+  | { name: "ready"; tags: Tag[]; track: Track }
   | { name: "error"; message: string };
 
 export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
@@ -24,6 +27,9 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [isSavingTags, setIsSavingTags] = useState(false);
+  const [tagSaveError, setTagSaveError] = useState<string | null>(null);
+  const [tagSaveSuccess, setTagSaveSuccess] = useState<string | null>(null);
 
   const loadTrack = useCallback(async (showLoading: boolean) => {
     if (!accessToken) {
@@ -41,8 +47,11 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
     }
 
     try {
-      const track = await getTrack(accessToken, trackId);
-      setDetailState({ name: "ready", track });
+      const [track, tags] = await Promise.all([
+        getTrack(accessToken, trackId),
+        listTags(accessToken),
+      ]);
+      setDetailState({ name: "ready", tags, track });
     } catch (error: unknown) {
       setDetailState({
         name: "error",
@@ -66,12 +75,42 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
     try {
       await updateTrack(accessToken, trackId, payload);
       const track = await getTrack(accessToken, trackId);
-      setDetailState({ name: "ready", track });
+      setDetailState((current) =>
+        current.name === "ready"
+          ? { name: "ready", tags: current.tags, track }
+          : { name: "ready", tags: [], track },
+      );
       setSaveSuccess("Metadata saved.");
     } catch (error: unknown) {
       setSaveError(getErrorMessage(error));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const saveTags = async (payload: TrackTagUpdate) => {
+    if (!accessToken) {
+      setTagSaveError("Sign in again to save this track's tags.");
+      return;
+    }
+
+    setIsSavingTags(true);
+    setTagSaveError(null);
+    setTagSaveSuccess(null);
+
+    try {
+      await updateTrack(accessToken, trackId, payload);
+      const track = await getTrack(accessToken, trackId);
+      setDetailState((current) =>
+        current.name === "ready"
+          ? { name: "ready", tags: current.tags, track }
+          : { name: "ready", tags: [], track },
+      );
+      setTagSaveSuccess("Tags saved.");
+    } catch (error: unknown) {
+      setTagSaveError(getErrorMessage(error));
+    } finally {
+      setIsSavingTags(false);
     }
   };
 
@@ -139,6 +178,14 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
             errorMessage={saveError}
             onSave={saveMetadata}
             successMessage={saveSuccess}
+            track={detailState.track}
+          />
+          <TrackTagEditor
+            allTags={detailState.tags}
+            disabled={isSavingTags}
+            errorMessage={tagSaveError}
+            onSave={saveTags}
+            successMessage={tagSaveSuccess}
             track={detailState.track}
           />
           <h2 style={{ marginTop: "34px" }}>Technical fields</h2>
