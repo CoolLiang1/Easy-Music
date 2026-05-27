@@ -3,11 +3,15 @@
 This document describes the local development workflow for Easy Music.
 
 Easy Music has completed Phase 1 backend development and now includes the
-Phase 2 Web app scaffold. The FastAPI backend, PostgreSQL migrations, media
-storage helpers, upload endpoint, authenticated track/tag APIs, streaming
-endpoint, and one-track worker flow exist. The Web app currently renders only a
-minimal placeholder screen. Android, Recommendation, AI Assistant, and
-production deployment hardening remain outside the current Web scaffold.
+Phase 2 Web management console. The FastAPI backend, PostgreSQL migrations,
+media storage helpers, upload endpoint, authenticated track/tag APIs, streaming
+endpoint, and worker flow exist. The Web app supports browser login, library
+viewing, upload, processing refresh, metadata editing, tag management, track tag
+assignment, and authenticated playback for ready tracks.
+
+Android, Recommendation, AI Assistant, playback history, feedback events,
+offline cache behavior, and production deployment hardening remain outside the
+Phase 2 Web scope.
 
 ## Workflow
 
@@ -157,15 +161,22 @@ cd web
 npm install
 ```
 
+Configure the Web API base URL for the current terminal when the backend does
+not run at the default `http://127.0.0.1:8000`:
+
+```powershell
+$env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+```
+
 Run the Web development server from `web/`:
 
 ```powershell
 npm run dev
 ```
 
-Vite prints the local browser URL, usually `http://localhost:5173/`. The
-current scaffold does not call backend APIs yet, so no API service is required
-to view the placeholder screen.
+Vite prints the local browser URL, usually `http://localhost:5173/`. The Web
+console calls the backend API after login, so run PostgreSQL, migrations, the
+API, and an initial local user before doing a full browser smoke test.
 
 Run the Web type check from `web/`:
 
@@ -178,6 +189,83 @@ Build the Web app from `web/`:
 ```powershell
 npm run build
 ```
+
+There is no `npm run lint` script configured for the Web app at this time.
+
+## Phase 2 Web Browser Smoke Test
+
+Use this flow to verify the completed Phase 2 Web console against the local
+backend:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial user. If the database already has a user, keep
+   using that account instead of creating another one.
+
+   Host flow from `backend/`:
+
+   ```powershell
+   $env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@localhost:5432/easy_music_dev"
+   $env:MEDIA_ROOT = ".\media"
+   $env:APP_SECRET_KEY = "development-secret-key-change-before-deploy"
+   $env:EASY_MUSIC_INITIAL_PASSWORD = "replace-with-a-local-password"
+   .\.venv\Scripts\python.exe -m app.auth.initial_user --username admin
+   ```
+
+4. From `web/`, install dependencies if needed, then start Vite:
+
+   ```powershell
+   npm install
+   $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+   npm run dev
+   ```
+
+5. Open the Vite URL, usually `http://localhost:5173/`, and log in with the
+   local user.
+6. Visit `Upload`, upload an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
+   upload result creates a track with an initial processing status.
+7. Run a worker from the repository root:
+
+   ```powershell
+   docker compose run --rm worker
+   ```
+
+   Or keep the worker running:
+
+   ```powershell
+   docker compose up -d worker-loop
+   ```
+
+8. Return to `Library` or the track detail page and use refresh, or wait for
+   lightweight polling while the track is processing, until the status becomes
+   `ready`.
+9. Open the track detail page and edit title, artist, album, content type,
+   source URL, liked state, cooldown date, and assigned tags as needed.
+10. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
+    `state`, `type`, `attribute`), rename it, change its group, and delete one
+    explicit tag.
+11. For a ready track, use the playback control from the library row or track
+    detail page and confirm audio loads through the authenticated stream
+    endpoint.
+
+Expected result:
+
+- Login stores a browser session and protected pages load after refresh.
+- Upload creates a processing track.
+- Worker processing updates the track to `ready`.
+- Metadata and tag edits persist after refresh.
+- Ready tracks play in the browser.
+- Non-ready tracks keep playback disabled.
 
 ## Automated Checks
 
@@ -202,6 +290,20 @@ The test suite covers:
 Manual API verification steps are documented in
 `docs/API_MANUAL_TESTING.md`.
 
+Run the Phase 2 Web checks from `web/`:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+Expected result:
+
+- TypeScript completes without errors.
+- Vite produces a production build under `web/dist/`.
+- No Web lint command is expected until a lint script is added to
+  `web/package.json`.
+
 ## Database Migrations
 
 Backend migrations use Alembic with SQLAlchemy. The migration environment reads
@@ -219,7 +321,8 @@ Local migration workflow:
 
 ## Scope Notes
 
-Phase 1 backend verification must not add Web tests, Android tests,
-Recommendation behavior, AI Assistant behavior, or production deployment
-hardening. Those areas may remain described in planning documents, but they are
-not part of the current backend test and manual verification scope.
+Phase 2 Web verification must not add Android behavior, Recommendation
+behavior, AI Assistant behavior, playback history, feedback events, offline
+cache behavior, or production deployment hardening. Those areas may remain
+described in planning documents, but they are outside the current Web console
+verification scope.

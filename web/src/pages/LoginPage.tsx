@@ -1,41 +1,112 @@
+import { type FormEvent, useEffect, useState } from "react";
+
+import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { RouteLink } from "../routes/RouteLink";
+import { navigateTo } from "../routes/router";
 
 type LoginPageProps = {
   isAuthenticated?: boolean;
   onUsePlaceholderSession?: () => void;
 };
 
-export function LoginPage({
-  isAuthenticated = false,
-  onUsePlaceholderSession,
-}: LoginPageProps) {
+export function LoginPage(_props: LoginPageProps) {
+  return (
+    <AuthProvider restoreStoredSession={false}>
+      <LoginForm />
+    </AuthProvider>
+  );
+}
+
+function LoginForm() {
+  const { login, logout, status } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    void logout();
+  }, [logout]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await login({ username, password });
+      navigateTo("/library");
+    } catch (requestError: unknown) {
+      setError(getLoginErrorMessage(requestError));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <main className="login-shell">
       <section className="login-panel" aria-labelledby="login-title">
         <p className="eyebrow">Phase 2 Web Console</p>
         <h1 id="login-title">Easy Music</h1>
         <p className="page-copy">
-          Temporary route gate for the Web console. Real browser login and
-          session handling are scheduled for a later Phase 2 task.
+          Sign in with the local owner account created for the Phase 1 backend.
         </p>
 
-        <div className="login-actions">
-          {onUsePlaceholderSession ? (
+        <form className="login-actions" onSubmit={handleSubmit}>
+          <label>
+            Username
+            <input
+              autoComplete="username"
+              disabled={isSubmitting || status === "checking"}
+              name="username"
+              onChange={(event) => setUsername(event.target.value)}
+              required
+              type="text"
+              value={username}
+            />
+          </label>
+
+          <label>
+            Password
+            <input
+              autoComplete="current-password"
+              disabled={isSubmitting || status === "checking"}
+              name="password"
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              type="password"
+              value={password}
+            />
+          </label>
+
+          {error ? (
+            <p className="page-copy" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <div className="login-actions">
             <button
               className="button primary"
-              onClick={onUsePlaceholderSession}
-              type="button"
+              disabled={isSubmitting || status === "checking"}
+              type="submit"
             >
-              Use placeholder session
+              {isSubmitting ? "Signing in..." : "Sign in"}
             </button>
-          ) : null}
-          {isAuthenticated ? (
             <RouteLink className="button secondary" to="/library">
-              Return to library
+              Back to library
             </RouteLink>
-          ) : null}
-        </div>
+          </div>
+        </form>
       </section>
     </main>
   );
+}
+
+function getLoginErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Sign in failed. Check the username and password, then try again.";
 }
