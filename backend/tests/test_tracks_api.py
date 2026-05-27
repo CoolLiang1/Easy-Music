@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,9 +10,11 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth.password import hash_password
 from app.auth.tokens import create_access_token
+from app.core.config import Settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
+from app.media.storage import MediaStorage, get_media_storage
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
@@ -32,13 +35,15 @@ def db_session() -> Generator[Session]:
         yield session
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient]:
+def client(db_session: Session, tmp_path: Path) -> Generator[TestClient]:
     app = create_app()
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
 
     def override_get_db() -> Generator[Session]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_media_storage] = lambda: storage
     with TestClient(app) as test_client:
         yield test_client
 
@@ -221,5 +226,115 @@ def test_cannot_access_another_users_track(
     track = create_track(db_session, other_user)
 
     response = client.get(f"/api/tracks/{track.id}", headers=auth_headers(owner))
+
+    assert response.status_code == 404
+
+
+def test_stream_track_returns_playback_file(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True)
+    playback_path.write_bytes(b"0123456789")
+
+    response = client.get(f"/api/tracks/{track.id}/stream", headers=auth_headers(user))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("audio/mpeg")
+    assert response.headers["accept-ranges"] == "bytes"
+    assert response.headers["content-length"] == "10"
+    assert response.content == b"0123456789"
+
+
+def test_stream_track_supports_range_requests(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True)
+    playback_path.write_bytes(b"0123456789")
+
+    response = client.get(
+        f"/api/tracks/{track.id}/stream",
+        headers={**auth_headers(user), "Range": "bytes=2-5"},
+    )
+
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 2-5/10"
+    assert response.headers["content-length"] == "4"
+    assert response.content == b"2345"
+
+
+def test_stream_track_rejects_invalid_range(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True)
+    playback_path.write_bytes(b"0123456789")
+
+    response = client.get(
+        f"/api/tracks/{track.id}/stream",
+        headers={**auth_headers(user), "Range": "bytes=20-30"},
+    )
+
+    assert response.status_code == 416
+    assert response.headers["content-range"] == "bytes */10"
+
+
+def test_stream_track_requires_authentication(client: TestClient, db_session: Session) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.get(f"/api/tracks/{track.id}/stream")
+
+    assert response.status_code == 401
+
+
+def test_cannot_stream_another_users_track(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    track = create_track(db_session, other_user)
+
+    response = client.get(f"/api/tracks/{track.id}/stream", headers=auth_headers(owner))
+
+    assert response.status_code == 404
+
+
+def test_cannot_stream_track_that_is_not_ready(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.status = "processing"
+    db_session.commit()
+
+    response = client.get(f"/api/tracks/{track.id}/stream", headers=auth_headers(user))
+
+    assert response.status_code == 404
+
+
+def test_cannot_stream_missing_playback_file(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.get(f"/api/tracks/{track.id}/stream", headers=auth_headers(user))
 
     assert response.status_code == 404

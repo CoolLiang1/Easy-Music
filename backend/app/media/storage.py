@@ -35,6 +35,9 @@ class MediaStorage:
         root = Path(self.settings.media_root).resolve(strict=False)
         return path.resolve(strict=False).relative_to(root).as_posix()
 
+    def stored_media_path(self, relative_path: str) -> Path:
+        return resolve_media_path(self.settings.media_root, relative_path)
+
 
 def get_media_storage() -> MediaStorage:
     return MediaStorage()
