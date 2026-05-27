@@ -1,31 +1,92 @@
-import { RouteLink } from "../routes/RouteLink";
+import { useEffect, useState } from "react";
+
+import { listTracks } from "../api/tracks";
+import { useAuth } from "../auth/AuthProvider";
+import { TrackTable } from "../components/TrackTable";
+import type { Track } from "../types/track";
+
+type LibraryState =
+  | { name: "loading" }
+  | { name: "ready"; tracks: Track[] }
+  | { name: "error"; message: string };
 
 export function LibraryPage() {
+  const { accessToken } = useAuth();
+  const [libraryState, setLibraryState] = useState<LibraryState>({
+    name: "loading",
+  });
+
+  useEffect(() => {
+    if (!accessToken) {
+      setLibraryState({
+        name: "error",
+        message: "Sign in again to load the library.",
+      });
+      return;
+    }
+
+    let isActive = true;
+    setLibraryState({ name: "loading" });
+
+    listTracks(accessToken)
+      .then((tracks) => {
+        if (!isActive) {
+          return;
+        }
+
+        setLibraryState({ name: "ready", tracks });
+      })
+      .catch((error: unknown) => {
+        if (!isActive) {
+          return;
+        }
+
+        setLibraryState({
+          name: "error",
+          message: getErrorMessage(error),
+        });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [accessToken]);
+
   return (
     <section className="page-panel" aria-labelledby="library-title">
       <p className="eyebrow">Library</p>
       <h1 id="library-title">Music library</h1>
       <p className="page-copy">
-        Track listing will be connected to the Phase 1 track API in a later
-        task.
+        Browse every uploaded track, including items still processing or failed.
       </p>
 
-      <div className="placeholder-grid">
-        <div className="placeholder-card">
-          <h2>Tracks</h2>
-          <p>Placeholder area for title, artist, status, and update time.</p>
+      {libraryState.name === "loading" ? (
+        <div className="empty-state" aria-live="polite">
+          Loading tracks...
         </div>
-        <div className="placeholder-card">
-          <h2>Selection</h2>
-          <p>
-            Track rows will navigate to detail pages when the library feature is
-            implemented.
-          </p>
-          <RouteLink className="button secondary" to="/tracks/placeholder-track">
-            Open placeholder detail
-          </RouteLink>
+      ) : null}
+
+      {libraryState.name === "error" ? (
+        <div className="empty-state" role="alert">
+          {libraryState.message}
         </div>
-      </div>
+      ) : null}
+
+      {libraryState.name === "ready" && libraryState.tracks.length === 0 ? (
+        <div className="empty-state">No tracks have been uploaded yet.</div>
+      ) : null}
+
+      {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
+        <TrackTable tracks={libraryState.tracks} />
+      ) : null}
     </section>
   );
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Unable to load tracks.";
 }
