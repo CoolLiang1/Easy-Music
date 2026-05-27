@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.easymusic.app.auth.data.AuthTokenStore
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
+import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.domain.TrackRepository
 import com.easymusic.app.library.ui.LibraryScreen
@@ -18,7 +19,7 @@ object LibraryRoutes {
 
 @Composable
 fun LibraryRoute(
-    onOpenNowPlaying: () -> Unit,
+    onOpenNowPlaying: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -38,6 +39,6 @@ fun LibraryRoute(
         modifier = modifier,
         uiState = viewModel.uiState,
         onRefresh = viewModel::refresh,
-        onTrackSelected = { onOpenNowPlaying() },
+        onTrackSelected = onOpenNowPlaying,
     )
 }

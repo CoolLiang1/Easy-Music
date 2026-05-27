@@ -26,6 +26,7 @@ import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.LibraryRoute
 import com.easymusic.app.library.LibraryRoutes
+import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.NowPlayingRoute
 import com.easymusic.app.player.PlayerRoutes
 
@@ -51,6 +52,7 @@ fun AppNavGraph(
     val sessionState = sessionViewModel.uiState
     val session = sessionState.session
     var currentRoute by rememberSaveable { mutableStateOf(startRoute) }
+    var nowPlayingTrack by remember { mutableStateOf<TrackResponse?>(null) }
 
     LaunchedEffect(session) {
         when (session) {
@@ -91,7 +93,10 @@ fun AppNavGraph(
             ) { contentPadding ->
                 LibraryRoute(
                     modifier = Modifier.padding(contentPadding),
-                    onOpenNowPlaying = { currentRoute = PlayerRoutes.NOW_PLAYING },
+                    onOpenNowPlaying = { track ->
+                        nowPlayingTrack = track
+                        currentRoute = PlayerRoutes.NOW_PLAYING
+                    },
                 )
             }
         }
@@ -105,6 +110,7 @@ fun AppNavGraph(
                 onLogout = sessionViewModel::logout,
             ) { contentPadding ->
                 NowPlayingRoute(
+                    track = nowPlayingTrack,
                     modifier = Modifier.padding(contentPadding),
                     onBackToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 )

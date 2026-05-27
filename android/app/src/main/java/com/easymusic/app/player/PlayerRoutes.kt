@@ -1,16 +1,17 @@
 package com.easymusic.app.player
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import com.easymusic.app.auth.data.AuthTokenStore
+import com.easymusic.app.core.config.AppConfig
+import com.easymusic.app.core.network.ApiClient
+import com.easymusic.app.library.data.TrackApi
+import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.player.domain.PlayerController
+import com.easymusic.app.player.ui.NowPlayingRouteContent
+import com.easymusic.app.player.ui.NowPlayingViewModel
 
 object PlayerRoutes {
     const val NOW_PLAYING = "now_playing"
@@ -18,29 +19,23 @@ object PlayerRoutes {
 
 @Composable
 fun NowPlayingRoute(
+    track: TrackResponse?,
     onBackToLibrary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = "Now Playing",
-            style = MaterialTheme.typography.headlineMedium,
+    val context = LocalContext.current
+    val viewModel = remember(context, track?.id) {
+        NowPlayingViewModel(
+            track = track,
+            trackApi = TrackApi(ApiClient(AppConfig.default())),
+            tokenStore = AuthTokenStore(context),
+            playerController = PlayerController(context),
         )
-        Text(
-            text = "Playback behavior will be added in a later task.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Button(
-            modifier = Modifier.padding(top = 24.dp),
-            onClick = onBackToLibrary,
-        ) {
-            Text("Back to Library")
-        }
     }
+
+    NowPlayingRouteContent(
+        modifier = modifier,
+        viewModel = viewModel,
+        onBackToLibrary = onBackToLibrary,
+    )
 }
