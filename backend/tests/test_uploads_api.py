@@ -14,6 +14,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
 from app.media.storage import MediaStorage, get_media_storage
+from app.models.processing_job import ProcessingJob
 from app.models.track import Track
 from app.models.user import User
 
@@ -86,6 +87,11 @@ def test_upload_audio_creates_track_and_saves_original(
     assert track.user_id == user.id
     assert track.original_file_path == body["original_file_path"]
     assert (tmp_path / track.original_file_path).read_bytes() == b"audio bytes"
+
+    job = db_session.query(ProcessingJob).one()
+    assert job.track_id == track.id
+    assert job.status == "pending"
+    assert job.error_message is None
 
 
 def test_upload_rejects_unsupported_extension(

@@ -2,11 +2,11 @@ import argparse
 import os
 
 from app.db.session import SessionLocal
-from app.worker.jobs import process_one_track
+from app.worker.jobs import process_next_job, process_one_track
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Process one uploaded track.")
+    parser = argparse.ArgumentParser(description="Process uploaded tracks.")
     parser.add_argument(
         "--track-id",
         type=int,
@@ -15,14 +15,18 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if args.track_id is None:
-        parser.print_help()
-        return 0
-
     with SessionLocal() as db:
-        track = process_one_track(db, args.track_id)
+        if args.track_id is not None:
+            track = process_one_track(db, args.track_id)
+            print(f"Processed track {track.id}: {track.status}")
+            return 0
 
-    print(f"Processed track {track.id}: {track.status}")
+        job = process_next_job(db)
+
+    if job is None:
+        print("No pending processing jobs.")
+    else:
+        print(f"Processed job {job.id}: {job.status}")
     return 0
 
 

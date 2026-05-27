@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.media.storage import MediaStorage
 from app.models.track import Track
 from app.models.user import User
+from app.services.jobs import create_processing_job
 
 
 ALLOWED_UPLOAD_TYPES = {
@@ -91,6 +92,7 @@ def create_uploaded_track(
 
     track.original_file_path = storage.relative_media_path(destination)
     track.status = "processing"
+    create_processing_job(db, track)
     db.commit()
     db.refresh(track)
     return track
