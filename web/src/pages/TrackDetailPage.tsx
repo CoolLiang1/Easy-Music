@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getTrack } from "../api/tracks";
+import { getTrack, updateTrack } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
+import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
-import type { Track } from "../types/track";
+import type { Track, TrackMetadataUpdate } from "../types/track";
 
 type TrackDetailPageProps = {
   trackId: string;
@@ -20,6 +21,9 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
     name: "loading",
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   const loadTrack = useCallback(async (showLoading: boolean) => {
     if (!accessToken) {
@@ -49,6 +53,28 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
     }
   }, [accessToken, trackId]);
 
+  const saveMetadata = async (payload: TrackMetadataUpdate) => {
+    if (!accessToken) {
+      setSaveError("Sign in again to save this track.");
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    try {
+      await updateTrack(accessToken, trackId, payload);
+      const track = await getTrack(accessToken, trackId);
+      setDetailState({ name: "ready", track });
+      setSaveSuccess("Metadata saved.");
+    } catch (error: unknown) {
+      setSaveError(getErrorMessage(error));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     void loadTrack(true);
   }, [loadTrack]);
@@ -77,8 +103,8 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
           : "Track metadata"}
       </h1>
       <p className="page-copy">
-        Review the latest backend processing state for this track. Metadata
-        editing is handled in a later task.
+        Review the latest backend processing state for this track and update
+        owner-managed metadata.
       </p>
       <div className="login-actions">
         <button
@@ -108,6 +134,14 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
           <p className="page-copy" aria-live="polite">
             {getStatusSummary(detailState.track.status)}
           </p>
+          <TrackMetadataForm
+            disabled={isSaving}
+            errorMessage={saveError}
+            onSave={saveMetadata}
+            successMessage={saveSuccess}
+            track={detailState.track}
+          />
+          <h2 style={{ marginTop: "34px" }}>Technical fields</h2>
           <dl className="detail-list">
             <div>
               <dt>Track ID</dt>
@@ -118,18 +152,6 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
               <dd>
                 <TrackStatusBadge status={detailState.track.status} />
               </dd>
-            </div>
-            <div>
-              <dt>Artist</dt>
-              <dd>{detailState.track.artist || "Not set"}</dd>
-            </div>
-            <div>
-              <dt>Album</dt>
-              <dd>{detailState.track.album || "Not set"}</dd>
-            </div>
-            <div>
-              <dt>Content type</dt>
-              <dd>{formatValue(detailState.track.content_type)}</dd>
             </div>
             <div>
               <dt>Duration</dt>
@@ -144,8 +166,20 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
               <dd>{formatBitrate(detailState.track.bitrate)}</dd>
             </div>
             <div>
-              <dt>Liked</dt>
-              <dd>{detailState.track.liked ? "Yes" : "No"}</dd>
+              <dt>Original file path</dt>
+              <dd>{detailState.track.original_file_path || "Not available"}</dd>
+            </div>
+            <div>
+              <dt>Playback file path</dt>
+              <dd>{detailState.track.playback_file_path || "Not available"}</dd>
+            </div>
+            <div>
+              <dt>Cover path</dt>
+              <dd>{detailState.track.cover_path || "Not available"}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{formatDateTime(detailState.track.created_at)}</dd>
             </div>
             <div>
               <dt>Updated</dt>
@@ -179,14 +213,6 @@ function getStatusSummary(status: string) {
   }
 
   return "This track has a backend status that is not recognized by the Web console yet.";
-}
-
-function formatValue(value: string) {
-  return value
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function formatDuration(durationSeconds: number | null) {

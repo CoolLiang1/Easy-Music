@@ -33,3 +33,14 @@ export type TrackUpdate = {
   cooldown_until?: string | null;
   tag_ids?: number[] | null;
 };
+
+export type TrackMetadataUpdate = Pick<
+  TrackUpdate,
+  | "album"
+  | "artist"
+  | "content_type"
+  | "cooldown_until"
+  | "liked"
+  | "source_url"
+  | "title"
+>;
