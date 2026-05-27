@@ -2,8 +2,10 @@ package com.easymusic.app.auth.domain
 
 import com.easymusic.app.auth.data.AuthApi
 import com.easymusic.app.auth.data.AuthTokenStore
+import com.easymusic.app.auth.data.LoginRequest
 import com.easymusic.app.auth.data.TokenResponse
 import com.easymusic.app.core.network.ApiResult
+import com.easymusic.app.core.network.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -33,6 +35,20 @@ class AuthRepository(
 
     suspend fun saveToken(tokenResponse: TokenResponse) {
         tokenStore.saveToken(tokenResponse.accessToken)
+    }
+
+    suspend fun login(
+        username: String,
+        password: String,
+    ): ApiResult<Unit> {
+        return authApi.login(
+            LoginRequest(
+                username = username,
+                password = password,
+            ),
+        ).map { tokenResponse ->
+            tokenStore.saveToken(tokenResponse.accessToken)
+        }
     }
 
     suspend fun clearToken() {

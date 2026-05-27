@@ -7,20 +7,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.easymusic.app.core.config.AppConfig
-import com.easymusic.app.core.network.ApiClient
 
 @Composable
 fun EasyMusicApp(
     config: AppConfig = AppConfig.default(),
 ) {
-    val apiClient = ApiClient(config)
-
     MaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
-            AppNavGraph()
+            AppNavGraph(config = config)
         }
     }
 }
