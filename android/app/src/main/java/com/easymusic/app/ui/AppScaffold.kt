@@ -1,0 +1,48 @@
+package com.easymusic.app.ui
+
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.easymusic.app.auth.domain.AuthSession
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppScaffold(
+    session: AuthSession.Authenticated,
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier,
+    isLoggingOut: Boolean = false,
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text("Easy Music")
+                },
+                actions = {
+                    Text(
+                        modifier = Modifier.padding(end = 8.dp),
+                        text = session.currentUser.username,
+                    )
+                    Button(
+                        modifier = Modifier.padding(end = 8.dp),
+                        enabled = !isLoggingOut,
+                        onClick = onLogout,
+                    ) {
+                        Text(if (isLoggingOut) "Signing Out" else "Sign Out")
+                    }
+                },
+            )
+        },
+        content = content,
+    )
+}

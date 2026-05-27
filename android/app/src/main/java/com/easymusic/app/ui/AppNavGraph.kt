@@ -2,10 +2,10 @@ package com.easymusic.app.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,6 +21,7 @@ import com.easymusic.app.auth.domain.AuthRepository
 import com.easymusic.app.auth.domain.AuthSession
 import com.easymusic.app.auth.ui.LoginScreen
 import com.easymusic.app.auth.ui.LoginViewModel
+import com.easymusic.app.auth.ui.SessionViewModel
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.LibraryRoute
@@ -44,7 +45,11 @@ fun AppNavGraph(
     val loginViewModel = remember(authRepository) {
         LoginViewModel(authRepository)
     }
-    val session by authRepository.session.collectAsState(initial = AuthSession.Checking)
+    val sessionViewModel = remember(authRepository) {
+        SessionViewModel(authRepository)
+    }
+    val sessionState = sessionViewModel.uiState
+    val session = sessionState.session
     var currentRoute by rememberSaveable { mutableStateOf(startRoute) }
 
     LaunchedEffect(session) {
@@ -72,21 +77,39 @@ fun AppNavGraph(
             onUsernameChange = loginViewModel::onUsernameChange,
             onPasswordChange = loginViewModel::onPasswordChange,
             onSubmit = {
-                loginViewModel.submit {
-                    currentRoute = LibraryRoutes.LIBRARY
-                }
+                loginViewModel.submit(sessionViewModel::restoreSession)
             },
         )
 
-        LibraryRoutes.LIBRARY -> LibraryRoute(
-            modifier = modifier,
-            onOpenNowPlaying = { currentRoute = PlayerRoutes.NOW_PLAYING },
-        )
+        LibraryRoutes.LIBRARY -> {
+            val authenticated = session as? AuthSession.Authenticated ?: return
+            AppScaffold(
+                modifier = modifier,
+                session = authenticated,
+                isLoggingOut = sessionState.isLoggingOut,
+                onLogout = sessionViewModel::logout,
+            ) { contentPadding ->
+                LibraryRoute(
+                    modifier = Modifier.padding(contentPadding),
+                    onOpenNowPlaying = { currentRoute = PlayerRoutes.NOW_PLAYING },
+                )
+            }
+        }
 
-        PlayerRoutes.NOW_PLAYING -> NowPlayingRoute(
-            modifier = modifier,
-            onBackToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-        )
+        PlayerRoutes.NOW_PLAYING -> {
+            val authenticated = session as? AuthSession.Authenticated ?: return
+            AppScaffold(
+                modifier = modifier,
+                session = authenticated,
+                isLoggingOut = sessionState.isLoggingOut,
+                onLogout = sessionViewModel::logout,
+            ) { contentPadding ->
+                NowPlayingRoute(
+                    modifier = Modifier.padding(contentPadding),
+                    onBackToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+                )
+            }
+        }
     }
 }
 

@@ -6,30 +6,32 @@ import com.easymusic.app.auth.data.LoginRequest
 import com.easymusic.app.auth.data.TokenResponse
 import com.easymusic.app.core.network.ApiResult
 import com.easymusic.app.core.network.map
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 
 class AuthRepository(
     private val authApi: AuthApi,
     private val tokenStore: AuthTokenStore,
 ) {
-    val session: Flow<AuthSession> = tokenStore.token
-        .map { token ->
-            if (token == null) {
-                AuthSession.Unauthenticated
-            } else {
-                AuthSession.Authenticated(bearerToken = token)
-            }
-        }
-        .onStart { emit(AuthSession.Checking) }
-
     suspend fun restoreSession(): AuthSession {
         val token = tokenStore.readToken()
-        return if (token == null) {
-            AuthSession.Unauthenticated
-        } else {
-            AuthSession.Authenticated(bearerToken = token)
+        if (token == null) {
+            return AuthSession.Unauthenticated
+        }
+
+        return when (val result = authApi.me(token)) {
+            is ApiResult.Success -> AuthSession.Authenticated(
+                bearerToken = token,
+                currentUser = result.value,
+            )
+
+            is ApiResult.Unauthorized -> {
+                tokenStore.clearToken()
+                AuthSession.Unauthenticated
+            }
+
+            is ApiResult.HttpError,
+            is ApiResult.NetworkError,
+            is ApiResult.SerializationError,
+            -> AuthSession.Unauthenticated
         }
     }
 
@@ -52,6 +54,10 @@ class AuthRepository(
     }
 
     suspend fun clearToken() {
+        tokenStore.clearToken()
+    }
+
+    suspend fun signOutAfterAuthFailure() {
         tokenStore.clearToken()
     }
 
