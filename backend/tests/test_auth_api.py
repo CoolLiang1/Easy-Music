@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth.password import hash_password
+from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
@@ -94,3 +95,24 @@ def test_me_returns_current_user(client: TestClient, db_session: Session) -> Non
         "username": user.username,
         "created_at": user.created_at.isoformat(),
     }
+
+
+def test_login_allows_web_cors_preflight(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
+    get_settings.cache_clear()
+    app = create_app()
+    get_settings.cache_clear()
+
+    with TestClient(app) as test_client:
+        response = test_client.options(
+            "/api/auth/login",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "POST" in response.headers["access-control-allow-methods"]
