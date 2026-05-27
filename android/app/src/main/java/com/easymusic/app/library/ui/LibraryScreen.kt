@@ -22,6 +22,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +40,18 @@ fun LibraryScreen(
     onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var selectedTrackId by remember { mutableStateOf<Int?>(null) }
+
+    selectedTrackId?.let { trackId ->
+        TrackDetailRoute(
+            trackId = trackId,
+            onBackToLibrary = { selectedTrackId = null },
+            onOpenNowPlaying = onTrackSelected,
+            modifier = modifier,
+        )
+        return
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -60,7 +76,7 @@ fun LibraryScreen(
                 tracks = uiState.tracks,
                 errorMessage = uiState.errorMessage,
                 onRefresh = onRefresh,
-                onTrackSelected = onTrackSelected,
+                onTrackSelected = { track -> selectedTrackId = track.id },
             )
         }
     }

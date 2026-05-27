@@ -1,0 +1,290 @@
+package com.easymusic.app.library.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.easymusic.app.auth.data.AuthTokenStore
+import com.easymusic.app.core.config.AppConfig
+import com.easymusic.app.core.network.ApiClient
+import com.easymusic.app.library.data.TrackApi
+import com.easymusic.app.library.data.TrackResponse
+
+@Composable
+fun TrackDetailRoute(
+    trackId: Int,
+    onBackToLibrary: () -> Unit,
+    onOpenNowPlaying: (TrackResponse) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val viewModel = remember(context, trackId) {
+        TrackDetailViewModel(
+            trackId = trackId,
+            trackApi = TrackApi(ApiClient(AppConfig.default())),
+            tokenStore = AuthTokenStore(context),
+        )
+    }
+
+    TrackDetailScreen(
+        modifier = modifier,
+        uiState = viewModel.uiState,
+        onBackToLibrary = onBackToLibrary,
+        onRefresh = viewModel::refresh,
+        onOpenNowPlaying = onOpenNowPlaying,
+    )
+}
+
+@Composable
+fun TrackDetailScreen(
+    uiState: TrackDetailUiState,
+    onBackToLibrary: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenNowPlaying: (TrackResponse) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Track Detail",
+                    style = MaterialTheme.typography.headlineMedium,
+                )
+                Text(
+                    text = "Fresh cloud metadata",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = onBackToLibrary) {
+                Text("Library")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        when {
+            uiState.isLoading -> DetailLoading()
+            uiState.errorMessage != null -> DetailError(
+                kind = uiState.errorKind,
+                message = uiState.errorMessage,
+                onRefresh = onRefresh,
+            )
+
+            uiState.track != null -> DetailContent(
+                track = uiState.track,
+                onOpenNowPlaying = onOpenNowPlaying,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailLoading() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator()
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("Loading track detail")
+    }
+}
+
+@Composable
+private fun DetailError(
+    kind: TrackDetailErrorKind?,
+    message: String,
+    onRefresh: () -> Unit,
+) {
+    val title = when (kind) {
+        TrackDetailErrorKind.NotFound -> "Track not found"
+        TrackDetailErrorKind.Unauthorized -> "Sign in required"
+        TrackDetailErrorKind.Other,
+        null,
+        -> "Could not load track"
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            modifier = Modifier.padding(top = 8.dp),
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        Button(
+            modifier = Modifier.padding(top = 16.dp),
+            onClick = onRefresh,
+        ) {
+            Text("Try Again")
+        }
+    }
+}
+
+@Composable
+private fun DetailContent(
+    track: TrackResponse,
+    onOpenNowPlaying: (TrackResponse) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                MetadataRow(label = "Artist", value = track.artist.orUnknown())
+                MetadataRow(label = "Album", value = track.album.orUnknown())
+                MetadataRow(label = "Duration", value = track.durationSeconds?.formatDuration() ?: "Unknown")
+                MetadataRow(label = "Content Type", value = track.contentType)
+                MetadataRow(label = "Liked", value = if (track.liked) "Yes" else "No")
+                MetadataRow(label = "Cooldown", value = track.cooldownUntil ?: "None")
+                MetadataRow(label = "Created", value = track.createdAt)
+                MetadataRow(label = "Updated", value = track.updatedAt)
+            }
+        }
+
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Playback",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = if (track.isReady) {
+                        "Ready to stream when playback is wired in."
+                    } else {
+                        "Only ready tracks can stream. This track is ${track.status}."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    enabled = track.isReady,
+                    onClick = { onOpenNowPlaying(track) },
+                ) {
+                    Text("Play")
+                }
+            }
+        }
+
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Tags",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (track.tags.isEmpty()) {
+                    Text(
+                        text = "No tags",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        track.tags.forEach { tag ->
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(tag.name) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetadataRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp),
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun String?.orUnknown(): String =
+    if (isNullOrBlank()) "Unknown" else this
+
+private fun Int.formatDuration(): String {
+    val minutes = this / 60
+    val seconds = this % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
+}
