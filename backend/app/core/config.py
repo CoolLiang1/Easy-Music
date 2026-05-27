@@ -4,9 +4,11 @@ from typing import Annotated
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from app.media.paths import validate_storage_dir
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 
     app_name: str = "Easy Music API"
     database_url: str = Field(
@@ -38,6 +40,11 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @field_validator("originals_dir", "playback_dir")
+    @classmethod
+    def validate_media_subdir(cls, value: str) -> str:
+        return validate_storage_dir(value)
 
 
 @lru_cache
