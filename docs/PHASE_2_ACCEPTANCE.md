@@ -2,18 +2,13 @@
 
 This document records the Phase 2 Web management console verification result.
 
-## Acceptance Result
-
-- Phase 2 Web: passed by automated Web checks.
-- Browser smoke test: documented for repeatable local verification.
-
-## Verified Automated Items
+## Automated Checks
 
 - `npm run typecheck`: passed.
 - `npm run build`: passed.
 - `npm run lint`: not configured in `web/package.json`.
 
-## Manual Browser Smoke Coverage
+## Manual Browser Smoke Test
 
 The repeatable browser smoke test is documented in:
 
@@ -35,8 +30,22 @@ The documented flow covers:
 - Playing a ready track in the browser through the authenticated stream
   endpoint.
 
-## Scope Notes
+## Actual Manual Result
 
-Android, Recommendation, AI Assistant, playback history, feedback events,
-offline cache behavior, and production deployment hardening remain outside
-Phase 2 Web verification.
+- Manual browser smoke test: passed.
+- Result recorded after the Web app was successfully started and the documented
+  browser smoke test was completed.
+
+## Known Issues
+
+- No Phase 2 Web acceptance issues are recorded from the completed browser
+  smoke test.
+- Android, Recommendation, AI Assistant, playback history, feedback events,
+  offline cache behavior, and production deployment hardening remain outside
+  Phase 2 Web verification.
+
+## Final Acceptance Decision
+
+- Current decision: Phase 2 Web accepted.
+- Automated Web checks passed.
+- Manual browser smoke test passed.
