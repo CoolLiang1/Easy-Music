@@ -99,7 +99,7 @@ export function LibraryPage() {
       ) : null}
 
       {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
-        <TrackTable tracks={libraryState.tracks} />
+        <TrackTable accessToken={accessToken} tracks={libraryState.tracks} />
       ) : null}
     </section>
   );

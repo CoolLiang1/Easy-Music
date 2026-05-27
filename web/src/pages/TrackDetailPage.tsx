@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import { TrackTagEditor } from "../components/TrackTagEditor";
+import { WebAudioPlayer } from "../components/WebAudioPlayer";
 import type { Tag } from "../types/tag";
 import type { Track, TrackMetadataUpdate, TrackTagUpdate } from "../types/track";
 
@@ -173,6 +174,7 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
           <p className="page-copy" aria-live="polite">
             {getStatusSummary(detailState.track.status)}
           </p>
+          <WebAudioPlayer accessToken={accessToken} track={detailState.track} />
           <TrackMetadataForm
             disabled={isSaving}
             errorMessage={saveError}

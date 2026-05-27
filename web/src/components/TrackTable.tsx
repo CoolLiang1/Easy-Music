@@ -1,12 +1,14 @@
 import { RouteLink } from "../routes/RouteLink";
 import type { Track } from "../types/track";
 import { TrackStatusBadge } from "./TrackStatusBadge";
+import { WebAudioPlayer } from "./WebAudioPlayer";
 
 type TrackTableProps = {
+  accessToken: string | null;
   tracks: Track[];
 };
 
-export function TrackTable({ tracks }: TrackTableProps) {
+export function TrackTable({ accessToken, tracks }: TrackTableProps) {
   return (
     <div
       style={{
@@ -32,6 +34,7 @@ export function TrackTable({ tracks }: TrackTableProps) {
               "Duration",
               "Liked",
               "Updated",
+              "Playback",
             ].map((heading) => (
               <th
                 key={heading}
@@ -76,6 +79,9 @@ export function TrackTable({ tracks }: TrackTableProps) {
               <td style={bodyCellStyle}>{formatDuration(track.duration_seconds)}</td>
               <td style={bodyCellStyle}>{track.liked ? "Yes" : "No"}</td>
               <td style={bodyCellStyle}>{formatDateTime(track.updated_at)}</td>
+              <td style={bodyCellStyle}>
+                <WebAudioPlayer accessToken={accessToken} compact track={track} />
+              </td>
             </tr>
           ))}
         </tbody>
