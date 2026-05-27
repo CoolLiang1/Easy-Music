@@ -2,7 +2,11 @@
 
 This document describes the intended deployment direction for Easy Music.
 
-Deployment is planned but not implemented yet. The repository now includes a minimal Docker Compose skeleton, but backend runtime code, worker processing code, a web container, reverse proxy configuration, and production deployment scripts are not implemented at this stage.
+Deployment is planned but not production-hardened yet. The repository includes
+a Docker Compose backend stack for local integration: PostgreSQL, FastAPI API,
+one-shot worker, optional loop worker, and persistent media volumes. Web,
+Android, reverse proxy configuration, HTTPS, backups, and monitoring remain
+future work.
 
 ## Direction
 
@@ -17,16 +21,58 @@ The current Docker Compose skeleton reserves:
 
 Caddy reverse proxy and HTTPS are planned for a later hardening phase.
 
-## Docker Compose Skeleton
+## Docker Compose Backend Stack
 
 `docker-compose.yml` defines:
 
 - `postgres` using the official PostgreSQL image and a persistent `postgres_data` volume.
-- `api` using the future `./backend` build context and exposing local development port `8000`.
-- `worker` using the same future `./backend` build context.
+- `api` using the `./backend` build context and exposing local development port `8000`.
+- `worker` using the same backend image for one-shot pending-job processing.
+- `worker-loop` using the same backend image for continuous polling.
 - `media_originals` and `media_playback` volumes mounted under `/app/media/originals` and `/app/media/playback`.
 
-The API and worker commands point at the expected future backend entry points. They will not run until the backend project skeleton and worker module are added in later tasks.
+The backend image installs FFmpeg, which provides both `ffmpeg` and `ffprobe`,
+and includes `alembic.ini` plus the `alembic/` migration directory so database
+migrations can run from inside the container.
+
+Build the backend services:
+
+```powershell
+docker compose build api worker
+```
+
+Start PostgreSQL and the API:
+
+```powershell
+docker compose up -d postgres api
+```
+
+Check media tools inside the API container:
+
+```powershell
+docker compose exec api sh -c "ffmpeg -version && ffprobe -version"
+```
+
+Apply migrations inside the API container:
+
+```powershell
+docker compose exec api alembic upgrade head
+```
+
+Run one pending worker job and exit:
+
+```powershell
+docker compose run --rm worker
+```
+
+Run the worker continuously:
+
+```powershell
+docker compose up -d worker-loop
+```
+
+The loop interval defaults to 5 seconds and can be changed with
+`WORKER_POLL_INTERVAL_SECONDS`.
 
 ## Planned Storage
 
@@ -41,11 +87,12 @@ The storage layout should avoid mixing original files, generated playback files,
 
 ## Current Limitations
 
-- The Docker Compose file is a skeleton only.
 - Production HTTPS has not been configured yet.
 - Caddy configuration has not been added yet.
 - Backups, logging, health checks, and monitoring have not been added yet.
-- Backend, Web, Android, and worker runtime code do not exist yet.
+- Web and Android runtime code do not exist yet.
+- The worker loop is intentionally simple polling for Phase 1; Redis, Celery,
+  and distributed worker coordination are not included.
 
 ## Production Hardening Later
 

@@ -44,6 +44,23 @@ services:
       - postgres
     command: ["python", "-m", "app.worker"]
 
+  worker-loop:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://easy_music:change-me-development-only@postgres:5432/easy_music_dev}
+      MEDIA_ROOT: /app/media
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-5}
+    volumes:
+      - media_originals:/app/media/originals
+      - media_playback:/app/media/playback
+    depends_on:
+      - postgres
+    command: ["python", "-m", "app.worker", "--loop"]
+
 volumes:
   postgres_data:
   media_originals:

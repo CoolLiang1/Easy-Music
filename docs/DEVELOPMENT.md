@@ -23,6 +23,13 @@ outside Phase 1 backend verification.
 The backend lives in `backend/` and uses FastAPI, SQLAlchemy, Alembic,
 PostgreSQL, and FFmpeg/ffprobe.
 
+Check local FFmpeg tools before running real media-processing smoke tests:
+
+```powershell
+ffmpeg -version
+ffprobe -version
+```
+
 From the repository root, start PostgreSQL with Docker Compose:
 
 ```powershell
@@ -74,6 +81,20 @@ Run one pending worker job from `backend/`:
 .\.venv\Scripts\python.exe -m app.worker
 ```
 
+Run the worker continuously from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.worker --loop --poll-interval 5
+```
+
+The same loop mode can be enabled with environment variables:
+
+```powershell
+$env:WORKER_LOOP = "true"
+$env:WORKER_POLL_INTERVAL_SECONDS = "5"
+.\.venv\Scripts\python.exe -m app.worker
+```
+
 Run the worker for a specific track ID:
 
 ```powershell
@@ -83,16 +104,28 @@ Run the worker for a specific track ID:
 ## Docker Compose Local Flow
 
 Docker Compose defines `postgres`, `api`, and `worker` services for local
-integration checks:
+integration checks. The backend image includes FFmpeg, ffprobe, `alembic.ini`,
+and the `alembic/` migration directory.
 
 ```powershell
 docker compose up -d postgres api
 ```
 
+Check FFmpeg tools inside the API container:
+
+```powershell
+docker compose exec api sh -c "ffmpeg -version && ffprobe -version"
+```
+
 The Compose services read development-safe values from `.env.example` and
 override container-specific `DATABASE_URL` and `MEDIA_ROOT` values. Run
-database migrations from the host against the Compose PostgreSQL port before
-using the API:
+database migrations inside the API container:
+
+```powershell
+docker compose exec api alembic upgrade head
+```
+
+You can also run migrations from the host against the Compose PostgreSQL port:
 
 ```powershell
 cd backend
@@ -104,6 +137,12 @@ Process pending jobs through Compose with:
 
 ```powershell
 docker compose run --rm worker
+```
+
+Run a continuously polling Compose worker with:
+
+```powershell
+docker compose up -d worker-loop
 ```
 
 ## Automated Checks

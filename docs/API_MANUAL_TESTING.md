@@ -11,6 +11,13 @@ processing, and authenticated audio streaming.
 - Backend development dependencies installed in `backend/.venv`.
 - `ffmpeg` and `ffprobe` available on `PATH` for real media processing.
 
+Check local media tools:
+
+```powershell
+ffmpeg -version
+ffprobe -version
+```
+
 From the repository root, start PostgreSQL:
 
 ```powershell
@@ -52,7 +59,7 @@ Run the API from `backend/`:
 In a second PowerShell window, verify health:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/health"
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/health"
 ```
 
 ## Login
@@ -121,6 +128,12 @@ Or process the uploaded track directly:
 .\.venv\Scripts\python.exe -m app.worker --track-id $trackId
 ```
 
+Run the local worker continuously:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.worker --loop --poll-interval 5
+```
+
 Verify the track is ready:
 
 ```powershell
@@ -174,7 +187,19 @@ Start the Compose API stack from the repository root:
 docker compose up -d postgres api
 ```
 
-Run migrations from the host against the Compose PostgreSQL port:
+Check FFmpeg and ffprobe inside Docker:
+
+```powershell
+docker compose exec api sh -c "ffmpeg -version && ffprobe -version"
+```
+
+Run migrations inside the API container:
+
+```powershell
+docker compose exec api alembic upgrade head
+```
+
+Alternatively, run migrations from the host against the Compose PostgreSQL port:
 
 ```powershell
 cd backend
@@ -191,6 +216,32 @@ Return to the repository root and process one pending job through Compose:
 cd ..
 docker compose run --rm worker
 ```
+
+Or run a continuously polling Compose worker:
+
+```powershell
+docker compose up -d worker-loop
+```
+
+## Full Upload To Stream Closure
+
+1. Start PostgreSQL and API with `docker compose up -d postgres api`.
+2. Run `docker compose exec api alembic upgrade head`.
+3. Create or reuse the initial user.
+4. Generate `test-tone.wav` with FFmpeg.
+5. Log in and upload `test-tone.wav` to `POST /api/tracks/upload`.
+6. Confirm the upload response has `status: processing`.
+7. Run `docker compose run --rm worker`, or keep `worker-loop` running.
+8. Fetch `GET /api/tracks/$trackId` until `status` is `ready`.
+9. Call `GET /api/tracks/$trackId/stream` with the bearer token.
+
+Expected result:
+
+- Upload creates a pending processing job.
+- Worker extracts metadata with ffprobe and writes playback MP3 with FFmpeg.
+- Track becomes `ready`.
+- Stream endpoint returns `200 OK` for full playback and `206 Partial Content`
+  for Range requests.
 
 ## Automated Regression Check
 
