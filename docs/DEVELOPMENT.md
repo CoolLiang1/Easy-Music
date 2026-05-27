@@ -1,100 +1,152 @@
 # Development
 
-This document describes the expected local development workflow for Easy Music.
+This document describes the local development workflow for Easy Music.
 
-The project is currently in Phase 0. Backend, Web, Android, and deployment code are planned but not yet implemented. Do not assume any local server, web app, Android project, Docker Compose stack, or automated test suite exists until the corresponding task creates it.
+Easy Music is currently in Phase 1 backend development. The FastAPI backend,
+PostgreSQL migrations, media storage helpers, upload endpoint, authenticated
+track/tag APIs, streaming endpoint, and one-track worker flow exist. Web,
+Android, Recommendation, AI Assistant, and production deployment hardening are
+outside Phase 1 backend verification.
 
 ## Workflow
 
-1. Start from the `develop` branch.
+1. Start from the intended development branch.
 2. Work on one documented task at a time.
 3. Keep changes inside the files and directories named by the current task.
-4. Avoid creating implementation directories before their scoped task starts.
+4. Do not implement later tasks early.
 5. Inspect `git diff` before committing.
-6. Commit completed tasks separately with a concise message.
+6. Commit completed tasks separately with a concise Conventional Commits
+   message.
 
-## Planned Development Areas
+## Backend Setup
 
-The repository structure is planned before implementation directories are created. Do not create `backend/`, `web/`, `android/`, or `deploy/` until the task for that area starts.
+The backend lives in `backend/` and uses FastAPI, SQLAlchemy, Alembic,
+PostgreSQL, and FFmpeg/ffprobe.
 
-Planned top-level directories:
+From the repository root, start PostgreSQL with Docker Compose:
 
-- `backend/`: future FastAPI service, database migrations, backend tests, media-processing integration, and worker entry points.
-- `web/`: future React/Vite management console source, browser UI tests, and web build configuration.
-- `android/`: future Kotlin, Jetpack Compose, and Media3 Android client source and Android build configuration.
-- `deploy/`: future deployment assets such as Docker Compose hardening, reverse proxy configuration, and host setup notes.
-- `docs/`: project planning, architecture, development, environment, and deployment documentation.
+```powershell
+docker compose up -d postgres
+```
 
-### Backend
+Create a local backend environment from `backend/` if one does not already
+exist:
 
-The backend is planned as a FastAPI service with PostgreSQL, Alembic migrations, media storage, FFmpeg integration, authentication, track management, tag management, upload handling, and background worker support.
+```powershell
+cd backend
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
 
-It is not implemented yet.
+Use the repository development database URL when running backend commands from
+the host:
 
-High-level backend module boundaries are planned as:
+```powershell
+$env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@localhost:5432/easy_music_dev"
+$env:MEDIA_ROOT = ".\media"
+```
 
-- Auth: login, session/token handling, password hashing, and authenticated API access.
-- Users: user profile and ownership boundaries, starting with the single-user version.
-- Tracks: music metadata, playback file references, track status, and library records.
-- Tags: user-managed tag taxonomy and track-tag relationships.
-- Uploads: accepted audio uploads, validation, original file storage, and upload lifecycle state.
-- Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
-- Worker: background job entry points for media processing and other asynchronous backend work.
+Apply migrations from `backend/`:
 
-### Web
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```
 
-The web app is planned as a React/Vite management console for login, upload, library management, track editing, tag editing, recommendation testing, and browser playback.
-
-It is not implemented yet. Web UI implementation is excluded from Phase 0.
-
-### Android
-
-The Android app is planned as a Kotlin, Jetpack Compose, and Media3 client for mobile playback, background playback, notification controls, lock screen controls, headset controls, manual cache, offline playback, and event sync.
-
-It is not implemented yet. Android app implementation is excluded from Phase 0.
-
-### Recommendation And AI Assistant
-
-Recommendation and AI Assistant behavior may appear in architecture notes as future product direction, but their implementation is excluded from Phase 0. Phase 0 should not add recommendation code, AI assistant code, provider integrations, prompts, or active runtime requirements for those areas.
-
-### Deployment
-
-Deployment is planned around Docker Compose, PostgreSQL, API, worker, persistent media storage, and later production hardening.
-
-It is not implemented yet. Create `deploy/` only when a deployment task explicitly requires it.
-
-## Local Checks
-
-At this stage, verification includes the backend skeleton and migration setup:
-
-- Confirm new documentation links resolve.
-- Confirm wording does not claim unimplemented features already work.
-- Confirm no web, Android, deployment business code, or backend business features were added early.
-- From `backend/`, run `python -m alembic current` with `DATABASE_URL` pointing at a reachable PostgreSQL database to verify Alembic can read configuration and connect.
-
-Future tasks will add technology-specific checks for backend, web, Android, migrations, Docker Compose, and deployment.
-
-## Database Migrations
-
-Backend migrations use Alembic with SQLAlchemy. The migration environment reads `DATABASE_URL` through the same backend settings used by the FastAPI application, so local runs should set `DATABASE_URL` instead of editing `backend/alembic.ini`.
-
-Local migration workflow:
-
-1. Start PostgreSQL with the credentials from `.env.example` or provide an equivalent `DATABASE_URL`.
-2. Change into `backend/`.
-3. Run `python -m alembic current` to check connectivity and the current revision.
-4. After future model tasks add ORM models, create revisions with `python -m alembic revision --autogenerate -m "describe change"`.
-5. Apply migrations with `python -m alembic upgrade head`.
-
-Phase 0 Task 6 intentionally adds only the shared declarative base, database session setup, and Alembic infrastructure. It does not define business tables.
-
-## Initial User
-
-After applying the user migration, create the first local user with a password supplied through an environment variable:
+Create the initial local user after migrations have been applied:
 
 ```powershell
 $env:EASY_MUSIC_INITIAL_PASSWORD = "replace-with-a-local-password"
-python -m app.auth.initial_user --username admin
+.\.venv\Scripts\python.exe -m app.auth.initial_user --username admin
 ```
 
-The command refuses to create another user if any user already exists, and it does not define a default password.
+The initial-user command is single-use and refuses to create another user if
+any user already exists. It does not define a default production password.
+
+Run the API locally from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Run one pending worker job from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.worker
+```
+
+Run the worker for a specific track ID:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.worker --track-id 1
+```
+
+## Docker Compose Local Flow
+
+Docker Compose defines `postgres`, `api`, and `worker` services for local
+integration checks:
+
+```powershell
+docker compose up -d postgres api
+```
+
+The Compose services read development-safe values from `.env.example` and
+override container-specific `DATABASE_URL` and `MEDIA_ROOT` values. Run
+database migrations from the host against the Compose PostgreSQL port before
+using the API:
+
+```powershell
+cd backend
+$env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@localhost:5432/easy_music_dev"
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```
+
+Process pending jobs through Compose with:
+
+```powershell
+docker compose run --rm worker
+```
+
+## Automated Checks
+
+Run all Phase 1 backend tests from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+The test suite covers:
+
+- Auth login, invalid credentials, and current-user lookup.
+- Authenticated tag create, list, update, delete, validation, and ownership.
+- Authenticated track list, detail, update, delete, tag association, ownership,
+  and streaming behavior.
+- Upload validation, original-file storage, and processing-job creation.
+- Media storage path generation and path traversal protection.
+- FFmpeg/ffprobe argument construction and structured failures.
+- Track processing success, rerun behavior, and failure handling.
+- Worker job success, failure, and empty-queue behavior.
+
+Manual API verification steps are documented in
+`docs/API_MANUAL_TESTING.md`.
+
+## Database Migrations
+
+Backend migrations use Alembic with SQLAlchemy. The migration environment reads
+`DATABASE_URL` through the same backend settings used by the FastAPI
+application, so local runs should set `DATABASE_URL` instead of editing
+`backend/alembic.ini`.
+
+Local migration workflow:
+
+1. Start PostgreSQL.
+2. Change into `backend/`.
+3. Set `DATABASE_URL` for the target database.
+4. Run `.\.venv\Scripts\python.exe -m alembic current` to check connectivity.
+5. Apply migrations with `.\.venv\Scripts\python.exe -m alembic upgrade head`.
+
+## Scope Notes
+
+Phase 1 backend verification must not add Web tests, Android tests,
+Recommendation behavior, AI Assistant behavior, or production deployment
+hardening. Those areas may remain described in planning documents, but they are
+not part of the current backend test and manual verification scope.
