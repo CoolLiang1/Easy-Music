@@ -2,11 +2,12 @@
 
 This document describes the local development workflow for Easy Music.
 
-Easy Music is currently in Phase 1 backend development. The FastAPI backend,
-PostgreSQL migrations, media storage helpers, upload endpoint, authenticated
-track/tag APIs, streaming endpoint, and one-track worker flow exist. Web,
-Android, Recommendation, AI Assistant, and production deployment hardening are
-outside Phase 1 backend verification.
+Easy Music has completed Phase 1 backend development and now includes the
+Phase 2 Web app scaffold. The FastAPI backend, PostgreSQL migrations, media
+storage helpers, upload endpoint, authenticated track/tag APIs, streaming
+endpoint, and one-track worker flow exist. The Web app currently renders only a
+minimal placeholder screen. Android, Recommendation, AI Assistant, and
+production deployment hardening remain outside the current Web scaffold.
 
 ## Workflow
 
@@ -143,6 +144,39 @@ Run a continuously polling Compose worker with:
 
 ```powershell
 docker compose up -d worker-loop
+```
+
+## Web Setup
+
+The Web app lives in `web/` and uses React, TypeScript, and Vite.
+
+Install Web dependencies from `web/`:
+
+```powershell
+cd web
+npm install
+```
+
+Run the Web development server from `web/`:
+
+```powershell
+npm run dev
+```
+
+Vite prints the local browser URL, usually `http://localhost:5173/`. The
+current scaffold does not call backend APIs yet, so no API service is required
+to view the placeholder screen.
+
+Run the Web type check from `web/`:
+
+```powershell
+npm run typecheck
+```
+
+Build the Web app from `web/`:
+
+```powershell
+npm run build
 ```
 
 ## Automated Checks
