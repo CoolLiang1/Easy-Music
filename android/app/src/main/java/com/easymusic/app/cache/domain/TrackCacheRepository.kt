@@ -1,0 +1,145 @@
+package com.easymusic.app.cache.domain
+
+import com.easymusic.app.cache.data.CacheDownloadProgress
+import com.easymusic.app.cache.data.CacheFileDownloadResult
+import com.easymusic.app.cache.data.CacheFileStore
+import com.easymusic.app.cache.data.CachedTrackDao
+import com.easymusic.app.cache.data.CachedTrackEntity
+import com.easymusic.app.library.data.TrackResponse
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import kotlinx.coroutines.CancellationException
+
+sealed interface TrackCacheResult {
+    data class Success(val cachedTrack: CachedTrack) : TrackCacheResult
+    data class Failure(val message: String) : TrackCacheResult
+}
+
+class TrackCacheRepository(
+    private val cachedTrackDao: CachedTrackDao,
+    private val cacheFileStore: CacheFileStore,
+) {
+    suspend fun getTrack(trackId: Int): CachedTrack? =
+        cachedTrackDao.getTrack(trackId)?.toDomain()
+
+    suspend fun cacheTrack(
+        track: TrackResponse,
+        bearerToken: String,
+        streamUrl: String,
+        onProgress: (CacheDownloadProgress) -> Unit = {},
+    ): TrackCacheResult {
+        if (!track.isReady) {
+            return TrackCacheResult.Failure("Only ready tracks can be cached.")
+        }
+
+        cachedTrackDao.upsert(
+            track.toEntity(
+                status = CacheStatus.Caching,
+                localFilePath = null,
+                byteSize = null,
+                cachedAt = null,
+                lastError = null,
+            ),
+        )
+
+        val result = try {
+            cacheFileStore.downloadTrackStream(
+                trackId = track.id,
+                streamUrl = streamUrl,
+                bearerToken = bearerToken,
+                onProgress = onProgress,
+            )
+        } catch (exception: CancellationException) {
+            cachedTrackDao.upsert(
+                track.toEntity(
+                    status = CacheStatus.Failed,
+                    localFilePath = null,
+                    byteSize = null,
+                    cachedAt = null,
+                    lastError = "Cache download was canceled.",
+                ),
+            )
+            throw exception
+        }
+
+        return when (result) {
+            is CacheFileDownloadResult.Success -> {
+                val cached = track.toEntity(
+                    status = CacheStatus.Cached,
+                    localFilePath = result.file.absolutePath,
+                    byteSize = result.byteSize,
+                    cachedAt = nowUtc(),
+                    lastError = null,
+                )
+                cachedTrackDao.upsert(cached)
+                TrackCacheResult.Success(cached.toDomain())
+            }
+
+            is CacheFileDownloadResult.Failure -> {
+                cachedTrackDao.upsert(
+                    track.toEntity(
+                        status = CacheStatus.Failed,
+                        localFilePath = null,
+                        byteSize = null,
+                        cachedAt = null,
+                        lastError = result.message,
+                    ),
+                )
+                TrackCacheResult.Failure(result.message)
+            }
+        }
+    }
+
+    private fun TrackResponse.toEntity(
+        status: CacheStatus,
+        localFilePath: String?,
+        byteSize: Long?,
+        cachedAt: String?,
+        lastError: String?,
+    ): CachedTrackEntity = CachedTrackEntity(
+        trackId = id,
+        title = title,
+        artist = artist,
+        album = album,
+        durationSeconds = durationSeconds,
+        contentType = contentType,
+        tagsSnapshotJson = tagsSnapshotJson(),
+        sourceUpdatedAt = updatedAt,
+        localFilePath = localFilePath,
+        byteSize = byteSize,
+        cacheStatus = status.value,
+        cachedAt = cachedAt,
+        lastError = lastError,
+    )
+
+    private fun TrackResponse.tagsSnapshotJson(): String =
+        JSONArray(
+            tags.map { tag ->
+                JSONObject()
+                    .put("id", tag.id)
+                    .put("name", tag.name)
+                    .put("group", tag.group)
+                    .put("created_at", tag.createdAt)
+            },
+        ).toString()
+
+    private fun CachedTrackEntity.toDomain(): CachedTrack = CachedTrack(
+        trackId = trackId,
+        title = title,
+        artist = artist,
+        album = album,
+        durationSeconds = durationSeconds,
+        contentType = contentType,
+        tagsSnapshotJson = tagsSnapshotJson,
+        sourceUpdatedAt = sourceUpdatedAt,
+        localFilePath = localFilePath,
+        byteSize = byteSize,
+        cacheStatus = CacheStatus.entries.firstOrNull { it.value == cacheStatus } ?: CacheStatus.Failed,
+        cachedAt = cachedAt,
+        lastError = lastError,
+    )
+
+    private fun nowUtc(): String = OffsetDateTime.now(ZoneOffset.UTC).toString()
+}

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +29,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.auth.data.AuthTokenStore
+import com.easymusic.app.cache.data.CacheFileStore
+import com.easymusic.app.cache.data.EasyMusicDatabase
+import com.easymusic.app.cache.domain.CacheStatus
+import com.easymusic.app.cache.domain.TrackCacheRepository
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.data.TrackApi
@@ -44,10 +50,15 @@ fun TrackDetailRoute(
 ) {
     val context = LocalContext.current
     val viewModel = remember(context, trackId) {
+        val database = EasyMusicDatabase.getInstance(context)
         TrackDetailViewModel(
             trackId = trackId,
             trackApi = TrackApi(ApiClient(AppConfig.default())),
             tokenStore = AuthTokenStore(context),
+            trackCacheRepository = TrackCacheRepository(
+                cachedTrackDao = database.cachedTrackDao(),
+                cacheFileStore = CacheFileStore(context),
+            ),
         )
     }
     val playbackState by PlaybackStateStore.state.collectAsState()
@@ -59,6 +70,7 @@ fun TrackDetailRoute(
         onBackToLibrary = onBackToLibrary,
         onRefresh = viewModel::refresh,
         onOpenNowPlaying = onOpenNowPlaying,
+        onCacheTrack = viewModel::cacheTrack,
     )
 }
 
@@ -69,6 +81,7 @@ fun TrackDetailScreen(
     onBackToLibrary: () -> Unit,
     onRefresh: () -> Unit,
     onOpenNowPlaying: (TrackResponse) -> Unit,
+    onCacheTrack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -110,7 +123,9 @@ fun TrackDetailScreen(
             uiState.track != null -> DetailContent(
                 track = uiState.track,
                 playbackState = playbackState,
+                cacheState = uiState.cacheState,
                 onOpenNowPlaying = onOpenNowPlaying,
+                onCacheTrack = onCacheTrack,
             )
         }
     }
@@ -171,11 +186,15 @@ private fun DetailError(
 private fun DetailContent(
     track: TrackResponse,
     playbackState: PlayerUiState,
+    cacheState: TrackCacheUiState,
     onOpenNowPlaying: (TrackResponse) -> Unit,
+    onCacheTrack: () -> Unit,
 ) {
     val isCurrentTrack = playbackState.track?.id == track.id
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -227,6 +246,43 @@ private fun DetailContent(
                     onClick = { onOpenNowPlaying(track) },
                 ) {
                     Text(if (isCurrentTrack) "Open Now Playing" else "Play")
+                }
+            }
+        }
+
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Offline Cache",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = track.cacheLabel(cacheState),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (cacheState.status == CacheStatus.Failed) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                Button(
+                    enabled = track.isReady &&
+                        !cacheState.isCaching &&
+                        cacheState.status != CacheStatus.Cached,
+                    onClick = onCacheTrack,
+                ) {
+                    Text(
+                        when {
+                            !track.isReady -> "Cache Unavailable"
+                            cacheState.status == CacheStatus.Cached -> "Cached"
+                            cacheState.status == CacheStatus.Failed -> "Retry Cache"
+                            else -> "Cache Track"
+                        },
+                    )
                 }
             }
         }
@@ -295,6 +351,19 @@ private fun MetadataRow(
 
 private fun String?.orUnknown(): String =
     if (isNullOrBlank()) "Unknown" else this
+
+private fun TrackResponse.cacheLabel(cacheState: TrackCacheUiState): String {
+    if (!isReady) {
+        return "Only ready tracks can be cached. This track is $status."
+    }
+
+    return when (cacheState.status) {
+        CacheStatus.NotCached -> "Not cached on this device."
+        CacheStatus.Caching -> cacheState.message ?: "Caching track"
+        CacheStatus.Cached -> cacheState.message ?: "Cached for offline playback."
+        CacheStatus.Failed -> cacheState.errorMessage ?: "Cache download failed."
+    }
+}
 
 private fun PlayerUiState.detailPlaybackLabel(): String =
     when (status) {
