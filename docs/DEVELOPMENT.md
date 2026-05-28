@@ -304,6 +304,13 @@ Expected result:
 - No Web lint command is expected until a lint script is added to
   `web/package.json`.
 
+## Android Local Backend
+
+Android emulator local backend: use `http://10.0.2.2:8000`. The debug network
+security config allows cleartext HTTP only for `10.0.2.2`. For physical devices,
+use the host machine LAN IP and update the debug config accordingly. Production
+should use HTTPS.
+
 ## Database Migrations
 
 Backend migrations use Alembic with SQLAlchemy. The migration environment reads
