@@ -17,6 +17,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +31,9 @@ import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.player.domain.PlaybackStateStore
+import com.easymusic.app.player.domain.PlaybackStatus
+import com.easymusic.app.player.domain.PlayerUiState
 
 @Composable
 fun TrackDetailRoute(
@@ -45,10 +50,12 @@ fun TrackDetailRoute(
             tokenStore = AuthTokenStore(context),
         )
     }
+    val playbackState by PlaybackStateStore.state.collectAsState()
 
     TrackDetailScreen(
         modifier = modifier,
         uiState = viewModel.uiState,
+        playbackState = playbackState,
         onBackToLibrary = onBackToLibrary,
         onRefresh = viewModel::refresh,
         onOpenNowPlaying = onOpenNowPlaying,
@@ -58,6 +65,7 @@ fun TrackDetailRoute(
 @Composable
 fun TrackDetailScreen(
     uiState: TrackDetailUiState,
+    playbackState: PlayerUiState,
     onBackToLibrary: () -> Unit,
     onRefresh: () -> Unit,
     onOpenNowPlaying: (TrackResponse) -> Unit,
@@ -101,6 +109,7 @@ fun TrackDetailScreen(
 
             uiState.track != null -> DetailContent(
                 track = uiState.track,
+                playbackState = playbackState,
                 onOpenNowPlaying = onOpenNowPlaying,
             )
         }
@@ -161,8 +170,10 @@ private fun DetailError(
 @Composable
 private fun DetailContent(
     track: TrackResponse,
+    playbackState: PlayerUiState,
     onOpenNowPlaying: (TrackResponse) -> Unit,
 ) {
+    val isCurrentTrack = playbackState.track?.id == track.id
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -201,8 +212,10 @@ private fun DetailContent(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = if (track.isReady) {
-                        "Ready to stream when playback is wired in."
+                    text = if (isCurrentTrack) {
+                        playbackState.detailPlaybackLabel()
+                    } else if (track.isReady) {
+                        "Ready to stream."
                     } else {
                         "Only ready tracks can stream. This track is ${track.status}."
                     },
@@ -213,7 +226,7 @@ private fun DetailContent(
                     enabled = track.isReady,
                     onClick = { onOpenNowPlaying(track) },
                 ) {
-                    Text("Play")
+                    Text(if (isCurrentTrack) "Open Now Playing" else "Play")
                 }
             }
         }
@@ -282,6 +295,16 @@ private fun MetadataRow(
 
 private fun String?.orUnknown(): String =
     if (isNullOrBlank()) "Unknown" else this
+
+private fun PlayerUiState.detailPlaybackLabel(): String =
+    when (status) {
+        PlaybackStatus.Buffering -> "This track is buffering."
+        PlaybackStatus.Playing -> "This track is playing."
+        PlaybackStatus.Paused -> "This track is paused."
+        PlaybackStatus.Ended -> "Playback finished for this track."
+        PlaybackStatus.Error -> errorMessage ?: "Playback failed for this track."
+        PlaybackStatus.Idle -> "This track is loaded."
+    }
 
 private fun Int.formatDuration(): String {
     val minutes = this / 60

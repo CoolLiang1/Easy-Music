@@ -25,7 +25,7 @@ class NowPlayingViewModel(
     private var positionJob: Job? = null
 
     init {
-        if (track != null) {
+        if (track != null && uiState.value.track?.id != track.id) {
             playTrack(track)
         }
         startPositionUpdates()
@@ -50,7 +50,6 @@ class NowPlayingViewModel(
 
     fun dispose() {
         positionJob?.cancel()
-        playerController.release()
     }
 
     private fun playTrack(track: TrackResponse) {

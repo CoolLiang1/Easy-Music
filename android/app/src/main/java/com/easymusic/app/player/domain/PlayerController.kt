@@ -12,46 +12,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.data.AuthenticatedDataSourceFactory
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-
-data class PlayerUiState(
-    val track: TrackResponse? = null,
-    val isPlaying: Boolean = false,
-    val isBuffering: Boolean = false,
-    val durationMs: Long = 0L,
-    val positionMs: Long = 0L,
-    val errorMessage: String? = null,
-)
 
 @OptIn(UnstableApi::class)
 class PlayerController(
     context: Context,
     private val dataSourceFactory: AuthenticatedDataSourceFactory = AuthenticatedDataSourceFactory(),
 ) {
-    private val player = ExoPlayer.Builder(context.applicationContext).build()
-    private val mutableUiState = MutableStateFlow(PlayerUiState())
+    private val player = SharedPlayerHolder.player(context.applicationContext)
 
-    val uiState: StateFlow<PlayerUiState> = mutableUiState.asStateFlow()
-
-    init {
-        player.addListener(
-            object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    publishState()
-                }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    publishState()
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    publishState(errorMessage = error.toPlaybackMessage())
-                }
-            },
-        )
-    }
+    val uiState: StateFlow<PlayerUiState> = PlaybackStateStore.state
 
     fun play(
         track: TrackResponse,
@@ -59,9 +29,12 @@ class PlayerController(
         streamUrl: String,
     ) {
         if (!track.isReady) {
-            mutableUiState.value = PlayerUiState(
-                track = track,
-                errorMessage = "Only ready tracks can stream. This track is ${track.status}.",
+            PlaybackStateStore.update(
+                PlayerUiState(
+                    track = track,
+                    status = PlaybackStatus.Error,
+                    errorMessage = "Only ready tracks can stream. This track is ${track.status}.",
+                ),
             )
             return
         }
@@ -80,9 +53,12 @@ class PlayerController(
         val mediaSource = DefaultMediaSourceFactory(dataSourceFactory.create(bearerToken))
             .createMediaSource(mediaItem)
         player.setMediaSource(mediaSource)
-        mutableUiState.value = PlayerUiState(
-            track = track,
-            isBuffering = true,
+        PlaybackStateStore.update(
+            PlayerUiState(
+                track = track,
+                status = PlaybackStatus.Buffering,
+                isBuffering = true,
+            ),
         )
         player.prepare()
         player.play()
@@ -90,42 +66,103 @@ class PlayerController(
 
     fun pause() {
         player.pause()
-        publishState()
+        publishState(player)
     }
 
     fun resume() {
+        if (player.playbackState == Player.STATE_ENDED) {
+            player.seekTo(0L)
+        }
         player.play()
-        publishState()
+        publishState(player)
     }
 
     fun fail(
         track: TrackResponse?,
         message: String,
     ) {
-        mutableUiState.value = mutableUiState.value.copy(
-            track = track ?: mutableUiState.value.track,
-            isPlaying = false,
-            isBuffering = false,
-            errorMessage = message,
-        )
+        PlaybackStateStore.update { current ->
+            current.copy(
+                track = track ?: current.track,
+                status = PlaybackStatus.Error,
+                isPlaying = false,
+                isBuffering = false,
+                errorMessage = message,
+            )
+        }
     }
 
     fun seekTo(positionMs: Long) {
         player.seekTo(positionMs.coerceAtLeast(0L))
-        publishState()
+        publishState(player)
     }
 
     fun updatePosition() {
-        publishState()
+        publishState(player)
     }
 
     fun release() {
         player.release()
+        SharedPlayerHolder.clear()
+        PlaybackStateStore.update(PlayerUiState())
     }
 
-    private fun publishState(errorMessage: String? = mutableUiState.value.errorMessage) {
-        val duration = player.duration.takeIf { it > 0 } ?: mutableUiState.value.durationMs
-        mutableUiState.value = mutableUiState.value.copy(
+    private object SharedPlayerHolder {
+        private var player: ExoPlayer? = null
+
+        fun player(context: Context): ExoPlayer {
+            val current = player
+            if (current != null) {
+                return current
+            }
+
+            return ExoPlayer.Builder(context).build().also { created ->
+                created.addListener(
+                    object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            publishState(created)
+                        }
+
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            publishState(created)
+                        }
+
+                        override fun onPlayerError(error: PlaybackException) {
+                            publishState(
+                                player = created,
+                                errorMessage = error.toPlaybackMessage(),
+                            )
+                        }
+                    },
+                )
+                player = created
+            }
+        }
+
+        fun clear() {
+            player = null
+        }
+    }
+}
+
+private fun publishState(
+    player: Player,
+    errorMessage: String? = PlaybackStateStore.state.value.errorMessage,
+) {
+    val current = PlaybackStateStore.state.value
+    val duration = player.duration.takeIf { it > 0 } ?: current.durationMs
+    val status = when {
+        errorMessage != null -> PlaybackStatus.Error
+        player.playbackState == Player.STATE_BUFFERING -> PlaybackStatus.Buffering
+        player.playbackState == Player.STATE_ENDED -> PlaybackStatus.Ended
+        player.isPlaying -> PlaybackStatus.Playing
+        current.track != null -> PlaybackStatus.Paused
+        else -> PlaybackStatus.Idle
+    }
+
+    PlaybackStateStore.update {
+        it.copy(
+            status = status,
             isPlaying = player.isPlaying,
             isBuffering = player.playbackState == Player.STATE_BUFFERING,
             durationMs = duration.coerceAtLeast(0L),

@@ -22,16 +22,23 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.player.domain.PlaybackStateStore
+import com.easymusic.app.player.domain.PlaybackStatus
+import com.easymusic.app.player.domain.PlayerController
+import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.ui.MiniPlayer
 
 @Composable
 fun LibraryScreen(
@@ -41,14 +48,26 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
 ) {
     var selectedTrackId by remember { mutableStateOf<Int?>(null) }
+    val context = LocalContext.current
+    val playerController = remember(context) { PlayerController(context) }
+    val playbackState by PlaybackStateStore.state.collectAsState()
 
     selectedTrackId?.let { trackId ->
-        TrackDetailRoute(
-            trackId = trackId,
-            onBackToLibrary = { selectedTrackId = null },
-            onOpenNowPlaying = onTrackSelected,
-            modifier = modifier,
-        )
+        Column(modifier = modifier.fillMaxSize()) {
+            TrackDetailRoute(
+                trackId = trackId,
+                onBackToLibrary = { selectedTrackId = null },
+                onOpenNowPlaying = onTrackSelected,
+                modifier = Modifier.weight(1f),
+            )
+            LibraryMiniPlayer(
+                uiState = playbackState,
+                playerController = playerController,
+                onOpenNowPlaying = {
+                    playbackState.track?.let(onTrackSelected)
+                },
+            )
+        }
         return
     }
 
@@ -64,21 +83,32 @@ fun LibraryScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        when {
-            uiState.isLoading -> LibraryLoading()
-            uiState.errorMessage != null && uiState.tracks.isEmpty() -> LibraryError(
-                message = uiState.errorMessage,
-                onRefresh = onRefresh,
-            )
+        Column(modifier = Modifier.weight(1f)) {
+            when {
+                uiState.isLoading -> LibraryLoading()
+                uiState.errorMessage != null && uiState.tracks.isEmpty() -> LibraryError(
+                    message = uiState.errorMessage,
+                    onRefresh = onRefresh,
+                )
 
-            uiState.tracks.isEmpty() -> LibraryEmpty(onRefresh = onRefresh)
-            else -> TrackList(
-                tracks = uiState.tracks,
-                errorMessage = uiState.errorMessage,
-                onRefresh = onRefresh,
-                onTrackSelected = { track -> selectedTrackId = track.id },
-            )
+                uiState.tracks.isEmpty() -> LibraryEmpty(onRefresh = onRefresh)
+                else -> TrackList(
+                    tracks = uiState.tracks,
+                    playbackState = playbackState,
+                    errorMessage = uiState.errorMessage,
+                    onRefresh = onRefresh,
+                    onTrackSelected = { track -> selectedTrackId = track.id },
+                )
+            }
         }
+
+        LibraryMiniPlayer(
+            uiState = playbackState,
+            playerController = playerController,
+            onOpenNowPlaying = {
+                playbackState.track?.let(onTrackSelected)
+            },
+        )
     }
 }
 
@@ -183,6 +213,7 @@ private fun LibraryError(
 @Composable
 private fun TrackList(
     tracks: List<TrackResponse>,
+    playbackState: PlayerUiState,
     errorMessage: String?,
     onRefresh: () -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
@@ -207,6 +238,7 @@ private fun TrackList(
         ) { track ->
             TrackRow(
                 track = track,
+                playbackState = playbackState,
                 onClick = { onTrackSelected(track) },
             )
         }
@@ -244,13 +276,17 @@ private fun InlineError(
 @Composable
 private fun TrackRow(
     track: TrackResponse,
+    playbackState: PlayerUiState,
     onClick: () -> Unit,
 ) {
+    val isCurrentTrack = playbackState.track?.id == track.id
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
         colors = CardDefaults.cardColors(
-            containerColor = if (track.isReady) {
+            containerColor = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else if (track.isReady) {
                 MaterialTheme.colorScheme.surfaceContainer
             } else {
                 MaterialTheme.colorScheme.surfaceContainerLow
@@ -287,9 +323,12 @@ private fun TrackRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = if (track.isReady) "Tap to open" else "Not playable yet",
+                    text = track.rowPlaybackLabel(
+                        isCurrentTrack = isCurrentTrack,
+                        status = playbackState.status,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (track.isReady) {
+                    color = if (isCurrentTrack || track.isReady) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -308,6 +347,39 @@ private fun TrackRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LibraryMiniPlayer(
+    uiState: PlayerUiState,
+    playerController: PlayerController,
+    onOpenNowPlaying: () -> Unit,
+) {
+    MiniPlayer(
+        uiState = uiState,
+        onOpenNowPlaying = onOpenNowPlaying,
+        onPlay = playerController::resume,
+        onPause = playerController::pause,
+        onTick = playerController::updatePosition,
+    )
+}
+
+private fun TrackResponse.rowPlaybackLabel(
+    isCurrentTrack: Boolean,
+    status: PlaybackStatus,
+): String {
+    if (!isCurrentTrack) {
+        return if (isReady) "Tap to open" else "Not playable yet"
+    }
+
+    return when (status) {
+        PlaybackStatus.Buffering -> "Current track - buffering"
+        PlaybackStatus.Playing -> "Current track - playing"
+        PlaybackStatus.Paused -> "Current track - paused"
+        PlaybackStatus.Ended -> "Current track - finished"
+        PlaybackStatus.Error -> "Current track - error"
+        PlaybackStatus.Idle -> "Current track"
     }
 }
 

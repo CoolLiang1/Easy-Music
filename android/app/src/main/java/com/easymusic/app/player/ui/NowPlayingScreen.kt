@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
 
 @Composable
@@ -72,7 +73,7 @@ fun NowPlayingScreen(
 
         TrackSummary(track = track)
 
-        if (uiState.isBuffering) {
+        if (uiState.status == PlaybackStatus.Buffering) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator()
                 Text(
@@ -102,7 +103,7 @@ fun NowPlayingScreen(
                 enabled = track.isReady && !uiState.isPlaying,
                 onClick = onPlay,
             ) {
-                Text("Play")
+                Text(if (uiState.status == PlaybackStatus.Ended) "Replay" else "Play")
             }
             OutlinedButton(
                 enabled = uiState.isPlaying,
