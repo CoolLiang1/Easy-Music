@@ -179,6 +179,44 @@ Expected result:
 - Response includes `Accept-Ranges: bytes`.
 - Invalid or missing auth returns `401 Unauthorized`.
 
+## Sync Playback Events
+
+Phase 4 adds one minimal authenticated endpoint for Android offline playback
+event retry:
+
+```powershell
+$eventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $eventId
+        track_id = $trackId
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected result:
+
+- The response includes `accepted` and `failed` arrays.
+- A valid event for a track owned by the authenticated user is returned with
+  `status: accepted`.
+- Retrying the same `client_event_id` is safe and returns `status: duplicate`.
+- A missing token returns `401 Unauthorized`.
+- A `track_id` not owned by the authenticated user is reported in `failed`
+  without inserting that event.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

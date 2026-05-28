@@ -106,6 +106,34 @@ Run the worker for a specific track ID:
 .\.venv\Scripts\python.exe -m app.worker --track-id 1
 ```
 
+Sync Android playback events after applying Phase 4 migrations:
+
+```powershell
+$eventId = [guid]::NewGuid().ToString()
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $eventId
+        track_id = $trackId
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+The endpoint is authenticated, accepts small batches, validates track ownership,
+and reports per-event `accepted`, `duplicate`, or `failed` results so Android
+can retry offline events safely.
+
 ## Docker Compose Local Flow
 
 Docker Compose defines `postgres`, `api`, and `worker` services for local
@@ -281,6 +309,8 @@ The test suite covers:
 - Authenticated tag create, list, update, delete, validation, and ownership.
 - Authenticated track list, detail, update, delete, tag association, ownership,
   and streaming behavior.
+- Authenticated playback-event bulk sync, validation, ownership, and duplicate
+  retry behavior.
 - Upload validation, original-file storage, and processing-job creation.
 - Media storage path generation and path traversal protection.
 - FFmpeg/ffprobe argument construction and structured failures.
