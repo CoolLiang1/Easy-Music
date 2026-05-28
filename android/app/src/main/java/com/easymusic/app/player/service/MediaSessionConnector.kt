@@ -75,9 +75,12 @@ object MediaSessionConnector {
             player = exoPlayer
         }
 
-        return MediaSession.Builder(appContext, createdPlayer).build().also { session ->
-            mediaSession = session
-        }
+        return MediaSession.Builder(appContext, createdPlayer)
+            .setMediaButtonPreferences(PlaybackNotificationConfig.mediaButtonPreferences())
+            .build()
+            .also { session ->
+                mediaSession = session
+            }
     }
 }
 
@@ -89,6 +92,7 @@ fun publishState(
     val duration = player.duration.takeIf { it > 0 } ?: current.durationMs
     val status = when {
         errorMessage != null -> PlaybackStatus.Error
+        player.playbackState == Player.STATE_IDLE -> PlaybackStatus.Idle
         player.playbackState == Player.STATE_BUFFERING -> PlaybackStatus.Buffering
         player.playbackState == Player.STATE_ENDED -> PlaybackStatus.Ended
         player.isPlaying -> PlaybackStatus.Playing

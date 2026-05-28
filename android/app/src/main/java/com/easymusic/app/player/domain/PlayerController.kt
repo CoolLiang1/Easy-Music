@@ -114,6 +114,7 @@ class PlayerController(
     }
 
     private fun ensureServiceRunning() {
-        appContext.startService(Intent(appContext, EasyMusicPlaybackService::class.java))
+        MediaSessionConnector.session(appContext)
+        appContext.startForegroundService(Intent(appContext, EasyMusicPlaybackService::class.java))
     }
 }
