@@ -3,7 +3,6 @@ package com.easymusic.app.player.domain
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.OptIn
-import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -115,9 +114,6 @@ class PlayerController(
     }
 
     private fun ensureServiceRunning() {
-        ContextCompat.startForegroundService(
-            appContext,
-            Intent(appContext, EasyMusicPlaybackService::class.java),
-        )
+        appContext.startService(Intent(appContext, EasyMusicPlaybackService::class.java))
     }
 }
