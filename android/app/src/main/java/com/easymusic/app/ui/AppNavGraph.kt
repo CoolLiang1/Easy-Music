@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,7 +23,9 @@ import com.easymusic.app.auth.domain.AuthSession
 import com.easymusic.app.auth.ui.LoginScreen
 import com.easymusic.app.auth.ui.LoginViewModel
 import com.easymusic.app.auth.ui.SessionViewModel
+import com.easymusic.app.cache.data.EasyMusicDatabase
 import com.easymusic.app.cache.domain.CachedTrack
+import com.easymusic.app.cache.sync.PlaybackEventSyncWorker
 import com.easymusic.app.cache.ui.CachedTracksRoute
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
@@ -56,8 +59,19 @@ fun AppNavGraph(
     }
     val sessionState = sessionViewModel.uiState
     val session = sessionState.session
+    val offlinePlaybackEventDao = remember(context) {
+        EasyMusicDatabase.getInstance(context).offlinePlaybackEventDao()
+    }
+    val pendingPlaybackEventCount by offlinePlaybackEventDao.observePendingCount().collectAsState(initial = 0)
+    val pendingPlaybackEventError by offlinePlaybackEventDao.observePendingLastError().collectAsState(initial = null)
     var currentRoute by rememberSaveable { mutableStateOf(startRoute) }
     var nowPlayingTrack by remember { mutableStateOf<TrackResponse?>(null) }
+
+    LaunchedEffect(session, pendingPlaybackEventCount) {
+        if (session is AuthSession.Authenticated && pendingPlaybackEventCount > 0) {
+            PlaybackEventSyncWorker.enqueue(context)
+        }
+    }
 
     LaunchedEffect(session) {
         when (session) {
@@ -97,6 +111,9 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                pendingPlaybackEventCount = pendingPlaybackEventCount,
+                playbackEventSyncMessage = pendingPlaybackEventError,
+                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
                 onLogout = sessionViewModel::logout,
             ) { contentPadding ->
                 LibraryRoute(
@@ -118,6 +135,9 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                pendingPlaybackEventCount = pendingPlaybackEventCount,
+                playbackEventSyncMessage = pendingPlaybackEventError,
+                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
                 onLogout = sessionViewModel::logout,
             ) { contentPadding ->
                 NowPlayingRoute(
@@ -137,6 +157,9 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                pendingPlaybackEventCount = pendingPlaybackEventCount,
+                playbackEventSyncMessage = pendingPlaybackEventError,
+                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
                 onLogout = sessionViewModel::logout,
             ) { contentPadding ->
                 CachedTracksRoute(

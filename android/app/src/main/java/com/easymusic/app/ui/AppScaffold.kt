@@ -23,6 +23,9 @@ fun AppScaffold(
     currentRoute: String? = null,
     onNavigateToLibrary: (() -> Unit)? = null,
     onNavigateToCachedTracks: (() -> Unit)? = null,
+    pendingPlaybackEventCount: Int = 0,
+    playbackEventSyncMessage: String? = null,
+    onRetryPlaybackEventSync: (() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -47,6 +50,18 @@ fun AppScaffold(
                             onClick = onNavigateToCachedTracks,
                         ) {
                             Text("Cached")
+                        }
+                    }
+                    if (pendingPlaybackEventCount > 0) {
+                        Text(
+                            modifier = Modifier.padding(end = 8.dp),
+                            text = playbackEventSyncMessage
+                                ?: "$pendingPlaybackEventCount events pending",
+                        )
+                        if (onRetryPlaybackEventSync != null) {
+                            TextButton(onClick = onRetryPlaybackEventSync) {
+                                Text("Sync")
+                            }
                         }
                     }
                     Text(

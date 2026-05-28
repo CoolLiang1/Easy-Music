@@ -4,18 +4,25 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.easymusic.app.auth.data.AuthTokenStore
 import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.cache.domain.CachedPlaybackSource
 import com.easymusic.app.cache.domain.OfflinePlaybackEventSyncStatus
 import com.easymusic.app.cache.domain.OfflinePlaybackEventType
+import com.easymusic.app.cache.domain.PlaybackEventSyncRepository
+import com.easymusic.app.cache.domain.PlaybackEventSyncResult
 import com.easymusic.app.cache.domain.TrackCacheDeleteResult
 import com.easymusic.app.cache.domain.TrackCacheRepository
+import com.easymusic.app.core.network.ApiResult
 import com.easymusic.app.player.domain.PlaybackEventRecorder
 import com.easymusic.app.player.domain.PlaybackSource
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -27,6 +34,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import kotlin.io.path.createTempDirectory
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class EasyMusicDatabaseTest {
     private lateinit var database: EasyMusicDatabase
@@ -281,6 +289,91 @@ class EasyMusicDatabaseTest {
         assertEquals(30.0, events.first { it.eventType == OfflinePlaybackEventType.Seek.value }.positionSeconds, 0.0)
     }
 
+    @Test
+    fun playbackEventSyncRepository_marksAcceptedAndDuplicateEventsSynced() = runTest {
+        val tokenStore = testTokenStore("token-success")
+        val api = FakePlaybackEventSyncApi(
+            result = ApiResult.Success(
+                PlaybackEventSyncResponse(
+                    accepted = listOf(
+                        PlaybackEventAcceptedResponse("event-1", "accepted"),
+                        PlaybackEventAcceptedResponse("event-2", "duplicate"),
+                    ),
+                    failed = emptyList(),
+                ),
+            ),
+        )
+        offlinePlaybackEventDao.insert(playbackEventEntity("event-1", "2026-05-28T09:30:00Z"))
+        offlinePlaybackEventDao.insert(playbackEventEntity("event-2", "2026-05-28T09:31:00Z"))
+
+        val result = syncRepository(tokenStore, api).syncPendingEvents()
+
+        assertEquals(PlaybackEventSyncResult.Synced(acceptedCount = 2, failedCount = 0), result)
+        assertTrue(offlinePlaybackEventDao.listPending(limit = 10).isEmpty())
+        assertEquals(listOf("event-1", "event-2"), api.syncedEventIds)
+    }
+
+    @Test
+    fun playbackEventSyncRepository_recordsValidationFailuresWithoutBlockingAcceptedEvents() = runTest {
+        val tokenStore = testTokenStore("token-validation")
+        val api = FakePlaybackEventSyncApi(
+            result = ApiResult.Success(
+                PlaybackEventSyncResponse(
+                    accepted = listOf(PlaybackEventAcceptedResponse("event-1", "accepted")),
+                    failed = listOf(
+                        PlaybackEventFailedResponse(
+                            clientEventId = "event-2",
+                            trackId = 404,
+                            error = "Track does not belong to the current user.",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        offlinePlaybackEventDao.insert(playbackEventEntity("event-1", "2026-05-28T09:30:00Z"))
+        offlinePlaybackEventDao.insert(playbackEventEntity("event-2", "2026-05-28T09:31:00Z"))
+
+        val result = syncRepository(tokenStore, api).syncPendingEvents()
+
+        assertEquals(PlaybackEventSyncResult.Synced(acceptedCount = 1, failedCount = 1), result)
+        assertTrue(offlinePlaybackEventDao.listPending(limit = 10).isEmpty())
+        assertEquals(0, offlinePlaybackEventDao.observePendingCount().first())
+    }
+
+    @Test
+    fun playbackEventSyncRepository_leavesEventsPendingWhenSignInIsRequired() = runTest {
+        val tokenStore = testTokenStore("token-expired")
+        val api = FakePlaybackEventSyncApi(
+            result = ApiResult.Unauthorized("Authentication is required."),
+        )
+        offlinePlaybackEventDao.insert(playbackEventEntity("event-1", "2026-05-28T09:30:00Z"))
+
+        val result = syncRepository(tokenStore, api).syncPendingEvents()
+
+        assertEquals(PlaybackEventSyncResult.SignInRequired, result)
+        val pending = offlinePlaybackEventDao.listPending(limit = 10).single()
+        assertEquals("event-1", pending.clientEventId)
+        assertEquals(1, pending.retryCount)
+        assertEquals("Sign in is required to sync playback events.", pending.lastError)
+    }
+
+    @Test
+    fun playbackEventSyncRepository_keepsTransientFailuresPendingForRetry() = runTest {
+        val tokenStore = testTokenStore("token-network")
+        val api = FakePlaybackEventSyncApi(
+            result = ApiResult.NetworkError("network unavailable"),
+        )
+        offlinePlaybackEventDao.insert(playbackEventEntity("event-1", "2026-05-28T09:30:00Z"))
+
+        val result = syncRepository(tokenStore, api).syncPendingEvents()
+
+        assertEquals(PlaybackEventSyncResult.RetryableFailure("network unavailable"), result)
+        val pending = offlinePlaybackEventDao.listPending(limit = 10).single()
+        assertEquals("event-1", pending.clientEventId)
+        assertEquals(1, pending.retryCount)
+        assertEquals("network unavailable", pending.lastError)
+    }
+
     private fun cachedTrackEntity(
         trackId: Int = 42,
         title: String,
@@ -321,6 +414,42 @@ class EasyMusicDatabaseTest {
         lastError = null,
         syncedAt = null,
     )
+
+    private suspend fun TestScope.testTokenStore(token: String): AuthTokenStore {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
+            produceFile = { File(cacheDirectory, "auth-${token.hashCode()}.preferences_pb") },
+        )
+        return AuthTokenStore(dataStore).also { tokenStore ->
+            tokenStore.saveToken(token)
+        }
+    }
+
+    private fun syncRepository(
+        tokenStore: AuthTokenStore,
+        api: PlaybackEventSyncApi,
+    ): PlaybackEventSyncRepository =
+        PlaybackEventSyncRepository(
+            offlinePlaybackEventDao = offlinePlaybackEventDao,
+            playbackEventSyncApi = api,
+            tokenStore = tokenStore,
+            clock = Clock.fixed(Instant.parse("2026-05-28T09:32:00Z"), ZoneOffset.UTC),
+        )
+
+    private class FakePlaybackEventSyncApi(
+        private val result: ApiResult<PlaybackEventSyncResponse>,
+    ) : PlaybackEventSyncApi {
+        var syncedEventIds: List<String> = emptyList()
+            private set
+
+        override fun syncPlaybackEvents(
+            bearerToken: String,
+            events: List<OfflinePlaybackEventEntity>,
+        ): ApiResult<PlaybackEventSyncResponse> {
+            syncedEventIds = events.map { it.clientEventId }
+            return result
+        }
+    }
 
     private fun deleteKnownFile(name: String) {
         val file = File(cacheDirectory, name)
