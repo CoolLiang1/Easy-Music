@@ -6,6 +6,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,6 +20,9 @@ fun AppScaffold(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
     isLoggingOut: Boolean = false,
+    currentRoute: String? = null,
+    onNavigateToLibrary: (() -> Unit)? = null,
+    onNavigateToCachedTracks: (() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -29,6 +33,22 @@ fun AppScaffold(
                     Text("Easy Music")
                 },
                 actions = {
+                    if (onNavigateToLibrary != null) {
+                        TextButton(
+                            enabled = currentRoute != "library",
+                            onClick = onNavigateToLibrary,
+                        ) {
+                            Text("Library")
+                        }
+                    }
+                    if (onNavigateToCachedTracks != null) {
+                        TextButton(
+                            enabled = currentRoute != "cached_tracks",
+                            onClick = onNavigateToCachedTracks,
+                        ) {
+                            Text("Cached")
+                        }
+                    }
                     Text(
                         modifier = Modifier.padding(end = 8.dp),
                         text = session.currentUser.username,

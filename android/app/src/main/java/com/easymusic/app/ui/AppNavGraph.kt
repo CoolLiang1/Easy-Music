@@ -22,13 +22,18 @@ import com.easymusic.app.auth.domain.AuthSession
 import com.easymusic.app.auth.ui.LoginScreen
 import com.easymusic.app.auth.ui.LoginViewModel
 import com.easymusic.app.auth.ui.SessionViewModel
+import com.easymusic.app.cache.domain.CachedTrack
+import com.easymusic.app.cache.ui.CachedTracksRoute
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.LibraryRoute
 import com.easymusic.app.library.LibraryRoutes
+import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.NowPlayingRoute
 import com.easymusic.app.player.PlayerRoutes
+
+private const val CACHED_TRACKS_ROUTE = "cached_tracks"
 
 @Composable
 fun AppNavGraph(
@@ -89,6 +94,9 @@ fun AppNavGraph(
                 modifier = modifier,
                 session = authenticated,
                 isLoggingOut = sessionState.isLoggingOut,
+                currentRoute = currentRoute,
+                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
                 onLogout = sessionViewModel::logout,
             ) { contentPadding ->
                 LibraryRoute(
@@ -107,6 +115,9 @@ fun AppNavGraph(
                 modifier = modifier,
                 session = authenticated,
                 isLoggingOut = sessionState.isLoggingOut,
+                currentRoute = currentRoute,
+                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
                 onLogout = sessionViewModel::logout,
             ) { contentPadding ->
                 NowPlayingRoute(
@@ -116,8 +127,45 @@ fun AppNavGraph(
                 )
             }
         }
+
+        CACHED_TRACKS_ROUTE -> {
+            val authenticated = session as? AuthSession.Authenticated ?: return
+            AppScaffold(
+                modifier = modifier,
+                session = authenticated,
+                isLoggingOut = sessionState.isLoggingOut,
+                currentRoute = currentRoute,
+                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                onLogout = sessionViewModel::logout,
+            ) { contentPadding ->
+                CachedTracksRoute(
+                    modifier = Modifier.padding(contentPadding),
+                    onTrackSelected = { cachedTrack ->
+                        nowPlayingTrack = cachedTrack.toTrackResponse()
+                        currentRoute = PlayerRoutes.NOW_PLAYING
+                    },
+                )
+            }
+        }
     }
 }
+
+private fun CachedTrack.toTrackResponse(): TrackResponse =
+    TrackResponse(
+        id = trackId,
+        title = title,
+        artist = artist,
+        album = album,
+        durationSeconds = durationSeconds,
+        contentType = contentType,
+        status = TrackResponse.STATUS_READY,
+        liked = false,
+        cooldownUntil = null,
+        createdAt = cachedAt ?: sourceUpdatedAt,
+        updatedAt = sourceUpdatedAt,
+        tags = emptyList<TagResponse>(),
+    )
 
 @Composable
 private fun SessionChecking(

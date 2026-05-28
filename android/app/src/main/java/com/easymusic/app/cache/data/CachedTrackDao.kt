@@ -16,6 +16,9 @@ interface CachedTrackDao {
     @Query("SELECT * FROM cached_tracks")
     fun observeTracks(): Flow<List<CachedTrackEntity>>
 
+    @Query("SELECT * FROM cached_tracks WHERE cacheStatus = :cacheStatus ORDER BY title COLLATE NOCASE ASC")
+    fun observeTracksByStatus(cacheStatus: String): Flow<List<CachedTrackEntity>>
+
     @Query("SELECT * FROM cached_tracks WHERE trackId = :trackId")
     suspend fun getTrack(trackId: Int): CachedTrackEntity?
 

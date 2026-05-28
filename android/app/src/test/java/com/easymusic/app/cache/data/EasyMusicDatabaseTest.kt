@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.cache.domain.OfflinePlaybackEventSyncStatus
 import com.easymusic.app.cache.domain.OfflinePlaybackEventType
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,6 +67,34 @@ class EasyMusicDatabaseTest {
     }
 
     @Test
+    fun cachedTrackDao_observesOnlyCachedTracksByStatus() = runTest {
+        val cached = cachedTrackEntity(
+            trackId = 42,
+            title = "Cached Song",
+            cacheStatus = CacheStatus.Cached.value,
+            localFilePath = "/private/cache/track-42.mp3",
+            byteSize = 1234L,
+            cachedAt = "2026-05-28T09:30:00Z",
+        )
+        val failed = cachedTrackEntity(
+            trackId = 43,
+            title = "Failed Song",
+            cacheStatus = CacheStatus.Failed.value,
+            localFilePath = null,
+            byteSize = null,
+            cachedAt = null,
+        )
+
+        cachedTrackDao.upsert(failed)
+        cachedTrackDao.upsert(cached)
+
+        assertEquals(
+            listOf(cached),
+            cachedTrackDao.observeTracksByStatus(CacheStatus.Cached.value).first(),
+        )
+    }
+
+    @Test
     fun offlinePlaybackEventDao_insertsListsAndMarksSyncState() = runTest {
         val pending = playbackEventEntity("event-1", "2026-05-28T09:30:00Z")
         val newer = playbackEventEntity("event-2", "2026-05-28T09:31:00Z")
@@ -90,13 +119,14 @@ class EasyMusicDatabaseTest {
     }
 
     private fun cachedTrackEntity(
+        trackId: Int = 42,
         title: String,
         cacheStatus: String,
         localFilePath: String?,
         byteSize: Long?,
         cachedAt: String?,
     ): CachedTrackEntity = CachedTrackEntity(
-        trackId = 42,
+        trackId = trackId,
         title = title,
         artist = "The Testers",
         album = "Foundation",

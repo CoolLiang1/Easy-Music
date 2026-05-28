@@ -34,6 +34,11 @@ class TrackCacheRepository(
             tracks.associate { track -> track.trackId to track.toDomain() }
         }
 
+    fun observeCachedTracks(): Flow<List<CachedTrack>> =
+        cachedTrackDao.observeTracksByStatus(CacheStatus.Cached.value).map { tracks ->
+            tracks.map { track -> track.toDomain() }
+        }
+
     suspend fun cacheTrack(
         track: TrackResponse,
         bearerToken: String,
