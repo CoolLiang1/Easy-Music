@@ -18,6 +18,8 @@ data class OfflinePlaybackEventEntity(
     val positionSeconds: Double,
     val durationSeconds: Double?,
     val occurredAt: String,
+    val client: String,
+    val playbackSource: String?,
     val retryCount: Int = 0,
     val syncStatus: String,
     val lastError: String?,

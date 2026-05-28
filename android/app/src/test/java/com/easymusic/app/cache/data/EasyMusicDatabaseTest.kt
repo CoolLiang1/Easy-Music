@@ -10,6 +10,11 @@ import com.easymusic.app.cache.domain.OfflinePlaybackEventSyncStatus
 import com.easymusic.app.cache.domain.OfflinePlaybackEventType
 import com.easymusic.app.cache.domain.TrackCacheDeleteResult
 import com.easymusic.app.cache.domain.TrackCacheRepository
+import com.easymusic.app.player.domain.PlaybackEventRecorder
+import com.easymusic.app.player.domain.PlaybackSource
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -222,6 +227,60 @@ class EasyMusicDatabaseTest {
         assertTrue(offlinePlaybackEventDao.listPending(limit = 10).isEmpty())
     }
 
+    @Test
+    fun playbackEventRecorder_recordsDurablePendingPlaybackTransitions() = runTest {
+        var nextEventId = 0
+        val recorder = PlaybackEventRecorder(
+            offlinePlaybackEventDao = offlinePlaybackEventDao,
+            clock = Clock.fixed(Instant.parse("2026-05-28T09:30:00Z"), ZoneOffset.UTC),
+            scope = this,
+            clientEventIdFactory = {
+                nextEventId += 1
+                "event-$nextEventId"
+            },
+        )
+
+        recorder.startTrack(
+            trackId = 42,
+            playbackSource = PlaybackSource.OfflineCache,
+            durationMs = 180_000L,
+        )
+        recorder.onIsPlayingChanged(
+            isPlaying = false,
+            positionMs = 12_500L,
+            durationMs = 180_000L,
+            isBuffering = false,
+            isEnded = false,
+        )
+        recorder.onIsPlayingChanged(
+            isPlaying = true,
+            positionMs = 12_500L,
+            durationMs = 180_000L,
+            isBuffering = false,
+            isEnded = false,
+        )
+        recorder.recordSeek(positionMs = 30_000L, durationMs = 180_000L)
+        recorder.recordComplete(positionMs = 180_000L, durationMs = 180_000L)
+        recorder.flushPendingWrites()
+
+        val events = offlinePlaybackEventDao.listPending(limit = 10)
+
+        assertEquals(
+            listOf(
+                OfflinePlaybackEventType.Play.value,
+                OfflinePlaybackEventType.Pause.value,
+                OfflinePlaybackEventType.Resume.value,
+                OfflinePlaybackEventType.Seek.value,
+                OfflinePlaybackEventType.Complete.value,
+            ),
+            events.map { it.eventType },
+        )
+        assertTrue(events.all { it.syncStatus == OfflinePlaybackEventSyncStatus.Pending.value })
+        assertTrue(events.all { it.client == "android" })
+        assertTrue(events.all { it.playbackSource == "offline_cache" })
+        assertEquals(30.0, events.first { it.eventType == OfflinePlaybackEventType.Seek.value }.positionSeconds, 0.0)
+    }
+
     private fun cachedTrackEntity(
         trackId: Int = 42,
         title: String,
@@ -255,6 +314,8 @@ class EasyMusicDatabaseTest {
         positionSeconds = 12.5,
         durationSeconds = 180.0,
         occurredAt = occurredAt,
+        client = "android",
+        playbackSource = "offline_cache",
         retryCount = 0,
         syncStatus = OfflinePlaybackEventSyncStatus.Pending.value,
         lastError = null,

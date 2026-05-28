@@ -12,11 +12,13 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
+import com.easymusic.app.player.domain.PlaybackEventRecorder
 import com.easymusic.app.player.domain.PlayerUiState
 
 object MediaSessionConnector {
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
+    private var playbackEventRecorder: PlaybackEventRecorder? = null
 
     fun player(context: Context): ExoPlayer {
         return ensureSession(context).player as ExoPlayer
@@ -24,6 +26,10 @@ object MediaSessionConnector {
 
     fun session(context: Context): MediaSession {
         return ensureSession(context)
+    }
+
+    fun setPlaybackEventRecorder(recorder: PlaybackEventRecorder) {
+        playbackEventRecorder = recorder
     }
 
     fun release() {
@@ -63,10 +69,32 @@ object MediaSessionConnector {
                 exoPlayer.addListener(
                     object : Player.Listener {
                         override fun onPlaybackStateChanged(playbackState: Int) {
+                            when (playbackState) {
+                                Player.STATE_ENDED -> {
+                                    playbackEventRecorder?.recordComplete(
+                                        positionMs = exoPlayer.currentPosition,
+                                        durationMs = exoPlayer.duration.takeIf { it > 0L },
+                                    )
+                                }
+
+                                Player.STATE_IDLE -> {
+                                    playbackEventRecorder?.recordStopBeforeComplete(
+                                        positionMs = exoPlayer.currentPosition,
+                                        durationMs = exoPlayer.duration.takeIf { it > 0L },
+                                    )
+                                }
+                            }
                             publishState(exoPlayer)
                         }
 
                         override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            playbackEventRecorder?.onIsPlayingChanged(
+                                isPlaying = isPlaying,
+                                positionMs = exoPlayer.currentPosition,
+                                durationMs = exoPlayer.duration.takeIf { it > 0L },
+                                isBuffering = exoPlayer.playbackState == Player.STATE_BUFFERING,
+                                isEnded = exoPlayer.playbackState == Player.STATE_ENDED,
+                            )
                             publishState(exoPlayer)
                         }
 

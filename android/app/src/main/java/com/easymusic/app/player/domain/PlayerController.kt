@@ -9,6 +9,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.easymusic.app.cache.data.EasyMusicDatabase
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.data.AuthenticatedDataSourceFactory
 import com.easymusic.app.player.service.EasyMusicPlaybackService
@@ -21,8 +22,12 @@ import kotlinx.coroutines.flow.StateFlow
 class PlayerController(
     private val context: Context,
     private val dataSourceFactory: AuthenticatedDataSourceFactory = AuthenticatedDataSourceFactory(),
+    playbackEventRecorder: PlaybackEventRecorder? = null,
 ) {
     private val appContext = context.applicationContext
+    private val eventRecorder = playbackEventRecorder ?: PlaybackEventRecorder(
+        EasyMusicDatabase.getInstance(appContext).offlinePlaybackEventDao(),
+    )
 
     val uiState: StateFlow<PlayerUiState> = PlaybackStateStore.state
 
@@ -47,6 +52,7 @@ class PlayerController(
         val mediaSource = DefaultMediaSourceFactory(dataSourceFactory.create(bearerToken))
             .createMediaSource(mediaItem)
         val player = MediaSessionConnector.player(appContext)
+        MediaSessionConnector.setPlaybackEventRecorder(eventRecorder)
         player.setMediaSource(mediaSource)
         startPlayback(
             player = player,
@@ -71,6 +77,7 @@ class PlayerController(
         }
 
         val player = MediaSessionConnector.player(appContext)
+        MediaSessionConnector.setPlaybackEventRecorder(eventRecorder)
         player.setMediaItem(track.toMediaItem(Uri.fromFile(audioFile).toString()))
         startPlayback(
             player = player,
@@ -84,6 +91,14 @@ class PlayerController(
         track: TrackResponse,
         playbackSource: PlaybackSource,
     ) {
+        val previousState = PlaybackStateStore.state.value
+        eventRecorder.startTrack(
+            trackId = track.id,
+            playbackSource = playbackSource,
+            positionMs = previousState.positionMs,
+            durationMs = previousState.durationMs.takeIf { it > 0L }
+                ?: track.durationSeconds?.times(1000L),
+        )
         PlaybackStateStore.update(
             PlayerUiState(
                 track = track,
@@ -106,6 +121,10 @@ class PlayerController(
     fun resume() {
         val player = MediaSessionConnector.player(appContext)
         if (player.playbackState == Player.STATE_ENDED) {
+            eventRecorder.restartCurrent(
+                positionMs = 0L,
+                durationMs = player.duration.takeIf { it > 0L },
+            )
             player.seekTo(0L)
         }
         player.play()
@@ -130,6 +149,10 @@ class PlayerController(
     fun seekTo(positionMs: Long) {
         val player = MediaSessionConnector.player(appContext)
         player.seekTo(positionMs.coerceAtLeast(0L))
+        eventRecorder.recordSeek(
+            positionMs = player.currentPosition,
+            durationMs = player.duration.takeIf { it > 0L },
+        )
         publishState(player)
     }
 
@@ -145,6 +168,10 @@ class PlayerController(
         }
 
         val player = MediaSessionConnector.player(appContext)
+        eventRecorder.recordStopBeforeComplete(
+            positionMs = player.currentPosition,
+            durationMs = player.duration.takeIf { it > 0L },
+        )
         player.stop()
         player.clearMediaItems()
         PlaybackStateStore.update(
