@@ -8,6 +8,7 @@ import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.cache.domain.CachedPlaybackSource
 import com.easymusic.app.cache.domain.OfflinePlaybackEventSyncStatus
 import com.easymusic.app.cache.domain.OfflinePlaybackEventType
+import com.easymusic.app.cache.domain.TrackCacheDeleteResult
 import com.easymusic.app.cache.domain.TrackCacheRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -149,6 +150,52 @@ class EasyMusicDatabaseTest {
         val updated = requireNotNull(cachedTrackDao.getTrack(42))
         assertEquals(CacheStatus.Failed.value, updated.cacheStatus)
         assertEquals("Cached audio file is missing or unreadable.", updated.lastError)
+    }
+
+    @Test
+    fun trackCacheRepository_deletesOneCachedFileAndRecord() = runTest {
+        val cachedFile = File(cacheDirectory, "track-42.mp3").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+        cachedTrackDao.upsert(
+            cachedTrackEntity(
+                title = "Cached Song",
+                cacheStatus = CacheStatus.Cached.value,
+                localFilePath = cachedFile.absolutePath,
+                byteSize = 3L,
+                cachedAt = "2026-05-28T09:30:00Z",
+            ),
+        )
+        val repository = TrackCacheRepository(
+            cachedTrackDao = cachedTrackDao,
+            cacheFileStore = CacheFileStore(cacheDirectory),
+        )
+
+        assertEquals(TrackCacheDeleteResult.Success, repository.deleteCachedTrack(42))
+
+        assertTrue(!cachedFile.exists())
+        assertNull(cachedTrackDao.getTrack(42))
+    }
+
+    @Test
+    fun trackCacheRepository_deletesRecordWhenCachedFileIsMissing() = runTest {
+        cachedTrackDao.upsert(
+            cachedTrackEntity(
+                title = "Missing Song",
+                cacheStatus = CacheStatus.Cached.value,
+                localFilePath = File(cacheDirectory, "track-42.mp3").absolutePath,
+                byteSize = 3L,
+                cachedAt = "2026-05-28T09:30:00Z",
+            ),
+        )
+        val repository = TrackCacheRepository(
+            cachedTrackDao = cachedTrackDao,
+            cacheFileStore = CacheFileStore(cacheDirectory),
+        )
+
+        assertEquals(TrackCacheDeleteResult.Success, repository.deleteCachedTrack(42))
+
+        assertNull(cachedTrackDao.getTrack(42))
     }
 
     @Test

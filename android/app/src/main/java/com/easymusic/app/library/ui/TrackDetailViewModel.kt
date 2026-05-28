@@ -8,11 +8,13 @@ import androidx.lifecycle.viewModelScope
 import com.easymusic.app.auth.data.AuthTokenStore
 import com.easymusic.app.cache.data.CacheDownloadProgress
 import com.easymusic.app.cache.domain.CacheStatus
+import com.easymusic.app.cache.domain.TrackCacheDeleteResult
 import com.easymusic.app.cache.domain.TrackCacheRepository
 import com.easymusic.app.cache.domain.TrackCacheResult
 import com.easymusic.app.core.network.ApiResult
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.player.domain.PlayerController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -52,6 +54,7 @@ class TrackDetailViewModel(
     private val trackApi: TrackApi,
     private val tokenStore: AuthTokenStore,
     private val trackCacheRepository: TrackCacheRepository,
+    private val playerController: PlayerController,
 ) : ViewModel() {
     var uiState by mutableStateOf(TrackDetailUiState(isLoading = true))
         private set
@@ -119,6 +122,35 @@ class TrackDetailViewModel(
                 is TrackCacheResult.Failure -> uiState.copy(
                     cacheState = TrackCacheUiState(
                         status = CacheStatus.Failed,
+                        errorMessage = result.message,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun deleteCachedTrack() {
+        viewModelScope.launch {
+            playerController.stopIfPlayingCachedTrack(trackId)
+            uiState = uiState.copy(
+                cacheState = uiState.cacheState.copy(
+                    message = "Deleting cached copy",
+                    errorMessage = null,
+                ),
+            )
+
+            uiState = when (val result = withContext(Dispatchers.IO) {
+                trackCacheRepository.deleteCachedTrack(trackId)
+            }) {
+                TrackCacheDeleteResult.Success -> uiState.copy(
+                    cacheState = TrackCacheUiState(
+                        status = CacheStatus.NotCached,
+                        message = "Cached copy deleted from this device.",
+                    ),
+                )
+
+                is TrackCacheDeleteResult.Failure -> uiState.copy(
+                    cacheState = uiState.cacheState.copy(
                         errorMessage = result.message,
                     ),
                 )

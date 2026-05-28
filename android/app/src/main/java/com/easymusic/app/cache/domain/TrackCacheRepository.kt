@@ -1,6 +1,7 @@
 package com.easymusic.app.cache.domain
 
 import com.easymusic.app.cache.data.CacheDownloadProgress
+import com.easymusic.app.cache.data.CacheFileDeleteResult
 import com.easymusic.app.cache.data.CacheFileDownloadResult
 import com.easymusic.app.cache.data.CacheFileStore
 import com.easymusic.app.cache.data.CachedTrackDao
@@ -18,6 +19,11 @@ import kotlinx.coroutines.flow.map
 sealed interface TrackCacheResult {
     data class Success(val cachedTrack: CachedTrack) : TrackCacheResult
     data class Failure(val message: String) : TrackCacheResult
+}
+
+sealed interface TrackCacheDeleteResult {
+    data object Success : TrackCacheDeleteResult
+    data class Failure(val message: String) : TrackCacheDeleteResult
 }
 
 sealed interface CachedPlaybackSource {
@@ -131,6 +137,21 @@ class TrackCacheRepository(
                 )
                 TrackCacheResult.Failure(result.message)
             }
+        }
+    }
+
+    suspend fun deleteCachedTrack(trackId: Int): TrackCacheDeleteResult {
+        val cached = cachedTrackDao.getTrack(trackId) ?: return TrackCacheDeleteResult.Success
+
+        return when (val fileResult = cacheFileStore.deleteCachedTrackFile(cached.localFilePath)) {
+            CacheFileDeleteResult.Deleted,
+            CacheFileDeleteResult.Missing,
+            -> {
+                cachedTrackDao.deleteTrack(trackId)
+                TrackCacheDeleteResult.Success
+            }
+
+            is CacheFileDeleteResult.Failure -> TrackCacheDeleteResult.Failure(fileResult.message)
         }
     }
 

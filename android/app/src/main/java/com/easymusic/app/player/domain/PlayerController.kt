@@ -138,6 +138,26 @@ class PlayerController(
         publishState(player)
     }
 
+    fun stopIfPlayingCachedTrack(trackId: Int) {
+        val current = PlaybackStateStore.state.value
+        if (current.track?.id != trackId || current.playbackSource != PlaybackSource.OfflineCache) {
+            return
+        }
+
+        val player = MediaSessionConnector.player(appContext)
+        player.stop()
+        player.clearMediaItems()
+        PlaybackStateStore.update(
+            current.copy(
+                status = PlaybackStatus.Idle,
+                isPlaying = false,
+                isBuffering = false,
+                positionMs = 0L,
+                errorMessage = "Cached copy was deleted.",
+            ),
+        )
+    }
+
     fun release() {
         MediaSessionConnector.release()
     }

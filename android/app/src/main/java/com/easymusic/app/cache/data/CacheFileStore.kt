@@ -21,6 +21,12 @@ sealed interface CacheFileDownloadResult {
     data class Failure(val message: String) : CacheFileDownloadResult
 }
 
+sealed interface CacheFileDeleteResult {
+    data object Deleted : CacheFileDeleteResult
+    data object Missing : CacheFileDeleteResult
+    data class Failure(val message: String) : CacheFileDeleteResult
+}
+
 data class CacheDownloadProgress(
     val bytesDownloaded: Long,
     val totalBytes: Long?,
@@ -35,6 +41,35 @@ class CacheFileStore(
 
     fun finalFileForTrack(trackId: Int): File =
         File(cacheDirectory, "track-$trackId.mp3")
+
+    suspend fun deleteCachedTrackFile(localFilePath: String?): CacheFileDeleteResult =
+        withContext(Dispatchers.IO) {
+            if (localFilePath.isNullOrBlank()) {
+                return@withContext CacheFileDeleteResult.Missing
+            }
+
+            val file = File(localFilePath)
+            val cacheRoot = cacheDirectory.canonicalFile
+            val target = file.canonicalFile
+
+            if (!target.path.startsWith(cacheRoot.path + File.separator)) {
+                return@withContext CacheFileDeleteResult.Failure("Cached file path is outside app cache storage.")
+            }
+
+            if (!target.exists()) {
+                return@withContext CacheFileDeleteResult.Missing
+            }
+
+            if (!target.isFile) {
+                return@withContext CacheFileDeleteResult.Failure("Cached path is not a file.")
+            }
+
+            if (target.delete()) {
+                CacheFileDeleteResult.Deleted
+            } else {
+                CacheFileDeleteResult.Failure("Cached file could not be deleted.")
+            }
+        }
 
     suspend fun downloadTrackStream(
         trackId: Int,

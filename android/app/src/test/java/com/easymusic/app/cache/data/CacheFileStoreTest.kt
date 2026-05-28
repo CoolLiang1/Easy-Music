@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -37,6 +38,33 @@ class CacheFileStoreTest {
         assertEquals(
             File(cacheDirectory, "track-42.mp3").absolutePath,
             fileStore.finalFileForTrack(42).absolutePath,
+        )
+    }
+
+    @Test
+    fun deleteCachedTrackFile_deletesOneExplicitFile() = runTest {
+        val fileStore = CacheFileStore(cacheDirectory)
+        val cachedFile = fileStore.finalFileForTrack(42).apply {
+            parentFile?.mkdirs()
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+
+        assertEquals(
+            CacheFileDeleteResult.Deleted,
+            fileStore.deleteCachedTrackFile(cachedFile.absolutePath),
+        )
+
+        assertFalse(cachedFile.exists())
+    }
+
+    @Test
+    fun deleteCachedTrackFile_treatsMissingFileAsCleanable() = runTest {
+        val fileStore = CacheFileStore(cacheDirectory)
+        val cachedFile = fileStore.finalFileForTrack(42)
+
+        assertEquals(
+            CacheFileDeleteResult.Missing,
+            fileStore.deleteCachedTrackFile(cachedFile.absolutePath),
         )
     }
 
