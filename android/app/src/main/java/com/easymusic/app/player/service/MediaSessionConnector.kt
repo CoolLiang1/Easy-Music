@@ -2,6 +2,8 @@ package com.easymusic.app.player.service
 
 import android.content.Context
 import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -53,34 +55,46 @@ object MediaSessionConnector {
         }
 
         val appContext = context.applicationContext
-        val createdPlayer = player ?: ExoPlayer.Builder(appContext).build().also { exoPlayer ->
-            exoPlayer.addListener(
-                object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        publishState(exoPlayer)
-                    }
+        val createdPlayer = player ?: ExoPlayer.Builder(appContext)
+            .setAudioAttributes(playbackAudioAttributes(), true)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+            .also { exoPlayer ->
+                exoPlayer.addListener(
+                    object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            publishState(exoPlayer)
+                        }
 
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        publishState(exoPlayer)
-                    }
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            publishState(exoPlayer)
+                        }
 
-                    override fun onPlayerError(error: PlaybackException) {
-                        publishState(
-                            player = exoPlayer,
-                            errorMessage = error.toPlaybackMessage(),
-                        )
-                    }
-                },
-            )
-            player = exoPlayer
-        }
+                        override fun onPlayerError(error: PlaybackException) {
+                            publishState(
+                                player = exoPlayer,
+                                errorMessage = error.toPlaybackMessage(),
+                            )
+                        }
+                    },
+                )
+                player = exoPlayer
+            }
 
         return MediaSession.Builder(appContext, createdPlayer)
+            .setCallback(MediaSessionCallback())
             .setMediaButtonPreferences(PlaybackNotificationConfig.mediaButtonPreferences())
             .build()
             .also { session ->
                 mediaSession = session
             }
+    }
+
+    private fun playbackAudioAttributes(): AudioAttributes {
+        return AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
     }
 }
 
