@@ -24,10 +24,6 @@ object MediaSessionConnector {
         return ensureSession(context)
     }
 
-    fun currentSession(): MediaSession? {
-        return mediaSession
-    }
-
     fun release() {
         mediaSession?.release()
         mediaSession = null

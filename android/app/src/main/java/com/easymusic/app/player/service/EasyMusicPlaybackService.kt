@@ -12,7 +12,7 @@ class EasyMusicPlaybackService : MediaSessionService() {
         super.onCreate()
         setMediaNotificationProvider(PlaybackNotificationConfig.provider(this))
         setShowNotificationForIdlePlayer(SHOW_NOTIFICATION_FOR_IDLE_PLAYER_NEVER)
-        MediaSessionConnector.session(this)
+        playbackSession()
     }
 
     override fun onStartCommand(
@@ -20,15 +20,14 @@ class EasyMusicPlaybackService : MediaSessionService() {
         flags: Int,
         startId: Int,
     ): Int {
+        val session = playbackSession()
         val result = super.onStartCommand(intent, flags, startId)
-        MediaSessionConnector.currentSession()?.let { session ->
-            onUpdateNotification(session, true)
-        }
+        onUpdateNotification(session, true)
         return result
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession {
-        return MediaSessionConnector.session(this)
+        return playbackSession()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -40,5 +39,13 @@ class EasyMusicPlaybackService : MediaSessionService() {
     override fun onDestroy() {
         MediaSessionConnector.release()
         super.onDestroy()
+    }
+
+    private fun playbackSession(): MediaSession {
+        val session = MediaSessionConnector.session(this)
+        if (!isSessionAdded(session)) {
+            addSession(session)
+        }
+        return session
     }
 }
