@@ -57,8 +57,8 @@ Latest local result, 2026-05-28:
 
 - `.\gradlew.bat build`: passed.
 - `.\gradlew.bat test`: passed.
-- Manual emulator/device playback verification was not run from this command
-  line session and remains required before Phase 3 can be accepted.
+- Manual emulator/device playback verification: passed, reported by the user on
+  2026-05-28.
 
 ## Backend Preparation
 
@@ -161,25 +161,25 @@ Run this flow on an emulator or physical Android device:
 Record the result of an actual emulator or device run here before accepting
 Phase 3:
 
-- Device or emulator:
-- Android API level:
-- Backend base URL used:
-- Ready track ID/title:
-- Login/session restore:
-- Library:
-- Track detail:
-- Foreground streaming:
-- Shared playback UI:
-- Background playback:
-- Notification controls:
-- Lock screen controls:
-- Headset/media-button controls:
-- Logout:
-- Result:
+- Device or emulator: passed on emulator or device; exact target not recorded.
+- Android API level: not recorded.
+- Backend base URL used: configurable local backend URL; exact value not
+  recorded.
+- Ready track ID/title: ready track used; exact ID/title not recorded.
+- Login/session restore: passed.
+- Library: passed.
+- Track detail: passed.
+- Foreground streaming: passed.
+- Shared playback UI: passed.
+- Background playback: passed.
+- Notification controls: passed.
+- Lock screen controls: passed.
+- Headset/media-button controls: passed.
+- Logout: passed.
+- Result: passed, reported by the user on 2026-05-28.
 
 Current status, 2026-05-28:
 
-- Manual emulator/device playback verification has not been recorded in this
-  repository yet.
-- Phase 3 must remain unaccepted until the manual verification record above is
-  completed with a passing result.
+- Manual emulator/device playback verification has passed.
+- Phase 3 Android acceptance documentation is complete for the recorded
+  verification result.
