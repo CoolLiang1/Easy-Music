@@ -40,8 +40,6 @@ class PlayerController(
             return
         }
 
-        ensureServiceRunning()
-
         val mediaItem = MediaItem.Builder()
             .setUri(streamUrl)
             .setMediaMetadata(
@@ -66,6 +64,7 @@ class PlayerController(
         )
         player.prepare()
         player.play()
+        ensureServiceRunning()
     }
 
     fun pause() {
