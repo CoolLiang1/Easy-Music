@@ -9,9 +9,9 @@ endpoint, and worker flow exist. The Web app supports browser login, library
 viewing, upload, processing refresh, metadata editing, tag management, track tag
 assignment, and authenticated playback for ready tracks.
 
-Android, Recommendation, AI Assistant, playback history, feedback events,
-offline cache behavior, and production deployment hardening remain outside the
-Phase 2 Web scope.
+Recommendation, AI Assistant, playback history, feedback events, offline cache
+behavior, and production deployment hardening remain outside the Phase 3
+Android scope.
 
 ## Workflow
 
@@ -306,10 +306,81 @@ Expected result:
 
 ## Android Local Backend
 
-Android emulator local backend: use `http://10.0.2.2:8000`. The debug network
-security config allows cleartext HTTP only for `10.0.2.2`. For physical devices,
-use the host machine LAN IP and update the debug config accordingly. Production
-should use HTTPS.
+The Android app lives in `android/` and uses Kotlin, Jetpack Compose, Material
+3, AndroidX DataStore, and AndroidX Media3.
+
+Build and test from `android/`:
+
+```powershell
+cd android
+.\gradlew.bat build
+.\gradlew.bat test
+```
+
+The Android backend base URL must stay configurable. Do not write production
+hosts, usernames, passwords, or bearer tokens into source files.
+
+- Android emulator to host backend: use `http://10.0.2.2:8000`.
+- Connected device or emulator with port reverse: run
+  `adb reverse tcp:8000 tcp:8000`, then configure the app for
+  `http://127.0.0.1:8000`.
+- Physical device without port reverse: use the host machine LAN URL, for
+  example `http://<host-lan-ip>:8000`, and update the debug network security
+  config if cleartext HTTP is needed for that host.
+- Production environments should use HTTPS.
+
+## Phase 3 Android Smoke Test
+
+Use this flow to verify the completed Phase 3 Android player against the local
+Phase 1 backend:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload a supported audio file through the Web console if a ready track does
+   not already exist.
+5. Process pending media jobs until at least one track is `ready`:
+
+   ```powershell
+   docker compose run --rm worker
+   ```
+
+   Or keep the worker running:
+
+   ```powershell
+   docker compose up -d worker-loop
+   ```
+
+6. Open the Android project in Android Studio or install a debug build on an
+   emulator or device.
+7. Configure the Android API base URL for the target environment. The stock
+   emulator host-loopback URL is usually `http://10.0.2.2:8000`.
+8. Log in with the local user and confirm Library loads tracks from
+   `GET /api/tracks`.
+9. Open a track detail screen and confirm fresh metadata loads from
+   `GET /api/tracks/{track_id}`.
+10. Play a `ready` track and confirm streaming uses
+    `GET /api/tracks/{track_id}/stream` with bearer authentication.
+11. Confirm foreground controls, mini player state, background playback,
+    notification controls, lock screen controls, and headset/media-button
+    play-pause behavior.
+12. Record the emulator or device result in `docs/PHASE_3_ACCEPTANCE.md`.
+
+Phase 3 acceptance must not be marked complete without an actual emulator or
+device playback run. Offline cache, recommendation, AI Assistant, playback
+history, feedback events, production deployment hardening, and new backend
+endpoints remain outside this phase.
 
 ## Database Migrations
 
