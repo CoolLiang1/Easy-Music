@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
@@ -94,6 +95,7 @@ fun LibraryScreen(
                 uiState.tracks.isEmpty() -> LibraryEmpty(onRefresh = onRefresh)
                 else -> TrackList(
                     tracks = uiState.tracks,
+                    cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                     playbackState = playbackState,
                     errorMessage = uiState.errorMessage,
                     onRefresh = onRefresh,
@@ -213,6 +215,7 @@ private fun LibraryError(
 @Composable
 private fun TrackList(
     tracks: List<TrackResponse>,
+    cacheStatesByTrackId: Map<Int, LibraryCacheUiState>,
     playbackState: PlayerUiState,
     errorMessage: String?,
     onRefresh: () -> Unit,
@@ -238,6 +241,7 @@ private fun TrackList(
         ) { track ->
             TrackRow(
                 track = track,
+                cacheState = cacheStatesByTrackId[track.id] ?: LibraryCacheUiState(),
                 playbackState = playbackState,
                 onClick = { onTrackSelected(track) },
             )
@@ -276,6 +280,7 @@ private fun InlineError(
 @Composable
 private fun TrackRow(
     track: TrackResponse,
+    cacheState: LibraryCacheUiState,
     playbackState: PlayerUiState,
     onClick: () -> Unit,
 ) {
@@ -309,7 +314,10 @@ private fun TrackRow(
                     TrackSubtitle(track = track)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                StatusChip(track = track)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CacheStatusChip(cacheState = cacheState)
+                    StatusChip(track = track)
+                }
             }
 
             Row(
@@ -351,6 +359,15 @@ private fun TrackRow(
 }
 
 @Composable
+private fun CacheStatusChip(cacheState: LibraryCacheUiState) {
+    AssistChip(
+        onClick = {},
+        label = { Text(cacheState.cacheLabel()) },
+        enabled = cacheState.status == CacheStatus.Cached,
+    )
+}
+
+@Composable
 private fun LibraryMiniPlayer(
     uiState: PlayerUiState,
     playerController: PlayerController,
@@ -382,6 +399,14 @@ private fun TrackResponse.rowPlaybackLabel(
         PlaybackStatus.Idle -> "Current track"
     }
 }
+
+private fun LibraryCacheUiState.cacheLabel(): String =
+    when (status) {
+        CacheStatus.NotCached -> "Not cached"
+        CacheStatus.Caching -> "Caching"
+        CacheStatus.Cached -> "Cached"
+        CacheStatus.Failed -> "Cache failed"
+    }
 
 @Composable
 private fun TrackSubtitle(track: TrackResponse) {

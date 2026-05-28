@@ -11,6 +11,8 @@ import org.json.JSONObject
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 sealed interface TrackCacheResult {
     data class Success(val cachedTrack: CachedTrack) : TrackCacheResult
@@ -23,6 +25,14 @@ class TrackCacheRepository(
 ) {
     suspend fun getTrack(trackId: Int): CachedTrack? =
         cachedTrackDao.getTrack(trackId)?.toDomain()
+
+    fun observeTrack(trackId: Int): Flow<CachedTrack?> =
+        cachedTrackDao.observeTrack(trackId).map { entity -> entity?.toDomain() }
+
+    fun observeTracksById(): Flow<Map<Int, CachedTrack>> =
+        cachedTrackDao.observeTracks().map { tracks ->
+            tracks.associate { track -> track.trackId to track.toDomain() }
+        }
 
     suspend fun cacheTrack(
         track: TrackResponse,

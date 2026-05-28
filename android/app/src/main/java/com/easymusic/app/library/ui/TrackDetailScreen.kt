@@ -269,6 +269,7 @@ private fun DetailContent(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                 )
+                CacheMetadata(cacheState = cacheState)
                 Button(
                     enabled = track.isReady &&
                         !cacheState.isCaching &&
@@ -322,6 +323,24 @@ private fun DetailContent(
 }
 
 @Composable
+private fun CacheMetadata(cacheState: TrackCacheUiState) {
+    if (cacheState.status != CacheStatus.Cached) {
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        MetadataRow(
+            label = "File Size",
+            value = cacheState.byteSize?.formatBytes() ?: "Unknown",
+        )
+        MetadataRow(
+            label = "Cached",
+            value = cacheState.cachedAt ?: "Unknown",
+        )
+    }
+}
+
+@Composable
 private fun MetadataRow(
     label: String,
     value: String,
@@ -364,6 +383,13 @@ private fun TrackResponse.cacheLabel(cacheState: TrackCacheUiState): String {
         CacheStatus.Failed -> cacheState.errorMessage ?: "Cache download failed."
     }
 }
+
+private fun Long.formatBytes(): String =
+    when {
+        this >= 1_000_000L -> "${this / 1_000_000L} MB"
+        this >= 1_000L -> "${this / 1_000L} KB"
+        else -> "$this B"
+    }
 
 private fun PlayerUiState.detailPlaybackLabel(): String =
     when (status) {

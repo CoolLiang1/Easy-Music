@@ -16,6 +16,7 @@ import com.easymusic.app.library.data.TrackResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -31,6 +32,8 @@ data class TrackCacheUiState(
     val status: CacheStatus = CacheStatus.NotCached,
     val bytesDownloaded: Long? = null,
     val totalBytes: Long? = null,
+    val byteSize: Long? = null,
+    val cachedAt: String? = null,
     val message: String? = null,
     val errorMessage: String? = null,
 ) {
@@ -56,6 +59,7 @@ class TrackDetailViewModel(
     private var cacheJob: Job? = null
 
     init {
+        watchCacheState()
         loadTrack()
         watchTokenForLogout()
     }
@@ -106,6 +110,8 @@ class TrackDetailViewModel(
                     cacheState = TrackCacheUiState(
                         status = CacheStatus.Cached,
                         bytesDownloaded = result.cachedTrack.byteSize,
+                        byteSize = result.cachedTrack.byteSize,
+                        cachedAt = result.cachedTrack.cachedAt,
                         message = "Cached for offline playback.",
                     ),
                 )
@@ -149,23 +155,9 @@ class TrackDetailViewModel(
 
             uiState = when (result) {
                 is ApiResult.Success -> {
-                    val cachedTrack = withContext(Dispatchers.IO) {
-                        trackCacheRepository.getTrack(trackId)
-                    }
                     TrackDetailUiState(
                         track = result.value,
-                        cacheState = cachedTrack?.let { cached ->
-                            TrackCacheUiState(
-                                status = cached.cacheStatus,
-                                bytesDownloaded = cached.byteSize,
-                                message = if (cached.cacheStatus == CacheStatus.Cached) {
-                                    "Cached for offline playback."
-                                } else {
-                                    null
-                                },
-                                errorMessage = cached.lastError,
-                            )
-                        } ?: TrackCacheUiState(),
+                        cacheState = uiState.cacheState,
                     )
                 }
 
@@ -206,6 +198,29 @@ class TrackDetailViewModel(
                     message = progress.label(),
                 ),
             )
+        }
+    }
+
+    private fun watchCacheState() {
+        viewModelScope.launch {
+            trackCacheRepository.observeTrack(trackId).collectLatest { cached ->
+                val cacheState = cached?.let {
+                    TrackCacheUiState(
+                        status = it.cacheStatus,
+                        bytesDownloaded = it.byteSize,
+                        byteSize = it.byteSize,
+                        cachedAt = it.cachedAt,
+                        message = if (it.cacheStatus == CacheStatus.Cached) {
+                            "Cached for offline playback."
+                        } else {
+                            null
+                        },
+                        errorMessage = it.lastError,
+                    )
+                } ?: TrackCacheUiState()
+
+                uiState = uiState.copy(cacheState = cacheState)
+            }
         }
     }
 
