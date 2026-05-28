@@ -5,8 +5,10 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.easymusic.app.cache.domain.CacheStatus
+import com.easymusic.app.cache.domain.CachedPlaybackSource
 import com.easymusic.app.cache.domain.OfflinePlaybackEventSyncStatus
 import com.easymusic.app.cache.domain.OfflinePlaybackEventType
+import com.easymusic.app.cache.domain.TrackCacheRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -16,10 +18,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
+import kotlin.io.path.createTempDirectory
 
 @RunWith(AndroidJUnit4::class)
 class EasyMusicDatabaseTest {
     private lateinit var database: EasyMusicDatabase
+    private lateinit var cacheDirectory: File
 
     private val cachedTrackDao: CachedTrackDao
         get() = database.cachedTrackDao()
@@ -33,11 +38,14 @@ class EasyMusicDatabaseTest {
         database = Room.inMemoryDatabaseBuilder(context, EasyMusicDatabase::class.java)
             .allowMainThreadQueries()
             .build()
+        cacheDirectory = createTempDirectory(prefix = "easy-music-db-test").toFile()
     }
 
     @After
     fun tearDown() {
         database.close()
+        deleteKnownFile("track-42.mp3")
+        cacheDirectory.delete()
     }
 
     @Test
@@ -92,6 +100,55 @@ class EasyMusicDatabaseTest {
             listOf(cached),
             cachedTrackDao.observeTracksByStatus(CacheStatus.Cached.value).first(),
         )
+    }
+
+    @Test
+    fun trackCacheRepository_prefersReadableCachedPlaybackSource() = runTest {
+        val cachedFile = File(cacheDirectory, "track-42.mp3").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+        cachedTrackDao.upsert(
+            cachedTrackEntity(
+                title = "Cached Song",
+                cacheStatus = CacheStatus.Cached.value,
+                localFilePath = cachedFile.absolutePath,
+                byteSize = 3L,
+                cachedAt = "2026-05-28T09:30:00Z",
+            ),
+        )
+        val repository = TrackCacheRepository(
+            cachedTrackDao = cachedTrackDao,
+            cacheFileStore = CacheFileStore(cacheDirectory),
+        )
+
+        val source = repository.cachedPlaybackSource(42)
+
+        val available = source as CachedPlaybackSource.Available
+        assertEquals(cachedFile.absolutePath, available.file.absolutePath)
+        assertEquals(42, available.cachedTrack.trackId)
+    }
+
+    @Test
+    fun trackCacheRepository_marksMissingCachedFileFailed() = runTest {
+        cachedTrackDao.upsert(
+            cachedTrackEntity(
+                title = "Missing Song",
+                cacheStatus = CacheStatus.Cached.value,
+                localFilePath = File(cacheDirectory, "track-42.mp3").absolutePath,
+                byteSize = 3L,
+                cachedAt = "2026-05-28T09:30:00Z",
+            ),
+        )
+        val repository = TrackCacheRepository(
+            cachedTrackDao = cachedTrackDao,
+            cacheFileStore = CacheFileStore(cacheDirectory),
+        )
+
+        assertEquals(CachedPlaybackSource.Unavailable, repository.cachedPlaybackSource(42))
+
+        val updated = requireNotNull(cachedTrackDao.getTrack(42))
+        assertEquals(CacheStatus.Failed.value, updated.cacheStatus)
+        assertEquals("Cached audio file is missing or unreadable.", updated.lastError)
     }
 
     @Test
@@ -156,4 +213,11 @@ class EasyMusicDatabaseTest {
         lastError = null,
         syncedAt = null,
     )
+
+    private fun deleteKnownFile(name: String) {
+        val file = File(cacheDirectory, name)
+        if (file.exists() && file.isFile) {
+            file.delete()
+        }
+    }
 }

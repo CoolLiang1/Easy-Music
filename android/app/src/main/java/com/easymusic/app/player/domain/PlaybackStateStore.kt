@@ -14,9 +14,15 @@ enum class PlaybackStatus {
     Error,
 }
 
+enum class PlaybackSource {
+    OnlineStream,
+    OfflineCache,
+}
+
 data class PlayerUiState(
     val track: TrackResponse? = null,
     val status: PlaybackStatus = PlaybackStatus.Idle,
+    val playbackSource: PlaybackSource = PlaybackSource.OnlineStream,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val durationMs: Long = 0L,

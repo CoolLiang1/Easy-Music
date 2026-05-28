@@ -8,6 +8,7 @@ import com.easymusic.app.cache.data.CachedTrackEntity
 import com.easymusic.app.library.data.TrackResponse
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import kotlinx.coroutines.CancellationException
@@ -17,6 +18,11 @@ import kotlinx.coroutines.flow.map
 sealed interface TrackCacheResult {
     data class Success(val cachedTrack: CachedTrack) : TrackCacheResult
     data class Failure(val message: String) : TrackCacheResult
+}
+
+sealed interface CachedPlaybackSource {
+    data class Available(val cachedTrack: CachedTrack, val file: File) : CachedPlaybackSource
+    data object Unavailable : CachedPlaybackSource
 }
 
 class TrackCacheRepository(
@@ -38,6 +44,27 @@ class TrackCacheRepository(
         cachedTrackDao.observeTracksByStatus(CacheStatus.Cached.value).map { tracks ->
             tracks.map { track -> track.toDomain() }
         }
+
+    suspend fun cachedPlaybackSource(trackId: Int): CachedPlaybackSource {
+        val cached = cachedTrackDao.getTrack(trackId) ?: return CachedPlaybackSource.Unavailable
+        if (cached.cacheStatus != CacheStatus.Cached.value) {
+            return CachedPlaybackSource.Unavailable
+        }
+
+        val localFilePath = cached.localFilePath
+        val file = localFilePath?.let(::File)
+        if (file != null && file.isFile && file.canRead() && file.length() > 0L) {
+            return CachedPlaybackSource.Available(cached.toDomain(), file)
+        }
+
+        cachedTrackDao.upsert(
+            cached.copy(
+                cacheStatus = CacheStatus.Failed.value,
+                lastError = "Cached audio file is missing or unreadable.",
+            ),
+        )
+        return CachedPlaybackSource.Unavailable
+    }
 
     suspend fun cacheTrack(
         track: TrackResponse,

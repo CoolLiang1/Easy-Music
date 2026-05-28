@@ -2,6 +2,7 @@ package com.easymusic.app.player.domain
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -13,6 +14,7 @@ import com.easymusic.app.player.data.AuthenticatedDataSourceFactory
 import com.easymusic.app.player.service.EasyMusicPlaybackService
 import com.easymusic.app.player.service.MediaSessionConnector
 import com.easymusic.app.player.service.publishState
+import java.io.File
 import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(UnstableApi::class)
@@ -40,25 +42,53 @@ class PlayerController(
             return
         }
 
-        val mediaItem = MediaItem.Builder()
-            .setUri(streamUrl)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(track.title)
-                    .setArtist(track.artist)
-                    .setAlbumTitle(track.album)
-                    .build(),
-            )
-            .build()
+        val mediaItem = track.toMediaItem(streamUrl)
 
         val mediaSource = DefaultMediaSourceFactory(dataSourceFactory.create(bearerToken))
             .createMediaSource(mediaItem)
         val player = MediaSessionConnector.player(appContext)
         player.setMediaSource(mediaSource)
+        startPlayback(
+            player = player,
+            track = track,
+            playbackSource = PlaybackSource.OnlineStream,
+        )
+    }
+
+    fun playCached(
+        track: TrackResponse,
+        audioFile: File,
+    ) {
+        if (!track.isReady) {
+            PlaybackStateStore.update(
+                PlayerUiState(
+                    track = track,
+                    status = PlaybackStatus.Error,
+                    errorMessage = "Only ready tracks can play. This track is ${track.status}.",
+                ),
+            )
+            return
+        }
+
+        val player = MediaSessionConnector.player(appContext)
+        player.setMediaItem(track.toMediaItem(Uri.fromFile(audioFile).toString()))
+        startPlayback(
+            player = player,
+            track = track,
+            playbackSource = PlaybackSource.OfflineCache,
+        )
+    }
+
+    private fun startPlayback(
+        player: Player,
+        track: TrackResponse,
+        playbackSource: PlaybackSource,
+    ) {
         PlaybackStateStore.update(
             PlayerUiState(
                 track = track,
                 status = PlaybackStatus.Buffering,
+                playbackSource = playbackSource,
                 isBuffering = true,
             ),
         )
@@ -116,4 +146,16 @@ class PlayerController(
         MediaSessionConnector.session(appContext)
         appContext.startForegroundService(Intent(appContext, EasyMusicPlaybackService::class.java))
     }
+
+    private fun TrackResponse.toMediaItem(uri: String): MediaItem =
+        MediaItem.Builder()
+            .setUri(uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(title)
+                    .setArtist(artist)
+                    .setAlbumTitle(album)
+                    .build(),
+            )
+            .build()
 }

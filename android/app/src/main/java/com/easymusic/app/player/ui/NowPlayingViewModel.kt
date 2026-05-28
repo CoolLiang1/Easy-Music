@@ -3,6 +3,8 @@ package com.easymusic.app.player.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.easymusic.app.auth.data.AuthTokenStore
+import com.easymusic.app.cache.domain.CachedPlaybackSource
+import com.easymusic.app.cache.domain.TrackCacheRepository
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlayerController
@@ -19,6 +21,7 @@ class NowPlayingViewModel(
     private val track: TrackResponse?,
     private val trackApi: TrackApi,
     private val tokenStore: AuthTokenStore,
+    private val trackCacheRepository: TrackCacheRepository,
     private val playerController: PlayerController,
 ) : ViewModel() {
     val uiState: StateFlow<PlayerUiState> = playerController.uiState
@@ -54,6 +57,18 @@ class NowPlayingViewModel(
 
     private fun playTrack(track: TrackResponse) {
         viewModelScope.launch {
+            val cachedSource = withContext(Dispatchers.IO) {
+                trackCacheRepository.cachedPlaybackSource(track.id)
+            }
+
+            if (cachedSource is CachedPlaybackSource.Available) {
+                playerController.playCached(
+                    track = track,
+                    audioFile = cachedSource.file,
+                )
+                return@launch
+            }
+
             val token = withContext(Dispatchers.IO) {
                 tokenStore.readToken()
             }
