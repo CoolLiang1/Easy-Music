@@ -164,3 +164,62 @@ class AiRecommendResponse(BaseModel):
     parsed_intent: ParsedIntentResponse
     request_id: str
     results: list[RecommendationResult] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# track tag suggestions
+# ---------------------------------------------------------------------------
+
+
+class TagSuggestionRequest(BaseModel):
+    """Request for ``POST /api/ai/tracks/{track_id}/suggest-tags``."""
+
+    include_new_tag_suggestions: bool = False
+
+
+class ExistingTagSuggestion(BaseModel):
+    """A suggested tag that already exists in the user's tag catalogue."""
+
+    tag_id: int
+    name: str
+    group: str
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    reason: str = ""
+
+
+class NewTagSuggestion(BaseModel):
+    """A suggested new tag name — returned as a suggestion only, never created."""
+
+    name: str
+    group: str
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    reason: str = ""
+
+
+class AiTagSuggestionOutput(BaseModel):
+    """Shape the AI must return for tag suggestions.
+
+    ``existing_tag_ids`` must come from the catalogue in the prompt.
+    ``new_tag_suggestions`` are suggestions only — the endpoint never creates
+    or binds them automatically.
+    """
+
+    existing_tag_ids: list[int] = Field(default_factory=list)
+    new_tag_suggestions: list[NewTagSuggestion] = Field(default_factory=list)
+    explanation: str | None = None
+
+
+class TagSuggestionResponse(BaseModel):
+    """Response for ``POST /api/ai/tracks/{track_id}/suggest-tags``.
+
+    ``existing_tag_suggestions`` is keyed by tag group.
+    ``new_tag_suggestions`` are suggestions only — nothing has been created.
+    """
+
+    track_id: int
+    existing_tag_suggestions: dict[str, list[ExistingTagSuggestion]] = Field(
+        default_factory=dict,
+    )
+    new_tag_suggestions: list[NewTagSuggestion] = Field(default_factory=list)
+    explanation: str | None = None
+    provider_status: AiProviderStatus

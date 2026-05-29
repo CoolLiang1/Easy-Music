@@ -19,8 +19,10 @@ from app.schemas.ai import (
     AiRecommendResponse,
     ParsedIntentResponse,
     ParseListeningIntentRequest,
+    TagSuggestionRequest,
+    TagSuggestionResponse,
 )
-from app.services import ai_intent
+from app.services import ai_intent, ai_tag_suggestions
 from app.services.ai_provider import AiProviderService
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -108,6 +110,32 @@ def ai_recommend(
         )
 
     return response
+
+
+@router.post(
+    "/tracks/{track_id}/suggest-tags",
+    response_model=TagSuggestionResponse,
+)
+def suggest_track_tags(
+    track_id: int,
+    payload: TagSuggestionRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+) -> TagSuggestionResponse:
+    """Suggest tags for one track using AI-assisted metadata analysis.
+
+    Returns existing-tag suggestions grouped by tag group.  The endpoint never
+    creates tags and never assigns them to the track.  Callers must explicitly
+    apply selected suggestions through the existing track update flow.
+    """
+    return ai_tag_suggestions.suggest_tags_for_track(
+        db,
+        current_user,
+        ai_provider,
+        track_id,
+        include_new_tag_suggestions=payload.include_new_tag_suggestions,
+    )
 
 
 def _is_ok(provider_status) -> bool:

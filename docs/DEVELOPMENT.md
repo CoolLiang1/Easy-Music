@@ -303,10 +303,13 @@ docker compose up -d --force-recreate api
 - `backend/app/services/ai_intent.py` — `parse_listening_intent` service that
   loads the user's tag catalogue, builds a prompt, calls the AI, and re-validates
   returned tag ids through the Phase 5 recommendation tag checks.
+- `backend/app/services/ai_tag_suggestions.py` — `suggest_tags_for_track` service
+  that suggests existing tags (by id) and optional new tag names for a track
+  using track metadata and the user's tag taxonomy.  Never creates or assigns tags.
 - `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
   `ParseListeningIntentRequest`, `ParsedIntentResponse`, and supporting schemas.
 
-Available AI endpoints after Task 6.4:
+Available AI endpoints after Task 6.5:
 
 - `POST /api/ai/parse-listening-intent` (authenticated) — maps natural-language
   listening requests to Phase 5-compatible structured tag ids using only the
@@ -315,6 +318,9 @@ Available AI endpoints after Task 6.4:
   the AI, then delegates ranking to the existing Phase 5 recommendation service.
   The LLM never selects track ids and never bypasses cooldown, recent-playback,
   or feedback penalties.
+- `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) — suggests
+  existing tags and optional new tag names for a track using AI-assisted
+  metadata analysis. The endpoint never creates or assigns tags.
 
 Later tasks will add the actual HTTP provider client and additional AI endpoints.
 

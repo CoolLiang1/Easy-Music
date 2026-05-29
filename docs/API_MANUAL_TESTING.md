@@ -675,8 +675,87 @@ Invoke-RestMethod `
   ids.
 - All ranking, cooldown, recent playback, and feedback penalties are handled by
   the existing Phase 5 `recommend_tracks` service.
-- The endpoint does not implement tag suggestion.
 - The endpoint does not modify Android playback or cache behavior.
+
+## Phase 6 Track Tag Suggestion
+
+Phase 6 Task 6.5 adds one authenticated AI endpoint that suggests tags for a
+single track using its metadata and the current user's tag taxonomy. The endpoint
+never creates or assigns tags — callers must apply suggestions explicitly.
+
+### AI Tag Suggestion Smoke Test
+
+```powershell
+# Prerequisites: logged-in user, at least one track, and a working AI provider.
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/$trackId/suggest-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{}'
+```
+
+Expected result with a working provider:
+
+- `track_id` matches the requested track.
+- `provider_status` is `ok`.
+- `existing_tag_suggestions` is a dict keyed by tag group (`scenario`,
+  `state`, `type`, `attribute`), each value a list of objects with `tag_id`,
+  `name`, `group`, `confidence`, and `reason`.
+- `new_tag_suggestions` is an empty list when not requested.
+- `explanation` provides a short human-readable summary when available.
+
+Request new tag name suggestions:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/$trackId/suggest-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"include_new_tag_suggestions": true}'
+```
+
+Expected result with `include_new_tag_suggestions: true`:
+
+- `new_tag_suggestions` may contain suggested tag names, each with `name`,
+  `group`, `confidence`, and `reason`.
+- New tag suggestions are returned as suggestions only — no tags are created
+  in the database and no tags are assigned to the track.
+
+Expected result with provider disabled or unconfigured:
+
+- `provider_status` is `disabled` or `unconfigured`.
+- `existing_tag_suggestions` is an empty object.
+- `new_tag_suggestions` is an empty list.
+- HTTP status is `200 OK`.
+
+Verify missing auth and unowned track:
+
+```powershell
+# Missing auth
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/1/suggest-tags" `
+  -ContentType "application/json" `
+  -Body '{}'
+# Expected: 401 Unauthorized
+
+# Unowned or nonexistent track returns provider_status: "error"
+```
+
+### Notes
+
+- The endpoint never creates, renames, deletes, or binds tags.
+- The endpoint never assigns tag suggestions to the track automatically.
+- Callers must apply selected suggestions through `PATCH
+  /api/tracks/{track_id}` with the chosen `tag_ids`.
+- New tag name suggestions must be created explicitly via `POST /api/tags`
+  before they can be assigned.
+- The prompt includes track metadata (title, artist, album, content_type,
+  source_url, original filename basename) and the full user tag catalogue.
+- Internal storage paths are not exposed beyond the filename basename.
 
 ## Docker Compose API Flow
 
