@@ -242,6 +242,67 @@ Run a continuously polling Compose worker with:
 docker compose up -d worker-loop
 ```
 
+## AI Provider Configuration (Development Only)
+
+Phase 6 adds a development-safe AI provider abstraction. All AI features are off
+by default. No real API keys are committed.
+
+### Local Backend AI Settings
+
+From `backend/`, set these environment variables before starting the API:
+
+```powershell
+$env:AI_ENABLED = "true"
+$env:AI_PROVIDER = "openai-compatible"
+$env:AI_API_KEY = "your-own-provider-key"
+$env:AI_MODEL = "gpt-4o-mini"
+$env:AI_BASE_URL = "https://api.openai.com/v1"
+```
+
+| Variable       | Default                      | Notes                                      |
+| -------------- | ---------------------------- | ------------------------------------------ |
+| `AI_ENABLED`   | `false`                      | Must be `true` for any AI feature to work. |
+| `AI_PROVIDER`  | `""`                         | Provider identifier; currently only `openai-compatible` is expected. |
+| `AI_API_KEY`   | `""`                         | Your own key — never commit it.            |
+| `AI_MODEL`     | `""`                         | Model id recognised by the provider, e.g. `gpt-4o-mini`. |
+| `AI_BASE_URL`  | `""`                         | Provider API base, e.g. `https://api.openai.com/v1`. |
+
+When `AI_ENABLED` is `false` or `AI_API_KEY` / `AI_MODEL` are empty, the
+provider service returns a documented `disabled` or `unconfigured` status.
+Downstream AI endpoints can map these to clear responses without crashing.
+
+### Docker Compose
+
+The `.env.example` file at the repository root includes placeholder AI variables.
+Copy the AI section to a local `.env` file (never committed) and set your own
+values when you need to test AI features locally:
+
+```powershell
+AI_ENABLED=true
+AI_PROVIDER=openai-compatible
+AI_API_KEY=your-own-provider-key
+AI_MODEL=gpt-4o-mini
+AI_BASE_URL=https://api.openai.com/v1
+```
+
+Recreate the `api` service after changing `.env`:
+
+```powershell
+docker compose up -d --force-recreate api
+```
+
+### Provider Abstraction
+
+- `backend/app/core/config.py` — settings fields (`AI_ENABLED`, `AI_PROVIDER`,
+  `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`).
+- `backend/app/services/ai_provider.py` — `AiProviderService` that detects
+  disabled/unconfigured state and delegates to an injectable client.
+- `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
+  and `AiProviderStatus`.
+
+Later tasks will add the actual HTTP client and endpoint-specific services. The
+abstraction is designed so callers never need to know provider details.
+
 ## Web Setup
 
 The Web app lives in `web/` and uses React, TypeScript, and Vite.
