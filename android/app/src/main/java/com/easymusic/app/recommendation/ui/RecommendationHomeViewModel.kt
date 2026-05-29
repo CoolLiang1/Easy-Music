@@ -8,8 +8,12 @@ import androidx.lifecycle.viewModelScope
 import com.easymusic.app.core.network.ApiResult
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackApi
+import com.easymusic.app.recommendation.data.AiRecommendRequest
+import com.easymusic.app.recommendation.data.AiRecommendResponse
 import com.easymusic.app.recommendation.data.FeedbackEventRequest
 import com.easymusic.app.recommendation.data.FeedbackType
+import com.easymusic.app.recommendation.data.MatchedTagItem
+import com.easymusic.app.recommendation.data.ParsedIntentResponse
 import com.easymusic.app.recommendation.data.RecommendationRequest
 import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
@@ -34,6 +38,7 @@ data class RecommendationHomeUiState(
     val recommendationResults: List<RecommendationResult> = emptyList(),
     val feedbackStates: Map<Int, RecommendationFeedbackUiState> = emptyMap(),
     val needsSignIn: Boolean = false,
+    val aiState: AiRecommendationUiState = AiRecommendationUiState(),
 ) {
     val hasAnyTags: Boolean
         get() = groupedTags.allTags.isNotEmpty()
@@ -61,6 +66,22 @@ data class RecommendationTagGroups(
     val allTags: List<TagResponse>
         get() = scenarios + states + types + attributes
 }
+
+data class AiRecommendationUiState(
+    val textInput: String = "",
+    val isRequesting: Boolean = false,
+    val errorMessage: String? = null,
+    val providerStatus: String? = null,
+    val parsedContext: AiParsedContext? = null,
+    val results: List<RecommendationResult> = emptyList(),
+)
+
+data class AiParsedContext(
+    val matchedTags: Map<String, List<MatchedTagItem>> = emptyMap(),
+    val unmatchedTerms: List<String> = emptyList(),
+    val explanation: String? = null,
+    val structuredRequest: RecommendationRequest? = null,
+)
 
 class RecommendationHomeViewModel(
     private val initialNetworkAvailable: Boolean = true,
@@ -203,6 +224,205 @@ class RecommendationHomeViewModel(
                 is ApiResult.SerializationError -> uiState.copy(
                     isRequestingRecommendations = false,
                     recommendationErrorMessage = result.message,
+                )
+            }
+        }
+    }
+
+    fun updateAiText(text: String) {
+        uiState = uiState.copy(
+            aiState = uiState.aiState.copy(
+                textInput = text,
+                errorMessage = null,
+            ),
+        )
+    }
+
+    fun requestAiRecommendation(isNetworkAvailable: Boolean = true) {
+        val text = uiState.aiState.textInput.trim()
+        if (text.isEmpty()) {
+            uiState = uiState.copy(
+                aiState = uiState.aiState.copy(
+                    errorMessage = "Type a natural-language request first.",
+                ),
+            )
+            return
+        }
+
+        if (!isNetworkAvailable) {
+            uiState = uiState.copy(
+                aiState = uiState.aiState.copy(
+                    errorMessage = "You are offline. AI recommendations need the backend.",
+                    isRequesting = false,
+                    results = emptyList(),
+                    parsedContext = null,
+                ),
+            )
+            return
+        }
+
+        if (uiState.aiState.isRequesting) {
+            return
+        }
+
+        uiState = uiState.copy(
+            aiState = uiState.aiState.copy(
+                isRequesting = true,
+                errorMessage = null,
+                results = emptyList(),
+                parsedContext = null,
+                providerStatus = null,
+            ),
+        )
+
+        viewModelScope.launch {
+            val request = AiRecommendRequest(text = text)
+            val result = withContext(Dispatchers.IO) {
+                recommendationRepository.getAiRecommendations(request)
+            }
+
+            uiState = when (result) {
+                is ApiResult.Success -> {
+                    val response: AiRecommendResponse = result.value
+                    val parsed = response.parsedIntent
+                    uiState.copy(
+                        aiState = uiState.aiState.copy(
+                            isRequesting = false,
+                            errorMessage = null,
+                            providerStatus = parsed.providerStatus,
+                            parsedContext = AiParsedContext(
+                                matchedTags = parsed.matchedTags,
+                                unmatchedTerms = parsed.unmatchedTerms,
+                                explanation = parsed.explanation,
+                                structuredRequest = parsed.structuredRequest,
+                            ),
+                            results = response.results.take(AiRecommendRequest.DEFAULT_AI_LIMIT),
+                        ),
+                        feedbackStates = emptyMap(),
+                        needsSignIn = false,
+                    )
+                }
+
+                is ApiResult.Unauthorized -> uiState.copy(
+                    aiState = uiState.aiState.copy(
+                        isRequesting = false,
+                        errorMessage = result.message,
+                    ),
+                    needsSignIn = true,
+                )
+
+                is ApiResult.HttpError -> uiState.copy(
+                    aiState = uiState.aiState.copy(
+                        isRequesting = false,
+                        errorMessage = result.message,
+                    ),
+                )
+
+                is ApiResult.NetworkError -> uiState.copy(
+                    aiState = uiState.aiState.copy(
+                        isRequesting = false,
+                        errorMessage = result.message,
+                    ),
+                )
+
+                is ApiResult.SerializationError -> uiState.copy(
+                    aiState = uiState.aiState.copy(
+                        isRequesting = false,
+                        errorMessage = result.message,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun sendAiFeedback(
+        trackId: Int,
+        feedbackType: FeedbackType,
+        isNetworkAvailable: Boolean = true,
+    ) {
+        if (!isNetworkAvailable) {
+            uiState = uiState.withFeedbackState(
+                trackId = trackId,
+                state = RecommendationFeedbackUiState(
+                    errorMessage = "You are offline. Recommendation feedback needs the backend.",
+                ),
+            )
+            return
+        }
+
+        val currentFeedbackState = uiState.feedbackStates[trackId]
+        if (currentFeedbackState?.isSending == true) {
+            return
+        }
+
+        val parsedRequest = uiState.aiState.parsedContext?.structuredRequest
+        val event = FeedbackEventRequest(
+            clientEventId = UUID.randomUUID().toString(),
+            trackId = trackId,
+            feedbackType = feedbackType,
+            scenarioTagIds = parsedRequest?.scenarioTagIds ?: emptyList(),
+            stateTagIds = parsedRequest?.stateTagIds ?: emptyList(),
+            typeTagIds = parsedRequest?.typeTagIds ?: emptyList(),
+            attributeTagIds = parsedRequest?.attributeTagIds ?: emptyList(),
+            occurredAt = Instant.now().toString(),
+        )
+
+        uiState = uiState.withFeedbackState(
+            trackId = trackId,
+            state = RecommendationFeedbackUiState(isSending = true),
+        )
+
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                recommendationRepository.sendFeedbackEvent(event)
+            }
+
+            uiState = when (result) {
+                is ApiResult.Success -> {
+                    val accepted = result.value.accepted.firstOrNull()
+                    val failed = result.value.failed.firstOrNull()
+                    when {
+                        accepted != null -> uiState.withFeedbackState(
+                            trackId = trackId,
+                            state = RecommendationFeedbackUiState(
+                                message = feedbackType.successMessage(),
+                            ),
+                        )
+
+                        failed != null -> uiState.withFeedbackState(
+                            trackId = trackId,
+                            state = RecommendationFeedbackUiState(
+                                errorMessage = failed.error,
+                            ),
+                        )
+
+                        else -> uiState.withFeedbackState(
+                            trackId = trackId,
+                            state = RecommendationFeedbackUiState(
+                                errorMessage = "Feedback response did not include a result.",
+                            ),
+                        )
+                    }
+                }
+
+                is ApiResult.Unauthorized -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
+                ).copy(needsSignIn = true)
+
+                is ApiResult.HttpError -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
+                )
+
+                is ApiResult.NetworkError -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
+                )
+
+                is ApiResult.SerializationError -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
                 )
             }
         }
