@@ -757,6 +757,102 @@ Invoke-RestMethod `
   source_url, original filename basename) and the full user tag catalogue.
 - Internal storage paths are not exposed beyond the filename basename.
 
+## Phase 6 AI Assistant V1 Closure
+
+Before accepting Phase 6, verify the AI endpoints with one local user and at
+least three `ready` tracks that have structured tags in the `scenario`, `state`,
+`type`, and `attribute` groups.
+
+Run the disabled or unconfigured provider check first, without committing any
+real provider key:
+
+```powershell
+$env:AI_ENABLED = "false"
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "calm focus music for writing"
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected disabled/unconfigured result:
+
+- `provider_status` is `disabled` or `unconfigured`.
+- `structured_request` contains empty tag arrays.
+- No track ids are returned.
+
+Then run the provider-ok flow using development-only local environment values:
+
+```powershell
+$aiRecommendation = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/recommend" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "calm focus instrumental music for working"
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+
+$aiRecommendation.parsed_intent.structured_request
+$aiRecommendation.results | Format-Table rank, score, reason
+```
+
+Expected AI recommendation closure result:
+
+- The parsed intent is expressed as the existing Phase 5 structured
+  recommendation request shape.
+- Recommendation results are ordered by the Phase 5 rule-based ranking service.
+- Cooldown, recent playback, liked state, and feedback penalties are still
+  enforced.
+- The LLM does not directly select tracks and does not replace Phase 5 reason
+  text.
+
+Verify tag suggestions remain advisory only:
+
+```powershell
+$beforeTags = Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/$trackId" `
+  -Headers $headers
+
+$suggestions = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/$trackId/suggest-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"include_new_tag_suggestions": true}'
+
+$afterTags = Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/$trackId" `
+  -Headers $headers
+
+$beforeTags.tags
+$suggestions.existing_tag_suggestions
+$suggestions.new_tag_suggestions
+$afterTags.tags
+```
+
+Expected tag suggestion closure result:
+
+- Existing tag suggestions reference only tags owned by the authenticated user.
+- New tag suggestions are names only.
+- The track's assigned tags are unchanged until a caller explicitly applies
+  selected tags through `PATCH /api/tracks/{track_id}`.
+- No tags are created by the suggestion endpoint.
+
+Record the backend, Web, and Android manual verification results in
+`docs/PHASE_6_ACCEPTANCE.md`. Phase 6 is not accepted until the Web AI
+Assistant and Android natural-language recommendation flows have both been
+manually verified.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

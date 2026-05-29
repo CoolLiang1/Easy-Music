@@ -695,6 +695,66 @@ manual structured recommendation verification. AI Assistant, natural-language
 parsing, AI-generated reasons, production ML or training platforms, social
 features, and deployment hardening remain outside this phase.
 
+## Phase 6 AI Assistant V1 Smoke Test
+
+Use this flow to verify the completed Phase 6 AI Assistant V1 loop against the
+local backend while preserving Phase 5 rule-based ranking, Phase 3 Media3
+playback, and Phase 4 cached playback source selection:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload and process enough audio files until at least three tracks are
+   `ready`, then assign structured tags in the `scenario`, `state`, `type`,
+   and `attribute` groups.
+5. Configure development-only AI provider values if testing provider-ok
+   behavior. Never commit a real key, production secret, or bearer token.
+6. Use the AI endpoint smoke tests in `docs/API_MANUAL_TESTING.md` to verify
+   disabled/unconfigured provider behavior, `POST
+   /api/ai/parse-listening-intent`, `POST /api/ai/recommend`, `POST
+   /api/ai/tracks/{track_id}/suggest-tags`, Phase 5 ranking integrity, and tag
+   suggestions that do not auto-create or auto-assign tags.
+7. From `web/`, run the Web app and open the AI Assistant after login:
+
+   ```powershell
+   $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+   npm run dev
+   ```
+
+8. Submit a natural-language request, confirm parsed structured context,
+   primary recommendation and alternatives, existing feedback actions, and
+   tag-suggestion confirmation behavior.
+9. Confirm existing Library, Upload, Tags, Track Detail, structured
+   Recommendation, and Web playback still work.
+10. Open the Android app on an emulator or device, configure the local backend
+    URL, log in, and open Recommendation Home.
+11. Confirm structured controls still work, submit a natural-language request,
+    confirm parsed context and results, and select a recommendation to hand off
+    to existing Now Playing/Media3 playback.
+12. Cache one recommended ready track through the existing manual Track Detail
+    cache action, then confirm selecting that recommended track can use Phase 4
+    cached playback source selection.
+13. Confirm AI loading, unauthorized, offline, provider unavailable, backend
+    error, and empty-result states are understandable.
+14. Record the automated and manual results in `docs/PHASE_6_ACCEPTANCE.md`.
+
+Phase 6 acceptance must not be marked complete without actual Web AI Assistant
+verification and actual Android natural-language recommendation verification.
+Production deployment hardening, embeddings, audio analysis, training
+platforms, social features, automatic downloads, and playback rewrites remain
+outside this phase.
+
 ## Database Migrations
 
 Backend migrations use Alembic with SQLAlchemy. The migration environment reads
