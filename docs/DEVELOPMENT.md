@@ -3,19 +3,22 @@
 This document describes the local development workflow for Easy Music.
 
 Easy Music has completed Phase 1 backend development, the Phase 2 Web
-management console, and the Phase 3 Android player. The FastAPI backend,
-PostgreSQL migrations, media storage helpers, upload endpoint, authenticated
-track/tag APIs, streaming endpoint, playback-event sync endpoint, and worker
-flow exist. The Web app supports browser login, library viewing, upload,
-processing refresh, metadata editing, tag management, track tag assignment, and
-authenticated playback for ready tracks. The Android app supports authenticated
-library/detail flows, Media3 playback, and Phase 4 manual offline cache
-behavior.
+management console, the Phase 3 Android player, and the Phase 4 Android manual
+offline cache. The FastAPI backend, PostgreSQL migrations, media storage
+helpers, upload endpoint, authenticated track/tag APIs, streaming endpoint,
+playback-event sync endpoint, Recommendation V1 feedback endpoint, structured
+recommendation endpoint, and worker flow exist. The Web app supports browser
+login, library viewing, upload, processing refresh, metadata editing, tag
+management, track tag assignment, authenticated playback for ready tracks, and
+a structured Recommendation V1 test panel. The Android app supports
+authenticated library/detail flows, Media3 playback, Phase 4 manual offline
+cache behavior, and a structured Recommendation Home.
 
-Recommendation, AI Assistant, Web new features, production deployment
+AI Assistant, natural-language parsing, AI-generated recommendation reasons,
+production ML or training platforms, social features, production deployment
 hardening, automatic full-library offline sync, complex download queue
 management, and background caching of the entire library remain outside the
-Phase 4 Android offline-cache scope.
+Phase 5 Recommendation V1 scope.
 
 ## Workflow
 
@@ -544,6 +547,71 @@ device offline playback run. Recommendation, AI Assistant, Web new features,
 production deployment hardening, automatic full-library offline sync, complex
 download queue management, and background caching of the entire library remain
 outside this phase.
+
+## Phase 5 Recommendation V1 Smoke Test
+
+Use this flow to verify the completed Phase 5 structured recommendation loop
+against the local backend while preserving the Phase 3 Media3 playback
+architecture and Phase 4 cached playback source selection:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload and process enough audio files until at least three tracks are
+   `ready`:
+
+   ```powershell
+   docker compose run --rm worker
+   ```
+
+   Or keep the worker running:
+
+   ```powershell
+   docker compose up -d worker-loop
+   ```
+
+5. In the Web console, create or reuse tags in the supported groups:
+   `scenario`, `state`, `type`, and `attribute`.
+6. Assign those tags to at least three ready tracks.
+7. Use the feedback and recommendation API smoke tests in
+   `docs/API_MANUAL_TESTING.md` to verify `POST /api/feedback-events` and
+   `POST /api/recommendations`.
+8. From `web/`, run the Web app and open `/recommendations` after login:
+
+   ```powershell
+   $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+   npm run dev
+   ```
+
+9. Select structured tags, request recommendations, send feedback, and confirm
+   existing Library, Upload, Tags, Track Detail, and Web playback still work.
+10. Open the Android app on an emulator or device, configure the local backend
+    URL, log in, and open Recommendation Home.
+11. Select structured tags, request recommendations, confirm primary result and
+    alternatives, and select a recommendation to hand off to the existing Now
+    Playing flow.
+12. Cache one recommended ready track through the existing Track Detail cache
+    action, then confirm selecting that recommended track can use Phase 4
+    cached playback source selection.
+13. Send Recommendation V1 feedback actions from Android and manually request
+    recommendations again to confirm subsequent results can change.
+14. Record the automated and manual results in `docs/PHASE_5_ACCEPTANCE.md`.
+
+Phase 5 acceptance must not be marked complete without actual Android and Web
+manual structured recommendation verification. AI Assistant, natural-language
+parsing, AI-generated reasons, production ML or training platforms, social
+features, and deployment hardening remain outside this phase.
 
 ## Database Migrations
 

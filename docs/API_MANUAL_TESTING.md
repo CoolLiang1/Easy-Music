@@ -401,6 +401,96 @@ Expected result:
 - A missing token returns `401 Unauthorized`.
 - An unowned tag id or tag id in the wrong group returns `400 Bad Request`.
 
+## Phase 5 Structured Recommendation Closure
+
+Before accepting Phase 5, verify the feedback and recommendation endpoints with
+one local user and at least three `ready` tracks that have structured tags.
+Create or reuse tags in each supported group:
+
+- `scenario`
+- `state`
+- `type`
+- `attribute`
+
+Assign the tags to at least three ready tracks, then run the feedback and
+recommendation requests above with real local ids:
+
+```powershell
+$recommendation = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+
+$recommendation.results | Format-Table rank, score, reason
+```
+
+Send feedback for one returned result using the same structured context:
+
+```powershell
+$feedbackEventId = [guid]::NewGuid().ToString()
+$recommendedTrackId = $recommendation.results[0].track.id
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $recommendedTrackId
+        feedback_type = "not_suitable_for_context"
+        scenario_tag_ids = @($scenarioTagId)
+        state_tag_ids = @($stateTagId)
+        type_tag_ids = @($typeTagId)
+        attribute_tag_ids = @($attributeTagId)
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "web"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Request recommendations again with the same structured context:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected closure result:
+
+- The first request returns up to three ordered recommendation results.
+- Results include deterministic rule-based reasons, not AI-generated text.
+- Feedback for the recommended track is accepted.
+- A repeated recommendation request can reflect feedback penalties such as
+  `not_today`, `not_suitable_for_context`, `skip_recommendation`, or `tired`.
+- No natural-language prompt, AI Assistant endpoint, social feature, or
+  production ML service is involved.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:
