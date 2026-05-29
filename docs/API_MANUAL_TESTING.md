@@ -491,6 +491,96 @@ Expected closure result:
 - No natural-language prompt, AI Assistant endpoint, social feature, or
   production ML service is involved.
 
+## Phase 6 AI Listening Intent Parsing
+
+Phase 6 Task 6.3 adds one authenticated AI endpoint for natural-language
+listening-intent parsing. The endpoint maps free-text requests onto the existing
+Phase 5 structured recommendation shape using only the authenticated user's tags.
+
+The AI provider must be enabled and configured (see `docs/DEVELOPMENT.md` AI
+Provider Configuration section). When the provider is disabled or unconfigured
+the endpoint returns a documented fallback empty structured request.
+
+### AI Parse Listening Intent Smoke Test
+
+```powershell
+# Reuse the login flow and header setup from the Login section above.
+# Ensure at least one tag exists in each group (scenario, state, type, attribute)
+# for the authenticated user.
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "I want calm focus instrumental piano music for working"
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected result with a working provider:
+
+- `provider_status` is `ok`.
+- `structured_request` contains Phase 5-compatible `scenario_tag_ids`,
+  `state_tag_ids`, `type_tag_ids`, `attribute_tag_ids`,
+  `exclude_attribute_tag_ids`, `limit` (default 3), and `client`.
+- `matched_tags` is a dict keyed by tag group (`scenario`, `state`, `type`,
+  `attribute`), each value a list of `{id, name, group}` objects.
+- `unmatched_terms` lists any words the AI could not map.
+- `explanation` provides a short human-readable mapping summary when available.
+
+Expected result with provider disabled or unconfigured (AI_ENABLED=false or
+missing key/model):
+
+- `provider_status` is `disabled` or `unconfigured`.
+- `structured_request` returns empty tag arrays.
+- `matched_tags` is an empty object.
+- HTTP status is `200 OK` (fallback is the default).
+
+Verify missing auth:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -ContentType "application/json" `
+  -Body '{"text": "any request"}'
+```
+
+Expected: `401 Unauthorized`.
+
+### AI Parse Listening Intent Tag Validation
+
+The endpoint re-validates every tag id the AI returns using the same Phase 5
+ownership and group checks as `POST /api/recommendations`. Tags belonging to
+another user, tags in the wrong group, or invented tag ids all cause the
+endpoint to return a provider-status of `error` (still `200 OK` when
+`fallback_to_empty` is `true`).
+
+Set `fallback_to_empty = false` to receive a `503 Service Unavailable` response
+when the provider is not available or the parse fails:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "any request"
+    fallback_to_empty = $false
+  } | ConvertTo-Json -Depth 4)
+```
+
+### Notes
+
+- The endpoint never creates, renames, deletes, or binds tags.
+- The endpoint does not call `recommend_tracks` — it only parses intent.
+- The endpoint does not return track ids or track payloads.
+- The LLM is instructed never to invent tag ids and to use only tags from the
+  catalogue supplied in the prompt.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

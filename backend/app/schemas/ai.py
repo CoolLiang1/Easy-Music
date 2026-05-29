@@ -4,6 +4,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from app.schemas.recommendation import RecommendationRequest
+
 
 class AiProviderStatus(str, Enum):
     OK = "ok"
@@ -80,3 +82,53 @@ class AiCompletionResult(BaseModel):
             model=model,
             is_success=False,
         )
+
+
+# ---------------------------------------------------------------------------
+# listening-intent parsing
+# ---------------------------------------------------------------------------
+
+
+class ParseListeningIntentRequest(BaseModel):
+    """Request for ``POST /api/ai/parse-listening-intent``."""
+
+    text: str = Field(min_length=1, max_length=1000)
+    client: str | None = Field(default=None, max_length=50)
+    fallback_to_empty: bool = Field(default=True)
+
+
+class AiIntentOutput(BaseModel):
+    """Shape the AI must return when parsing listening intent.
+
+    Every tag id must come from the tag catalogue supplied in the prompt.
+    """
+
+    scenario_tag_ids: list[int] = Field(default_factory=list)
+    state_tag_ids: list[int] = Field(default_factory=list)
+    type_tag_ids: list[int] = Field(default_factory=list)
+    attribute_tag_ids: list[int] = Field(default_factory=list)
+    exclude_attribute_tag_ids: list[int] = Field(default_factory=list)
+    unmatched_terms: list[str] = Field(default_factory=list)
+    explanation: str | None = None
+
+
+class MatchedTagItem(BaseModel):
+    """Compact tag representation used inside ``ParsedIntentResponse``."""
+
+    id: int
+    name: str
+    group: str
+
+
+class ParsedIntentResponse(BaseModel):
+    """Response for ``POST /api/ai/parse-listening-intent``.
+
+    ``structured_request`` is Phase 5-compatible so callers can forward it
+    directly to ``POST /api/recommendations``.
+    """
+
+    structured_request: RecommendationRequest
+    matched_tags: dict[str, list[MatchedTagItem]] = Field(default_factory=dict)
+    unmatched_terms: list[str] = Field(default_factory=list)
+    explanation: str | None = None
+    provider_status: AiProviderStatus

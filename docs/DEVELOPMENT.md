@@ -297,11 +297,23 @@ docker compose up -d --force-recreate api
   `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`).
 - `backend/app/services/ai_provider.py` — `AiProviderService` that detects
   disabled/unconfigured state and delegates to an injectable client.
+- `backend/app/services/ai_json.py` — `extract_json`, prompt builders, and the
+  `complete_and_parse_json` pipeline that validates LLM output against a Pydantic
+  model.
+- `backend/app/services/ai_intent.py` — `parse_listening_intent` service that
+  loads the user's tag catalogue, builds a prompt, calls the AI, and re-validates
+  returned tag ids through the Phase 5 recommendation tag checks.
 - `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
-  and `AiProviderStatus`.
+  `ParseListeningIntentRequest`, `ParsedIntentResponse`, and supporting schemas.
 
-Later tasks will add the actual HTTP client and endpoint-specific services. The
-abstraction is designed so callers never need to know provider details.
+Available AI endpoint after Task 6.3:
+
+- `POST /api/ai/parse-listening-intent` (authenticated) — maps natural-language
+  listening requests to Phase 5-compatible structured tag ids using only the
+  current user's existing tags.
+
+Later tasks will add the actual HTTP provider client and additional AI endpoints.
+The abstraction is designed so callers never need to know provider details.
 
 ## Web Setup
 

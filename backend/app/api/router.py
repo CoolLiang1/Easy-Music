@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    ai,
     auth,
     feedback_events,
     playback_events,
@@ -11,6 +12,7 @@ from app.api.routes import (
 )
 
 api_router = APIRouter()
+api_router.include_router(ai.router, prefix="/api")
 api_router.include_router(auth.router, prefix="/api")
 api_router.include_router(feedback_events.router, prefix="/api")
 api_router.include_router(playback_events.router, prefix="/api")
