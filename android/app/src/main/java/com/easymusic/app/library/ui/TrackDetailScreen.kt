@@ -52,6 +52,7 @@ fun TrackDetailRoute(
     onBackToLibrary: () -> Unit,
     onOpenNowPlaying: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     val context = LocalContext.current
     val viewModel = remember(context, trackId) {
@@ -65,6 +66,7 @@ fun TrackDetailRoute(
                 cacheFileStore = CacheFileStore(context),
             ),
             playerController = PlayerController(context),
+            initialNetworkAvailable = isNetworkAvailable,
         )
     }
     val playbackState by PlaybackStateStore.state.collectAsState()
@@ -74,10 +76,11 @@ fun TrackDetailRoute(
         uiState = viewModel.uiState,
         playbackState = playbackState,
         onBackToLibrary = onBackToLibrary,
-        onRefresh = viewModel::refresh,
+        onRefresh = { viewModel.refresh(isNetworkAvailable) },
         onOpenNowPlaying = onOpenNowPlaying,
-        onCacheTrack = viewModel::cacheTrack,
+        onCacheTrack = { viewModel.cacheTrack(isNetworkAvailable) },
         onDeleteCachedTrack = viewModel::deleteCachedTrack,
+        isNetworkAvailable = isNetworkAvailable,
     )
 }
 
@@ -91,6 +94,7 @@ fun TrackDetailScreen(
     onCacheTrack: () -> Unit,
     onDeleteCachedTrack: () -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     Column(
         modifier = modifier
@@ -108,9 +112,13 @@ fun TrackDetailScreen(
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    text = "Fresh cloud metadata",
+                    text = if (isNetworkAvailable) "Fresh cloud metadata" else "Cloud metadata unavailable while offline",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isNetworkAvailable) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
                 )
             }
             OutlinedButton(onClick = onBackToLibrary) {
@@ -125,6 +133,7 @@ fun TrackDetailScreen(
             uiState.errorMessage != null -> DetailError(
                 kind = uiState.errorKind,
                 message = uiState.errorMessage,
+                isNetworkAvailable = isNetworkAvailable,
                 onRefresh = onRefresh,
             )
 
@@ -132,6 +141,7 @@ fun TrackDetailScreen(
                 track = uiState.track,
                 playbackState = playbackState,
                 cacheState = uiState.cacheState,
+                isNetworkAvailable = isNetworkAvailable,
                 onOpenNowPlaying = onOpenNowPlaying,
                 onCacheTrack = onCacheTrack,
                 onDeleteCachedTrack = onDeleteCachedTrack,
@@ -157,6 +167,7 @@ private fun DetailLoading() {
 private fun DetailError(
     kind: TrackDetailErrorKind?,
     message: String,
+    isNetworkAvailable: Boolean,
     onRefresh: () -> Unit,
 ) {
     val title = when (kind) {
@@ -184,9 +195,10 @@ private fun DetailError(
         )
         Button(
             modifier = Modifier.padding(top = 16.dp),
+            enabled = isNetworkAvailable,
             onClick = onRefresh,
         ) {
-            Text("Try Again")
+            Text(if (isNetworkAvailable) "Try Again" else "Offline")
         }
     }
 }
@@ -196,6 +208,7 @@ private fun DetailContent(
     track: TrackResponse,
     playbackState: PlayerUiState,
     cacheState: TrackCacheUiState,
+    isNetworkAvailable: Boolean,
     onOpenNowPlaying: (TrackResponse) -> Unit,
     onCacheTrack: () -> Unit,
     onDeleteCachedTrack: () -> Unit,
@@ -308,11 +321,13 @@ private fun DetailContent(
                 Button(
                     enabled = track.isReady &&
                         !cacheState.isCaching &&
-                        cacheState.status != CacheStatus.Cached,
+                        cacheState.status != CacheStatus.Cached &&
+                        isNetworkAvailable,
                     onClick = onCacheTrack,
                 ) {
                     Text(
                         when {
+                            !isNetworkAvailable -> "Offline"
                             !track.isReady -> "Cache Unavailable"
                             cacheState.status == CacheStatus.Cached -> "Cached"
                             cacheState.status == CacheStatus.Failed -> "Retry Cache"

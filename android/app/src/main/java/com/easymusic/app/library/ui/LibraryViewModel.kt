@@ -30,6 +30,7 @@ data class LibraryCacheUiState(
 )
 
 class LibraryViewModel(
+    private val initialNetworkAvailable: Boolean = true,
     private val trackRepository: TrackRepository,
     private val bearerTokenProvider: suspend () -> String?,
     private val trackCacheRepository: TrackCacheRepository,
@@ -39,16 +40,35 @@ class LibraryViewModel(
 
     init {
         watchCacheStates()
-        loadTracks(isRefresh = false)
+        loadTracks(
+            isRefresh = false,
+            isNetworkAvailable = initialNetworkAvailable,
+        )
     }
 
-    fun refresh() {
-        loadTracks(isRefresh = true)
+    fun refresh(isNetworkAvailable: Boolean = true) {
+        loadTracks(
+            isRefresh = true,
+            isNetworkAvailable = isNetworkAvailable,
+        )
     }
 
-    private fun loadTracks(isRefresh: Boolean) {
+    private fun loadTracks(
+        isRefresh: Boolean,
+        isNetworkAvailable: Boolean,
+    ) {
         val currentTracks = uiState.tracks
         val currentCacheStates = uiState.cacheStatesByTrackId
+        if (!isNetworkAvailable) {
+            uiState = uiState.copy(
+                isLoading = false,
+                isRefreshing = false,
+                errorMessage = "You are offline. Library refresh needs the backend; open Cached Tracks to play music stored on this device.",
+                needsSignIn = false,
+            )
+            return
+        }
+
         uiState = uiState.copy(
             isLoading = !isRefresh && currentTracks.isEmpty(),
             isRefreshing = isRefresh,

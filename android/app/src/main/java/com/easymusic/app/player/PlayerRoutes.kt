@@ -25,6 +25,7 @@ fun NowPlayingRoute(
     track: TrackResponse?,
     onBackToLibrary: () -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     val context = LocalContext.current
     val viewModel = remember(context, track?.id) {
@@ -38,12 +39,14 @@ fun NowPlayingRoute(
                 cacheFileStore = CacheFileStore(context),
             ),
             playerController = PlayerController(context),
+            initialNetworkAvailable = isNetworkAvailable,
         )
     }
 
     NowPlayingRouteContent(
         modifier = modifier,
         viewModel = viewModel,
+        isNetworkAvailable = isNetworkAvailable,
         onBackToLibrary = onBackToLibrary,
     )
 }

@@ -24,12 +24,14 @@ object LibraryRoutes {
 fun LibraryRoute(
     onOpenNowPlaying: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     val context = LocalContext.current
     val tokenStore = remember(context) { AuthTokenStore(context) }
     val viewModel = remember(context) {
         val database = EasyMusicDatabase.getInstance(context)
         LibraryViewModel(
+            initialNetworkAvailable = isNetworkAvailable,
             trackRepository = TrackRepository(
                 TrackApi(
                     ApiClient(AppConfig.default()),
@@ -46,7 +48,8 @@ fun LibraryRoute(
     LibraryScreen(
         modifier = modifier,
         uiState = viewModel.uiState,
-        onRefresh = viewModel::refresh,
+        isNetworkAvailable = isNetworkAvailable,
+        onRefresh = { viewModel.refresh(isNetworkAvailable) },
         onTrackSelected = onOpenNowPlaying,
     )
 }

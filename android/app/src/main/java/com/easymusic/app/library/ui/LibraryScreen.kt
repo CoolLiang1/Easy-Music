@@ -47,6 +47,7 @@ fun LibraryScreen(
     onRefresh: () -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     var selectedTrackId by remember { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
@@ -59,6 +60,7 @@ fun LibraryScreen(
                 trackId = trackId,
                 onBackToLibrary = { selectedTrackId = null },
                 onOpenNowPlaying = onTrackSelected,
+                isNetworkAvailable = isNetworkAvailable,
                 modifier = Modifier.weight(1f),
             )
             LibraryMiniPlayer(
@@ -79,6 +81,7 @@ fun LibraryScreen(
     ) {
         LibraryHeader(
             isRefreshing = uiState.isRefreshing,
+            isNetworkAvailable = isNetworkAvailable,
             onRefresh = onRefresh,
         )
 
@@ -117,6 +120,7 @@ fun LibraryScreen(
 @Composable
 private fun LibraryHeader(
     isRefreshing: Boolean,
+    isNetworkAvailable: Boolean,
     onRefresh: () -> Unit,
 ) {
     Row(
@@ -130,16 +134,26 @@ private fun LibraryHeader(
                 style = MaterialTheme.typography.headlineMedium,
             )
             Text(
-                text = "Cloud tracks",
+                text = if (isNetworkAvailable) "Cloud tracks" else "Cloud tracks unavailable while offline",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isNetworkAvailable) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
             )
         }
         OutlinedButton(
-            enabled = !isRefreshing,
+            enabled = !isRefreshing && isNetworkAvailable,
             onClick = onRefresh,
         ) {
-            Text(if (isRefreshing) "Refreshing" else "Refresh")
+            Text(
+                when {
+                    !isNetworkAvailable -> "Offline"
+                    isRefreshing -> "Refreshing"
+                    else -> "Refresh"
+                },
+            )
         }
     }
 }

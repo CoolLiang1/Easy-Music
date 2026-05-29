@@ -31,6 +31,7 @@ fun LoginScreen(
     onPasswordChange: (String) -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     Column(
         modifier = modifier
@@ -48,6 +49,16 @@ fun LoginScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (!isNetworkAvailable) {
+            Text(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                text = "You are offline. Sign in needs the backend, but cached tracks remain available after a restored session.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -78,7 +89,11 @@ fun LoginScreen(
                 imeAction = ImeAction.Done,
             ),
             keyboardActions = KeyboardActions(
-                onDone = { onSubmit() },
+                onDone = {
+                    if (isNetworkAvailable) {
+                        onSubmit()
+                    }
+                },
             ),
         )
 
@@ -97,7 +112,7 @@ fun LoginScreen(
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = onSubmit,
-            enabled = !uiState.isLoading,
+            enabled = !uiState.isLoading && isNetworkAvailable,
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(

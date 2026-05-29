@@ -55,6 +55,7 @@ class TrackDetailViewModel(
     private val tokenStore: AuthTokenStore,
     private val trackCacheRepository: TrackCacheRepository,
     private val playerController: PlayerController,
+    private val initialNetworkAvailable: Boolean = true,
 ) : ViewModel() {
     var uiState by mutableStateOf(TrackDetailUiState(isLoading = true))
         private set
@@ -63,17 +64,27 @@ class TrackDetailViewModel(
 
     init {
         watchCacheState()
-        loadTrack()
+        loadTrack(initialNetworkAvailable)
         watchTokenForLogout()
     }
 
-    fun refresh() {
-        loadTrack()
+    fun refresh(isNetworkAvailable: Boolean = true) {
+        loadTrack(isNetworkAvailable)
     }
 
-    fun cacheTrack() {
+    fun cacheTrack(isNetworkAvailable: Boolean = true) {
         val track = uiState.track ?: return
         if (!track.isReady || cacheJob?.isActive == true) {
+            return
+        }
+
+        if (!isNetworkAvailable) {
+            uiState = uiState.copy(
+                cacheState = TrackCacheUiState(
+                    status = CacheStatus.Failed,
+                    errorMessage = "You are offline. New cache downloads need the backend stream.",
+                ),
+            )
             return
         }
 
@@ -158,7 +169,16 @@ class TrackDetailViewModel(
         }
     }
 
-    private fun loadTrack() {
+    private fun loadTrack(isNetworkAvailable: Boolean) {
+        if (!isNetworkAvailable) {
+            uiState = uiState.copy(
+                isLoading = false,
+                errorMessage = "You are offline. Track detail refresh needs the backend.",
+                errorKind = TrackDetailErrorKind.Other,
+            )
+            return
+        }
+
         uiState = uiState.copy(
             isLoading = true,
             errorMessage = null,

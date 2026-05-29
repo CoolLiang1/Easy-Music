@@ -32,6 +32,7 @@ import com.easymusic.app.player.domain.PlayerUiState
 @Composable
 fun NowPlayingScreen(
     uiState: PlayerUiState,
+    isNetworkAvailable: Boolean,
     onBackToLibrary: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
@@ -59,10 +60,18 @@ fun NowPlayingScreen(
                 Text(
                     text = when (uiState.playbackSource) {
                         PlaybackSource.OfflineCache -> "Offline cached playback"
-                        PlaybackSource.OnlineStream -> "Online stream"
+                        PlaybackSource.OnlineStream -> if (isNetworkAvailable) {
+                            "Online stream"
+                        } else {
+                            "Online stream unavailable while offline"
+                        }
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (uiState.playbackSource == PlaybackSource.OnlineStream && !isNetworkAvailable) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
             OutlinedButton(onClick = onBackToLibrary) {
@@ -104,7 +113,9 @@ fun NowPlayingScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
-                enabled = track.isReady && !uiState.isPlaying,
+                enabled = track.isReady &&
+                    !uiState.isPlaying &&
+                    (isNetworkAvailable || uiState.playbackSource == PlaybackSource.OfflineCache),
                 onClick = onPlay,
             ) {
                 Text(if (uiState.status == PlaybackStatus.Ended) "Replay" else "Play")
@@ -124,6 +135,7 @@ fun NowPlayingRouteContent(
     viewModel: NowPlayingViewModel,
     onBackToLibrary: () -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -136,8 +148,9 @@ fun NowPlayingRouteContent(
     NowPlayingScreen(
         modifier = modifier,
         uiState = uiState,
+        isNetworkAvailable = isNetworkAvailable,
         onBackToLibrary = onBackToLibrary,
-        onPlay = viewModel::play,
+        onPlay = { viewModel.play(isNetworkAvailable) },
         onPause = viewModel::pause,
         onSeekTo = viewModel::seekTo,
     )

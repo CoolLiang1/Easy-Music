@@ -29,6 +29,8 @@ import com.easymusic.app.cache.sync.PlaybackEventSyncWorker
 import com.easymusic.app.cache.ui.CachedTracksRoute
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
+import com.easymusic.app.core.network.ConnectivityObserver
+import com.easymusic.app.core.network.ConnectivityStatus
 import com.easymusic.app.library.LibraryRoute
 import com.easymusic.app.library.LibraryRoutes
 import com.easymusic.app.library.data.TagResponse
@@ -59,6 +61,12 @@ fun AppNavGraph(
     }
     val sessionState = sessionViewModel.uiState
     val session = sessionState.session
+    val connectivityObserver = remember(context) {
+        ConnectivityObserver(context)
+    }
+    val connectivityStatus by connectivityObserver.observe()
+        .collectAsState(initial = connectivityObserver.currentStatus)
+    val isNetworkAvailable = connectivityStatus == ConnectivityStatus.Available
     val offlinePlaybackEventDao = remember(context) {
         EasyMusicDatabase.getInstance(context).offlinePlaybackEventDao()
     }
@@ -100,6 +108,7 @@ fun AppNavGraph(
             onSubmit = {
                 loginViewModel.submit(sessionViewModel::restoreSession)
             },
+            isNetworkAvailable = isNetworkAvailable,
         )
 
         LibraryRoutes.LIBRARY -> {
@@ -111,6 +120,7 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
                 onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
@@ -118,6 +128,7 @@ fun AppNavGraph(
             ) { contentPadding ->
                 LibraryRoute(
                     modifier = Modifier.padding(contentPadding),
+                    isNetworkAvailable = isNetworkAvailable,
                     onOpenNowPlaying = { track ->
                         nowPlayingTrack = track
                         currentRoute = PlayerRoutes.NOW_PLAYING
@@ -135,6 +146,7 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
                 onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
@@ -143,6 +155,7 @@ fun AppNavGraph(
                 NowPlayingRoute(
                     track = nowPlayingTrack,
                     modifier = Modifier.padding(contentPadding),
+                    isNetworkAvailable = isNetworkAvailable,
                     onBackToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 )
             }
@@ -157,6 +170,7 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
                 onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
@@ -164,6 +178,7 @@ fun AppNavGraph(
             ) { contentPadding ->
                 CachedTracksRoute(
                     modifier = Modifier.padding(contentPadding),
+                    isNetworkAvailable = isNetworkAvailable,
                     onTrackSelected = { cachedTrack ->
                         nowPlayingTrack = cachedTrack.toTrackResponse()
                         currentRoute = PlayerRoutes.NOW_PLAYING

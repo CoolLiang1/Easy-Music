@@ -43,6 +43,7 @@ import com.easymusic.app.player.domain.PlayerController
 fun CachedTracksRoute(
     onTrackSelected: (CachedTrack) -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     val context = LocalContext.current
     val viewModel = remember(context) {
@@ -60,6 +61,7 @@ fun CachedTracksRoute(
     CachedTracksScreen(
         modifier = modifier,
         uiState = uiState,
+        isNetworkAvailable = isNetworkAvailable,
         onTrackSelected = onTrackSelected,
         onDeleteCachedTrack = viewModel::deleteCachedTrack,
         onClearDeleteError = viewModel::clearDeleteError,
@@ -73,6 +75,7 @@ fun CachedTracksScreen(
     onDeleteCachedTrack: (CachedTrack) -> Unit,
     onClearDeleteError: () -> Unit,
     modifier: Modifier = Modifier,
+    isNetworkAvailable: Boolean = true,
 ) {
     var pendingDelete by remember { mutableStateOf<CachedTrack?>(null) }
 
@@ -109,9 +112,17 @@ fun CachedTracksScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "Stored on this device",
+            text = if (isNetworkAvailable) {
+                "Stored on this device"
+            } else {
+                "Stored on this device and playable while offline"
+            },
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (isNetworkAvailable) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
         )
 
         Spacer(modifier = Modifier.height(16.dp))

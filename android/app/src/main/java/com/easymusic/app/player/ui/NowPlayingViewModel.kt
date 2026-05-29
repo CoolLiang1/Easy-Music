@@ -9,6 +9,7 @@ import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlayerController
 import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.PlaybackSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,24 +24,36 @@ class NowPlayingViewModel(
     private val tokenStore: AuthTokenStore,
     private val trackCacheRepository: TrackCacheRepository,
     private val playerController: PlayerController,
+    private val initialNetworkAvailable: Boolean = true,
 ) : ViewModel() {
     val uiState: StateFlow<PlayerUiState> = playerController.uiState
     private var positionJob: Job? = null
 
     init {
         if (track != null && uiState.value.track?.id != track.id) {
-            playTrack(track)
+            playTrack(
+                track = track,
+                isNetworkAvailable = initialNetworkAvailable,
+            )
         }
         startPositionUpdates()
     }
 
-    fun play() {
+    fun play(isNetworkAvailable: Boolean = true) {
         if (uiState.value.track != null) {
+            val state = uiState.value
+            if (!isNetworkAvailable && state.playbackSource != PlaybackSource.OfflineCache) {
+                playerController.fail(
+                    track = state.track,
+                    message = "You are offline. Online playback needs the backend stream; play a cached track instead.",
+                )
+                return
+            }
             playerController.resume()
             return
         }
 
-        track?.let(::playTrack)
+        track?.let { playTrack(it, isNetworkAvailable) }
     }
 
     fun pause() {
@@ -55,7 +68,10 @@ class NowPlayingViewModel(
         positionJob?.cancel()
     }
 
-    private fun playTrack(track: TrackResponse) {
+    private fun playTrack(
+        track: TrackResponse,
+        isNetworkAvailable: Boolean,
+    ) {
         viewModelScope.launch {
             val cachedSource = withContext(Dispatchers.IO) {
                 trackCacheRepository.cachedPlaybackSource(track.id)
@@ -65,6 +81,14 @@ class NowPlayingViewModel(
                 playerController.playCached(
                     track = track,
                     audioFile = cachedSource.file,
+                )
+                return@launch
+            }
+
+            if (!isNetworkAvailable) {
+                playerController.fail(
+                    track = track,
+                    message = "You are offline. This track is not cached on this device.",
                 )
                 return@launch
             }

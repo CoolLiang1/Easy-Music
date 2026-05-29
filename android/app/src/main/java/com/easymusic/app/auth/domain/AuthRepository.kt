@@ -18,10 +18,13 @@ class AuthRepository(
         }
 
         return when (val result = authApi.me(token)) {
-            is ApiResult.Success -> AuthSession.Authenticated(
-                bearerToken = token,
-                currentUser = result.value,
-            )
+            is ApiResult.Success -> {
+                tokenStore.saveCurrentUser(result.value)
+                AuthSession.Authenticated(
+                    bearerToken = token,
+                    currentUser = result.value,
+                )
+            }
 
             is ApiResult.Unauthorized -> {
                 tokenStore.clearToken()
@@ -31,7 +34,18 @@ class AuthRepository(
             is ApiResult.HttpError,
             is ApiResult.NetworkError,
             is ApiResult.SerializationError,
-            -> AuthSession.Unauthenticated
+            -> {
+                val currentUser = tokenStore.readCurrentUser()
+                if (currentUser != null) {
+                    AuthSession.Authenticated(
+                        bearerToken = token,
+                        currentUser = currentUser,
+                        isOfflineRestored = true,
+                    )
+                } else {
+                    AuthSession.Unauthenticated
+                }
+            }
         }
     }
 
