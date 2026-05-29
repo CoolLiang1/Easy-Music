@@ -2,87 +2,89 @@
 
 Plugs into AiProviderService so real provider calls work when the backend
 is configured with AI_ENABLED=true and a valid API key.
+
+Uses only stdlib (urllib) — no extra dependencies needed in production.
 """
 
 from __future__ import annotations
 
 import json
-import time
+import socket
+import urllib.error
+import urllib.request
 from typing import Any
-
-import httpx
 
 from app.core.config import Settings
 from app.schemas.ai import AiCompletionRequest, AiCompletionResult
+
+_TIMEOUT_SECONDS = 60
 
 
 class OpenAiCompatibleClient:
     """Minimal OpenAI-compatible chat completions client.
 
-    Uses the ``/chat/completions`` endpoint.  Works with OpenAI and any
-    provider that exposes the same API shape (e.g. Azure, local Ollama with
-    a proxy, etc.).
+    Calls ``POST /chat/completions`` on the configured AI_BASE_URL.  Works
+    with OpenAI and any provider exposing the same API shape.
     """
 
-    def __init__(self, settings: Settings, *, http_client: httpx.Client | None = None):
+    def __init__(self, settings: Settings):
         self._settings = settings
-        self._http = http_client or httpx.Client(timeout=30.0)
 
     def complete(self, request: AiCompletionRequest) -> AiCompletionResult:
         url = f"{self._settings.ai_base_url.rstrip('/')}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self._settings.ai_api_key}",
-            "Content-Type": "application/json",
-        }
         body: dict[str, Any] = {
             "model": self._settings.ai_model,
             "messages": _sanitize_messages(request.messages),
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
         }
+        data = json.dumps(body).encode("utf-8")
+
+        http_request = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "Authorization": f"Bearer {self._settings.ai_api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
 
         try:
-            response = self._http.post(url, headers=headers, json=body)
+            with urllib.request.urlopen(http_request, timeout=_TIMEOUT_SECONDS) as resp:
+                raw = resp.read().decode("utf-8")
+                response_data = json.loads(raw)
+                content = _extract_content(response_data)
+                if content is None:
+                    return AiCompletionResult.error(
+                        error_type="empty_response",
+                        message="Provider returned no message content.",
+                    )
+                return AiCompletionResult.ok(
+                    content=content,
+                    model=response_data.get("model", self._settings.ai_model),
+                )
 
-            if response.status_code == 401 or response.status_code == 403:
+        except urllib.error.HTTPError as exc:
+            error_body = _read_error_body(exc)
+            status = exc.code
+
+            if status in (401, 403):
                 return AiCompletionResult.error(
                     error_type="auth_error",
-                    message=_extract_error(response),
+                    message=error_body or "Authentication failed — check your AI_API_KEY.",
                 )
-
-            if response.status_code == 429:
+            if status == 429:
                 return AiCompletionResult.error(
                     error_type="rate_limited",
-                    message=_extract_error(response) or "Rate limited by provider.",
+                    message=error_body or "Rate limited by provider.",
                 )
-
-            if not response.is_success:
-                return AiCompletionResult.error(
-                    error_type="provider_error",
-                    message=_extract_error(response)
-                    or f"Provider returned HTTP {response.status_code}.",
-                )
-
-            data = response.json()
-            content = _extract_content(data)
-            if content is None:
-                return AiCompletionResult.error(
-                    error_type="empty_response",
-                    message="Provider returned no message content.",
-                )
-
-            return AiCompletionResult.ok(
-                content=content,
-                model=data.get("model", self._settings.ai_model),
-            )
-
-        except httpx.TimeoutException:
             return AiCompletionResult.error(
-                error_type="timeout",
-                message="AI provider request timed out.",
+                error_type="provider_error",
+                message=error_body or f"Provider returned HTTP {status}.",
             )
 
-        except httpx.NetworkError as exc:
+        except (urllib.error.URLError, socket.timeout, OSError) as exc:
             return AiCompletionResult.error(
                 error_type="network_error",
                 message=f"Could not reach AI provider: {exc}",
@@ -117,14 +119,13 @@ def _extract_content(data: dict[str, Any]) -> str | None:
     return message.get("content")
 
 
-def _extract_error(response: httpx.Response) -> str:
+def _read_error_body(exc: urllib.error.HTTPError) -> str:
     try:
-        body = response.json()
+        raw = exc.read().decode("utf-8")
+        body = json.loads(raw)
         error = body.get("error", {})
         if isinstance(error, dict):
             return error.get("message", "") or json.dumps(error)
         return str(error)
-    except (ValueError, json.JSONDecodeError):
-        pass
-    text = (response.text or "").strip()
-    return text[:500] if text else response.reason_phrase or f"HTTP {response.status_code}"
+    except Exception:
+        return exc.reason or f"HTTP {exc.code}"
