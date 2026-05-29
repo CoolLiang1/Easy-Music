@@ -34,6 +34,7 @@ import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.recommendation.data.HttpAiRecommendationApi
 import com.easymusic.app.recommendation.data.HttpFeedbackApi
 import com.easymusic.app.recommendation.data.HttpRecommendationApi
 import com.easymusic.app.recommendation.data.FeedbackType
@@ -57,6 +58,7 @@ fun RecommendationHomeRoute(
             trackApi = TrackApi(apiClient),
             recommendationRepository = RecommendationRepository(
                 recommendationApi = HttpRecommendationApi(apiClient),
+                aiRecommendationApi = HttpAiRecommendationApi(apiClient),
                 feedbackApi = HttpFeedbackApi(apiClient),
                 tokenStore = tokenStore,
             ),

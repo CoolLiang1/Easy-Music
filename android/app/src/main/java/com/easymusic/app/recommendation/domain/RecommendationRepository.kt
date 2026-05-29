@@ -2,16 +2,22 @@ package com.easymusic.app.recommendation.domain
 
 import com.easymusic.app.auth.data.AuthTokenStore
 import com.easymusic.app.core.network.ApiResult
+import com.easymusic.app.recommendation.data.AiParseIntentRequest
+import com.easymusic.app.recommendation.data.AiRecommendRequest
+import com.easymusic.app.recommendation.data.AiRecommendResponse
+import com.easymusic.app.recommendation.data.AiRecommendationApi
 import com.easymusic.app.recommendation.data.FeedbackApi
 import com.easymusic.app.recommendation.data.FeedbackBulkRequest
 import com.easymusic.app.recommendation.data.FeedbackEventRequest
 import com.easymusic.app.recommendation.data.FeedbackResponse
+import com.easymusic.app.recommendation.data.ParsedIntentResponse
 import com.easymusic.app.recommendation.data.RecommendationApi
 import com.easymusic.app.recommendation.data.RecommendationRequest
 import com.easymusic.app.recommendation.data.RecommendationResponse
 
 class RecommendationRepository(
     private val recommendationApi: RecommendationApi,
+    private val aiRecommendationApi: AiRecommendationApi,
     private val feedbackApi: FeedbackApi,
     private val tokenStore: AuthTokenStore,
 ) {
@@ -22,6 +28,30 @@ class RecommendationRepository(
             ?: return ApiResult.Unauthorized("Please sign in again to request recommendations.")
 
         return recommendationApi.getRecommendations(
+            bearerToken = token,
+            request = request,
+        )
+    }
+
+    suspend fun parseAiIntent(
+        request: AiParseIntentRequest,
+    ): ApiResult<ParsedIntentResponse> {
+        val token = tokenStore.readToken()
+            ?: return ApiResult.Unauthorized("Please sign in again to use the AI Assistant.")
+
+        return aiRecommendationApi.parseListeningIntent(
+            bearerToken = token,
+            request = request,
+        )
+    }
+
+    suspend fun getAiRecommendations(
+        request: AiRecommendRequest,
+    ): ApiResult<AiRecommendResponse> {
+        val token = tokenStore.readToken()
+            ?: return ApiResult.Unauthorized("Please sign in again to use the AI Assistant.")
+
+        return aiRecommendationApi.aiRecommend(
             bearerToken = token,
             request = request,
         )
