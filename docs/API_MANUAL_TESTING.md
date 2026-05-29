@@ -217,6 +217,77 @@ Expected result:
 - A `track_id` not owned by the authenticated user is reported in `failed`
   without inserting that event.
 
+Retry the same request to verify Android-safe idempotency:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $eventId
+        track_id = $trackId
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected retry result:
+
+- The response includes the same `client_event_id` in `accepted`.
+- The event status is `duplicate`.
+- No duplicate playback-event row is inserted.
+
+Verify mixed accepted and failed events with a known invalid or unowned track
+id:
+
+```powershell
+$mixedEventId = [guid]::NewGuid().ToString()
+$invalidEventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $mixedEventId
+        track_id = $trackId
+        event_type = "pause"
+        position_seconds = 0.5
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      },
+      @{
+        client_event_id = $invalidEventId
+        track_id = 999999999
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected mixed result:
+
+- The owned-track event is returned in `accepted`.
+- The invalid or unowned track event is returned in `failed`.
+- The failed event does not block insertion of the valid event.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

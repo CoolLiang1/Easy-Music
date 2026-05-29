@@ -2,16 +2,20 @@
 
 This document describes the local development workflow for Easy Music.
 
-Easy Music has completed Phase 1 backend development and now includes the
-Phase 2 Web management console. The FastAPI backend, PostgreSQL migrations,
-media storage helpers, upload endpoint, authenticated track/tag APIs, streaming
-endpoint, and worker flow exist. The Web app supports browser login, library
-viewing, upload, processing refresh, metadata editing, tag management, track tag
-assignment, and authenticated playback for ready tracks.
+Easy Music has completed Phase 1 backend development, the Phase 2 Web
+management console, and the Phase 3 Android player. The FastAPI backend,
+PostgreSQL migrations, media storage helpers, upload endpoint, authenticated
+track/tag APIs, streaming endpoint, playback-event sync endpoint, and worker
+flow exist. The Web app supports browser login, library viewing, upload,
+processing refresh, metadata editing, tag management, track tag assignment, and
+authenticated playback for ready tracks. The Android app supports authenticated
+library/detail flows, Media3 playback, and Phase 4 manual offline cache
+behavior.
 
-Recommendation, AI Assistant, playback history, feedback events, offline cache
-behavior, and production deployment hardening remain outside the Phase 3
-Android scope.
+Recommendation, AI Assistant, Web new features, production deployment
+hardening, automatic full-library offline sync, complex download queue
+management, and background caching of the entire library remain outside the
+Phase 4 Android offline-cache scope.
 
 ## Workflow
 
@@ -411,6 +415,74 @@ Phase 3 acceptance must not be marked complete without an actual emulator or
 device playback run. Offline cache, recommendation, AI Assistant, playback
 history, feedback events, production deployment hardening, and new backend
 endpoints remain outside this phase.
+
+## Phase 4 Android Offline Cache Smoke Test
+
+Use this flow to verify the completed Phase 4 Android offline cache against the
+local backend while preserving the Phase 3 Media3 playback architecture:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload a supported audio file through the Web console if a ready track does
+   not already exist.
+5. Process pending media jobs until at least one track is `ready`:
+
+   ```powershell
+   docker compose run --rm worker
+   ```
+
+   Or keep the worker running:
+
+   ```powershell
+   docker compose up -d worker-loop
+   ```
+
+6. Open the Android project in Android Studio or install a debug build on an
+   emulator or device.
+7. Configure the Android API base URL for the target environment. The stock
+   emulator host-loopback URL is usually `http://10.0.2.2:8000`.
+8. Log in with the local user and confirm Library loads tracks from
+   `GET /api/tracks`.
+9. Open a `ready` track and manually cache it from Track Detail.
+10. Confirm caching progress, success state, and retry/error handling if the
+    download is interrupted.
+11. Confirm Library and Track Detail show the cached state.
+12. Open Cached Tracks and confirm the cached track appears from local Room
+    data.
+13. Disable network access or stop the backend API, then confirm Cached Tracks
+    remains reachable.
+14. Play the cached track offline and confirm Now Playing identifies the cached
+    playback source.
+15. Confirm background playback, notification controls, lock screen controls,
+    and headset/media-button play-pause behavior still work for cached
+    playback.
+16. While offline, pause, resume, seek, stop before completion, and complete
+    playback where practical to create queued playback events.
+17. Restore network access and confirm queued playback events sync through
+    `POST /api/playback-events`.
+18. Delete one selected cached track from Track Detail or Cached Tracks and
+    confirm the app asks for confirmation first.
+19. Refresh Library or fetch `GET /api/tracks/{track_id}` to confirm deleting
+    the local cache did not delete the server track.
+20. Record the emulator or device result in `docs/PHASE_4_ACCEPTANCE.md`.
+
+Phase 4 acceptance must not be marked complete without an actual emulator or
+device offline playback run. Recommendation, AI Assistant, Web new features,
+production deployment hardening, automatic full-library offline sync, complex
+download queue management, and background caching of the entire library remain
+outside this phase.
 
 ## Database Migrations
 
