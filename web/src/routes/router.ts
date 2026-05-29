@@ -5,6 +5,7 @@ export type AppRoute =
   | { name: "library" }
   | { name: "upload" }
   | { name: "tags" }
+  | { name: "recommendations" }
   | { name: "trackDetail"; params: { trackId: string } }
   | { name: "notFound" };
 
@@ -30,6 +31,10 @@ export function getRoute(path: string): AppRoute {
 
   if (normalizedPath === "/tags") {
     return { name: "tags" };
+  }
+
+  if (normalizedPath === "/recommendations") {
+    return { name: "recommendations" };
   }
 
   const trackDetailMatch = normalizedPath.match(/^\/tracks\/([^/]+)$/);
