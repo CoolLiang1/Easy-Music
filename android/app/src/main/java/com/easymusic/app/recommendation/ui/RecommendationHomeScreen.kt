@@ -36,6 +36,7 @@ import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.recommendation.data.HttpFeedbackApi
 import com.easymusic.app.recommendation.data.HttpRecommendationApi
+import com.easymusic.app.recommendation.data.FeedbackType
 import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
 import java.util.Locale
@@ -75,6 +76,13 @@ fun RecommendationHomeRoute(
         onToggleExcludedAttribute = viewModel::toggleExcludedAttribute,
         onClearSelections = viewModel::clearSelections,
         onRequestRecommendations = { viewModel.requestRecommendations(isNetworkAvailable) },
+        onSendFeedback = { trackId, feedbackType ->
+            viewModel.sendFeedback(
+                trackId = trackId,
+                feedbackType = feedbackType,
+                isNetworkAvailable = isNetworkAvailable,
+            )
+        },
         onTrackSelected = onTrackSelected,
     )
 }
@@ -90,6 +98,7 @@ fun RecommendationHomeScreen(
     onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
+    onSendFeedback: (Int, FeedbackType) -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
@@ -129,6 +138,7 @@ fun RecommendationHomeScreen(
                 onToggleExcludedAttribute = onToggleExcludedAttribute,
                 onClearSelections = onClearSelections,
                 onRequestRecommendations = onRequestRecommendations,
+                onSendFeedback = onSendFeedback,
                 onTrackSelected = onTrackSelected,
             )
         }
@@ -266,6 +276,7 @@ private fun RecommendationControls(
     onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
+    onSendFeedback: (Int, FeedbackType) -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -301,6 +312,8 @@ private fun RecommendationControls(
         RecommendationStatus(uiState = uiState)
         RecommendationResults(
             uiState = uiState,
+            isNetworkAvailable = isNetworkAvailable,
+            onSendFeedback = onSendFeedback,
             onTrackSelected = onTrackSelected,
         )
 
@@ -335,6 +348,8 @@ private fun RecommendationControls(
 @Composable
 private fun RecommendationResults(
     uiState: RecommendationHomeUiState,
+    isNetworkAvailable: Boolean,
+    onSendFeedback: (Int, FeedbackType) -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
 ) {
     val results = uiState.recommendationResults
@@ -355,6 +370,11 @@ private fun RecommendationResults(
             RecommendationResultCard(
                 result = result,
                 isPrimary = true,
+                isNetworkAvailable = isNetworkAvailable,
+                feedbackState = uiState.feedbackStates[result.track.id],
+                onSendFeedback = { feedbackType ->
+                    onSendFeedback(result.track.id, feedbackType)
+                },
                 onClick = { onTrackSelected(result.track) },
             )
         }
@@ -371,6 +391,11 @@ private fun RecommendationResults(
                 RecommendationResultCard(
                     result = result,
                     isPrimary = false,
+                    isNetworkAvailable = isNetworkAvailable,
+                    feedbackState = uiState.feedbackStates[result.track.id],
+                    onSendFeedback = { feedbackType ->
+                        onSendFeedback(result.track.id, feedbackType)
+                    },
                     onClick = { onTrackSelected(result.track) },
                 )
             }
@@ -408,6 +433,9 @@ private fun EmptyRecommendationResults() {
 private fun RecommendationResultCard(
     result: RecommendationResult,
     isPrimary: Boolean,
+    isNetworkAvailable: Boolean,
+    feedbackState: RecommendationFeedbackUiState?,
+    onSendFeedback: (FeedbackType) -> Unit,
     onClick: () -> Unit,
 ) {
     val track = result.track
@@ -472,12 +500,96 @@ private fun RecommendationResultCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            RecommendationFeedbackActions(
+                feedbackState = feedbackState,
+                isNetworkAvailable = isNetworkAvailable,
+                onSendFeedback = onSendFeedback,
+            )
             Text(
                 text = "Tap to play",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )
         }
+    }
+}
+
+@Composable
+private fun RecommendationFeedbackActions(
+    feedbackState: RecommendationFeedbackUiState?,
+    isNetworkAvailable: Boolean,
+    onSendFeedback: (FeedbackType) -> Unit,
+) {
+    val isSending = feedbackState?.isSending == true
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FeedbackButton(
+                label = "Like",
+                enabled = isNetworkAvailable && !isSending,
+                onClick = { onSendFeedback(FeedbackType.Like) },
+            )
+            FeedbackButton(
+                label = "Tired",
+                enabled = isNetworkAvailable && !isSending,
+                onClick = { onSendFeedback(FeedbackType.Tired) },
+            )
+            FeedbackButton(
+                label = "Not Today",
+                enabled = isNetworkAvailable && !isSending,
+                onClick = { onSendFeedback(FeedbackType.NotToday) },
+            )
+            FeedbackButton(
+                label = "Not Suitable",
+                enabled = isNetworkAvailable && !isSending,
+                onClick = { onSendFeedback(FeedbackType.NotSuitableForContext) },
+            )
+            FeedbackButton(
+                label = "Skip",
+                enabled = isNetworkAvailable && !isSending,
+                onClick = { onSendFeedback(FeedbackType.SkipRecommendation) },
+            )
+        }
+
+        when {
+            isSending -> Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator()
+                Text(
+                    modifier = Modifier.padding(start = 12.dp),
+                    text = "Sending feedback",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            feedbackState?.errorMessage != null -> Text(
+                text = feedbackState.errorMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+
+            feedbackState?.message != null -> Text(
+                text = feedbackState.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeedbackButton(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        enabled = enabled,
+        onClick = onClick,
+    ) {
+        Text(label)
     }
 }
 

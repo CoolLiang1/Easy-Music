@@ -8,9 +8,13 @@ import androidx.lifecycle.viewModelScope
 import com.easymusic.app.core.network.ApiResult
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackApi
+import com.easymusic.app.recommendation.data.FeedbackEventRequest
+import com.easymusic.app.recommendation.data.FeedbackType
 import com.easymusic.app.recommendation.data.RecommendationRequest
 import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
+import java.time.Instant
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,6 +32,7 @@ data class RecommendationHomeUiState(
     val recommendationMessage: String? = null,
     val recommendationErrorMessage: String? = null,
     val recommendationResults: List<RecommendationResult> = emptyList(),
+    val feedbackStates: Map<Int, RecommendationFeedbackUiState> = emptyMap(),
     val needsSignIn: Boolean = false,
 ) {
     val hasAnyTags: Boolean
@@ -40,6 +45,12 @@ data class RecommendationHomeUiState(
             desiredAttributeTagIds.size +
             excludedAttributeTagIds.size
 }
+
+data class RecommendationFeedbackUiState(
+    val isSending: Boolean = false,
+    val message: String? = null,
+    val errorMessage: String? = null,
+)
 
 data class RecommendationTagGroups(
     val scenarios: List<TagResponse> = emptyList(),
@@ -74,6 +85,7 @@ class RecommendationHomeViewModel(
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
+            feedbackStates = emptyMap(),
         )
     }
 
@@ -83,6 +95,7 @@ class RecommendationHomeViewModel(
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
+            feedbackStates = emptyMap(),
         )
     }
 
@@ -92,6 +105,7 @@ class RecommendationHomeViewModel(
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
+            feedbackStates = emptyMap(),
         )
     }
 
@@ -102,6 +116,7 @@ class RecommendationHomeViewModel(
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
+            feedbackStates = emptyMap(),
         )
     }
 
@@ -112,6 +127,7 @@ class RecommendationHomeViewModel(
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
+            feedbackStates = emptyMap(),
         )
     }
 
@@ -125,6 +141,7 @@ class RecommendationHomeViewModel(
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
+            feedbackStates = emptyMap(),
         )
     }
 
@@ -134,6 +151,7 @@ class RecommendationHomeViewModel(
                 recommendationMessage = null,
                 recommendationErrorMessage = "You are offline. Recommendation requests need the backend.",
                 recommendationResults = emptyList(),
+                feedbackStates = emptyMap(),
             )
             return
         }
@@ -147,6 +165,7 @@ class RecommendationHomeViewModel(
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
+            feedbackStates = emptyMap(),
         )
 
         viewModelScope.launch {
@@ -161,6 +180,7 @@ class RecommendationHomeViewModel(
                     recommendationMessage = result.value.results.size.resultMessage(),
                     recommendationErrorMessage = null,
                     recommendationResults = result.value.results.take(RecommendationRequest.DEFAULT_LIMIT),
+                    feedbackStates = emptyMap(),
                     needsSignIn = false,
                 )
 
@@ -183,6 +203,92 @@ class RecommendationHomeViewModel(
                 is ApiResult.SerializationError -> uiState.copy(
                     isRequestingRecommendations = false,
                     recommendationErrorMessage = result.message,
+                )
+            }
+        }
+    }
+
+    fun sendFeedback(
+        trackId: Int,
+        feedbackType: FeedbackType,
+        isNetworkAvailable: Boolean = true,
+    ) {
+        if (!isNetworkAvailable) {
+            uiState = uiState.withFeedbackState(
+                trackId = trackId,
+                state = RecommendationFeedbackUiState(
+                    errorMessage = "You are offline. Recommendation feedback needs the backend.",
+                ),
+            )
+            return
+        }
+
+        val currentFeedbackState = uiState.feedbackStates[trackId]
+        if (currentFeedbackState?.isSending == true) {
+            return
+        }
+
+        val event = uiState.toFeedbackEventRequest(
+            trackId = trackId,
+            feedbackType = feedbackType,
+        )
+
+        uiState = uiState.withFeedbackState(
+            trackId = trackId,
+            state = RecommendationFeedbackUiState(isSending = true),
+        )
+
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                recommendationRepository.sendFeedbackEvent(event)
+            }
+
+            uiState = when (result) {
+                is ApiResult.Success -> {
+                    val accepted = result.value.accepted.firstOrNull()
+                    val failed = result.value.failed.firstOrNull()
+                    when {
+                        accepted != null -> uiState.withFeedbackState(
+                            trackId = trackId,
+                            state = RecommendationFeedbackUiState(
+                                message = feedbackType.successMessage(),
+                            ),
+                        )
+
+                        failed != null -> uiState.withFeedbackState(
+                            trackId = trackId,
+                            state = RecommendationFeedbackUiState(
+                                errorMessage = failed.error,
+                            ),
+                        )
+
+                        else -> uiState.withFeedbackState(
+                            trackId = trackId,
+                            state = RecommendationFeedbackUiState(
+                                errorMessage = "Feedback response did not include a result.",
+                            ),
+                        )
+                    }
+                }
+
+                is ApiResult.Unauthorized -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
+                ).copy(needsSignIn = true)
+
+                is ApiResult.HttpError -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
+                )
+
+                is ApiResult.NetworkError -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
+                )
+
+                is ApiResult.SerializationError -> uiState.withFeedbackState(
+                    trackId = trackId,
+                    state = RecommendationFeedbackUiState(errorMessage = result.message),
                 )
             }
         }
@@ -255,6 +361,12 @@ class RecommendationHomeViewModel(
     }
 }
 
+private fun RecommendationHomeUiState.withFeedbackState(
+    trackId: Int,
+    state: RecommendationFeedbackUiState,
+): RecommendationHomeUiState =
+    copy(feedbackStates = feedbackStates + (trackId to state))
+
 private fun RecommendationHomeUiState.toRecommendationRequest(): RecommendationRequest =
     RecommendationRequest(
         scenarioTagIds = selectedScenarioTagIds.sorted(),
@@ -262,6 +374,21 @@ private fun RecommendationHomeUiState.toRecommendationRequest(): RecommendationR
         typeTagIds = selectedTypeTagIds.sorted(),
         attributeTagIds = desiredAttributeTagIds.sorted(),
         excludeAttributeTagIds = excludedAttributeTagIds.sorted(),
+    )
+
+private fun RecommendationHomeUiState.toFeedbackEventRequest(
+    trackId: Int,
+    feedbackType: FeedbackType,
+): FeedbackEventRequest =
+    FeedbackEventRequest(
+        clientEventId = UUID.randomUUID().toString(),
+        trackId = trackId,
+        feedbackType = feedbackType,
+        scenarioTagIds = selectedScenarioTagIds.sorted(),
+        stateTagIds = selectedStateTagIds.sorted(),
+        typeTagIds = selectedTypeTagIds.sorted(),
+        attributeTagIds = desiredAttributeTagIds.sorted(),
+        occurredAt = Instant.now().toString(),
     )
 
 private fun List<TagResponse>.toRecommendationTagGroups(): RecommendationTagGroups =
@@ -283,4 +410,13 @@ private fun Int.resultMessage(): String =
         0 -> "No recommendations matched this context yet. Adjust the selected tags and request again."
         1 -> "Recommendation request completed with 1 candidate."
         else -> "Recommendation request completed with $this candidates."
+    }
+
+private fun FeedbackType.successMessage(): String =
+    when (this) {
+        FeedbackType.Like -> "Liked. Playback and cache behavior were not changed."
+        FeedbackType.Tired -> "Marked tired. Request again when you want a refreshed recommendation."
+        FeedbackType.NotToday -> "Marked not today. Request again to refresh."
+        FeedbackType.NotSuitableForContext -> "Marked not suitable for this context. Request again to refresh."
+        FeedbackType.SkipRecommendation -> "Skipped for recommendation. Request again to refresh."
     }
