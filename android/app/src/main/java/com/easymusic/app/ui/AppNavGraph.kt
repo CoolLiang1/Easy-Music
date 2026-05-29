@@ -212,6 +212,10 @@ fun AppNavGraph(
                     modifier = Modifier.padding(contentPadding),
                     config = config,
                     isNetworkAvailable = isNetworkAvailable,
+                    onTrackSelected = { track ->
+                        nowPlayingTrack = track
+                        currentRoute = PlayerRoutes.NOW_PLAYING
+                    },
                 )
             }
         }

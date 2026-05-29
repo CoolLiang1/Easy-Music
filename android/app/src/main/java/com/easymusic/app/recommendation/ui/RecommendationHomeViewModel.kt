@@ -9,6 +9,7 @@ import com.easymusic.app.core.network.ApiResult
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.recommendation.data.RecommendationRequest
+import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,6 +27,7 @@ data class RecommendationHomeUiState(
     val tagErrorMessage: String? = null,
     val recommendationMessage: String? = null,
     val recommendationErrorMessage: String? = null,
+    val recommendationResults: List<RecommendationResult> = emptyList(),
     val needsSignIn: Boolean = false,
 ) {
     val hasAnyTags: Boolean
@@ -71,6 +73,7 @@ class RecommendationHomeViewModel(
             selectedScenarioTagIds = uiState.selectedScenarioTagIds.toggled(tagId),
             recommendationMessage = null,
             recommendationErrorMessage = null,
+            recommendationResults = emptyList(),
         )
     }
 
@@ -79,6 +82,7 @@ class RecommendationHomeViewModel(
             selectedStateTagIds = uiState.selectedStateTagIds.toggled(tagId),
             recommendationMessage = null,
             recommendationErrorMessage = null,
+            recommendationResults = emptyList(),
         )
     }
 
@@ -87,6 +91,7 @@ class RecommendationHomeViewModel(
             selectedTypeTagIds = uiState.selectedTypeTagIds.toggled(tagId),
             recommendationMessage = null,
             recommendationErrorMessage = null,
+            recommendationResults = emptyList(),
         )
     }
 
@@ -96,6 +101,7 @@ class RecommendationHomeViewModel(
             excludedAttributeTagIds = uiState.excludedAttributeTagIds - tagId,
             recommendationMessage = null,
             recommendationErrorMessage = null,
+            recommendationResults = emptyList(),
         )
     }
 
@@ -105,6 +111,7 @@ class RecommendationHomeViewModel(
             desiredAttributeTagIds = uiState.desiredAttributeTagIds - tagId,
             recommendationMessage = null,
             recommendationErrorMessage = null,
+            recommendationResults = emptyList(),
         )
     }
 
@@ -117,6 +124,7 @@ class RecommendationHomeViewModel(
             excludedAttributeTagIds = emptySet(),
             recommendationMessage = null,
             recommendationErrorMessage = null,
+            recommendationResults = emptyList(),
         )
     }
 
@@ -125,6 +133,7 @@ class RecommendationHomeViewModel(
             uiState = uiState.copy(
                 recommendationMessage = null,
                 recommendationErrorMessage = "You are offline. Recommendation requests need the backend.",
+                recommendationResults = emptyList(),
             )
             return
         }
@@ -137,6 +146,7 @@ class RecommendationHomeViewModel(
             isRequestingRecommendations = true,
             recommendationMessage = null,
             recommendationErrorMessage = null,
+            recommendationResults = emptyList(),
         )
 
         viewModelScope.launch {
@@ -150,6 +160,7 @@ class RecommendationHomeViewModel(
                     isRequestingRecommendations = false,
                     recommendationMessage = result.value.results.size.resultMessage(),
                     recommendationErrorMessage = null,
+                    recommendationResults = result.value.results.take(RecommendationRequest.DEFAULT_LIMIT),
                     needsSignIn = false,
                 )
 

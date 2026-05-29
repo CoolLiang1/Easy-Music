@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -24,21 +26,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.auth.data.AuthTokenStore
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackApi
+import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.recommendation.data.HttpFeedbackApi
 import com.easymusic.app.recommendation.data.HttpRecommendationApi
+import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
+import java.util.Locale
 
 @Composable
 fun RecommendationHomeRoute(
     modifier: Modifier = Modifier,
     config: AppConfig = AppConfig.default(),
     isNetworkAvailable: Boolean = true,
+    onTrackSelected: (TrackResponse) -> Unit,
 ) {
     val context = LocalContext.current
     val viewModel = remember(context, config) {
@@ -68,6 +75,7 @@ fun RecommendationHomeRoute(
         onToggleExcludedAttribute = viewModel::toggleExcludedAttribute,
         onClearSelections = viewModel::clearSelections,
         onRequestRecommendations = { viewModel.requestRecommendations(isNetworkAvailable) },
+        onTrackSelected = onTrackSelected,
     )
 }
 
@@ -82,6 +90,7 @@ fun RecommendationHomeScreen(
     onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
+    onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
 ) {
@@ -120,6 +129,7 @@ fun RecommendationHomeScreen(
                 onToggleExcludedAttribute = onToggleExcludedAttribute,
                 onClearSelections = onClearSelections,
                 onRequestRecommendations = onRequestRecommendations,
+                onTrackSelected = onTrackSelected,
             )
         }
     }
@@ -256,6 +266,7 @@ private fun RecommendationControls(
     onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
+    onTrackSelected: (TrackResponse) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         TagSection(
@@ -288,6 +299,10 @@ private fun RecommendationControls(
         )
 
         RecommendationStatus(uiState = uiState)
+        RecommendationResults(
+            uiState = uiState,
+            onTrackSelected = onTrackSelected,
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -313,6 +328,155 @@ private fun RecommendationControls(
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationResults(
+    uiState: RecommendationHomeUiState,
+    onTrackSelected: (TrackResponse) -> Unit,
+) {
+    val results = uiState.recommendationResults
+    if (results.isEmpty()) {
+        if (uiState.recommendationMessage?.startsWith("No recommendations") == true) {
+            EmptyRecommendationResults()
+        }
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        results.firstOrNull()?.let { result ->
+            Text(
+                text = "Primary Recommendation",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            RecommendationResultCard(
+                result = result,
+                isPrimary = true,
+                onClick = { onTrackSelected(result.track) },
+            )
+        }
+
+        val alternatives = results.drop(1).take(2)
+        if (alternatives.isNotEmpty()) {
+            Text(
+                modifier = Modifier.padding(top = 4.dp),
+                text = "Alternatives",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            alternatives.forEach { result ->
+                RecommendationResultCard(
+                    result = result,
+                    isPrimary = false,
+                    onClick = { onTrackSelected(result.track) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyRecommendationResults() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "No matching recommendation",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Adjust the selected tags, then request recommendations again.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecommendationResultCard(
+    result: RecommendationResult,
+    isPrimary: Boolean,
+    onClick: () -> Unit,
+) {
+    val track = result.track
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPrimary) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = track.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = track.artistAlbumLabel(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    modifier = Modifier.padding(start = 12.dp),
+                    text = "#${result.rank} / ${result.score.formatScore()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            val tags = track.tags.take(4)
+            if (tags.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    tags.forEach { tag ->
+                        FilterChip(
+                            selected = false,
+                            onClick = {},
+                            label = { Text(tag.name) },
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = result.reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Tap to play",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -353,6 +517,15 @@ private fun TagSection(
         }
     }
 }
+
+private fun TrackResponse.artistAlbumLabel(): String =
+    listOfNotNull(artist, album)
+        .filter { value -> value.isNotBlank() }
+        .joinToString(separator = " - ")
+        .ifBlank { "Unknown artist or album" }
+
+private fun Double.formatScore(): String =
+    String.format(Locale.US, "%.1f", this)
 
 @Composable
 private fun AttributeSection(
