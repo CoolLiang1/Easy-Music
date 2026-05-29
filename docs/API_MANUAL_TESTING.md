@@ -363,6 +363,44 @@ Expected retry result:
 - The event status is `duplicate`.
 - No duplicate feedback-event row is inserted.
 
+## Request Structured Recommendations
+
+Phase 5 Task 5.3 adds one minimal authenticated endpoint for Recommendation V1
+structured requests:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+All tag arrays are optional. When tag ids are provided, they must belong to the
+authenticated user and match their expected groups: `scenario`, `state`, `type`,
+`attribute`, and excluded `attribute`. The request does not accept or parse a raw
+natural-language prompt.
+
+Expected result:
+
+- The response includes `request_id` and `results`.
+- `results` is ordered by the rule-based ranking service.
+- Each result includes `rank`, `score`, deterministic `reason`, and a `track`
+  payload compatible with `GET /api/tracks`.
+- When there are no ready recommendation candidates, `results` is an empty
+  array and the response is still `200 OK`.
+- A missing token returns `401 Unauthorized`.
+- An unowned tag id or tag id in the wrong group returns `400 Bad Request`.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

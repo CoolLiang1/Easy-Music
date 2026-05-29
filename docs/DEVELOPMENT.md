@@ -171,6 +171,30 @@ context-tag ownership, and reports per-event `accepted`, `duplicate`, or
 `failed` results. `like` sets `tracks.liked` to `true`; `tired` records feedback
 and sets a default 14-day `tracks.cooldown_until` from `occurred_at`.
 
+Request structured Recommendation V1 results after applying Phase 5 Task 5.3:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+The endpoint is authenticated, accepts only structured tag id groups, validates
+tag ownership and tag group compatibility, and returns a `request_id` plus up to
+three ordered results. Each result includes `rank`, `score`, deterministic
+rule-based `reason`, and the existing track response payload.
+
 ## Docker Compose Local Flow
 
 Docker Compose defines `postgres`, `api`, and `worker` services for local
@@ -350,6 +374,8 @@ The test suite covers:
   retry behavior.
 - Authenticated feedback-event sync, context tag validation, `like`, `tired`,
   and duplicate retry behavior.
+- Authenticated structured recommendation requests, tag ownership/group
+  validation, empty results, ordered results, and deterministic reason fields.
 - Upload validation, original-file storage, and processing-job creation.
 - Media storage path generation and path traversal protection.
 - FFmpeg/ffprobe argument construction and structured failures.

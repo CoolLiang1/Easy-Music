@@ -32,6 +32,13 @@ RECENT_PLAYBACK_WINDOWS = (
 NOT_SUITABLE_CONTEXT_PENALTY = 4.0
 RECENT_SKIP_RECOMMENDATION_PENALTY = 3.0
 RECENT_SKIP_RECOMMENDATION_WINDOW = timedelta(days=7)
+TAG_REQUEST_FIELDS = {
+    "scenario_tag_ids": "scenario",
+    "state_tag_ids": "state",
+    "type_tag_ids": "type",
+    "attribute_tag_ids": "attribute",
+    "exclude_attribute_tag_ids": "attribute",
+}
 
 
 @dataclass
@@ -41,6 +48,32 @@ class _ScoredTrack:
     matched: dict[str, list[str]] = field(default_factory=dict)
     penalties: list[str] = field(default_factory=list)
     boosts: list[str] = field(default_factory=list)
+
+
+def validate_recommendation_request_tags(
+    db: Session,
+    user: User,
+    request: RecommendationRequest,
+) -> str | None:
+    for field_name, expected_group in TAG_REQUEST_FIELDS.items():
+        tag_ids = _unique_ids(getattr(request, field_name))
+        if not tag_ids:
+            continue
+
+        tags = list(
+            db.scalars(
+                select(Tag).where(
+                    Tag.user_id == user.id,
+                    Tag.id.in_(tag_ids),
+                ),
+            ),
+        )
+        if len(tags) != len(tag_ids):
+            return "Recommendation tag not found for current user."
+        if any(tag.group != expected_group for tag in tags):
+            return f"Recommendation tag group must be {expected_group}."
+
+    return None
 
 
 def recommend_tracks(
