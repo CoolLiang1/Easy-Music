@@ -9,6 +9,7 @@ Uses only stdlib (urllib) — no extra dependencies needed in production.
 from __future__ import annotations
 
 import json
+import os
 import socket
 import urllib.error
 import urllib.request
@@ -29,6 +30,7 @@ class OpenAiCompatibleClient:
 
     def __init__(self, settings: Settings):
         self._settings = settings
+        self._opener = _build_opener()
 
     def complete(self, request: AiCompletionRequest) -> AiCompletionResult:
         url = f"{self._settings.ai_base_url.rstrip('/')}/chat/completions"
@@ -51,7 +53,7 @@ class OpenAiCompatibleClient:
         )
 
         try:
-            with urllib.request.urlopen(http_request, timeout=_TIMEOUT_SECONDS) as resp:
+            with self._opener.open(http_request, timeout=_TIMEOUT_SECONDS) as resp:
                 raw = resp.read().decode("utf-8")
                 response_data = json.loads(raw)
                 content = _extract_content(response_data)
@@ -117,6 +119,15 @@ def _extract_content(data: dict[str, Any]) -> str | None:
         return None
     message = choices[0].get("message", {})
     return message.get("content")
+
+
+def _build_opener() -> urllib.request.OpenerDirector:
+    """Build an opener that routes through HTTPS_PROXY if configured."""
+    proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    if proxy_url:
+        handler = urllib.request.ProxyHandler({"https": proxy_url})
+        return urllib.request.build_opener(handler)
+    return urllib.request.build_opener()
 
 
 def _read_error_body(exc: urllib.error.HTTPError) -> str:
