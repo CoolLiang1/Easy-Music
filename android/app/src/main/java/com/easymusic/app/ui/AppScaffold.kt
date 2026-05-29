@@ -29,6 +29,7 @@ fun AppScaffold(
     currentRoute: String? = null,
     onNavigateToLibrary: (() -> Unit)? = null,
     onNavigateToCachedTracks: (() -> Unit)? = null,
+    onNavigateToRecommendations: (() -> Unit)? = null,
     isNetworkAvailable: Boolean = true,
     pendingPlaybackEventCount: Int = 0,
     playbackEventSyncMessage: String? = null,
@@ -65,6 +66,14 @@ fun AppScaffold(
                             onClick = onNavigateToCachedTracks,
                         ) {
                             Text("Cached")
+                        }
+                    }
+                    if (onNavigateToRecommendations != null) {
+                        TextButton(
+                            enabled = currentRoute != "recommendations",
+                            onClick = onNavigateToRecommendations,
+                        ) {
+                            Text("Recommend")
                         }
                     }
                     if (pendingPlaybackEventCount > 0) {

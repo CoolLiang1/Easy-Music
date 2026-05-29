@@ -37,8 +37,10 @@ import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.NowPlayingRoute
 import com.easymusic.app.player.PlayerRoutes
+import com.easymusic.app.recommendation.ui.RecommendationHomeRoute
 
 private const val CACHED_TRACKS_ROUTE = "cached_tracks"
+private const val RECOMMENDATIONS_ROUTE = "recommendations"
 
 @Composable
 fun AppNavGraph(
@@ -120,6 +122,7 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
                 isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
@@ -146,6 +149,7 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
                 isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
@@ -170,6 +174,7 @@ fun AppNavGraph(
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
                 onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
                 isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
@@ -183,6 +188,30 @@ fun AppNavGraph(
                         nowPlayingTrack = cachedTrack.toTrackResponse()
                         currentRoute = PlayerRoutes.NOW_PLAYING
                     },
+                )
+            }
+        }
+
+        RECOMMENDATIONS_ROUTE -> {
+            val authenticated = session as? AuthSession.Authenticated ?: return
+            AppScaffold(
+                modifier = modifier,
+                session = authenticated,
+                isLoggingOut = sessionState.isLoggingOut,
+                currentRoute = currentRoute,
+                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
+                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
+                isNetworkAvailable = isNetworkAvailable,
+                pendingPlaybackEventCount = pendingPlaybackEventCount,
+                playbackEventSyncMessage = pendingPlaybackEventError,
+                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
+                onLogout = sessionViewModel::logout,
+            ) { contentPadding ->
+                RecommendationHomeRoute(
+                    modifier = Modifier.padding(contentPadding),
+                    config = config,
+                    isNetworkAvailable = isNetworkAvailable,
                 )
             }
         }
