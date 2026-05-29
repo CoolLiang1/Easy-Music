@@ -237,6 +237,60 @@ def test_future_cooldown_and_same_day_not_today_are_excluded(
     assert [result.track.title for result in results] == ["Available"]
 
 
+def test_future_cooldown_excludes_track(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scenario", "Focus")
+    available = create_track(db_session, user, "Available")
+    cooled_down = create_track(
+        db_session,
+        user,
+        "Cooldown",
+        cooldown_until=NOW + timedelta(hours=6),
+    )
+    assign_tags(db_session, available, focus)
+    assign_tags(db_session, cooled_down, focus)
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results] == ["Available"]
+
+
+def test_not_today_feedback_only_excludes_current_day(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scenario", "Focus")
+    available = create_track(db_session, user, "Available")
+    yesterday_not_today = create_track(db_session, user, "Yesterday Not Today")
+    today_not_today = create_track(db_session, user, "Today Not Today")
+    assign_tags(db_session, available, focus)
+    assign_tags(db_session, yesterday_not_today, focus)
+    assign_tags(db_session, today_not_today, focus)
+    add_feedback_event(
+        db_session,
+        user,
+        yesterday_not_today,
+        "not_today",
+        NOW - timedelta(days=1),
+    )
+    add_feedback_event(db_session, user, today_not_today, "not_today", NOW)
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results] == [
+        "Available",
+        "Yesterday Not Today",
+    ]
+
+
 def test_recent_playback_penalty_is_applied(db_session: Session) -> None:
     user = create_user(db_session)
     focus = create_tag(db_session, user, "scenario", "Focus")
