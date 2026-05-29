@@ -11,6 +11,7 @@ const navItems = [
   { label: "Library", path: "/library" },
   { label: "Upload", path: "/upload" },
   { label: "Tags", path: "/tags" },
+  { label: "AI Assistant", path: "/ai-assistant" },
   { label: "Recommendations", path: "/recommendations" },
   { label: "Track detail", path: "/tracks/placeholder-track" },
 ];
