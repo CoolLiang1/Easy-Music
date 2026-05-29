@@ -179,6 +179,228 @@ Expected result:
 - Response includes `Accept-Ranges: bytes`.
 - Invalid or missing auth returns `401 Unauthorized`.
 
+## Sync Playback Events
+
+Phase 4 adds one minimal authenticated endpoint for Android offline playback
+event retry:
+
+```powershell
+$eventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $eventId
+        track_id = $trackId
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected result:
+
+- The response includes `accepted` and `failed` arrays.
+- A valid event for a track owned by the authenticated user is returned with
+  `status: accepted`.
+- Retrying the same `client_event_id` is safe and returns `status: duplicate`.
+- A missing token returns `401 Unauthorized`.
+- A `track_id` not owned by the authenticated user is reported in `failed`
+  without inserting that event.
+
+Retry the same request to verify Android-safe idempotency:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $eventId
+        track_id = $trackId
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected retry result:
+
+- The response includes the same `client_event_id` in `accepted`.
+- The event status is `duplicate`.
+- No duplicate playback-event row is inserted.
+
+Verify mixed accepted and failed events with a known invalid or unowned track
+id:
+
+```powershell
+$mixedEventId = [guid]::NewGuid().ToString()
+$invalidEventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $mixedEventId
+        track_id = $trackId
+        event_type = "pause"
+        position_seconds = 0.5
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      },
+      @{
+        client_event_id = $invalidEventId
+        track_id = 999999999
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected mixed result:
+
+- The owned-track event is returned in `accepted`.
+- The invalid or unowned track event is returned in `failed`.
+- The failed event does not block insertion of the valid event.
+
+## Record Recommendation Feedback Events
+
+Phase 5 Task 5.1 adds one minimal authenticated endpoint for Recommendation V1
+feedback events:
+
+```powershell
+$feedbackEventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $trackId
+        feedback_type = "not_today"
+        scenario_tag_ids = @()
+        state_tag_ids = @()
+        type_tag_ids = @()
+        attribute_tag_ids = @()
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Supported `feedback_type` values are `like`, `tired`, `not_today`,
+`not_suitable_for_context`, and `skip_recommendation`. Context tag arrays are
+optional, but when present the tags must belong to the authenticated user and
+match their structured groups: `scenario`, `state`, `type`, and `attribute`.
+
+Expected result:
+
+- The response includes `accepted` and `failed` arrays.
+- A valid event for a track owned by the authenticated user is returned with
+  `status: accepted`.
+- Retrying the same `client_event_id` is safe and returns `status: duplicate`.
+- A missing token returns `401 Unauthorized`.
+- A `track_id` or context tag not owned by the authenticated user is reported in
+  `failed` without inserting that event.
+- `feedback_type: "like"` sets the track's `liked` field to `true`.
+- `feedback_type: "tired"` sets a default 14-day `cooldown_until` from
+  `occurred_at`.
+
+Retry the same request to verify idempotency:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $trackId
+        feedback_type = "not_today"
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected retry result:
+
+- The response includes the same `client_event_id` in `accepted`.
+- The event status is `duplicate`.
+- No duplicate feedback-event row is inserted.
+
+## Request Structured Recommendations
+
+Phase 5 Task 5.3 adds one minimal authenticated endpoint for Recommendation V1
+structured requests:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+All tag arrays are optional. When tag ids are provided, they must belong to the
+authenticated user and match their expected groups: `scenario`, `state`, `type`,
+`attribute`, and excluded `attribute`. The request does not accept or parse a raw
+natural-language prompt.
+
+Expected result:
+
+- The response includes `request_id` and `results`.
+- `results` is ordered by the rule-based ranking service.
+- Each result includes `rank`, `score`, deterministic `reason`, and a `track`
+  payload compatible with `GET /api/tracks`.
+- When there are no ready recommendation candidates, `results` is an empty
+  array and the response is still `200 OK`.
+- A missing token returns `401 Unauthorized`.
+- An unowned tag id or tag id in the wrong group returns `400 Bad Request`.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

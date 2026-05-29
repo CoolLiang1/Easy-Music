@@ -1,6 +1,7 @@
 import { AppLayout } from "./layout/AppLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { LibraryPage } from "./pages/LibraryPage";
+import { RecommendationPage } from "./pages/RecommendationPage";
 import { TagsPage } from "./pages/TagsPage";
 import { TrackDetailPage } from "./pages/TrackDetailPage";
 import { UploadPage } from "./pages/UploadPage";
@@ -44,6 +45,7 @@ export default function App() {
         {route.name === "library" ? <LibraryPage /> : null}
         {route.name === "upload" ? <UploadPage /> : null}
         {route.name === "tags" ? <TagsPage /> : null}
+        {route.name === "recommendations" ? <RecommendationPage /> : null}
         {route.name === "trackDetail" ? (
           <TrackDetailPage trackId={route.params.trackId} />
         ) : null}

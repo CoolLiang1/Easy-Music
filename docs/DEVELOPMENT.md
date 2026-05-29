@@ -2,16 +2,20 @@
 
 This document describes the local development workflow for Easy Music.
 
-Easy Music has completed Phase 1 backend development and now includes the
-Phase 2 Web management console. The FastAPI backend, PostgreSQL migrations,
-media storage helpers, upload endpoint, authenticated track/tag APIs, streaming
-endpoint, and worker flow exist. The Web app supports browser login, library
-viewing, upload, processing refresh, metadata editing, tag management, track tag
-assignment, and authenticated playback for ready tracks.
+Easy Music has completed Phase 1 backend development, the Phase 2 Web
+management console, and the Phase 3 Android player. The FastAPI backend,
+PostgreSQL migrations, media storage helpers, upload endpoint, authenticated
+track/tag APIs, streaming endpoint, playback-event sync endpoint, and worker
+flow exist. The Web app supports browser login, library viewing, upload,
+processing refresh, metadata editing, tag management, track tag assignment, and
+authenticated playback for ready tracks. The Android app supports authenticated
+library/detail flows, Media3 playback, and Phase 4 manual offline cache
+behavior.
 
-Android, Recommendation, AI Assistant, playback history, feedback events,
-offline cache behavior, and production deployment hardening remain outside the
-Phase 2 Web scope.
+Recommendation, AI Assistant, Web new features, production deployment
+hardening, automatic full-library offline sync, complex download queue
+management, and background caching of the entire library remain outside the
+Phase 4 Android offline-cache scope.
 
 ## Workflow
 
@@ -105,6 +109,91 @@ Run the worker for a specific track ID:
 ```powershell
 .\.venv\Scripts\python.exe -m app.worker --track-id 1
 ```
+
+Sync Android playback events after applying Phase 4 migrations:
+
+```powershell
+$eventId = [guid]::NewGuid().ToString()
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $eventId
+        track_id = $trackId
+        event_type = "play"
+        position_seconds = 0
+        duration_seconds = 1
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+The endpoint is authenticated, accepts small batches, validates track ownership,
+and reports per-event `accepted`, `duplicate`, or `failed` results so Android
+can retry offline events safely.
+
+Record Recommendation V1 feedback events after applying Phase 5 Task 5.1
+migrations:
+
+```powershell
+$feedbackEventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $trackId
+        feedback_type = "not_today"
+        scenario_tag_ids = @()
+        state_tag_ids = @()
+        type_tag_ids = @()
+        attribute_tag_ids = @()
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+The endpoint is authenticated, accepts small batches, validates track and
+context-tag ownership, and reports per-event `accepted`, `duplicate`, or
+`failed` results. `like` sets `tracks.liked` to `true`; `tired` records feedback
+and sets a default 14-day `tracks.cooldown_until` from `occurred_at`.
+
+Request structured Recommendation V1 results after applying Phase 5 Task 5.3:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+The endpoint is authenticated, accepts only structured tag id groups, validates
+tag ownership and tag group compatibility, and returns a `request_id` plus up to
+three ordered results. Each result includes `rank`, `score`, deterministic
+rule-based `reason`, and the existing track response payload.
 
 ## Docker Compose Local Flow
 
@@ -281,6 +370,12 @@ The test suite covers:
 - Authenticated tag create, list, update, delete, validation, and ownership.
 - Authenticated track list, detail, update, delete, tag association, ownership,
   and streaming behavior.
+- Authenticated playback-event bulk sync, validation, ownership, and duplicate
+  retry behavior.
+- Authenticated feedback-event sync, context tag validation, `like`, `tired`,
+  and duplicate retry behavior.
+- Authenticated structured recommendation requests, tag ownership/group
+  validation, empty results, ordered results, and deterministic reason fields.
 - Upload validation, original-file storage, and processing-job creation.
 - Media storage path generation and path traversal protection.
 - FFmpeg/ffprobe argument construction and structured failures.
@@ -303,6 +398,152 @@ Expected result:
 - Vite produces a production build under `web/dist/`.
 - No Web lint command is expected until a lint script is added to
   `web/package.json`.
+
+## Android Local Backend
+
+The Android app lives in `android/` and uses Kotlin, Jetpack Compose, Material
+3, AndroidX DataStore, and AndroidX Media3.
+
+Build and test from `android/`:
+
+```powershell
+cd android
+.\gradlew.bat build
+.\gradlew.bat test
+```
+
+The Android backend base URL must stay configurable. Do not write production
+hosts, usernames, passwords, or bearer tokens into source files.
+
+- Android emulator to host backend: use `http://10.0.2.2:8000`.
+- Connected device or emulator with port reverse: run
+  `adb reverse tcp:8000 tcp:8000`, then configure the app for
+  `http://127.0.0.1:8000`.
+- Physical device without port reverse: use the host machine LAN URL, for
+  example `http://<host-lan-ip>:8000`, and update the debug network security
+  config if cleartext HTTP is needed for that host.
+- Production environments should use HTTPS.
+
+## Phase 3 Android Smoke Test
+
+Use this flow to verify the completed Phase 3 Android player against the local
+Phase 1 backend:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload a supported audio file through the Web console if a ready track does
+   not already exist.
+5. Process pending media jobs until at least one track is `ready`:
+
+   ```powershell
+   docker compose run --rm worker
+   ```
+
+   Or keep the worker running:
+
+   ```powershell
+   docker compose up -d worker-loop
+   ```
+
+6. Open the Android project in Android Studio or install a debug build on an
+   emulator or device.
+7. Configure the Android API base URL for the target environment. The stock
+   emulator host-loopback URL is usually `http://10.0.2.2:8000`.
+8. Log in with the local user and confirm Library loads tracks from
+   `GET /api/tracks`.
+9. Open a track detail screen and confirm fresh metadata loads from
+   `GET /api/tracks/{track_id}`.
+10. Play a `ready` track and confirm streaming uses
+    `GET /api/tracks/{track_id}/stream` with bearer authentication.
+11. Confirm foreground controls, mini player state, background playback,
+    notification controls, lock screen controls, and headset/media-button
+    play-pause behavior.
+12. Record the emulator or device result in `docs/PHASE_3_ACCEPTANCE.md`.
+
+Phase 3 acceptance must not be marked complete without an actual emulator or
+device playback run. Offline cache, recommendation, AI Assistant, playback
+history, feedback events, production deployment hardening, and new backend
+endpoints remain outside this phase.
+
+## Phase 4 Android Offline Cache Smoke Test
+
+Use this flow to verify the completed Phase 4 Android offline cache against the
+local backend while preserving the Phase 3 Media3 playback architecture:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload a supported audio file through the Web console if a ready track does
+   not already exist.
+5. Process pending media jobs until at least one track is `ready`:
+
+   ```powershell
+   docker compose run --rm worker
+   ```
+
+   Or keep the worker running:
+
+   ```powershell
+   docker compose up -d worker-loop
+   ```
+
+6. Open the Android project in Android Studio or install a debug build on an
+   emulator or device.
+7. Configure the Android API base URL for the target environment. The stock
+   emulator host-loopback URL is usually `http://10.0.2.2:8000`.
+8. Log in with the local user and confirm Library loads tracks from
+   `GET /api/tracks`.
+9. Open a `ready` track and manually cache it from Track Detail.
+10. Confirm caching progress, success state, and retry/error handling if the
+    download is interrupted.
+11. Confirm Library and Track Detail show the cached state.
+12. Open Cached Tracks and confirm the cached track appears from local Room
+    data.
+13. Disable network access or stop the backend API, then confirm Cached Tracks
+    remains reachable.
+14. Play the cached track offline and confirm Now Playing identifies the cached
+    playback source.
+15. Confirm background playback, notification controls, lock screen controls,
+    and headset/media-button play-pause behavior still work for cached
+    playback.
+16. While offline, pause, resume, seek, stop before completion, and complete
+    playback where practical to create queued playback events.
+17. Restore network access and confirm queued playback events sync through
+    `POST /api/playback-events`.
+18. Delete one selected cached track from Track Detail or Cached Tracks and
+    confirm the app asks for confirmation first.
+19. Refresh Library or fetch `GET /api/tracks/{track_id}` to confirm deleting
+    the local cache did not delete the server track.
+20. Record the emulator or device result in `docs/PHASE_4_ACCEPTANCE.md`.
+
+Phase 4 acceptance must not be marked complete without an actual emulator or
+device offline playback run. Recommendation, AI Assistant, Web new features,
+production deployment hardening, automatic full-library offline sync, complex
+download queue management, and background caching of the entire library remain
+outside this phase.
 
 ## Database Migrations
 
