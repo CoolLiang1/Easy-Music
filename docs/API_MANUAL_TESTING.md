@@ -581,6 +581,103 @@ Invoke-RestMethod `
 - The LLM is instructed never to invent tag ids and to use only tags from the
   catalogue supplied in the prompt.
 
+## Phase 6 AI Recommendation Composition
+
+Phase 6 Task 6.4 adds one authenticated AI endpoint that combines natural-language
+intent parsing with the existing Phase 5 rule-based ranking. The LLM parses
+natural language into structured tag ids; track selection and scoring are always
+delegated to `POST /api/recommendations`.
+
+### AI Recommend Smoke Test
+
+```powershell
+# Prerequisites: logged-in user, at least three ready tracks tagged with
+# structured tags (scenario, state, type, attribute), and a working AI provider.
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/recommend" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "I want calm focus instrumental piano music for working"
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected result with a working provider and matching tracks:
+
+- `parsed_intent.provider_status` is `ok`.
+- `parsed_intent.structured_request` contains the Phase 5-compatible tag id
+  arrays that were parsed from the natural-language text.
+- `parsed_intent.matched_tags` maps each tag group to its matched items.
+- `parsed_intent.explanation` may provide an AI helper explanation (optional).
+- `request_id` is a UUID string.
+- `results` is ordered by the Phase 5 rule-based ranking service.
+- Each result includes `rank`, `score`, deterministic Phase 5 `reason` text,
+  and a `track` payload compatible with `GET /api/tracks`.
+- Phase 5 reason text is **not** replaced by any AI explanation — the AI
+  explanation lives in `parsed_intent.explanation`.
+
+Expected result with provider disabled or unconfigured:
+
+- `parsed_intent.provider_status` is `disabled` or `unconfigured`.
+- `results` is an empty array.
+- HTTP status is `200 OK` (fallback is the default).
+
+### AI Recommend Ranking Integrity
+
+The AI endpoint must never bypass Phase 5 ranking constraints. Verify:
+
+1. A track with `cooldown_until` in the future must not appear in results
+   (cooldown exclusion from `recommend_tracks`).
+2. A track with a `not_today` feedback event for today must not appear in
+   results.
+3. A liked track that also matches tags should rank above an unliked but
+   tag-matching track.
+
+Send `like` or `not_today` feedback via `POST /api/feedback-events` before
+calling the AI recommend endpoint to confirm the ranking adjusts accordingly.
+
+```powershell
+# First, send not_today for a track that would otherwise match
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body ((@{
+    events = @(@{
+      client_event_id = [guid]::NewGuid().ToString()
+      track_id = $trackToExclude
+      feedback_type = "not_today"
+      occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+      client = "web"
+    })
+  }) | ConvertTo-Json -Depth 6)
+
+# Then request AI recommendations — the not_today track must not appear
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/recommend" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "focus music"
+    limit = 3
+  } | ConvertTo-Json -Depth 4)
+```
+
+### Notes
+
+- The LLM only parses intent into tag ids — it never selects or returns track
+  ids.
+- All ranking, cooldown, recent playback, and feedback penalties are handled by
+  the existing Phase 5 `recommend_tracks` service.
+- The endpoint does not implement tag suggestion.
+- The endpoint does not modify Android playback or cache behavior.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

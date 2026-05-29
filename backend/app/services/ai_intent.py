@@ -6,6 +6,8 @@ constrained to select tag ids from a catalogue we supply — it never creates
 tags and never selects track ids.
 """
 
+from uuid import uuid4
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,7 @@ from app.models.user import User
 from app.schemas.ai import (
     AiIntentOutput,
     AiProviderStatus,
+    AiRecommendResponse,
     MatchedTagItem,
     ParsedIntentResponse,
 )
@@ -121,6 +124,55 @@ def parse_listening_intent(
         unmatched_terms=ai_output.unmatched_terms,
         explanation=ai_output.explanation,
         provider_status=AiProviderStatus.OK,
+    )
+
+
+def recommend_via_ai(
+    db: Session,
+    user: User,
+    provider: AiProviderService,
+    text: str,
+    *,
+    limit: int = 3,
+    client: str | None = None,
+    fallback_to_empty: bool = True,
+) -> AiRecommendResponse:
+    """Parse natural-language intent, then delegate ranking to Phase 5.
+
+    The LLM *only* parses intent into structured tag ids.  Track selection,
+    scoring, cooldown enforcement, and feedback penalties are all handled by
+    ``recommendation_service.recommend_tracks`` — the LLM never sees track ids
+    and cannot bypass ranking constraints.
+    """
+    # 1. Parse intent (same flow as parse_listening_intent)
+    parsed = parse_listening_intent(
+        db,
+        user,
+        provider,
+        text,
+        client=client,
+        fallback_to_empty=fallback_to_empty,
+    )
+
+    # 2. Provider unavailable — return empty response preserving parsed status
+    if parsed.provider_status != AiProviderStatus.OK:
+        return AiRecommendResponse(
+            parsed_intent=parsed,
+            request_id=str(uuid4()),
+            results=[],
+        )
+
+    # 3. Override the limit on the structured request (AI doesn't control it)
+    structured_req = parsed.structured_request
+    structured_req.limit = min(limit, 3)
+
+    # 4. Delegate to Phase 5 rule-based ranking — LLM never selects tracks
+    results = recommendation_service.recommend_tracks(db, user, structured_req)
+
+    return AiRecommendResponse(
+        parsed_intent=parsed,
+        request_id=str(uuid4()),
+        results=results,
     )
 
 

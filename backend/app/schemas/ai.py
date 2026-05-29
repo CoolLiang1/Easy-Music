@@ -4,7 +4,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from app.schemas.recommendation import RecommendationRequest
+from app.schemas.recommendation import RecommendationRequest, RecommendationResult
 
 
 class AiProviderStatus(str, Enum):
@@ -132,3 +132,35 @@ class ParsedIntentResponse(BaseModel):
     unmatched_terms: list[str] = Field(default_factory=list)
     explanation: str | None = None
     provider_status: AiProviderStatus
+
+
+# ---------------------------------------------------------------------------
+# AI recommendation composition
+# ---------------------------------------------------------------------------
+
+
+class AiRecommendRequest(BaseModel):
+    """Request for ``POST /api/ai/recommend``.
+
+    The LLM only parses intent — it never selects track ids.  Ranking is
+    delegated to the existing Phase 5 recommendation service.
+    """
+
+    text: str = Field(min_length=1, max_length=1000)
+    limit: int = Field(default=3, ge=1, le=10)
+    client: str | None = Field(default=None, max_length=50)
+    fallback_to_empty: bool = Field(default=True)
+
+
+class AiRecommendResponse(BaseModel):
+    """Response for ``POST /api/ai/recommend``.
+
+    ``parsed_intent`` exposes the full intent-parsing result so clients can
+    inspect matched tags, unmatched terms, and the AI explanation.
+    ``results`` uses the same Phase 5 ``RecommendationResult`` shape as
+    ``POST /api/recommendations`` so existing client models stay compatible.
+    """
+
+    parsed_intent: ParsedIntentResponse
+    request_id: str
+    results: list[RecommendationResult] = Field(default_factory=list)

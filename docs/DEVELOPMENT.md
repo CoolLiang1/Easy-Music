@@ -306,14 +306,17 @@ docker compose up -d --force-recreate api
 - `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
   `ParseListeningIntentRequest`, `ParsedIntentResponse`, and supporting schemas.
 
-Available AI endpoint after Task 6.3:
+Available AI endpoints after Task 6.4:
 
 - `POST /api/ai/parse-listening-intent` (authenticated) — maps natural-language
   listening requests to Phase 5-compatible structured tag ids using only the
   current user's existing tags.
+- `POST /api/ai/recommend` (authenticated) — parses natural-language intent via
+  the AI, then delegates ranking to the existing Phase 5 recommendation service.
+  The LLM never selects track ids and never bypasses cooldown, recent-playback,
+  or feedback penalties.
 
 Later tasks will add the actual HTTP provider client and additional AI endpoints.
-The abstraction is designed so callers never need to know provider details.
 
 ## Web Setup
 

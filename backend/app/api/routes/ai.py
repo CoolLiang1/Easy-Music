@@ -14,7 +14,12 @@ from app.auth.dependencies import get_current_user
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.ai import ParsedIntentResponse, ParseListeningIntentRequest
+from app.schemas.ai import (
+    AiRecommendRequest,
+    AiRecommendResponse,
+    ParsedIntentResponse,
+    ParseListeningIntentRequest,
+)
 from app.services import ai_intent
 from app.services.ai_provider import AiProviderService
 
@@ -59,6 +64,47 @@ def parse_listening_intent(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"AI provider unavailable: {response.provider_status.value}",
+        )
+
+    return response
+
+
+@router.post(
+    "/recommend",
+    response_model=AiRecommendResponse,
+)
+def ai_recommend(
+    payload: AiRecommendRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+) -> AiRecommendResponse:
+    """Parse natural-language intent and return Phase 5-ranked recommendations.
+
+    The LLM only parses intent into structured tag ids — track selection,
+    scoring, cooldown enforcement, and feedback penalties are all handled by
+    the existing Phase 5 recommendation service.
+    """
+    response = ai_intent.recommend_via_ai(
+        db,
+        current_user,
+        ai_provider,
+        payload.text,
+        limit=payload.limit,
+        client=payload.client,
+        fallback_to_empty=payload.fallback_to_empty,
+    )
+
+    if (
+        not payload.fallback_to_empty
+        and not _is_ok(response.parsed_intent.provider_status)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "AI provider unavailable: "
+                f"{response.parsed_intent.provider_status.value}"
+            ),
         )
 
     return response
