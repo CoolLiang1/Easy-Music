@@ -15,8 +15,11 @@ import com.easymusic.app.cache.domain.PlaybackEventSyncResult
 import com.easymusic.app.cache.domain.TrackCacheDeleteResult
 import com.easymusic.app.cache.domain.TrackCacheRepository
 import com.easymusic.app.core.network.ApiResult
+import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlaybackEventRecorder
 import com.easymusic.app.player.domain.PlaybackSource
+import com.easymusic.app.player.domain.PlaybackSourceSelector
+import com.easymusic.app.player.domain.SelectedPlaybackSource
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -163,6 +166,73 @@ class EasyMusicDatabaseTest {
         val updated = requireNotNull(cachedTrackDao.getTrack(42))
         assertEquals(CacheStatus.Failed.value, updated.cacheStatus)
         assertEquals("Cached audio file is missing or unreadable.", updated.lastError)
+    }
+
+    @Test
+    fun playbackSourceSelector_prefersCachedFileBeforeReadingOnlineToken() = runTest {
+        val cachedFile = File(cacheDirectory, "track-42.mp3").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+        cachedTrackDao.upsert(
+            cachedTrackEntity(
+                title = "Cached Song",
+                cacheStatus = CacheStatus.Cached.value,
+                localFilePath = cachedFile.absolutePath,
+                byteSize = 3L,
+                cachedAt = "2026-05-28T09:30:00Z",
+            ),
+        )
+        val selector = PlaybackSourceSelector(
+            trackCacheRepository = trackCacheRepository(),
+            readToken = { error("Token should not be read when a cached file is available.") },
+            streamUrlForTrack = { trackId -> "https://example.test/api/tracks/$trackId/stream" },
+        )
+
+        val source = selector.select(
+            track = readyTrack(),
+            isNetworkAvailable = false,
+        )
+
+        val cached = source as SelectedPlaybackSource.Cached
+        assertEquals(42, cached.track.id)
+        assertEquals(cachedFile.absolutePath, cached.audioFile.absolutePath)
+    }
+
+    @Test
+    fun playbackSourceSelector_fallsBackToOnlineStreamWhenNoValidCacheExists() = runTest {
+        val selector = PlaybackSourceSelector(
+            trackCacheRepository = trackCacheRepository(),
+            readToken = { "token-online" },
+            streamUrlForTrack = { trackId -> "https://example.test/api/tracks/$trackId/stream" },
+        )
+
+        val source = selector.select(
+            track = readyTrack(),
+            isNetworkAvailable = true,
+        )
+
+        val online = source as SelectedPlaybackSource.Online
+        assertEquals(42, online.track.id)
+        assertEquals("token-online", online.bearerToken)
+        assertEquals("https://example.test/api/tracks/42/stream", online.streamUrl)
+    }
+
+    @Test
+    fun playbackSourceSelector_reportsOfflineFailureWhenTrackIsNotCached() = runTest {
+        val selector = PlaybackSourceSelector(
+            trackCacheRepository = trackCacheRepository(),
+            readToken = { "token-online" },
+            streamUrlForTrack = { trackId -> "https://example.test/api/tracks/$trackId/stream" },
+        )
+
+        val source = selector.select(
+            track = readyTrack(),
+            isNetworkAvailable = false,
+        )
+
+        val failure = source as SelectedPlaybackSource.Failure
+        assertEquals(42, failure.track.id)
+        assertEquals("You are offline. This track is not cached on this device.", failure.message)
     }
 
     @Test
@@ -395,6 +465,26 @@ class EasyMusicDatabaseTest {
         cacheStatus = cacheStatus,
         cachedAt = cachedAt,
         lastError = null,
+    )
+
+    private fun readyTrack(): TrackResponse = TrackResponse(
+        id = 42,
+        title = "Cached Song",
+        artist = "The Testers",
+        album = "Foundation",
+        durationSeconds = 180,
+        contentType = "music",
+        status = TrackResponse.STATUS_READY,
+        liked = false,
+        cooldownUntil = null,
+        createdAt = "2026-05-28T08:00:00Z",
+        updatedAt = "2026-05-28T09:00:00Z",
+        tags = emptyList(),
+    )
+
+    private fun trackCacheRepository(): TrackCacheRepository = TrackCacheRepository(
+        cachedTrackDao = cachedTrackDao,
+        cacheFileStore = CacheFileStore(cacheDirectory),
     )
 
     private fun playbackEventEntity(

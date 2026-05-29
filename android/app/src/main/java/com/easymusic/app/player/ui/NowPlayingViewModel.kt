@@ -3,20 +3,19 @@ package com.easymusic.app.player.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.easymusic.app.auth.data.AuthTokenStore
-import com.easymusic.app.cache.domain.CachedPlaybackSource
 import com.easymusic.app.cache.domain.TrackCacheRepository
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlayerController
 import com.easymusic.app.player.domain.PlayerUiState
 import com.easymusic.app.player.domain.PlaybackSource
-import kotlinx.coroutines.Dispatchers
+import com.easymusic.app.player.domain.PlaybackSourceSelector
+import com.easymusic.app.player.domain.SelectedPlaybackSource
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class NowPlayingViewModel(
     private val track: TrackResponse?,
@@ -28,6 +27,11 @@ class NowPlayingViewModel(
 ) : ViewModel() {
     val uiState: StateFlow<PlayerUiState> = playerController.uiState
     private var positionJob: Job? = null
+    private val playbackSourceSelector = PlaybackSourceSelector(
+        trackCacheRepository = trackCacheRepository,
+        readToken = tokenStore::readToken,
+        streamUrlForTrack = trackApi::streamUrl,
+    )
 
     init {
         if (track != null && uiState.value.track?.id != track.id) {
@@ -73,43 +77,28 @@ class NowPlayingViewModel(
         isNetworkAvailable: Boolean,
     ) {
         viewModelScope.launch {
-            val cachedSource = withContext(Dispatchers.IO) {
-                trackCacheRepository.cachedPlaybackSource(track.id)
-            }
-
-            if (cachedSource is CachedPlaybackSource.Available) {
-                playerController.playCached(
+            when (
+                val selectedSource = playbackSourceSelector.select(
                     track = track,
-                    audioFile = cachedSource.file,
+                    isNetworkAvailable = isNetworkAvailable,
                 )
-                return@launch
-            }
-
-            if (!isNetworkAvailable) {
-                playerController.fail(
-                    track = track,
-                    message = "You are offline. This track is not cached on this device.",
+            ) {
+                is SelectedPlaybackSource.Cached -> playerController.playCached(
+                    track = selectedSource.track,
+                    audioFile = selectedSource.audioFile,
                 )
-                return@launch
-            }
 
-            val token = withContext(Dispatchers.IO) {
-                tokenStore.readToken()
-            }
-
-            if (token == null) {
-                playerController.fail(
-                    track = track,
-                    message = "Please sign in again before streaming this track.",
+                is SelectedPlaybackSource.Online -> playerController.play(
+                    track = selectedSource.track,
+                    bearerToken = selectedSource.bearerToken,
+                    streamUrl = selectedSource.streamUrl,
                 )
-                return@launch
-            }
 
-            playerController.play(
-                track = track,
-                bearerToken = token,
-                streamUrl = trackApi.streamUrl(track.id),
-            )
+                is SelectedPlaybackSource.Failure -> playerController.fail(
+                    track = selectedSource.track,
+                    message = selectedSource.message,
+                )
+            }
         }
     }
 
