@@ -75,3 +75,6 @@ logs/
 !backend/tests/fixtures/**/*.m4a
 !backend/tests/fixtures/**/*.wav
 !backend/tests/fixtures/**/*.ogg
+
+# claude code
+.claude/
