@@ -16,6 +16,7 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env.example
+      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://easy_music:change-me-development-only@postgres:5432/easy_music_dev}
       MEDIA_ROOT: /app/media
@@ -34,6 +35,7 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env.example
+      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://easy_music:change-me-development-only@postgres:5432/easy_music_dev}
       MEDIA_ROOT: /app/media
@@ -50,6 +52,7 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env.example
+      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://easy_music:change-me-development-only@postgres:5432/easy_music_dev}
       MEDIA_ROOT: /app/media
