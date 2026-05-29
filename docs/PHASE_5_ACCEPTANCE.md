@@ -93,8 +93,10 @@ Latest local result, 2026-05-29:
 - `npm run build` from `web/`: passed.
 - `.\gradlew.bat test` from `android/`: passed.
 - `.\gradlew.bat build` from `android/`: passed.
-- Manual Android structured recommendation verification: pending.
-- Manual Web structured recommendation verification: pending.
+- Manual Android structured recommendation verification: passed, reported by
+  the user on 2026-05-29.
+- Manual Web structured recommendation verification: passed, reported by the
+  user on 2026-05-29.
 
 ## Backend Preparation
 
@@ -229,33 +231,35 @@ Run this flow in a browser against the local Web dev server:
 
 ## Manual Verification Record
 
-Record the result of actual Android and Web runs here before accepting Phase 5:
+Recorded result of actual Android and Web runs:
 
-- Backend local user: not recorded.
 - Backend local user: `phase5_accept_20260529105400`.
 - Ready tagged track count: 3, track ids `7`, `8`, and `9`.
 - Scenario/state/type/attribute tags used: `13`, `14`, `15`, and `16`.
 - Backend feedback smoke test: passed on 2026-05-29.
 - Backend structured recommendation smoke test: passed on 2026-05-29.
-- Android device or emulator: not recorded.
+- Android device or emulator: passed on emulator or device; exact target not
+  recorded.
 - Android API level: not recorded.
-- Android backend base URL: not recorded.
-- Android Recommendation Home opens: pending.
-- Android structured tags load: pending.
-- Android recommendation request returns results: pending.
-- Android primary result and alternatives appear: pending.
-- Android selected recommendation uses existing playback: pending.
+- Android backend base URL: configurable local backend URL; exact value not
+  recorded.
+- Android Recommendation Home opens: passed.
+- Android structured tags load: passed.
+- Android recommendation request returns results: passed.
+- Android primary result and alternatives appear: passed.
+- Android selected recommendation uses existing playback: passed.
 - Android cached recommendation playback uses Phase 4 source selection:
-  pending.
-- Android feedback affects subsequent manual recommendation requests: pending.
+  passed.
+- Android feedback affects subsequent manual recommendation requests: passed.
 - Android existing Library, Cached Tracks, mini player, notification, lock
-  screen, and headset/media-button controls: pending.
-- Web browser and URL: not recorded.
-- Web recommendation route opens after login: pending.
-- Web structured recommendation request returns results: pending.
-- Web feedback actions can be sent: pending.
-- Web existing Library, Upload, Tags, Track Detail, and playback: pending.
-- Result: pending.
+  screen, and headset/media-button controls: passed.
+- Web browser and URL: passed in local browser; exact browser and URL not
+  recorded.
+- Web recommendation route opens after login: passed.
+- Web structured recommendation request returns results: passed.
+- Web feedback actions can be sent: passed.
+- Web existing Library, Upload, Tags, Track Detail, and playback: passed.
+- Result: passed, reported by the user on 2026-05-29.
 
 Current status, 2026-05-29:
 
@@ -263,5 +267,6 @@ Current status, 2026-05-29:
   and manual verification flow.
 - Backend API manual verification passed after rebuilding the local API
   container with current Phase 5 code and applying migrations.
-- Phase 5 is not accepted until the pending Android and Web manual verification
-  record is completed.
+- Manual Android and Web structured recommendation verification has passed.
+- Phase 5 Recommendation V1 acceptance documentation is complete for the
+  recorded verification result.
