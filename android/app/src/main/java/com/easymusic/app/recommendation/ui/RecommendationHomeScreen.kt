@@ -306,6 +306,7 @@ private fun RecommendationControls(
         // ── AI Assistant Section ──────────────────────────────────────
         AiAssistantSection(
             aiState = uiState.aiState,
+            feedbackStates = uiState.feedbackStates,
             isNetworkAvailable = isNetworkAvailable,
             onTextChanged = onAiTextChanged,
             onRequestRecommendation = onRequestAiRecommendation,
@@ -680,6 +681,7 @@ private fun TagSection(
 @Composable
 private fun AiAssistantSection(
     aiState: AiRecommendationUiState,
+    feedbackStates: Map<Int, RecommendationFeedbackUiState>,
     isNetworkAvailable: Boolean,
     onTextChanged: (String) -> Unit,
     onRequestRecommendation: () -> Unit,
@@ -752,7 +754,7 @@ private fun AiAssistantSection(
             AiResultsSection(
                 results = aiState.results,
                 isNetworkAvailable = isNetworkAvailable,
-                feedbackStates = emptyMap(),
+                feedbackStates = feedbackStates,
                 onSendFeedback = onSendFeedback,
                 onTrackSelected = onTrackSelected,
             )
