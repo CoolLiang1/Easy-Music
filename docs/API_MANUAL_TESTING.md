@@ -288,6 +288,81 @@ Expected mixed result:
 - The invalid or unowned track event is returned in `failed`.
 - The failed event does not block insertion of the valid event.
 
+## Record Recommendation Feedback Events
+
+Phase 5 Task 5.1 adds one minimal authenticated endpoint for Recommendation V1
+feedback events:
+
+```powershell
+$feedbackEventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $trackId
+        feedback_type = "not_today"
+        scenario_tag_ids = @()
+        state_tag_ids = @()
+        type_tag_ids = @()
+        attribute_tag_ids = @()
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Supported `feedback_type` values are `like`, `tired`, `not_today`,
+`not_suitable_for_context`, and `skip_recommendation`. Context tag arrays are
+optional, but when present the tags must belong to the authenticated user and
+match their structured groups: `scenario`, `state`, `type`, and `attribute`.
+
+Expected result:
+
+- The response includes `accepted` and `failed` arrays.
+- A valid event for a track owned by the authenticated user is returned with
+  `status: accepted`.
+- Retrying the same `client_event_id` is safe and returns `status: duplicate`.
+- A missing token returns `401 Unauthorized`.
+- A `track_id` or context tag not owned by the authenticated user is reported in
+  `failed` without inserting that event.
+- `feedback_type: "like"` sets the track's `liked` field to `true`.
+- `feedback_type: "tired"` sets a default 14-day `cooldown_until` from
+  `occurred_at`.
+
+Retry the same request to verify idempotency:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $trackId
+        feedback_type = "not_today"
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected retry result:
+
+- The response includes the same `client_event_id` in `accepted`.
+- The event status is `duplicate`.
+- No duplicate feedback-event row is inserted.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

@@ -138,6 +138,39 @@ The endpoint is authenticated, accepts small batches, validates track ownership,
 and reports per-event `accepted`, `duplicate`, or `failed` results so Android
 can retry offline events safely.
 
+Record Recommendation V1 feedback events after applying Phase 5 Task 5.1
+migrations:
+
+```powershell
+$feedbackEventId = [guid]::NewGuid().ToString()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $trackId
+        feedback_type = "not_today"
+        scenario_tag_ids = @()
+        state_tag_ids = @()
+        type_tag_ids = @()
+        attribute_tag_ids = @()
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "android"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+The endpoint is authenticated, accepts small batches, validates track and
+context-tag ownership, and reports per-event `accepted`, `duplicate`, or
+`failed` results. `like` sets `tracks.liked` to `true`; `tired` records feedback
+and sets a default 14-day `tracks.cooldown_until` from `occurred_at`.
+
 ## Docker Compose Local Flow
 
 Docker Compose defines `postgres`, `api`, and `worker` services for local
@@ -315,6 +348,8 @@ The test suite covers:
   and streaming behavior.
 - Authenticated playback-event bulk sync, validation, ownership, and duplicate
   retry behavior.
+- Authenticated feedback-event sync, context tag validation, `like`, `tired`,
+  and duplicate retry behavior.
 - Upload validation, original-file storage, and processing-job creation.
 - Media storage path generation and path traversal protection.
 - FFmpeg/ffprobe argument construction and structured failures.
