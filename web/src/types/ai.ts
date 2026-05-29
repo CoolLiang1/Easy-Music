@@ -46,3 +46,34 @@ export type AiRecommendResponse = {
   request_id: string;
   results: RecommendationResult[];
 };
+
+// ---------------------------------------------------------------------------
+// track tag suggestions
+// ---------------------------------------------------------------------------
+
+export type TagSuggestionRequest = {
+  include_new_tag_suggestions?: boolean;
+};
+
+export type ExistingTagSuggestion = {
+  tag_id: number;
+  name: string;
+  group: string;
+  confidence: number;
+  reason: string;
+};
+
+export type NewTagSuggestion = {
+  name: string;
+  group: string;
+  confidence: number;
+  reason: string;
+};
+
+export type TagSuggestionResponse = {
+  track_id: number;
+  existing_tag_suggestions: Record<string, ExistingTagSuggestion[]>;
+  new_tag_suggestions: NewTagSuggestion[];
+  explanation: string | null;
+  provider_status: AiProviderStatus;
+};

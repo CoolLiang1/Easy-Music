@@ -1,9 +1,11 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
+import { AiTagSuggestions } from "./AiTagSuggestions";
 import type { Tag, TagGroup } from "../types/tag";
 import type { Track, TrackTagUpdate } from "../types/track";
 
 type TrackTagEditorProps = {
+  accessToken?: string | null;
   allTags: Tag[];
   disabled?: boolean;
   errorMessage?: string | null;
@@ -22,6 +24,7 @@ const groupLabels: Record<TagGroup, string> = {
 };
 
 export function TrackTagEditor({
+  accessToken,
   allTags,
   disabled = false,
   errorMessage,
@@ -186,6 +189,13 @@ export function TrackTagEditor({
           {disabled ? "Saving..." : "Save tags"}
         </button>
       </div>
+
+      <AiTagSuggestions
+        accessToken={accessToken ?? null}
+        onToggleTag={toggleTag}
+        selectedTagIds={selectedTagIds}
+        trackId={track.id}
+      />
     </form>
   );
 }

@@ -183,6 +183,7 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
             track={detailState.track}
           />
           <TrackTagEditor
+            accessToken={accessToken}
             allTags={detailState.tags}
             disabled={isSavingTags}
             errorMessage={tagSaveError}

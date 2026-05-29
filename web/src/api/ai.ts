@@ -4,6 +4,8 @@ import type {
   AiRecommendResponse,
   ParsedIntentResponse,
   ParseListeningIntentRequest,
+  TagSuggestionRequest,
+  TagSuggestionResponse,
 } from "../types/ai";
 
 export function parseListeningIntent(
@@ -26,4 +28,19 @@ export function aiRecommend(
     accessToken,
     body: payload,
   });
+}
+
+export function suggestTrackTags(
+  accessToken: string,
+  trackId: number,
+  payload: TagSuggestionRequest = {},
+) {
+  return apiRequest<TagSuggestionResponse>(
+    `/api/ai/tracks/${encodeURIComponent(trackId)}/suggest-tags`,
+    {
+      method: "POST",
+      accessToken,
+      body: payload,
+    },
+  );
 }
