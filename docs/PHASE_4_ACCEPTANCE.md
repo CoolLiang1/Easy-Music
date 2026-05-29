@@ -71,7 +71,8 @@ Latest local result, 2026-05-29:
 - `.\.venv\Scripts\python.exe -m pytest` from `backend/`: passed, 55 tests.
 - `.\gradlew.bat test` from `android/`: passed.
 - `.\gradlew.bat build` from `android/`: passed.
-- Manual emulator/device offline playback verification: pending.
+- Manual emulator/device offline playback verification: passed, reported by
+  the user on 2026-05-29.
 
 ## Backend Preparation
 
@@ -199,29 +200,30 @@ Expected backend behavior:
 Record the result of an actual emulator or device run here before accepting
 Phase 4:
 
-- Device or emulator: pending.
-- Android API level: pending.
-- Backend base URL used: pending.
-- Ready track ID/title: pending.
-- Manual cache download for one ready track: pending.
-- Library cache state: pending.
-- Track Detail cache state: pending.
-- Cached Tracks local list: pending.
-- Cached Tracks usable while backend is unavailable: pending.
-- Offline cached playback: pending.
-- Background playback: pending.
-- Notification controls: pending.
-- Lock screen controls: pending.
-- Headset/media-button controls: pending.
-- Offline playback-event recording: pending.
-- Playback-event sync after reconnecting: pending.
-- Delete one cached track: pending.
-- Server track preserved after cache deletion: pending.
-- Logout: pending.
-- Result: pending.
+- Device or emulator: passed on emulator or device; exact target not recorded.
+- Android API level: not recorded.
+- Backend base URL used: configurable local backend URL; exact value not
+  recorded.
+- Ready track ID/title: ready track used; exact ID/title not recorded.
+- Manual cache download for one ready track: passed.
+- Library cache state: passed.
+- Track Detail cache state: passed.
+- Cached Tracks local list: passed.
+- Cached Tracks usable while backend is unavailable: passed.
+- Offline cached playback: passed.
+- Background playback: passed.
+- Notification controls: passed.
+- Lock screen controls: passed.
+- Headset/media-button controls: passed.
+- Offline playback-event recording: passed.
+- Playback-event sync after reconnecting: passed.
+- Delete one cached track: passed.
+- Server track preserved after cache deletion: passed.
+- Logout: passed.
+- Result: passed, reported by the user on 2026-05-29.
 
 Current status, 2026-05-29:
 
-- Phase 4 acceptance documentation is prepared.
-- Phase 4 must not be marked accepted until the manual emulator/device offline
-  playback verification record above is completed.
+- Manual emulator/device offline playback verification has passed.
+- Phase 4 Android offline cache acceptance documentation is complete for the
+  recorded verification result.
