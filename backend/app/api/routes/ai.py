@@ -24,18 +24,21 @@ from app.schemas.ai import (
 )
 from app.services import ai_intent, ai_tag_suggestions
 from app.services.ai_provider import AiProviderService
+from app.services.ai_client import OpenAiCompatibleClient
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 def _get_ai_provider() -> AiProviderService:
-    """Minimal dependency that constructs the AI provider service.
-
-    When no real HTTP client is injected the provider returns a
-    ``not_implemented`` error result — downstream services handle that
-    gracefully.
+    """Construct the AI provider service with a real HTTP client when
+    configured, otherwise leave it without one so callers get a clear
+    disabled / unconfigured / not-implemented result.
     """
-    return AiProviderService(get_settings())
+    settings = get_settings()
+    client = None
+    if settings.ai_enabled and settings.ai_api_key and settings.ai_model:
+        client = OpenAiCompatibleClient(settings)
+    return AiProviderService(settings, client=client)
 
 
 @router.post(
