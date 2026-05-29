@@ -232,10 +232,11 @@ Run this flow in a browser against the local Web dev server:
 Record the result of actual Android and Web runs here before accepting Phase 5:
 
 - Backend local user: not recorded.
-- Ready tagged track count: not recorded.
-- Scenario/state/type/attribute tags used: not recorded.
-- Backend feedback smoke test: pending.
-- Backend structured recommendation smoke test: pending.
+- Backend local user: `phase5_accept_20260529105400`.
+- Ready tagged track count: 3, track ids `7`, `8`, and `9`.
+- Scenario/state/type/attribute tags used: `13`, `14`, `15`, and `16`.
+- Backend feedback smoke test: passed on 2026-05-29.
+- Backend structured recommendation smoke test: passed on 2026-05-29.
 - Android device or emulator: not recorded.
 - Android API level: not recorded.
 - Android backend base URL: not recorded.
@@ -260,5 +261,7 @@ Current status, 2026-05-29:
 
 - Phase 5 acceptance documentation exists and defines the required automated
   and manual verification flow.
+- Backend API manual verification passed after rebuilding the local API
+  container with current Phase 5 code and applying migrations.
 - Phase 5 is not accepted until the pending Android and Web manual verification
   record is completed.
