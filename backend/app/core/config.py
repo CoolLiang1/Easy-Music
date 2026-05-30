@@ -34,6 +34,10 @@ class Settings(BaseSettings):
         validation_alias="CORS_ORIGINS",
     )
 
+    # Logging
+    log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
+    log_format: str = Field(default="text", validation_alias="LOG_FORMAT")
+
     # AI provider (development-only, no real secrets committed)
     ai_enabled: bool = Field(default=False, validation_alias="AI_ENABLED")
     ai_provider: str = Field(default="", validation_alias="AI_PROVIDER")

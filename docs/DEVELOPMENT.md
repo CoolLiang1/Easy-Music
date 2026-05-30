@@ -2,23 +2,26 @@
 
 This document describes the local development workflow for Easy Music.
 
-Easy Music has completed Phase 1 backend development, the Phase 2 Web
-management console, the Phase 3 Android player, and the Phase 4 Android manual
-offline cache. The FastAPI backend, PostgreSQL migrations, media storage
+Easy Music has completed Phase 1–6: backend core, Web management console,
+Android Media3 player, Android manual offline cache, Recommendation V1, and AI
+Assistant V1.  The FastAPI backend, PostgreSQL migrations, media storage
 helpers, upload endpoint, authenticated track/tag APIs, streaming endpoint,
 playback-event sync endpoint, Recommendation V1 feedback endpoint, structured
 recommendation endpoint, and worker flow exist. The Web app supports browser
 login, library viewing, upload, processing refresh, metadata editing, tag
-management, track tag assignment, authenticated playback for ready tracks, and
-a structured Recommendation V1 test panel. The Android app supports
-authenticated library/detail flows, Media3 playback, Phase 4 manual offline
-cache behavior, and a structured Recommendation Home.
+management, track tag assignment, authenticated playback for ready tracks,
+a structured Recommendation V1 test panel, and an AI Assistant panel. The
+Android app supports authenticated library/detail flows, Media3 playback,
+Phase 4 manual offline cache behavior, a structured Recommendation Home, and
+natural-language AI recommendation input.
 
-AI Assistant, natural-language parsing, AI-generated recommendation reasons,
-production ML or training platforms, social features, production deployment
-hardening, automatic full-library offline sync, complex download queue
-management, and background caching of the entire library remain outside the
-Phase 5 Recommendation V1 scope.
+Production deployment is covered separately.  For the full step-by-step
+guide see `docs/DEPLOYMENT.md`.  For production environment variables
+refer to `.env.production.example` in the repository root.
+
+Production ML or training platforms, social features, automatic full-library
+offline sync, complex download queue management, and background caching of the
+entire library remain outside the current scope.
 
 ## Workflow
 
@@ -769,6 +772,35 @@ Local migration workflow:
 3. Set `DATABASE_URL` for the target database.
 4. Run `.\.venv\Scripts\python.exe -m alembic current` to check connectivity.
 5. Apply migrations with `.\.venv\Scripts\python.exe -m alembic upgrade head`.
+
+## Production Host Directories
+
+For production deployments the application containers run as a non-root user
+(UID 1100 / GID 1100, defined in `backend/Dockerfile`).  Host directories used
+as bind mounts must be writable by this user.
+
+The recommended layout follows `docs/ARCHITECTURE.md`:
+
+| Host path | Container path | Used by |
+|---|---|---|
+| `/srv/easy-music/media/originals` | `/app/media/originals` | api, worker |
+| `/srv/easy-music/media/playback` | `/app/media/playback` | api, worker |
+| `/srv/easy-music/media/covers` | `/app/media/covers` | api, worker |
+| `/srv/easy-music/postgres` | `/var/lib/postgresql/data` | postgres |
+| `/srv/easy-music/backups` | (host only) | backup script |
+
+All paths are configurable through `.env.production`.  See
+`.env.production.example` for the variable names and defaults.
+
+A convenience script at `deploy/setup-host.sh` creates the directories and
+sets ownership.  Run it once before the first `docker compose up -d`:
+
+```bash
+sudo ./deploy/setup-host.sh
+```
+
+The script is non-destructive: it only runs `mkdir -p` and `chown`; it never
+deletes existing data.
 
 ## Scope Notes
 

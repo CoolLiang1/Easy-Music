@@ -1,0 +1,185 @@
+# Easy Music production Docker Compose
+# =====================================
+#
+# Prerequisites:
+#   1. Copy .env.production.example to .env.production and fill in real values.
+#   2. Build the Web SPA once:  cd web && npm run build
+#
+# Start the stack:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# Rebuild after code changes:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# The --env-file flag supplies the production variables.  Docker Compose also
+# reads .env automatically; deployers may copy .env.production to .env instead.
+
+services:
+  # -----------------------------------------------------------------------
+  # PostgreSQL — no host port published; only reachable inside the network
+  # -----------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-easy_music}
+      POSTGRES_USER: ${POSTGRES_USER:-easy_music}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?err}
+    volumes:
+      - ${POSTGRES_DATA_DIR:-./pgdata}:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-easy_music} -d ${POSTGRES_DB:-easy_music}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - easy_music_net
+
+  # -----------------------------------------------------------------------
+  # FastAPI backend
+  # -----------------------------------------------------------------------
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?err}
+      MEDIA_ROOT: /app/media
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+    volumes:
+      - ${MEDIA_HOST_ORIGINALS:-./media/originals}:/app/media/originals
+      - ${MEDIA_HOST_PLAYBACK:-./media/playback}:/app/media/playback
+      - ${MEDIA_HOST_COVERS:-./media/covers}:/app/media/covers
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health')\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - easy_music_net
+
+  # -----------------------------------------------------------------------
+  # Background worker  (media processing)
+  # -----------------------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?err}
+      MEDIA_ROOT: /app/media
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+    volumes:
+      - ${MEDIA_HOST_ORIGINALS:-./media/originals}:/app/media/originals
+      - ${MEDIA_HOST_PLAYBACK:-./media/playback}:/app/media/playback
+      - ${MEDIA_HOST_COVERS:-./media/covers}:/app/media/covers
+    command: ["python", "-m", "app.worker", "--loop"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'app\\.worker'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - easy_music_net
+
+  # -----------------------------------------------------------------------
+  # Caddy reverse proxy  — HTTPS termination + static Web SPA serving
+  # -----------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:?err}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${WEB_DIST_PATH:-./web/dist}:/srv/web:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - api
+    networks:
+      - easy_music_net
+
+# ---------------------------------------------------------------------------
+# Internal network  — only Caddy publishes ports to the host
+# ---------------------------------------------------------------------------
+networks:
+  easy_music_net:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Persistent volumes  (certs and Caddy state survive recreates)
+# ---------------------------------------------------------------------------
+volumes:
+  caddy_data:
+  caddy_config:
