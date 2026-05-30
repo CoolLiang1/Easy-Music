@@ -189,6 +189,7 @@ def complete_and_parse_json(
     system_instruction: str = "",
     max_tokens: int = 1024,
     temperature: float = 0.3,
+    max_attempts: int = 3,
 ) -> tuple[BaseModel | None, AiCompletionResult, str | None]:
     """Run the full prompt → provider → extract-JSON → validate pipeline.
 
@@ -209,11 +210,42 @@ def complete_and_parse_json(
         messages=messages,
         max_tokens=max_tokens,
         temperature=temperature,
+        response_format={"type": "json_object"},
     )
 
-    result = provider.complete(request)
-    if not result.is_success:
-        return None, result, None
+    attempts = max(1, max_attempts)
+    for attempt in range(attempts):
+        result = provider.complete(request)
+        if not result.is_success:
+            if _should_retry_completion(result, attempt, attempts):
+                continue
+            return None, result, None
 
-    parsed, parse_error = parse_json_response(result.content or "", output_model)
-    return parsed, result, parse_error
+        parsed, parse_error = parse_json_response(result.content or "", output_model)
+        if parsed is not None:
+            return parsed, result, None
+        if _should_retry_parse_error(parse_error, attempt, attempts):
+            continue
+        return None, result, parse_error
+
+    return None, result, parse_error
+
+
+def _should_retry_completion(
+    result: AiCompletionResult,
+    attempt: int,
+    max_attempts: int,
+) -> bool:
+    if attempt >= max_attempts - 1:
+        return False
+    return result.error_type == "empty_response"
+
+
+def _should_retry_parse_error(
+    parse_error: str | None,
+    attempt: int,
+    max_attempts: int,
+) -> bool:
+    if attempt >= max_attempts - 1 or parse_error is None:
+        return False
+    return parse_error.startswith("No valid JSON")

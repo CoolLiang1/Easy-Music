@@ -27,6 +27,7 @@ class AiCompletionRequest(BaseModel):
     )
     max_tokens: int = Field(default=1024, ge=1, le=8192)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
+    response_format: dict[str, str] | None = None
 
 
 class AiCompletionResult(BaseModel):

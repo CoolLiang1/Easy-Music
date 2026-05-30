@@ -95,7 +95,11 @@ def suggest_tags_for_track(
         return _empty_fallback(
             track_id,
             AiProviderStatus.ERROR,
-            explanation=parse_error or "AI tag suggestion failed.",
+            explanation=(
+                parse_error
+                or completion_result.error_message
+                or "AI tag suggestion failed."
+            ),
         )
 
     # 6. Validate existing tag ids returned by AI

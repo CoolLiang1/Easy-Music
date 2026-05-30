@@ -75,6 +75,19 @@ class _FakeClient:
         return AiCompletionResult.ok("{}")
 
 
+class _SequenceClient:
+    """Test double that returns configured results in order."""
+
+    def __init__(self, results: list[AiCompletionResult]):
+        self.results = results
+        self.calls: list[AiCompletionRequest] = []
+
+    def complete(self, request: AiCompletionRequest) -> AiCompletionResult:
+        self.calls.append(request)
+        index = min(len(self.calls) - 1, len(self.results) - 1)
+        return self.results[index]
+
+
 # ---------------------------------------------------------------------------
 # extract_json
 # ---------------------------------------------------------------------------
@@ -376,3 +389,59 @@ def test_complete_and_parse_passes_max_tokens_and_temperature() -> None:
     assert len(client.calls) == 1
     assert client.calls[0].max_tokens == 512
     assert client.calls[0].temperature == 0.1
+
+
+def test_complete_and_parse_requests_json_response_format() -> None:
+    client = _FakeClient()
+    svc = AiProviderService(
+        _settings(ai_enabled=True, ai_api_key="sk-test", ai_model="gpt-4"),
+        client=client,
+    )
+    complete_and_parse_json(svc, "request", _SimpleModel)
+    assert len(client.calls) == 1
+    assert client.calls[0].response_format == {"type": "json_object"}
+
+
+def test_complete_and_parse_retries_empty_json_response() -> None:
+    client = _SequenceClient(
+        [
+            AiCompletionResult.error("empty_response", "Provider returned no content."),
+            AiCompletionResult.ok('{"name": "rec", "count": 7}'),
+        ]
+    )
+    svc = AiProviderService(
+        _settings(ai_enabled=True, ai_api_key="sk-test", ai_model="gpt-4"),
+        client=client,
+    )
+
+    parsed, result, parse_error = complete_and_parse_json(
+        svc, "request", _SimpleModel
+    )
+
+    assert parsed is not None
+    assert parsed.name == "rec"
+    assert result.is_success is True
+    assert parse_error is None
+    assert len(client.calls) == 2
+
+
+def test_complete_and_parse_retries_no_valid_json_response() -> None:
+    client = _SequenceClient(
+        [
+            AiCompletionResult.ok(""),
+            AiCompletionResult.ok('{"name": "rec", "count": 7}'),
+        ]
+    )
+    svc = AiProviderService(
+        _settings(ai_enabled=True, ai_api_key="sk-test", ai_model="gpt-4"),
+        client=client,
+    )
+
+    parsed, result, parse_error = complete_and_parse_json(
+        svc, "request", _SimpleModel
+    )
+
+    assert parsed is not None
+    assert result.is_success is True
+    assert parse_error is None
+    assert len(client.calls) == 2

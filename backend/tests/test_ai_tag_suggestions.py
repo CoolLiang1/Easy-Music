@@ -281,6 +281,30 @@ def test_suggest_tags_returns_unconfigured_when_missing_key(
     assert response.json()["provider_status"] == "unconfigured"
 
 
+def test_suggest_tags_includes_provider_error_explanation(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "My Track")
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.error(
+        "empty_response",
+        "Provider returned no message content.",
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["provider_status"] == "error"
+    assert body["explanation"] == "Provider returned no message content."
+
+
 # ---------------------------------------------------------------------------
 # valid existing tag suggestions
 # ---------------------------------------------------------------------------

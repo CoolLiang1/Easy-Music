@@ -40,6 +40,8 @@ class OpenAiCompatibleClient:
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
         }
+        if request.response_format is not None:
+            body["response_format"] = request.response_format
         data = json.dumps(body).encode("utf-8")
 
         http_request = urllib.request.Request(
@@ -57,7 +59,7 @@ class OpenAiCompatibleClient:
                 raw = resp.read().decode("utf-8")
                 response_data = json.loads(raw)
                 content = _extract_content(response_data)
-                if content is None:
+                if content is None or not content.strip():
                     return AiCompletionResult.error(
                         error_type="empty_response",
                         message="Provider returned no message content.",

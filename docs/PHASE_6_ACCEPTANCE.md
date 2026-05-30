@@ -97,8 +97,9 @@ Latest local result, 2026-05-30:
 - `npm run build` from `web/`: passed.
 - `.\gradlew.bat test` from `android/`: passed.
 - `.\gradlew.bat build` from `android/`: passed.
-- Manual Web AI Assistant verification: pending.
-- Manual Android natural-language recommendation verification: pending.
+- Manual Web AI Assistant verification: passed.
+- Manual Android natural-language recommendation verification: passed for the
+  core recommendation, feedback, Media3 handoff, and cached playback flows.
 
 ## Development AI Provider Configuration
 
@@ -239,39 +240,74 @@ Run this flow on an emulator or physical Android device:
 
 Record actual Web and Android results here after running the manual flows:
 
-- Backend local user: pending.
-- Ready tagged track count: pending.
-- Scenario/state/type/attribute tags used: pending.
-- Backend provider disabled/unconfigured smoke test: pending.
-- Backend AI parse-listening-intent smoke test: pending.
-- Backend AI recommend smoke test: pending.
-- Backend AI ranking integrity check: pending.
-- Backend AI tag suggestion smoke test: pending.
-- Web browser and URL: pending.
-- Web AI Assistant opens after login: pending.
-- Web parsed structured intent display: pending.
-- Web primary recommendation and alternatives: pending.
-- Web feedback actions from AI results: pending.
-- Web tag suggestions require confirmation: pending.
+- Backend local user: `phase6_backend_20260530_002`.
+- Ready tagged track count: 3, track ids `13`, `14`, and `15`.
+- Scenario/state/type/attribute tags used: `Focus` (`21`), `Calm` (`22`),
+  `Instrumental` (`23`), and `Piano` (`24`).
+- Backend provider disabled/unconfigured smoke test: passed on 2026-05-30.
+  The Docker API on port 8000 returned `disabled`; a temporary local API on
+  port 8001 with `AI_ENABLED=true` and empty key/model returned
+  `unconfigured` and was stopped after the check.
+- Backend AI parse-listening-intent smoke test: passed for auth rejection,
+  disabled fallback, disabled `fallback_to_empty=false` returning `503`, and
+  unconfigured fallback. Provider-ok parsing was not run because no live
+  provider key/client was configured.
+- Backend AI recommend smoke test: passed for auth rejection and
+  disabled/unconfigured fallback responses with empty results. Provider-ok AI
+  recommendation was not run because no live provider key/client was
+  configured.
+- Backend AI ranking integrity check: passed through the Phase 5 structured
+  recommendation endpoint. Initial ranking returned track `13` first with
+  liked boost, followed by `14` and `15`; after `not_today` feedback for track
+  `13`, the next structured recommendation response excluded track `13`.
+- Backend AI tag suggestion smoke test: passed for auth rejection,
+  disabled/unconfigured fallback, and advisory-only behavior. Track `13` tags
+  remained unchanged as `21`, `22`, `23`, and `24` after requesting
+  suggestions.
+- Web browser and URL: passed with Chrome against
+  `http://127.0.0.1:5173`.
+- Web AI Assistant opens after login: passed.
+- Web parsed structured intent display: passed for `calm piano focus music`;
+  the UI displayed mapped `Focus`, `Calm`, and `Piano` intent.
+- Web primary recommendation and alternatives: passed.
+- Web feedback actions from AI results: passed with the `Like` action.
+- Web tag suggestions require confirmation: passed on track `17`
+  (`Sunset Lo-Fi Piano Meditation`); an existing suggestion was added only
+  after pressing `+ Add` and persisted only after `Save tags`.
 - Web existing Library, Upload, Tags, Track Detail, structured
-  Recommendation, and playback regression check: pending.
-- Android device or emulator: pending.
-- Android API level: pending.
-- Android backend base URL: pending.
-- Android structured Recommendation Home controls: pending.
-- Android natural-language recommendation request: pending.
-- Android parsed context and results display: pending.
+  Recommendation, and playback regression check: passed.
+- Android device or emulator: passed on emulator `emulator-5554`.
+- Android API level: Android 17, API 37.
+- Android backend base URL: passed with emulator host-loopback
+  `http://10.0.2.2:8000`.
+- Android structured Recommendation Home controls: passed; the screen loaded
+  structured controls and tag options from the backend.
+- Android natural-language recommendation request: passed for
+  `calm piano focus music`.
+- Android parsed context and results display: passed; parsed `Focus`,
+  `Calm`, `Instrumental`, and `Piano` context chips and AI recommendation
+  results were visible.
 - Android selected recommendation uses existing Media3/Now Playing handoff:
-  pending.
-- Android cached recommended track uses Phase 4 source selection: pending.
+  passed; selecting a recommendation opened Now Playing and completed
+  playback.
+- Android cached recommended track uses Phase 4 source selection: passed;
+  after caching a recommended track from Track Detail, selecting it again from
+  recommendations opened Now Playing with `Offline cached playback`.
 - Android AI loading, unauthorized, offline, provider unavailable, backend
-  error, and empty-result states: pending.
-- Android Phase 5 feedback actions: pending.
-- Result: pending.
+  error, and empty-result states: partially covered. Android automated tests
+  cover repository failure mapping, and backend manual smoke tests cover
+  unauthorized and provider fallback paths. The emulator UI pass did not
+  deliberately break auth, network, or provider configuration.
+- Android Phase 5 feedback actions: passed with the `Like` action from AI
+  recommendation results.
+- Result: Web and Android Phase 6 core manual acceptance passed on
+  2026-05-30. Destructive Android edge-state UI simulations remain a follow-up
+  if strict manual coverage of every error state is required.
 
 Current status, 2026-05-30:
 
-- Phase 6 acceptance documentation defines the required automated and manual
-  verification flow.
-- Phase 6 is not marked accepted until manual Web AI Assistant verification and
-  manual Android natural-language recommendation verification are recorded.
+- Phase 6 automated checks, Web manual AI Assistant verification, and Android
+  manual natural-language recommendation verification are recorded.
+- Phase 6 is accepted for the core AI Assistant V1 Web and Android flows, with
+  the Android destructive edge-state UI simulations noted above as residual
+  manual coverage.

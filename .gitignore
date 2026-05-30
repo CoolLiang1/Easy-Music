@@ -55,6 +55,7 @@ postgres-data/
 tmp/
 logs/
 *.log
+.acceptance-chrome-profile*/
 
 # Local media storage and generated audio artifacts
 /media/
