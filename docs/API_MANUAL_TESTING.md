@@ -401,6 +401,458 @@ Expected result:
 - A missing token returns `401 Unauthorized`.
 - An unowned tag id or tag id in the wrong group returns `400 Bad Request`.
 
+## Phase 5 Structured Recommendation Closure
+
+Before accepting Phase 5, verify the feedback and recommendation endpoints with
+one local user and at least three `ready` tracks that have structured tags.
+Create or reuse tags in each supported group:
+
+- `scenario`
+- `state`
+- `type`
+- `attribute`
+
+Assign the tags to at least three ready tracks, then run the feedback and
+recommendation requests above with real local ids:
+
+```powershell
+$recommendation = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+
+$recommendation.results | Format-Table rank, score, reason
+```
+
+Send feedback for one returned result using the same structured context:
+
+```powershell
+$feedbackEventId = [guid]::NewGuid().ToString()
+$recommendedTrackId = $recommendation.results[0].track.id
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    events = @(
+      @{
+        client_event_id = $feedbackEventId
+        track_id = $recommendedTrackId
+        feedback_type = "not_suitable_for_context"
+        scenario_tag_ids = @($scenarioTagId)
+        state_tag_ids = @($stateTagId)
+        type_tag_ids = @($typeTagId)
+        attribute_tag_ids = @($attributeTagId)
+        occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+        client = "web"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+```
+
+Request recommendations again with the same structured context:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/recommendations" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    scenario_tag_ids = @($scenarioTagId)
+    state_tag_ids = @($stateTagId)
+    type_tag_ids = @($typeTagId)
+    attribute_tag_ids = @($attributeTagId)
+    exclude_attribute_tag_ids = @()
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected closure result:
+
+- The first request returns up to three ordered recommendation results.
+- Results include deterministic rule-based reasons, not AI-generated text.
+- Feedback for the recommended track is accepted.
+- A repeated recommendation request can reflect feedback penalties such as
+  `not_today`, `not_suitable_for_context`, `skip_recommendation`, or `tired`.
+- No natural-language prompt, AI Assistant endpoint, social feature, or
+  production ML service is involved.
+
+## Phase 6 AI Listening Intent Parsing
+
+Phase 6 Task 6.3 adds one authenticated AI endpoint for natural-language
+listening-intent parsing. The endpoint maps free-text requests onto the existing
+Phase 5 structured recommendation shape using only the authenticated user's tags.
+
+The AI provider must be enabled and configured (see `docs/DEVELOPMENT.md` AI
+Provider Configuration section). When the provider is disabled or unconfigured
+the endpoint returns a documented fallback empty structured request.
+
+### AI Parse Listening Intent Smoke Test
+
+```powershell
+# Reuse the login flow and header setup from the Login section above.
+# Ensure at least one tag exists in each group (scenario, state, type, attribute)
+# for the authenticated user.
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "I want calm focus instrumental piano music for working"
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected result with a working provider:
+
+- `provider_status` is `ok`.
+- `structured_request` contains Phase 5-compatible `scenario_tag_ids`,
+  `state_tag_ids`, `type_tag_ids`, `attribute_tag_ids`,
+  `exclude_attribute_tag_ids`, `limit` (default 3), and `client`.
+- `matched_tags` is a dict keyed by tag group (`scenario`, `state`, `type`,
+  `attribute`), each value a list of `{id, name, group}` objects.
+- `unmatched_terms` lists any words the AI could not map.
+- `explanation` provides a short human-readable mapping summary when available.
+
+Expected result with provider disabled or unconfigured (AI_ENABLED=false or
+missing key/model):
+
+- `provider_status` is `disabled` or `unconfigured`.
+- `structured_request` returns empty tag arrays.
+- `matched_tags` is an empty object.
+- HTTP status is `200 OK` (fallback is the default).
+
+Verify missing auth:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -ContentType "application/json" `
+  -Body '{"text": "any request"}'
+```
+
+Expected: `401 Unauthorized`.
+
+### AI Parse Listening Intent Tag Validation
+
+The endpoint re-validates every tag id the AI returns using the same Phase 5
+ownership and group checks as `POST /api/recommendations`. Tags belonging to
+another user, tags in the wrong group, or invented tag ids all cause the
+endpoint to return a provider-status of `error` (still `200 OK` when
+`fallback_to_empty` is `true`).
+
+Set `fallback_to_empty = false` to receive a `503 Service Unavailable` response
+when the provider is not available or the parse fails:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "any request"
+    fallback_to_empty = $false
+  } | ConvertTo-Json -Depth 4)
+```
+
+### Notes
+
+- The endpoint never creates, renames, deletes, or binds tags.
+- The endpoint does not call `recommend_tracks` — it only parses intent.
+- The endpoint does not return track ids or track payloads.
+- The LLM is instructed never to invent tag ids and to use only tags from the
+  catalogue supplied in the prompt.
+
+## Phase 6 AI Recommendation Composition
+
+Phase 6 Task 6.4 adds one authenticated AI endpoint that combines natural-language
+intent parsing with the existing Phase 5 rule-based ranking. The LLM parses
+natural language into structured tag ids; track selection and scoring are always
+delegated to `POST /api/recommendations`.
+
+### AI Recommend Smoke Test
+
+```powershell
+# Prerequisites: logged-in user, at least three ready tracks tagged with
+# structured tags (scenario, state, type, attribute), and a working AI provider.
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/recommend" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "I want calm focus instrumental piano music for working"
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected result with a working provider and matching tracks:
+
+- `parsed_intent.provider_status` is `ok`.
+- `parsed_intent.structured_request` contains the Phase 5-compatible tag id
+  arrays that were parsed from the natural-language text.
+- `parsed_intent.matched_tags` maps each tag group to its matched items.
+- `parsed_intent.explanation` may provide an AI helper explanation (optional).
+- `request_id` is a UUID string.
+- `results` is ordered by the Phase 5 rule-based ranking service.
+- Each result includes `rank`, `score`, deterministic Phase 5 `reason` text,
+  and a `track` payload compatible with `GET /api/tracks`.
+- Phase 5 reason text is **not** replaced by any AI explanation — the AI
+  explanation lives in `parsed_intent.explanation`.
+
+Expected result with provider disabled or unconfigured:
+
+- `parsed_intent.provider_status` is `disabled` or `unconfigured`.
+- `results` is an empty array.
+- HTTP status is `200 OK` (fallback is the default).
+
+### AI Recommend Ranking Integrity
+
+The AI endpoint must never bypass Phase 5 ranking constraints. Verify:
+
+1. A track with `cooldown_until` in the future must not appear in results
+   (cooldown exclusion from `recommend_tracks`).
+2. A track with a `not_today` feedback event for today must not appear in
+   results.
+3. A liked track that also matches tags should rank above an unliked but
+   tag-matching track.
+
+Send `like` or `not_today` feedback via `POST /api/feedback-events` before
+calling the AI recommend endpoint to confirm the ranking adjusts accordingly.
+
+```powershell
+# First, send not_today for a track that would otherwise match
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/feedback-events" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body ((@{
+    events = @(@{
+      client_event_id = [guid]::NewGuid().ToString()
+      track_id = $trackToExclude
+      feedback_type = "not_today"
+      occurred_at = (Get-Date).ToUniversalTime().ToString("o")
+      client = "web"
+    })
+  }) | ConvertTo-Json -Depth 6)
+
+# Then request AI recommendations — the not_today track must not appear
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/recommend" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "focus music"
+    limit = 3
+  } | ConvertTo-Json -Depth 4)
+```
+
+### Notes
+
+- The LLM only parses intent into tag ids — it never selects or returns track
+  ids.
+- All ranking, cooldown, recent playback, and feedback penalties are handled by
+  the existing Phase 5 `recommend_tracks` service.
+- The endpoint does not modify Android playback or cache behavior.
+
+## Phase 6 Track Tag Suggestion
+
+Phase 6 Task 6.5 adds one authenticated AI endpoint that suggests tags for a
+single track using its metadata and the current user's tag taxonomy. The endpoint
+never creates or assigns tags — callers must apply suggestions explicitly.
+
+### AI Tag Suggestion Smoke Test
+
+```powershell
+# Prerequisites: logged-in user, at least one track, and a working AI provider.
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/$trackId/suggest-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{}'
+```
+
+Expected result with a working provider:
+
+- `track_id` matches the requested track.
+- `provider_status` is `ok`.
+- `existing_tag_suggestions` is a dict keyed by tag group (`scenario`,
+  `state`, `type`, `attribute`), each value a list of objects with `tag_id`,
+  `name`, `group`, `confidence`, and `reason`.
+- `new_tag_suggestions` is an empty list when not requested.
+- `explanation` provides a short human-readable summary when available.
+
+Request new tag name suggestions:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/$trackId/suggest-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"include_new_tag_suggestions": true}'
+```
+
+Expected result with `include_new_tag_suggestions: true`:
+
+- `new_tag_suggestions` may contain suggested tag names, each with `name`,
+  `group`, `confidence`, and `reason`.
+- New tag suggestions are returned as suggestions only — no tags are created
+  in the database and no tags are assigned to the track.
+
+Expected result with provider disabled or unconfigured:
+
+- `provider_status` is `disabled` or `unconfigured`.
+- `existing_tag_suggestions` is an empty object.
+- `new_tag_suggestions` is an empty list.
+- HTTP status is `200 OK`.
+
+Verify missing auth and unowned track:
+
+```powershell
+# Missing auth
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/1/suggest-tags" `
+  -ContentType "application/json" `
+  -Body '{}'
+# Expected: 401 Unauthorized
+
+# Unowned or nonexistent track returns provider_status: "error"
+```
+
+### Notes
+
+- The endpoint never creates, renames, deletes, or binds tags.
+- The endpoint never assigns tag suggestions to the track automatically.
+- Callers must apply selected suggestions through `PATCH
+  /api/tracks/{track_id}` with the chosen `tag_ids`.
+- New tag name suggestions must be created explicitly via `POST /api/tags`
+  before they can be assigned.
+- The prompt includes track metadata (title, artist, album, content_type,
+  source_url, original filename basename) and the full user tag catalogue.
+- Internal storage paths are not exposed beyond the filename basename.
+
+## Phase 6 AI Assistant V1 Closure
+
+Before accepting Phase 6, verify the AI endpoints with one local user and at
+least three `ready` tracks that have structured tags in the `scenario`, `state`,
+`type`, and `attribute` groups.
+
+Run the disabled or unconfigured provider check first, without committing any
+real provider key:
+
+```powershell
+$env:AI_ENABLED = "false"
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/parse-listening-intent" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "calm focus music for writing"
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected disabled/unconfigured result:
+
+- `provider_status` is `disabled` or `unconfigured`.
+- `structured_request` contains empty tag arrays.
+- No track ids are returned.
+
+Then run the provider-ok flow using development-only local environment values:
+
+```powershell
+$aiRecommendation = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/recommend" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    text = "calm focus instrumental music for working"
+    limit = 3
+    client = "web"
+  } | ConvertTo-Json -Depth 4)
+
+$aiRecommendation.parsed_intent.structured_request
+$aiRecommendation.results | Format-Table rank, score, reason
+```
+
+Expected AI recommendation closure result:
+
+- The parsed intent is expressed as the existing Phase 5 structured
+  recommendation request shape.
+- Recommendation results are ordered by the Phase 5 rule-based ranking service.
+- Cooldown, recent playback, liked state, and feedback penalties are still
+  enforced.
+- The LLM does not directly select tracks and does not replace Phase 5 reason
+  text.
+
+Verify tag suggestions remain advisory only:
+
+```powershell
+$beforeTags = Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/$trackId" `
+  -Headers $headers
+
+$suggestions = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/$trackId/suggest-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"include_new_tag_suggestions": true}'
+
+$afterTags = Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/$trackId" `
+  -Headers $headers
+
+$beforeTags.tags
+$suggestions.existing_tag_suggestions
+$suggestions.new_tag_suggestions
+$afterTags.tags
+```
+
+Expected tag suggestion closure result:
+
+- Existing tag suggestions reference only tags owned by the authenticated user.
+- New tag suggestions are names only.
+- The track's assigned tags are unchanged until a caller explicitly applies
+  selected tags through `PATCH /api/tracks/{track_id}`.
+- No tags are created by the suggestion endpoint.
+
+Record the backend, Web, and Android manual verification results in
+`docs/PHASE_6_ACCEPTANCE.md`. Phase 6 is not accepted until the Web AI
+Assistant and Android natural-language recommendation flows have both been
+manually verified.
+
 ## Docker Compose API Flow
 
 Start the Compose API stack from the repository root:

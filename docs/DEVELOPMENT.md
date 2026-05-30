@@ -2,20 +2,26 @@
 
 This document describes the local development workflow for Easy Music.
 
-Easy Music has completed Phase 1 backend development, the Phase 2 Web
-management console, and the Phase 3 Android player. The FastAPI backend,
-PostgreSQL migrations, media storage helpers, upload endpoint, authenticated
-track/tag APIs, streaming endpoint, playback-event sync endpoint, and worker
-flow exist. The Web app supports browser login, library viewing, upload,
-processing refresh, metadata editing, tag management, track tag assignment, and
-authenticated playback for ready tracks. The Android app supports authenticated
-library/detail flows, Media3 playback, and Phase 4 manual offline cache
-behavior.
+Easy Music has completed Phase 1–6: backend core, Web management console,
+Android Media3 player, Android manual offline cache, Recommendation V1, and AI
+Assistant V1.  The FastAPI backend, PostgreSQL migrations, media storage
+helpers, upload endpoint, authenticated track/tag APIs, streaming endpoint,
+playback-event sync endpoint, Recommendation V1 feedback endpoint, structured
+recommendation endpoint, and worker flow exist. The Web app supports browser
+login, library viewing, upload, processing refresh, metadata editing, tag
+management, track tag assignment, authenticated playback for ready tracks,
+a structured Recommendation V1 test panel, and an AI Assistant panel. The
+Android app supports authenticated library/detail flows, Media3 playback,
+Phase 4 manual offline cache behavior, a structured Recommendation Home, and
+natural-language AI recommendation input.
 
-Recommendation, AI Assistant, Web new features, production deployment
-hardening, automatic full-library offline sync, complex download queue
-management, and background caching of the entire library remain outside the
-Phase 4 Android offline-cache scope.
+Production deployment is covered separately.  For the full step-by-step
+guide see `docs/DEPLOYMENT.md`.  For production environment variables
+refer to `.env.production.example` in the repository root.
+
+Production ML or training platforms, social features, automatic full-library
+offline sync, complex download queue management, and background caching of the
+entire library remain outside the current scope.
 
 ## Workflow
 
@@ -238,6 +244,88 @@ Run a continuously polling Compose worker with:
 ```powershell
 docker compose up -d worker-loop
 ```
+
+## AI Provider Configuration (Development Only)
+
+Phase 6 adds a development-safe AI provider abstraction. All AI features are off
+by default. No real API keys are committed.
+
+### Local Backend AI Settings
+
+From `backend/`, set these environment variables before starting the API:
+
+```powershell
+$env:AI_ENABLED = "true"
+$env:AI_PROVIDER = "openai-compatible"
+$env:AI_API_KEY = "your-own-provider-key"
+$env:AI_MODEL = "gpt-4o-mini"
+$env:AI_BASE_URL = "https://api.openai.com/v1"
+```
+
+| Variable       | Default                      | Notes                                      |
+| -------------- | ---------------------------- | ------------------------------------------ |
+| `AI_ENABLED`   | `false`                      | Must be `true` for any AI feature to work. |
+| `AI_PROVIDER`  | `""`                         | Provider identifier; currently only `openai-compatible` is expected. |
+| `AI_API_KEY`   | `""`                         | Your own key — never commit it.            |
+| `AI_MODEL`     | `""`                         | Model id recognised by the provider, e.g. `gpt-4o-mini`. |
+| `AI_BASE_URL`  | `""`                         | Provider API base, e.g. `https://api.openai.com/v1`. |
+
+When `AI_ENABLED` is `false` or `AI_API_KEY` / `AI_MODEL` are empty, the
+provider service returns a documented `disabled` or `unconfigured` status.
+Downstream AI endpoints can map these to clear responses without crashing.
+
+### Docker Compose
+
+The `.env.example` file at the repository root includes placeholder AI variables.
+Copy the AI section to a local `.env` file (never committed) and set your own
+values when you need to test AI features locally:
+
+```powershell
+AI_ENABLED=true
+AI_PROVIDER=openai-compatible
+AI_API_KEY=your-own-provider-key
+AI_MODEL=gpt-4o-mini
+AI_BASE_URL=https://api.openai.com/v1
+```
+
+Recreate the `api` service after changing `.env`:
+
+```powershell
+docker compose up -d --force-recreate api
+```
+
+### Provider Abstraction
+
+- `backend/app/core/config.py` — settings fields (`AI_ENABLED`, `AI_PROVIDER`,
+  `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`).
+- `backend/app/services/ai_provider.py` — `AiProviderService` that detects
+  disabled/unconfigured state and delegates to an injectable client.
+- `backend/app/services/ai_json.py` — `extract_json`, prompt builders, and the
+  `complete_and_parse_json` pipeline that validates LLM output against a Pydantic
+  model.
+- `backend/app/services/ai_intent.py` — `parse_listening_intent` service that
+  loads the user's tag catalogue, builds a prompt, calls the AI, and re-validates
+  returned tag ids through the Phase 5 recommendation tag checks.
+- `backend/app/services/ai_tag_suggestions.py` — `suggest_tags_for_track` service
+  that suggests existing tags (by id) and optional new tag names for a track
+  using track metadata and the user's tag taxonomy.  Never creates or assigns tags.
+- `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
+  `ParseListeningIntentRequest`, `ParsedIntentResponse`, and supporting schemas.
+
+Available AI endpoints after Task 6.5:
+
+- `POST /api/ai/parse-listening-intent` (authenticated) — maps natural-language
+  listening requests to Phase 5-compatible structured tag ids using only the
+  current user's existing tags.
+- `POST /api/ai/recommend` (authenticated) — parses natural-language intent via
+  the AI, then delegates ranking to the existing Phase 5 recommendation service.
+  The LLM never selects track ids and never bypasses cooldown, recent-playback,
+  or feedback penalties.
+- `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) — suggests
+  existing tags and optional new tag names for a track using AI-assisted
+  metadata analysis. The endpoint never creates or assigns tags.
+
+Later tasks will add the actual HTTP provider client and additional AI endpoints.
 
 ## Web Setup
 
@@ -545,6 +633,131 @@ production deployment hardening, automatic full-library offline sync, complex
 download queue management, and background caching of the entire library remain
 outside this phase.
 
+## Phase 5 Recommendation V1 Smoke Test
+
+Use this flow to verify the completed Phase 5 structured recommendation loop
+against the local backend while preserving the Phase 3 Media3 playback
+architecture and Phase 4 cached playback source selection:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload and process enough audio files until at least three tracks are
+   `ready`:
+
+   ```powershell
+   docker compose run --rm worker
+   ```
+
+   Or keep the worker running:
+
+   ```powershell
+   docker compose up -d worker-loop
+   ```
+
+5. In the Web console, create or reuse tags in the supported groups:
+   `scenario`, `state`, `type`, and `attribute`.
+6. Assign those tags to at least three ready tracks.
+7. Use the feedback and recommendation API smoke tests in
+   `docs/API_MANUAL_TESTING.md` to verify `POST /api/feedback-events` and
+   `POST /api/recommendations`.
+8. From `web/`, run the Web app and open `/recommendations` after login:
+
+   ```powershell
+   $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+   npm run dev
+   ```
+
+9. Select structured tags, request recommendations, send feedback, and confirm
+   existing Library, Upload, Tags, Track Detail, and Web playback still work.
+10. Open the Android app on an emulator or device, configure the local backend
+    URL, log in, and open Recommendation Home.
+11. Select structured tags, request recommendations, confirm primary result and
+    alternatives, and select a recommendation to hand off to the existing Now
+    Playing flow.
+12. Cache one recommended ready track through the existing Track Detail cache
+    action, then confirm selecting that recommended track can use Phase 4
+    cached playback source selection.
+13. Send Recommendation V1 feedback actions from Android and manually request
+    recommendations again to confirm subsequent results can change.
+14. Record the automated and manual results in `docs/PHASE_5_ACCEPTANCE.md`.
+
+Phase 5 acceptance must not be marked complete without actual Android and Web
+manual structured recommendation verification. AI Assistant, natural-language
+parsing, AI-generated reasons, production ML or training platforms, social
+features, and deployment hardening remain outside this phase.
+
+## Phase 6 AI Assistant V1 Smoke Test
+
+Use this flow to verify the completed Phase 6 AI Assistant V1 loop against the
+local backend while preserving Phase 5 rule-based ranking, Phase 3 Media3
+playback, and Phase 4 cached playback source selection:
+
+1. From the repository root, start PostgreSQL and the API:
+
+   ```powershell
+   docker compose up -d postgres api
+   ```
+
+2. Apply database migrations:
+
+   ```powershell
+   docker compose exec api alembic upgrade head
+   ```
+
+3. Create or reuse the initial local user. If the database already has a user,
+   keep using that account instead of creating another one.
+4. Upload and process enough audio files until at least three tracks are
+   `ready`, then assign structured tags in the `scenario`, `state`, `type`,
+   and `attribute` groups.
+5. Configure development-only AI provider values if testing provider-ok
+   behavior. Never commit a real key, production secret, or bearer token.
+6. Use the AI endpoint smoke tests in `docs/API_MANUAL_TESTING.md` to verify
+   disabled/unconfigured provider behavior, `POST
+   /api/ai/parse-listening-intent`, `POST /api/ai/recommend`, `POST
+   /api/ai/tracks/{track_id}/suggest-tags`, Phase 5 ranking integrity, and tag
+   suggestions that do not auto-create or auto-assign tags.
+7. From `web/`, run the Web app and open the AI Assistant after login:
+
+   ```powershell
+   $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+   npm run dev
+   ```
+
+8. Submit a natural-language request, confirm parsed structured context,
+   primary recommendation and alternatives, existing feedback actions, and
+   tag-suggestion confirmation behavior.
+9. Confirm existing Library, Upload, Tags, Track Detail, structured
+   Recommendation, and Web playback still work.
+10. Open the Android app on an emulator or device, configure the local backend
+    URL, log in, and open Recommendation Home.
+11. Confirm structured controls still work, submit a natural-language request,
+    confirm parsed context and results, and select a recommendation to hand off
+    to existing Now Playing/Media3 playback.
+12. Cache one recommended ready track through the existing manual Track Detail
+    cache action, then confirm selecting that recommended track can use Phase 4
+    cached playback source selection.
+13. Confirm AI loading, unauthorized, offline, provider unavailable, backend
+    error, and empty-result states are understandable.
+14. Record the automated and manual results in `docs/PHASE_6_ACCEPTANCE.md`.
+
+Phase 6 acceptance must not be marked complete without actual Web AI Assistant
+verification and actual Android natural-language recommendation verification.
+Production deployment hardening, embeddings, audio analysis, training
+platforms, social features, automatic downloads, and playback rewrites remain
+outside this phase.
+
 ## Database Migrations
 
 Backend migrations use Alembic with SQLAlchemy. The migration environment reads
@@ -559,6 +772,35 @@ Local migration workflow:
 3. Set `DATABASE_URL` for the target database.
 4. Run `.\.venv\Scripts\python.exe -m alembic current` to check connectivity.
 5. Apply migrations with `.\.venv\Scripts\python.exe -m alembic upgrade head`.
+
+## Production Host Directories
+
+For production deployments the application containers run as a non-root user
+(UID 1100 / GID 1100, defined in `backend/Dockerfile`).  Host directories used
+as bind mounts must be writable by this user.
+
+The recommended layout follows `docs/ARCHITECTURE.md`:
+
+| Host path | Container path | Used by |
+|---|---|---|
+| `/srv/easy-music/media/originals` | `/app/media/originals` | api, worker |
+| `/srv/easy-music/media/playback` | `/app/media/playback` | api, worker |
+| `/srv/easy-music/media/covers` | `/app/media/covers` | api, worker |
+| `/srv/easy-music/postgres` | `/var/lib/postgresql/data` | postgres |
+| `/srv/easy-music/backups` | (host only) | backup script |
+
+All paths are configurable through `.env.production`.  See
+`.env.production.example` for the variable names and defaults.
+
+A convenience script at `deploy/setup-host.sh` creates the directories and
+sets ownership.  Run it once before the first `docker compose up -d`:
+
+```bash
+sudo ./deploy/setup-host.sh
+```
+
+The script is non-destructive: it only runs `mkdir -p` and `chown`; it never
+deletes existing data.
 
 ## Scope Notes
 

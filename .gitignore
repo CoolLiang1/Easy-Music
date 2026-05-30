@@ -55,6 +55,7 @@ postgres-data/
 tmp/
 logs/
 *.log
+.acceptance-chrome-profile*/
 
 # Local media storage and generated audio artifacts
 /media/
@@ -75,3 +76,6 @@ logs/
 !backend/tests/fixtures/**/*.m4a
 !backend/tests/fixtures/**/*.wav
 !backend/tests/fixtures/**/*.ogg
+
+# claude code
+.claude/

@@ -1,3 +1,4 @@
+import { AiAssistantPage } from "./pages/AiAssistantPage";
 import { AppLayout } from "./layout/AppLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { LibraryPage } from "./pages/LibraryPage";
@@ -45,6 +46,7 @@ export default function App() {
         {route.name === "library" ? <LibraryPage /> : null}
         {route.name === "upload" ? <UploadPage /> : null}
         {route.name === "tags" ? <TagsPage /> : null}
+        {route.name === "aiAssistant" ? <AiAssistantPage /> : null}
         {route.name === "recommendations" ? <RecommendationPage /> : null}
         {route.name === "trackDetail" ? (
           <TrackDetailPage trackId={route.params.trackId} />

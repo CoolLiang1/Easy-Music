@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -18,6 +19,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,9 +36,11 @@ import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.recommendation.data.HttpAiRecommendationApi
 import com.easymusic.app.recommendation.data.HttpFeedbackApi
 import com.easymusic.app.recommendation.data.HttpRecommendationApi
 import com.easymusic.app.recommendation.data.FeedbackType
+import com.easymusic.app.recommendation.data.MatchedTagItem
 import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
 import java.util.Locale
@@ -57,6 +61,7 @@ fun RecommendationHomeRoute(
             trackApi = TrackApi(apiClient),
             recommendationRepository = RecommendationRepository(
                 recommendationApi = HttpRecommendationApi(apiClient),
+                aiRecommendationApi = HttpAiRecommendationApi(apiClient),
                 feedbackApi = HttpFeedbackApi(apiClient),
                 tokenStore = tokenStore,
             ),
@@ -76,6 +81,15 @@ fun RecommendationHomeRoute(
         onToggleExcludedAttribute = viewModel::toggleExcludedAttribute,
         onClearSelections = viewModel::clearSelections,
         onRequestRecommendations = { viewModel.requestRecommendations(isNetworkAvailable) },
+        onAiTextChanged = viewModel::updateAiText,
+        onRequestAiRecommendation = { viewModel.requestAiRecommendation(isNetworkAvailable) },
+        onSendAiFeedback = { trackId, feedbackType ->
+            viewModel.sendAiFeedback(
+                trackId = trackId,
+                feedbackType = feedbackType,
+                isNetworkAvailable = isNetworkAvailable,
+            )
+        },
         onSendFeedback = { trackId, feedbackType ->
             viewModel.sendFeedback(
                 trackId = trackId,
@@ -98,6 +112,9 @@ fun RecommendationHomeScreen(
     onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
+    onAiTextChanged: (String) -> Unit,
+    onRequestAiRecommendation: () -> Unit,
+    onSendAiFeedback: (Int, FeedbackType) -> Unit,
     onSendFeedback: (Int, FeedbackType) -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
@@ -138,6 +155,9 @@ fun RecommendationHomeScreen(
                 onToggleExcludedAttribute = onToggleExcludedAttribute,
                 onClearSelections = onClearSelections,
                 onRequestRecommendations = onRequestRecommendations,
+                onAiTextChanged = onAiTextChanged,
+                onRequestAiRecommendation = onRequestAiRecommendation,
+                onSendAiFeedback = onSendAiFeedback,
                 onSendFeedback = onSendFeedback,
                 onTrackSelected = onTrackSelected,
             )
@@ -276,10 +296,34 @@ private fun RecommendationControls(
     onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
+    onAiTextChanged: (String) -> Unit,
+    onRequestAiRecommendation: () -> Unit,
+    onSendAiFeedback: (Int, FeedbackType) -> Unit,
     onSendFeedback: (Int, FeedbackType) -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        // ── AI Assistant Section ──────────────────────────────────────
+        AiAssistantSection(
+            aiState = uiState.aiState,
+            feedbackStates = uiState.feedbackStates,
+            isNetworkAvailable = isNetworkAvailable,
+            onTextChanged = onAiTextChanged,
+            onRequestRecommendation = onRequestAiRecommendation,
+            onSendFeedback = onSendAiFeedback,
+            onTrackSelected = onTrackSelected,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Structured Controls",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // ── Structured Tag Controls (unchanged) ───────────────────────
         TagSection(
             title = "Scenario",
             tags = uiState.groupedTags.scenarios,
@@ -627,6 +671,287 @@ private fun TagSection(
                 }
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AI Assistant section
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AiAssistantSection(
+    aiState: AiRecommendationUiState,
+    feedbackStates: Map<Int, RecommendationFeedbackUiState>,
+    isNetworkAvailable: Boolean,
+    onTextChanged: (String) -> Unit,
+    onRequestRecommendation: () -> Unit,
+    onSendFeedback: (Int, FeedbackType) -> Unit,
+    onTrackSelected: (TrackResponse) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Section header
+        Text(
+            text = "AI Assistant",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        // Text input + button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = aiState.textInput,
+                onValueChange = onTextChanged,
+                modifier = Modifier.weight(1f),
+                enabled = !aiState.isRequesting && isNetworkAvailable,
+                label = { Text("Describe what to listen to") },
+                placeholder = { Text("e.g. calm instrumental focus music") },
+                singleLine = true,
+            )
+            Button(
+                enabled = aiState.textInput.isNotBlank() &&
+                    !aiState.isRequesting &&
+                    isNetworkAvailable,
+                onClick = onRequestRecommendation,
+            ) {
+                Text(
+                    when {
+                        !isNetworkAvailable -> "Offline"
+                        aiState.isRequesting -> "..."
+                        else -> "Get"
+                    },
+                )
+            }
+        }
+
+        // AI loading
+        if (aiState.isRequesting) {
+            AiLoadingBanner()
+        }
+
+        // AI error
+        if (aiState.errorMessage != null && !aiState.isRequesting) {
+            AiErrorBanner(message = aiState.errorMessage)
+        }
+
+        // Provider status (non-ok)
+        if (!aiState.isRequesting && aiState.providerStatus != null &&
+            aiState.providerStatus != "ok"
+        ) {
+            AiProviderStatusBanner(status = aiState.providerStatus)
+        }
+
+        // Parsed context
+        if (aiState.parsedContext != null && !aiState.isRequesting) {
+            AiParsedContextSection(context = aiState.parsedContext)
+        }
+
+        // AI results
+        if (aiState.results.isNotEmpty() && !aiState.isRequesting) {
+            AiResultsSection(
+                results = aiState.results,
+                isNetworkAvailable = isNetworkAvailable,
+                feedbackStates = feedbackStates,
+                onSendFeedback = onSendFeedback,
+                onTrackSelected = onTrackSelected,
+            )
+        }
+
+        // Empty AI results
+        if (aiState.results.isEmpty() && aiState.providerStatus == "ok" &&
+            aiState.parsedContext != null && !aiState.isRequesting
+        ) {
+            EmptyAiResults()
+        }
+    }
+}
+
+@Composable
+private fun AiLoadingBanner() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(modifier = Modifier.height(16.dp).width(16.dp))
+            Text(
+                modifier = Modifier.padding(start = 12.dp),
+                text = "AI is parsing your request...",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AiErrorBanner(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            modifier = Modifier.padding(12.dp),
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun AiProviderStatusBanner(status: String) {
+    val message = when (status) {
+        "disabled" -> "AI provider is disabled. Set AI_ENABLED=true in backend config."
+        "unconfigured" -> "AI provider is not configured. Check AI_API_KEY and AI_MODEL."
+        "error" -> "AI provider encountered an error. Check backend logs."
+        else -> "AI provider status: $status"
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            modifier = Modifier.padding(12.dp),
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun AiParsedContextSection(context: AiParsedContext) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // AI explanation
+        if (!context.explanation.isNullOrBlank()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    modifier = Modifier.padding(12.dp),
+                    text = context.explanation,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+
+        // Matched tags by group
+        val groupOrder = listOf("scenario", "state", "type", "attribute")
+        val groupLabels = mapOf(
+            "scenario" to "Scenario",
+            "state" to "State",
+            "type" to "Type",
+            "attribute" to "Attribute",
+        )
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            groupOrder.forEach { group ->
+                val items = context.matchedTags[group].orEmpty()
+                items.forEach { tag ->
+                    FilterChip(
+                        selected = true,
+                        onClick = {},
+                        label = {
+                            Text("${groupLabels[group] ?: group}: ${tag.name}")
+                        },
+                    )
+                }
+            }
+        }
+
+        // Unmatched terms
+        if (context.unmatchedTerms.isNotEmpty()) {
+            Text(
+                text = "Unmatched: ${context.unmatchedTerms.joinToString(", ")}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AiResultsSection(
+    results: List<RecommendationResult>,
+    isNetworkAvailable: Boolean,
+    feedbackStates: Map<Int, RecommendationFeedbackUiState>,
+    onSendFeedback: (Int, FeedbackType) -> Unit,
+    onTrackSelected: (TrackResponse) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        results.firstOrNull()?.let { result ->
+            Text(
+                text = "AI Recommendation",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            RecommendationResultCard(
+                result = result,
+                isPrimary = true,
+                isNetworkAvailable = isNetworkAvailable,
+                feedbackState = feedbackStates[result.track.id],
+                onSendFeedback = { feedbackType ->
+                    onSendFeedback(result.track.id, feedbackType)
+                },
+                onClick = { onTrackSelected(result.track) },
+            )
+        }
+
+        val alternatives = results.drop(1).take(2)
+        if (alternatives.isNotEmpty()) {
+            Text(
+                modifier = Modifier.padding(top = 4.dp),
+                text = "AI Alternatives",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            alternatives.forEach { result ->
+                RecommendationResultCard(
+                    result = result,
+                    isPrimary = false,
+                    isNetworkAvailable = isNetworkAvailable,
+                    feedbackState = feedbackStates[result.track.id],
+                    onSendFeedback = { feedbackType ->
+                        onSendFeedback(result.track.id, feedbackType)
+                    },
+                    onClick = { onTrackSelected(result.track) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyAiResults() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            modifier = Modifier.padding(16.dp),
+            text = "No recommendations matched your request. Try different wording or check that ready tracks with matching tags exist.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
