@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# setup-host.sh  —  Easy Music production host directory setup
+# setup-host.sh - Easy Music production host directory setup
 # ---------------------------------------------------------------------------
 #
-# Creates the host-side directories required by docker-compose.prod.yml
-# and sets ownership so the non-root container users can read and write.
+# Creates the host-side directories required by docker-compose.prod.yml and
+# sets ownership so the non-root container users can read and write.
 #
 # This script is NON-DESTRUCTIVE: it only creates directories and adjusts
-# permissions.  It never deletes or overwrites existing data.
+# permissions. It never deletes or overwrites existing data.
 #
 # Usage:
 #   chmod +x deploy/setup-host.sh
@@ -16,13 +16,13 @@
 # Without sudo the script creates directories but cannot adjust ownership.
 # Run without sudo first to see what it would do, then re-run with sudo.
 #
-# Paths are read from .env.production when available; otherwise the
-# defaults below are used.
+# Paths are read from .env.production when available; otherwise the defaults
+# below are used.
 
 set -euo pipefail
 
 # ------------------------------------------------------------------
-# Default paths  (override through .env.production or environment)
+# Default paths (override through .env.production or environment)
 # ------------------------------------------------------------------
 MEDIA_ORIGINALS="${MEDIA_HOST_ORIGINALS:-/srv/easy-music/media/originals}"
 MEDIA_PLAYBACK="${MEDIA_HOST_PLAYBACK:-/srv/easy-music/media/playback}"
@@ -40,15 +40,17 @@ APP_GID="${EASY_MUSIC_APP_GID:-1100}"
 # ------------------------------------------------------------------
 ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env.production"
 if [ -f "$ENV_FILE" ]; then
-    echo "[setup-host] Reading ${ENV_FILE} …"
+    echo "[setup-host] Reading ${ENV_FILE} ..."
+
     # Only export the variables we care about so unrelated shell escapes
-    # in the env file cannot cause side-effects.
+    # in the env file cannot cause side effects.
     # shellcheck disable=SC2046
     export $(grep -E '^(MEDIA_HOST_ORIGINALS|MEDIA_HOST_PLAYBACK|MEDIA_HOST_COVERS|POSTGRES_DATA_DIR|BACKUP_DIR)=' "$ENV_FILE" | xargs) 2>/dev/null || true
     MEDIA_ORIGINALS="${MEDIA_HOST_ORIGINALS:-$MEDIA_ORIGINALS}"
     MEDIA_PLAYBACK="${MEDIA_HOST_PLAYBACK:-$MEDIA_PLAYBACK}"
     MEDIA_COVERS="${MEDIA_HOST_COVERS:-$MEDIA_COVERS}"
     POSTGRES_DATA="${POSTGRES_DATA_DIR:-$POSTGRES_DATA}"
+    BACKUP_DIR="${BACKUP_DIR:-$BACKUP_DIR}"
 fi
 
 echo ""
@@ -64,7 +66,7 @@ echo ""
 # ------------------------------------------------------------------
 # Create directories
 # ------------------------------------------------------------------
-echo "[setup-host] Creating directories …"
+echo "[setup-host] Creating directories ..."
 mkdir -p "$MEDIA_ORIGINALS"
 mkdir -p "$MEDIA_PLAYBACK"
 mkdir -p "$MEDIA_COVERS"
@@ -77,7 +79,7 @@ echo "[setup-host] Directories created (or already present)."
 # Permissions
 # ------------------------------------------------------------------
 if [ "$(id -u)" -eq 0 ]; then
-    echo "[setup-host] Running as root — setting ownership …"
+    echo "[setup-host] Running as root; setting ownership ..."
 
     # Media directories are written by the api / worker containers
     # which run as UID:GID ${APP_UID}:${APP_GID}.
@@ -89,9 +91,9 @@ if [ "$(id -u)" -eq 0 ]; then
     chown "${APP_UID}:${APP_GID}" "$BACKUP_DIR"
     chmod 700 "$BACKUP_DIR"
 
-    echo "[setup-host] Ownership set to ${APP_UID}:${APP_GID} for media dirs."
+    echo "[setup-host] Ownership set to ${APP_UID}:${APP_GID} for media and backup dirs."
 else
-    echo "[setup-host] NOT running as root — skipping chown."
+    echo "[setup-host] NOT running as root; skipping chown."
     echo "[setup-host] Re-run with sudo to set directory ownership:"
     echo "  sudo $0"
     echo ""
@@ -100,5 +102,5 @@ else
 fi
 
 echo ""
-echo "[setup-host] Done.  You can now start the stack:"
+echo "[setup-host] Done. You can now start the stack:"
 echo "  docker compose -f docker-compose.prod.yml --env-file .env.production up -d"
