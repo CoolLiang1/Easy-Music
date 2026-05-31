@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# backup-db.sh  —  Easy Music database backup
+# backup-db.sh - Easy Music database backup
 # ---------------------------------------------------------------------------
 #
 # Dumps the production PostgreSQL database to a compressed, timestamped file
-# using pg_dump inside the running postgres container.  The script does NOT
+# using pg_dump inside the running postgres container. The script does NOT
 # modify, drop, or recreate the source database.
 #
 # ---------------------------------------------------------------------------
@@ -23,37 +23,26 @@
 # ---------------------------------------------------------------------------
 # Cron example  (daily at 3:00 AM)
 # ---------------------------------------------------------------------------
-#   0 3 * * * /srv/easy-music/deploy/backup-db.sh /srv/easy-music/backups
+#   0 3 * * * /srv/easy-music/repo/deploy/backup-db.sh /srv/easy-music/backups
 #
 # ---------------------------------------------------------------------------
-# Retention  (remove backups older than BACKUP_RETENTION_DAYS)
+# Restore  (MANUAL - review before running)
 # ---------------------------------------------------------------------------
-# Add a separate cron entry to clean up old backups.  The backup script
-# itself never deletes files.  Example (run daily at 3:30 AM, keeps 30 days):
-#
-#   30 3 * * * find /srv/easy-music/backups -name 'easy_music_backup_*.sql.gz' -mtime +30 -delete
-#
-# Or use BACKUP_RETENTION_DAYS from .env.production:
-#   30 3 * * * find /srv/easy-music/backups -name 'easy_music_backup_*.sql.gz' -mtime +${BACKUP_RETENTION_DAYS:-30} -delete
-#
-# ---------------------------------------------------------------------------
-# Restore  (MANUAL — review before running)
-# ---------------------------------------------------------------------------
-# Restoring overwrites the existing database.  Only run this when you are
+# Restoring overwrites the existing database. Only run this when you are
 # certain you want to replace the current data with the backup.
 #
 #   1. Stop the api and worker so no writes happen during restore:
-#        docker compose -f docker-compose.prod.yml stop api worker
+#        docker compose -f docker-compose.prod.yml --env-file .env.production stop api worker
 #
 #   2. Restore from the backup file:
 #        gunzip < /srv/easy-music/backups/easy_music_backup_YYYY-MM-DD_HHMMSS.sql.gz \
-#          | docker compose -f docker-compose.prod.yml exec -T postgres \
+#          | docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
 #            psql -U easy_music -d easy_music
 #
 #   3. Start the services again:
-#        docker compose -f docker-compose.prod.yml start api worker
+#        docker compose -f docker-compose.prod.yml --env-file .env.production start api worker
 #
-#   WARNING: step 2 drops and recreates data.  There is no undo.
+#   WARNING: step 2 overwrites data. There is no undo.
 #            Take a fresh backup before restoring.
 
 set -euo pipefail
@@ -64,17 +53,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/docker-compose.prod.yml}"
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.production}"
 
 # ------------------------------------------------------------------
 # Backup destination
 # ------------------------------------------------------------------
 BACKUP_DIR="${1:-${BACKUP_DIR:-/srv/easy-music/backups}}"
-
-# ------------------------------------------------------------------
-# Database connection  (defaults match .env.production.example)
-# ------------------------------------------------------------------
-DB_NAME="${POSTGRES_DB:-easy_music}"
-DB_USER="${POSTGRES_USER:-easy_music}"
 
 # ------------------------------------------------------------------
 # Construct the output filename
@@ -91,10 +75,24 @@ if [ ! -f "$COMPOSE_FILE" ]; then
     exit 1
 fi
 
-if ! docker compose -f "$COMPOSE_FILE" ps postgres 2>/dev/null | grep -q 'Up\|running'; then
+if [ ! -f "$ENV_FILE" ]; then
+    echo "[backup-db] ERROR: env file not found: ${ENV_FILE}" >&2
+    echo "[backup-db] Set ENV_FILE to the path of .env.production." >&2
+    exit 1
+fi
+
+# Read only the database identity variables from .env.production. Do not source
+# the whole file, because it may contain secrets or characters with shell
+# meaning.
+# shellcheck disable=SC2046
+export $(grep -E '^(POSTGRES_DB|POSTGRES_USER)=' "$ENV_FILE" | xargs) 2>/dev/null || true
+DB_NAME="${POSTGRES_DB:-easy_music}"
+DB_USER="${POSTGRES_USER:-easy_music}"
+
+if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps postgres 2>/dev/null | grep -q 'Up\|running'; then
     echo "[backup-db] ERROR: postgres container is not running." >&2
     echo "[backup-db] Start the stack first:" >&2
-    echo "  docker compose -f ${COMPOSE_FILE} up -d postgres" >&2
+    echo "  docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d postgres" >&2
     exit 1
 fi
 
@@ -103,10 +101,10 @@ mkdir -p "$BACKUP_DIR"
 # ------------------------------------------------------------------
 # Run pg_dump inside the postgres container
 # ------------------------------------------------------------------
-echo "[backup-db] Dumping database '${DB_NAME}' …"
+echo "[backup-db] Dumping database '${DB_NAME}' ..."
 
 set +e
-docker compose -f "$COMPOSE_FILE" exec -T postgres \
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T postgres \
     pg_dump -U "$DB_USER" -d "$DB_NAME" \
     2> >(sed 's/^/[backup-db] /' >&2) \
     | gzip > "$BACKUP_FILE"
@@ -115,7 +113,7 @@ set -e
 
 if [ "$DUMP_EXIT" -ne 0 ]; then
     echo "[backup-db] ERROR: pg_dump exited with code ${DUMP_EXIT}" >&2
-    # Remove the partial (likely empty or corrupt) output file.
+    # Remove the partial file only; this script never deletes directories.
     rm -f "$BACKUP_FILE"
     exit 1
 fi
