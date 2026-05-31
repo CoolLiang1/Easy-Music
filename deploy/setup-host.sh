@@ -35,6 +35,10 @@ BACKUP_DIR="${BACKUP_DIR:-/srv/easy-music/backups}"
 APP_UID="${EASY_MUSIC_APP_UID:-1100}"
 APP_GID="${EASY_MUSIC_APP_GID:-1100}"
 
+# UID:GID used by the postgres:16-alpine image.
+POSTGRES_UID="${EASY_MUSIC_POSTGRES_UID:-70}"
+POSTGRES_GID="${EASY_MUSIC_POSTGRES_GID:-70}"
+
 # ------------------------------------------------------------------
 # Source .env.production if present (values override the defaults)
 # ------------------------------------------------------------------
@@ -61,6 +65,7 @@ echo "Media covers    : ${MEDIA_COVERS}"
 echo "PostgreSQL data : ${POSTGRES_DATA}"
 echo "Backups         : ${BACKUP_DIR}"
 echo "App UID:GID     : ${APP_UID}:${APP_GID}"
+echo "Postgres UID:GID: ${POSTGRES_UID}:${POSTGRES_GID}"
 echo ""
 
 # ------------------------------------------------------------------
@@ -87,11 +92,15 @@ if [ "$(id -u)" -eq 0 ]; then
     chown "${APP_UID}:${APP_GID}" "$MEDIA_PLAYBACK"
     chown "${APP_UID}:${APP_GID}" "$MEDIA_COVERS"
 
+    # PostgreSQL writes its data directory as the postgres container user.
+    chown "${POSTGRES_UID}:${POSTGRES_GID}" "$POSTGRES_DATA"
+    chmod 700 "$POSTGRES_DATA"
+
     # Backup directory should be writable by the operator; 700 is safe.
     chown "${APP_UID}:${APP_GID}" "$BACKUP_DIR"
     chmod 700 "$BACKUP_DIR"
 
-    echo "[setup-host] Ownership set to ${APP_UID}:${APP_GID} for media and backup dirs."
+    echo "[setup-host] Ownership set for media, postgres data, and backup dirs."
 else
     echo "[setup-host] NOT running as root; skipping chown."
     echo "[setup-host] Re-run with sudo to set directory ownership:"

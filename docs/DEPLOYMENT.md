@@ -1,398 +1,431 @@
-# Easy Music — Production Deployment Guide
+# Easy Music Production Deployment Guide
 
-This guide takes you from a fresh Ubuntu server to a running Easy Music stack
-accessible over HTTPS.  It assumes basic Linux and Docker familiarity.
-
-All paths and domain names below are **placeholders** — replace them with your
-own values.  Never commit real secrets to the repository.
-
----
+This guide deploys Easy Music on a fresh Ubuntu server with Docker Compose and
+HTTPS. Replace placeholder values such as `music.example.com` with your real
+domain and never commit production secrets.
 
 ## Prerequisites
 
-- **Ubuntu 22.04 LTS** or **24.04 LTS** (other distributions work but
-  commands may differ).
-- **Docker Engine** and the **Docker Compose plugin** installed.
-  Follow the official Docker documentation for your Ubuntu version.
-- A **public domain name** whose DNS A record points to the server's public IP.
-- Ports **80** and **443** reachable from the internet (firewall or security
-  group must allow inbound TCP on both ports).
-- **Git** installed (`sudo apt install git`).
-- At least 2 GB of free disk space for images, media, and backups
-  (4 TB recommended for a large library).
+- Ubuntu 22.04 LTS or 24.04 LTS.
+- Docker Engine and the Docker Compose plugin installed.
+- Git, curl, ca-certificates, openssl, and dnsutils installed.
+- A public domain whose DNS A record points to the server public IP.
+- Inbound TCP ports 80 and 443 open in the host firewall and cloud security
+  group.
+- At least 2 GB free disk space for a small test deployment. Use much more for
+  a real music library.
 
-Verify Docker is ready:
+Install basic tools:
+
+```bash
+sudo apt update
+sudo apt install -y git curl ca-certificates openssl dnsutils
+```
+
+Verify Docker:
 
 ```bash
 docker --version
 docker compose version
 ```
 
----
+If Docker is missing, install it from the official Docker Ubuntu guide:
 
-## Quick Start
+```text
+https://docs.docker.com/engine/install/ubuntu/
+```
 
-If you already have `.env.production` configured and host directories created,
-start the stack in two commands:
+## Step 1 - Clone the Repository
+
+Production should normally deploy the `main` branch. Use `develop` only for a
+temporary pre-production deployment.
+
+```bash
+sudo mkdir -p /srv/easy-music
+sudo chown "$USER:$USER" /srv/easy-music
+
+git clone -b main https://github.com/CoolLiang1/Easy-Music.git /srv/easy-music/repo
+cd /srv/easy-music/repo
+```
+
+If the repository already exists:
+
+```bash
+cd /srv/easy-music/repo
+git fetch origin
+git switch main
+git pull --ff-only origin main
+```
+
+Verify required deployment files:
+
+```bash
+test -f docker-compose.prod.yml
+test -f .env.production.example
+test -f deploy/setup-host.sh
+test -f deploy/backup-db.sh
+test -f deploy/Caddyfile
+```
+
+If `.env.production.example` is missing, the checkout is on the wrong branch or
+is out of date:
+
+```bash
+git status -sb
+git branch -a
+git log --oneline -n 5
+find . -maxdepth 3 -name ".env.production.example" -print
+```
+
+## Step 2 - Configure Production Environment
+
+Create `.env.production` only if it does not already exist:
+
+```bash
+if [ -f .env.production ]; then
+  echo ".env.production already exists; do not overwrite it."
+else
+  cp .env.production.example .env.production
+fi
+```
+
+Generate secrets:
+
+```bash
+openssl rand -hex 32
+openssl rand -base64 36
+```
+
+Edit the file:
+
+```bash
+nano .env.production
+```
+
+Set these required values:
+
+```env
+POSTGRES_DB=easy_music
+POSTGRES_USER=easy_music
+POSTGRES_PASSWORD=replace-with-a-strong-database-password
+DATABASE_URL=postgresql+psycopg://easy_music:replace-with-the-same-database-password@postgres:5432/easy_music
+
+APP_SECRET_KEY=replace-with-openssl-rand-hex-32
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=https://music.example.com
+CADDY_DOMAIN=music.example.com
+
+MEDIA_HOST_ORIGINALS=/srv/easy-music/media/originals
+MEDIA_HOST_PLAYBACK=/srv/easy-music/media/playback
+MEDIA_HOST_COVERS=/srv/easy-music/media/covers
+POSTGRES_DATA_DIR=/srv/easy-music/postgres
+
+LOG_LEVEL=INFO
+LOG_FORMAT=text
+
+AI_ENABLED=false
+AI_PROVIDER=openai-compatible
+AI_API_KEY=
+AI_MODEL=
+AI_BASE_URL=https://api.openai.com/v1
+```
+
+Rules:
+
+- `CADDY_DOMAIN` is the bare domain, for example `music.example.com`.
+- `CORS_ORIGINS` includes the scheme, for example `https://music.example.com`.
+- `DATABASE_URL` must use the same password as `POSTGRES_PASSWORD`.
+- Use `AI_ENABLED=false` for the first deployment unless AI credentials are
+  ready.
+
+Check for unfinished placeholders before continuing:
+
+```bash
+grep -E 'change-me|replace-with|your-domain|example.com' .env.production \
+  && echo "Fix placeholders before continuing"
+```
+
+If that command prints anything, edit `.env.production` again.
+
+## Step 3 - Prepare Host Directories
+
+Run the non-destructive setup script. It creates directories and sets ownership
+for the app containers and PostgreSQL data directory.
+
+```bash
+chmod +x deploy/setup-host.sh
+sudo ./deploy/setup-host.sh
+```
+
+Verify:
+
+```bash
+ls -ld /srv/easy-music/media/originals
+ls -ld /srv/easy-music/media/playback
+ls -ld /srv/easy-music/media/covers
+ls -ld /srv/easy-music/postgres
+ls -ld /srv/easy-music/backups
+```
+
+Expected ownership:
+
+- Media and backup directories: UID/GID `1100:1100`.
+- PostgreSQL data directory: UID/GID `70:70`.
+
+## Step 4 - Build the Web App
+
+Install Node.js and npm if missing:
+
+```bash
+node --version || sudo apt install -y nodejs npm
+npm --version
+```
+
+Build the SPA:
+
+```bash
+cd /srv/easy-music/repo/web
+npm install
+npm run build
+cd ..
+test -f web/dist/index.html
+```
+
+## Step 5 - Build, Start, and Migrate
+
+Always pass `--env-file .env.production` when using the production compose file.
+
+Validate compose config:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
+```
+
+Build and start:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production build
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 ```
 
-Then proceed to **Step 4 — First User** below.
-
----
-
-## Step 1 — Clone And Configure
-
-### 1.1 Clone the repository
+Apply database migrations:
 
 ```bash
-git clone https://github.com/<your-username>/easy-music.git /srv/easy-music/repo
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec api alembic upgrade head
+```
+
+Check status:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production ps
+```
+
+All services should be `Up` or `healthy`.
+
+## Step 6 - Verify HTTPS and Health
+
+Check Caddy logs:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 caddy
+```
+
+Check health:
+
+```bash
+curl -sS https://music.example.com/health
+```
+
+Expected response:
+
+```json
+{"status":"healthy","database":"connected"}
+```
+
+If HTTPS fails, verify DNS and firewall:
+
+```bash
+curl -4 ifconfig.me
+dig +short music.example.com
+sudo ufw status
+```
+
+The domain must resolve to the server public IP, and ports 80 and 443 must be
+reachable from the internet.
+
+## Step 7 - Create the First User
+
+Run this only once. The command refuses to create a user if any user already
+exists.
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec -e EASY_MUSIC_INITIAL_PASSWORD='your-admin-password-at-least-12-chars' \
+  api python -m app.auth.initial_user --username admin
+```
+
+If the command says a user already exists, keep using that existing account.
+Do not reset the database unless you intentionally want to lose data.
+
+## Step 8 - Browser Smoke Test
+
+Open:
+
+```text
+https://music.example.com
+```
+
+Verify:
+
+1. Login with the admin account.
+2. Open Library.
+3. Upload a small MP3, FLAC, M4A, WAV, or OGG file.
+4. Confirm the track appears with `processing` status.
+5. Wait until the worker marks it `ready`.
+6. Play the track in the browser.
+
+If processing stalls:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 worker
+```
+
+## Step 9 - Back Up the Database
+
+After the first successful deployment:
+
+```bash
+chmod +x deploy/backup-db.sh
+./deploy/backup-db.sh /srv/easy-music/backups
+ls -lh /srv/easy-music/backups
+```
+
+Optional daily backup cron:
+
+```cron
+0 3 * * * /srv/easy-music/repo/deploy/backup-db.sh /srv/easy-music/backups
+```
+
+The backup script creates files only. It does not delete old backups.
+
+## Ongoing Maintenance
+
+View logs:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f api
+```
+
+Restart services:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production restart api
+docker compose -f docker-compose.prod.yml --env-file .env.production restart worker
+```
+
+Apply updates:
+
+```bash
 cd /srv/easy-music/repo
-```
+./deploy/backup-db.sh /srv/easy-music/backups
 
-### 1.2 Create the production environment file
+git fetch origin
+git switch main
+git pull --ff-only origin main
 
-```bash
-cp .env.production.example .env.production
-```
-
-Edit `.env.production` and fill in every value marked **REQUIRED**:
-
-| Variable | What to set |
-|---|---|
-| `POSTGRES_PASSWORD` | A strong random password for the database. |
-| `DATABASE_URL` | Update the password portion to match `POSTGRES_PASSWORD`. |
-| `APP_SECRET_KEY` | Generate with `openssl rand -hex 32`.  Never reuse the dev key. |
-| `CORS_ORIGINS` | Your HTTPS domain, e.g. `https://music.example.com`. |
-| `CADDY_DOMAIN` | Your public domain, e.g. `music.example.com`. |
-| `MEDIA_HOST_ORIGINALS` | Recommended: `/srv/easy-music/media/originals`. |
-| `MEDIA_HOST_PLAYBACK` | Recommended: `/srv/easy-music/media/playback`. |
-| `MEDIA_HOST_COVERS` | Recommended: `/srv/easy-music/media/covers`. |
-| `POSTGRES_DATA_DIR` | Recommended: `/srv/easy-music/postgres`. |
-
-Optional: set `LOG_FORMAT=json` and adjust `LOG_LEVEL` for production.
-Enable AI features by setting `AI_ENABLED=true` and filling in the AI
-provider details.  See the inline comments in `.env.production.example`.
-
----
-
-## Step 2 — Host Directories
-
-Run the convenience script to create directories and set ownership:
-
-```bash
-sudo ./deploy/setup-host.sh
-```
-
-The script creates (if they don't already exist):
-
-| Directory | Purpose |
-|---|---|
-| `/srv/easy-music/media/originals` | Original uploaded files |
-| `/srv/easy-music/media/playback` | Generated MP3 playback files |
-| `/srv/easy-music/media/covers` | Cover images (future use) |
-| `/srv/easy-music/postgres` | PostgreSQL data files |
-| `/srv/easy-music/backups` | Database dump files |
-
-Ownership is set to UID 1100 / GID 1100, matching the non-root user inside
-the api and worker containers.  If you skip the script, create the directories
-manually and ensure they are writable by UID 1100.
-
----
-
-## Step 3 — Build And Start
-
-### 3.1 Build the Web SPA
-
-The production compose file mounts the built Web app as a read-only volume.
-Build it once (and again after future Web code changes):
-
-```bash
 cd web
 npm install
 npm run build
 cd ..
-```
 
-### 3.2 Build container images
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production build
-```
-
-### 3.3 Start the stack
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-```
-
-### 3.4 Verify the services are running
-
-```bash
-docker compose -f docker-compose.prod.yml ps
-```
-
-All four services (`postgres`, `api`, `worker`, `caddy`) should show
-`Up` or `healthy`.  Check Caddy obtained a TLS certificate:
-
-```bash
-docker compose -f docker-compose.prod.yml logs caddy | grep -i certificate
-```
-
-### 3.5 Quick smoke test
-
-```bash
-# Health endpoint (no auth required)
-curl -s https://<your-domain>/health
-
-# Should return: {"status":"healthy","database":"connected"}
-```
-
----
-
-## Step 4 — First User
-
-The initial-user command refuses to run if any user already exists.  Create
-the first user through the production API container:
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-    exec api python -m app.auth.initial_user --username admin
-```
-
-The command reads the password from the `EASY_MUSIC_INITIAL_PASSWORD`
-environment variable.  Set it once in the shell before running:
-
-```bash
-export EASY_MUSIC_INITIAL_PASSWORD="your-chosen-admin-password"
-```
-
-After the command succeeds, **unset the variable** so it does not linger
-in your shell history or environment:
-
-```bash
-unset EASY_MUSIC_INITIAL_PASSWORD
-```
-
-The command prints a confirmation.  If it refuses because a user already
-exists, keep using that existing account.
-
----
-
-## Step 5 — Verify
-
-### 5.1 Browser login
-
-Open `https://<your-domain>` in a browser.  You should see the Easy Music
-login page served over HTTPS with a valid certificate.
-
-Log in with the credentials from Step 4.  Confirm the Library page loads
-(empty is fine).
-
-### 5.2 Upload a test track
-
-1. From the Web console, open **Upload**.
-2. Select a small MP3, FLAC, M4A, WAV, or OGG file.
-3. Confirm the upload creates a track with `processing` status.
-4. The worker picks up the job within a few seconds (polling interval is 5 s
-   by default).
-5. Refresh the track detail page until the status becomes `ready`.
-
-### 5.3 Playback
-
-On the track detail page or Library, use the built-in player to confirm
-audio streams through the authenticated endpoint.
-
-### 5.4 Verify backup flow
-
-```bash
-./deploy/backup-db.sh /srv/easy-music/backups
-```
-
-Confirm it writes a compressed dump file.  Restore instructions are in the
-header of `deploy/backup-db.sh`.
-
----
-
-## Ongoing Maintenance
-
-### View logs
-
-```bash
-# All services
-docker compose -f docker-compose.prod.yml logs -f
-
-# A single service
-docker compose -f docker-compose.prod.yml logs -f api
-```
-
-Logs are written to stdout and captured by Docker's `json-file` driver.
-Rotation is configured at 10 MB per file, 3 files kept per service.
-
-### Restart a service
-
-```bash
-docker compose -f docker-compose.prod.yml restart api
-docker compose -f docker-compose.prod.yml restart worker
-```
-
-### Apply updates
-
-When new code is pushed to the repository:
-
-```bash
-cd /srv/easy-music/repo
-git pull
-
-# Rebuild the Web SPA
-cd web && npm install && npm run build && cd ..
-
-# Rebuild images and recreate containers
 docker compose -f docker-compose.prod.yml --env-file .env.production build
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-
-# Apply any new database migrations
 docker compose -f docker-compose.prod.yml --env-file .env.production \
-    exec api alembic upgrade head
+  exec api alembic upgrade head
+docker compose -f docker-compose.prod.yml --env-file .env.production ps
 ```
 
-### Database backups
-
-Run the backup script manually:
+Restore from a backup only after taking a fresh backup and confirming you want
+to overwrite current data:
 
 ```bash
-./deploy/backup-db.sh /srv/easy-music/backups
-```
+docker compose -f docker-compose.prod.yml --env-file .env.production stop api worker
 
-Add a cron job for daily backups (example runs at 3:00 AM local time):
-
-```
-0 3 * * * /srv/easy-music/repo/deploy/backup-db.sh /srv/easy-music/backups
-```
-
-Clean up backups older than `BACKUP_RETENTION_DAYS` (30 days by default):
-
-```
-30 3 * * * find /srv/easy-music/backups -name 'easy_music_backup_*.sql.gz' -mtime +30 -delete
-```
-
-### Restore from a backup
-
-**Warning: this overwrites the current database.  There is no undo.
-Take a fresh backup first.**
-
-```bash
-# 1. Stop the api and worker so nothing writes during restore
-docker compose -f docker-compose.prod.yml stop api worker
-
-# 2. Restore
 gunzip < /srv/easy-music/backups/easy_music_backup_YYYY-MM-DD_HHMMSS.sql.gz \
-  | docker compose -f docker-compose.prod.yml exec -T postgres \
+  | docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
     psql -U easy_music -d easy_music
 
-# 3. Start services again
-docker compose -f docker-compose.prod.yml start api worker
+docker compose -f docker-compose.prod.yml --env-file .env.production start api worker
 ```
-
----
 
 ## Troubleshooting
 
-### "port is already allocated" on startup
-
-Ports 80 or 443 are already in use.  Check for another web server:
+### Port is already allocated
 
 ```bash
 sudo lsof -i :80
 sudo lsof -i :443
 ```
 
-Stop the conflicting service or change the host ports in
+Stop the conflicting service or change the published ports in
 `docker-compose.prod.yml`.
 
 ### Caddy cannot obtain a certificate
 
-- Confirm the domain's DNS A record points to the server's **public** IP.
-- Confirm ports 80 and 443 are open to the internet (check the firewall or
-  cloud security group).
-- Check Caddy logs: `docker compose -f docker-compose.prod.yml logs caddy`.
-- Let's Encrypt has rate limits: if you redeploy repeatedly while testing,
-  you may hit them.  Wait or use the staging CA temporarily.
+Check DNS, firewall, and Caddy logs:
 
-### "Permission denied" on media upload
+```bash
+dig +short music.example.com
+curl -4 ifconfig.me
+sudo ufw status
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 caddy
+```
 
-The host media directories are not writable by the container user (UID 1100).
-Re-run the setup script:
+### Permission denied on upload or processing
 
 ```bash
 sudo ./deploy/setup-host.sh
-```
-
-Or fix ownership manually:
-
-```bash
-sudo chown -R 1100:1100 /srv/easy-music/media
+docker compose -f docker-compose.prod.yml --env-file .env.production restart api worker
 ```
 
 ### Database migration errors
 
-After updating code, run migrations manually:
-
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-    exec api alembic upgrade head
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 postgres
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 api
+docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic current
+docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic upgrade head
 ```
 
-Check the current revision:
+Common causes:
 
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-    exec api alembic current
-```
+- `DATABASE_URL` password does not match `POSTGRES_PASSWORD`.
+- `.env.production` still contains placeholders.
+- PostgreSQL data directory permissions are wrong.
 
 ### Worker not processing jobs
 
-Check worker logs:
-
 ```bash
-docker compose -f docker-compose.prod.yml logs worker
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 worker
+docker compose -f docker-compose.prod.yml --env-file .env.production restart worker
 ```
 
-Common causes: FFmpeg not found inside the image (should not happen with the
-provided Dockerfile), or media directory not writable by UID 1100.
-
-### Disk space running low
-
-- Check disk usage: `df -h /srv/easy-music`
-- Old Docker images: `docker image prune -a`
-- Old backup files: manually remove files older than your retention window.
-- Docker build cache: `docker builder prune`
-
-### Health check shows "unhealthy"
-
-If the API health check returns 503, the database may be unreachable:
+### Health check is unhealthy
 
 ```bash
-curl -s https://<your-domain>/health
+curl -sS https://music.example.com/health
+docker compose -f docker-compose.prod.yml --env-file .env.production ps
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 api
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 postgres
 ```
-
-Check postgres logs and restart if needed:
-
-```bash
-docker compose -f docker-compose.prod.yml logs postgres
-docker compose -f docker-compose.prod.yml restart postgres
-```
-
----
 
 ## Related Documents
 
-- `docs/DEVELOPMENT.md` — local development workflow.
-- `docs/ARCHITECTURE.md` — system architecture and design decisions.
-- `docs/API_MANUAL_TESTING.md` — API smoke tests.
-- `deploy/backup-db.sh` — backup script (header contains restore instructions).
-- `deploy/setup-host.sh` — host directory setup script.
-- `.env.production.example` — all production environment variables documented.
+- `docs/DEVELOPMENT.md` - local development workflow.
+- `docs/ARCHITECTURE.md` - system architecture and design decisions.
+- `docs/API_MANUAL_TESTING.md` - API smoke tests.
+- `deploy/setup-host.sh` - host directory setup script.
+- `deploy/backup-db.sh` - database backup script.
+- `.env.production.example` - production environment variable template.
