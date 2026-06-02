@@ -18,6 +18,7 @@ from app.services.ai_provider import AiProviderService
 T = TypeVar("T", bound=BaseModel)
 
 _MARKDOWN_JSON_RE = re.compile(r"```(?:json)?\s*\n?(.*?)```", re.DOTALL)
+STRUCTURED_JSON_MAX_TOKENS = 2048
 
 # ---------------------------------------------------------------------------
 # JSON extraction

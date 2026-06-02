@@ -524,6 +524,26 @@ def test_parse_intent_prompt_tells_ai_not_to_invent_tags(
     assert "never invent" in system_msg.lower() or "never invent" in user_msg.lower()
 
 
+def test_parse_intent_uses_larger_completion_budget(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(_intent_json())
+
+    response = client.post(
+        "/api/ai/parse-listening-intent",
+        json={"text": "calm focus music"},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert len(fake.calls) == 1
+    assert fake.calls[0].max_tokens == 2048
+
+
 # ---------------------------------------------------------------------------
 # ai not implemented (no real HTTP client yet)
 # ---------------------------------------------------------------------------

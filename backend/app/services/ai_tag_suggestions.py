@@ -21,7 +21,7 @@ from app.schemas.ai import (
     TagSuggestionResponse,
 )
 from app.schemas.tag import TagGroup
-from app.services.ai_json import complete_and_parse_json
+from app.services.ai_json import STRUCTURED_JSON_MAX_TOKENS, complete_and_parse_json
 from app.services.ai_provider import AiProviderService
 
 # ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ def suggest_tags_for_track(
             "Never invent, guess, or hallucinate tag ids. "
             "Only suggest new tag names when explicitly instructed."
         ),
-        max_tokens=512,
+        max_tokens=STRUCTURED_JSON_MAX_TOKENS,
         temperature=0.2,
     )
 

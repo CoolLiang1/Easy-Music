@@ -638,3 +638,24 @@ def test_suggest_tags_prompt_includes_tag_catalogue(
     assert f"id:{calm.id} Calm" in user_msg
     assert "[scenario]" in user_msg
     assert "[state]" in user_msg
+
+
+def test_suggest_tags_uses_larger_completion_budget(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "DeepSeek Reasoning Track")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(_suggestion_json())
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert len(fake.calls) == 1
+    assert fake.calls[0].max_tokens == 2048

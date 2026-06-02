@@ -22,7 +22,7 @@ from app.schemas.ai import (
 )
 from app.schemas.recommendation import RecommendationRequest
 from app.services import recommendations as recommendation_service
-from app.services.ai_json import complete_and_parse_json
+from app.services.ai_json import STRUCTURED_JSON_MAX_TOKENS, complete_and_parse_json
 from app.services.ai_provider import AiProviderService
 
 # ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ def parse_listening_intent(
             "Only use tag ids from the catalogue in the user message. "
             "Never invent, guess, or hallucinate tag ids."
         ),
-        max_tokens=512,
+        max_tokens=STRUCTURED_JSON_MAX_TOKENS,
         temperature=0.1,
     )
 
