@@ -31,4 +31,8 @@ Use short conventional prefixes when they fit:
 
 ## Current Project Notes
 
-The repository currently contains planning documents only. Backend, Web, Android, and deployment directories should be created by their scoped Phase 0 tasks rather than as empty placeholders.
+The repository now contains the accepted MVP implementation through Phase 7:
+backend, Web, Android, deployment assets, and per-phase acceptance documents.
+For new work, start from the latest stable branch, keep changes scoped, run the
+checks relevant to the touched area, and update the corresponding documentation
+or acceptance notes when project status changes.

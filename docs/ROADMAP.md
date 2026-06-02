@@ -17,7 +17,39 @@ It must include:
 - Login
 - Docker Compose deployment
 
+## Current Progress
+
+Status as of 2026-06-02:
+
+- Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
+  track/tag/upload APIs, media processing, worker flow, migrations, streaming,
+  and development Docker Compose are implemented.
+- Phase 2: Accepted. The Web management console includes login, upload,
+  library, track editing, tag editing, and browser playback.
+- Phase 3: Accepted. The Android app includes login, library/detail screens,
+  authenticated streaming, Media3 background playback, notification controls,
+  lock-screen/media-button behavior, and shared playback UI.
+- Phase 4: Accepted. Android manual offline cache, cached playback, local
+  metadata store, queued playback events, and reconnect sync are implemented.
+- Phase 5: Accepted. Recommendation V1 includes structured recommendation
+  requests, rule-based ranking, feedback events, Android recommendation home,
+  and Web recommendation test panel.
+- Phase 6: Accepted. AI Assistant V1 includes provider abstraction,
+  intent parsing, AI-assisted recommendation composition through the existing
+  ranking service, tag suggestions, Web AI panel, and Android
+  natural-language recommendation input.
+- Phase 7: Accepted by local verification. Deployment hardening includes
+  production Docker Compose, Caddy HTTPS config, production env template, host
+  storage layout, database backup script, structured logging, health checks,
+  and deployment documentation.
+
+The remaining deployment caveat is a real production smoke test on an Ubuntu
+server with a real domain and HTTPS certificate. That requires operator
+infrastructure and is intentionally deferred to first deployment.
+
 ## Phase 0: Project Foundation
+
+Status: Accepted.
 
 Goals:
 
@@ -37,6 +69,8 @@ Deliverables:
 - Initial `docker-compose.yml`
 
 ## Phase 1: Backend Core
+
+Status: Accepted.
 
 Goals:
 
@@ -59,6 +93,8 @@ Deliverables:
 
 ## Phase 2: Web Management Console
 
+Status: Accepted.
+
 Goals:
 
 - Login from browser
@@ -78,6 +114,8 @@ Deliverables:
 - Web audio player
 
 ## Phase 3: Android Player
+
+Status: Accepted.
 
 Goals:
 
@@ -100,6 +138,8 @@ Deliverables:
 
 ## Phase 4: Android Offline Cache
 
+Status: Accepted.
+
 Goals:
 
 - Manually cache tracks
@@ -116,6 +156,8 @@ Deliverables:
 - Event sync queue
 
 ## Phase 5: Recommendation V1
+
+Status: Accepted.
 
 Goals:
 
@@ -135,6 +177,8 @@ Deliverables:
 
 ## Phase 6: AI Assistant V1
 
+Status: Accepted.
+
 Goals:
 
 - Parse natural-language listening requests
@@ -150,6 +194,9 @@ Deliverables:
 - Web AI assistant panel
 
 ## Phase 7: Deployment Hardening
+
+Status: Accepted by local automated/static verification. Real-server
+production smoke testing remains an operator deployment step.
 
 Goals:
 
@@ -200,4 +247,3 @@ Deliverables:
 - Full ML recommendation system
 - Complete offline library sync
 - Native Windows client
-

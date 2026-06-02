@@ -18,7 +18,10 @@ The first version contains:
 
 ## 2. High-Level Architecture
 
-This document describes the intended system shape. Phase 0 is documentation and planning only; it does not implement backend services, Web UI, Android app, Recommendation, or AI Assistant behavior.
+This document describes the current MVP architecture after the accepted
+Phase 7 Deployment Hardening work. Backend, Web, Android, recommendation,
+AI assistant, and deployment artifacts are now implemented in their
+corresponding top-level directories.
 
 ```mermaid
 flowchart LR
@@ -43,23 +46,19 @@ flowchart LR
     Worker --> AI
 ```
 
-## 3. Repository Structure Plan
+## 3. Repository Structure
 
-Implementation directories are planned but should be created only when their corresponding task starts. Until then, keep the repository focused on documentation and task planning.
-
-Planned top-level structure:
+Top-level structure:
 
 - `backend/`: FastAPI backend service, Alembic migrations, backend tests, media-processing integration, and worker entry points.
-- `web/`: React/Vite web management console source, web tests, static assets, and frontend build configuration.
+- `web/`: React/Vite web management console source, static assets, and frontend build configuration.
 - `android/`: Kotlin, Jetpack Compose, and Media3 Android app source, Android tests, and Android build configuration.
-- `deploy/`: Docker Compose deployment assets, reverse proxy configuration, host setup notes, and production hardening material when those tasks begin.
+- `deploy/`: production reverse proxy configuration, host setup script, database backup script, and deployment support material.
 - `docs/`: product, architecture, development, environment, deployment, and task documentation.
-
-Phase 0 must not create placeholder source trees for `backend/`, `web/`, `android/`, or `deploy/`. Each directory should appear in the repository only as part of the task that starts real work for that area.
 
 ### 3.1 Backend Module Boundaries
 
-The future backend should keep these modules separated at a high level:
+The backend keeps these modules separated at a high level:
 
 - Auth: authentication, token/session handling, password hashing, and access control.
 - Users: user records, ownership boundaries, and single-user-to-future-multi-user compatibility.
@@ -67,9 +66,11 @@ The future backend should keep these modules separated at a high level:
 - Tags: tag taxonomy, tag groups, and track-tag assignment.
 - Uploads: audio upload validation, original file persistence, and upload lifecycle state.
 - Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
-- Worker: background job execution for media processing and future asynchronous backend jobs.
-
-Phase 0 explicitly excludes Web UI implementation, Android app implementation, Recommendation implementation, and AI Assistant implementation. Those areas may remain visible in target architecture notes, but Phase 0 should not add code, runtime configuration, detailed new API design, or provider integration for them.
+- Playback events: online/offline playback event ingestion and duplicate-safe sync.
+- Feedback events: recommendation feedback ingestion and cooldown/avoidance inputs.
+- Recommendation: structured rule-based ranking and result explanation.
+- AI assistant: provider abstraction, intent parsing, recommendation composition, and tag suggestions.
+- Worker: background job execution for media processing.
 
 ## 4. Deployment
 
@@ -100,9 +101,9 @@ Recommended mounted paths:
 
 ### 5.1 Technology
 
-- Python
+- Python 3.12
 - FastAPI
-- SQLAlchemy or SQLModel
+- SQLAlchemy
 - Alembic migrations
 - PostgreSQL
 - FFmpeg
@@ -162,7 +163,6 @@ Android should store:
 - React
 - TypeScript
 - Vite
-- TanStack Query or similar server-state library
 
 ### 7.2 Responsibilities
 
@@ -400,8 +400,8 @@ The API should return:
 ### AI
 
 - `POST /api/ai/parse-listening-intent`
-- `POST /api/ai/suggest-tags`
-- `POST /api/ai/organize-library`
+- `POST /api/ai/recommend`
+- `POST /api/ai/tracks/{track_id}/suggest-tags`
 
 ## 12. Security
 

@@ -1,8 +1,16 @@
 # Easy Music
 
-Easy Music is a planned self-hosted personal cloud music system for scenario-based listening.
+Easy Music is a self-hosted personal cloud music system for scenario-based
+listening.
 
-The repository is currently in Phase 0. It contains planning and documentation only. Backend, Web, Android, and deployment implementation areas are intentionally not created yet; each area should appear when its scoped task begins.
+The repository has completed the planned MVP implementation through Phase 7
+Deployment Hardening. It now contains a FastAPI backend, PostgreSQL migrations,
+media processing worker, React/Vite Web management console, Kotlin/Jetpack
+Compose Android listening client, and Docker Compose deployment artifacts.
+
+Phase 7 acceptance is documented locally. A real production smoke test on an
+Ubuntu host with a real domain and HTTPS certificate is still an operator-side
+deployment step, not a completed repository verification step.
 
 ## Documentation
 
@@ -13,14 +21,46 @@ The repository is currently in Phase 0. It contains planning and documentation o
 - [Environment](docs/ENVIRONMENT.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
+- [Phase 7 Acceptance](docs/PHASE_7_ACCEPTANCE.md)
 
-## Planned Areas
+## Implemented Areas
 
-- Backend: planned FastAPI API, worker, database, media processing, and configuration code. Not implemented yet.
-- Web: planned React/Vite management console and web player. Not implemented yet.
-- Android: planned Kotlin, Jetpack Compose, and Media3 listening client. Not implemented yet.
-- Deployment: planned Docker Compose based local and server deployment shape. Not implemented yet.
+- Backend: FastAPI API, auth, tracks, tags, uploads, media streaming,
+  playback events, feedback events, recommendation endpoints, AI assistant
+  endpoints, health checks, structured logging, Alembic migrations, and worker
+  media processing.
+- Web: React/Vite management console with login, upload flow, library, track
+  editor, tag editor, Web playback, recommendation test panel, and AI
+  assistant/tag suggestion UI.
+- Android: Kotlin/Jetpack Compose client with login, library, track detail,
+  Media3 playback service, background/notification controls, manual offline
+  cache, cached playback, playback-event sync, and structured/natural-language
+  recommendation flows.
+- Deployment: development Docker Compose, production Docker Compose, Caddy
+  HTTPS reverse proxy configuration, production environment template, host
+  setup script, database backup script, and deployment guide.
 
 ## Current Status
 
-No application code, runtime services, containers, or client applications are available yet. The current goal is to keep product, architecture, development, environment, and deployment decisions easy to find before implementation starts.
+Current documented progress:
+
+- Phase 0 / Phase 1: accepted. Backend foundation, auth, track/tag/upload
+  APIs, media processing, worker flow, streaming, and Docker development
+  configuration are in place.
+- Phase 2: accepted. Web management console automated checks and browser smoke
+  flow are recorded as passed.
+- Phase 3: accepted. Android online playback, Media3 background playback, and
+  system controls are recorded as passed.
+- Phase 4: accepted. Android manual offline cache and playback-event sync are
+  recorded as passed.
+- Phase 5: accepted. Rule-based recommendation and feedback flows are recorded
+  as passed across backend, Web, and Android.
+- Phase 6: accepted. AI Assistant V1 backend, Web, and Android flows are
+  recorded as passed for core behavior, with destructive Android edge-state UI
+  simulations noted as residual manual coverage.
+- Phase 7: accepted by local static and automated verification. Production
+  deployment artifacts exist, while the first real-server HTTPS smoke test is
+  deferred to the operator's deployment.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
+under `docs/` for the detailed record.
