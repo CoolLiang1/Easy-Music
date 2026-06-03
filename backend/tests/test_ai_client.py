@@ -78,3 +78,31 @@ def test_complete_treats_blank_content_as_empty_response(monkeypatch) -> None:
 
     assert result.is_success is False
     assert result.error_type == "empty_response"
+
+
+def test_complete_reports_truncated_empty_content(monkeypatch) -> None:
+    opener = _FakeOpener(
+        {
+            "model": "gpt-test",
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "Reasoning consumed the budget.",
+                    },
+                }
+            ],
+        }
+    )
+    monkeypatch.setattr("app.services.ai_client._build_opener", lambda: opener)
+
+    client = OpenAiCompatibleClient(_settings())
+    result = client.complete(
+        AiCompletionRequest(messages=[{"role": "user", "content": "hello"}])
+    )
+
+    assert result.is_success is False
+    assert result.error_type == "output_truncated"
+    assert result.error_message is not None
+    assert "Increase AI max_tokens" in result.error_message

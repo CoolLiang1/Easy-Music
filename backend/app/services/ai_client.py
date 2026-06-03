@@ -60,6 +60,15 @@ class OpenAiCompatibleClient:
                 response_data = json.loads(raw)
                 content = _extract_content(response_data)
                 if content is None or not content.strip():
+                    if _is_truncated_completion(response_data):
+                        return AiCompletionResult.error(
+                            error_type="output_truncated",
+                            message=(
+                                "Provider output was truncated before message "
+                                "content was produced. Increase AI max_tokens "
+                                "or reduce the prompt size."
+                            ),
+                        )
                     return AiCompletionResult.error(
                         error_type="empty_response",
                         message="Provider returned no message content.",
@@ -121,6 +130,13 @@ def _extract_content(data: dict[str, Any]) -> str | None:
         return None
     message = choices[0].get("message", {})
     return message.get("content")
+
+
+def _is_truncated_completion(data: dict[str, Any]) -> bool:
+    choices = data.get("choices")
+    if not choices:
+        return False
+    return choices[0].get("finish_reason") == "length"
 
 
 def _build_opener() -> urllib.request.OpenerDirector:
