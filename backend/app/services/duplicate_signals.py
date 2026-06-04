@@ -53,6 +53,10 @@ def build_normalized_metadata_key(
 
 
 def _normalize_metadata_part(value: str | None) -> str:
+    return normalize_metadata_text(value)
+
+
+def normalize_metadata_text(value: str | None) -> str:
     if value is None:
         return ""
 
