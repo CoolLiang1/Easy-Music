@@ -6,6 +6,7 @@ from app.api.routes import (
     auth,
     duplicates,
     feedback_events,
+    library_reports,
     playback_events,
     recommendations,
     tags,
@@ -19,6 +20,7 @@ api_router.include_router(ai.router, prefix="/api")
 api_router.include_router(auth.router, prefix="/api")
 api_router.include_router(duplicates.router, prefix="/api")
 api_router.include_router(feedback_events.router, prefix="/api")
+api_router.include_router(library_reports.router, prefix="/api")
 api_router.include_router(playback_events.router, prefix="/api")
 api_router.include_router(recommendations.router, prefix="/api")
 api_router.include_router(tags.router, prefix="/api")

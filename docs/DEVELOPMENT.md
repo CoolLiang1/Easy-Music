@@ -446,12 +446,15 @@ backend:
 9. Select two or more tracks in Library, choose existing tags from the batch
    tag panel, confirm adding and removing tags, and verify the affected rows
    update without changing unselected tracks.
-10. Open the track detail page and edit title, artist, album, content type,
+10. Open `Reports` and confirm the read-only organization sections load:
+    untagged ready tracks, missing metadata, processing attention, duplicate
+    candidates, never played, rarely played, and expired cooldowns.
+11. Open the track detail page and edit title, artist, album, content type,
    source URL, liked state, cooldown date, and assigned tags as needed.
-11. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
+12. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
     `state`, `type`, `attribute`), rename it, change its group, and delete one
     explicit tag.
-12. For a ready track, use the playback control from the library row or track
+13. For a ready track, use the playback control from the library row or track
     detail page and confirm audio loads through the authenticated stream
     endpoint.
 

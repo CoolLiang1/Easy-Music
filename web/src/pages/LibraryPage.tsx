@@ -171,6 +171,9 @@ export function LibraryPage() {
         <RouteLink className="button secondary" to="/duplicates">
           Review duplicates
         </RouteLink>
+        <RouteLink className="button secondary" to="/reports">
+          Organization reports
+        </RouteLink>
       </div>
 
       {libraryState.name === "loading" ? (

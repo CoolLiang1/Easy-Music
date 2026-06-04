@@ -4,6 +4,7 @@ export type AppRoute =
   | { name: "login" }
   | { name: "aiAssistant" }
   | { name: "duplicates" }
+  | { name: "reports" }
   | { name: "library" }
   | { name: "upload" }
   | { name: "tags" }
@@ -33,6 +34,10 @@ export function getRoute(path: string): AppRoute {
 
   if (normalizedPath === "/duplicates") {
     return { name: "duplicates" };
+  }
+
+  if (normalizedPath === "/reports") {
+    return { name: "reports" };
   }
 
   if (normalizedPath === "/tags") {

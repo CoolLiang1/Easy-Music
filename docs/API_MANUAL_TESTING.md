@@ -246,6 +246,35 @@ Expected result:
 - The endpoint preserves existing tag ownership and track ownership checks.
 - No track, media file, tag, or duplicate candidate is deleted or merged.
 
+## Review Library Organization Reports
+
+V1.1 adds a read-only organization report endpoint for Web Library cleanup
+workflows:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/library/reports" `
+  -Headers $headers
+```
+
+Expected result:
+
+- The response includes `generated_at`.
+- `untagged_ready_tracks` lists ready tracks with no assigned tags.
+- `missing_metadata_tracks` lists ready tracks missing artist, album, duration,
+  or cover data, with reason strings.
+- `processing_tracks` lists still-processing and failed uploads.
+- `duplicate_groups` includes the same advisory duplicate candidate shape as
+  `GET /api/tracks/duplicates`.
+- `never_played_ready_tracks` lists ready tracks without playback events.
+- `rarely_played_ready_tracks` lists ready tracks whose last playback is older
+  than the report threshold.
+- `stale_cooldown_tracks` lists ready tracks with expired cooldown timestamps.
+- A missing token returns `401 Unauthorized`.
+- The endpoint is current-user scoped and does not modify tracks, tags,
+  playback events, feedback events, media files, or duplicate candidates.
+
 ## Stream A Ready Track
 
 Download the full stream:
