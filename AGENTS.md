@@ -40,8 +40,8 @@ Before implementing, read the relevant docs first:
 - Local workflow and verification expectations: `docs/DEVELOPMENT.md`.
 - API smoke flows: `docs/API_MANUAL_TESTING.md`.
 - Deployment and production behavior: `docs/DEPLOYMENT.md`.
-- Current phase/task context: the relevant `docs/PHASE_*_TASKS.md` and
-  `docs/PHASE_*_ACCEPTANCE.md`.
+- Current phase/task context: the relevant `docs/TASKS/PHASE_*_TASKS.md` and
+  `docs/ACCEPTANCE/PHASE_*_ACCEPTANCE.md`.
 
 Then inspect the narrow code path for the task. Prefer existing service,
 repository, schema, route, UI, and test patterns over inventing new structures.
@@ -129,7 +129,7 @@ Consider updating:
 - `docs/ENVIRONMENT.md` and env examples for configuration contract changes.
 - `docs/DEPLOYMENT.md`, `docker-compose.prod.yml`, and deploy scripts for
   production workflow changes.
-- Relevant `docs/PHASE_*_TASKS.md` and `docs/PHASE_*_ACCEPTANCE.md` when a
+- Relevant `docs/TASKS/PHASE_*_TASKS.md` and `docs/ACCEPTANCE/PHASE_*_ACCEPTANCE.md` when a
   phase task or acceptance status changes.
 - This `AGENTS.md` when an unexpected pitfall or stable agent rule emerges.
 

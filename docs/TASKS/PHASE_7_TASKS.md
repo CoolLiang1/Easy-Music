@@ -407,7 +407,7 @@ operator can run manually or schedule through cron.
   `.pgpass` file or hardcoded credentials.
 - The script is readable and commented; a deployer who reads it can
   understand every step.
-- `docs/PHASE_7_TASKS.md` (this file) or the deployment guide documents:
+- `docs/TASKS/PHASE_7_TASKS.md` (this file) or the deployment guide documents:
   - How to run the backup script manually.
   - A cron example for daily backups (e.g. `0 3 * * *`).
   - How to restore from a backup (e.g. `gunzip < backup.sql.gz |
@@ -623,7 +623,7 @@ Document and record the Phase 7 Deployment Hardening verification results.
 
 ### Main Files
 
-- `docs/PHASE_7_ACCEPTANCE.md` (new)
+- `docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md` (new)
 - `docs/DEPLOYMENT.md`
 
 ### Dependencies
@@ -632,7 +632,7 @@ Document and record the Phase 7 Deployment Hardening verification results.
 
 ### Acceptance Criteria
 
-- `docs/PHASE_7_ACCEPTANCE.md` records:
+- `docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md` records:
   - Automated check results: backend tests, Web typecheck/build, Android
     test/build, production compose config validation.
   - Production configuration audit: Caddyfile review, backup script review,
@@ -682,7 +682,7 @@ Phase 7 is complete when:
    guide.
 9. All existing automated checks pass and production configuration artifacts
    are syntactically valid.
-10. `docs/PHASE_7_ACCEPTANCE.md` records the verification results.
+10. `docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md` records the verification results.
 
 ## General Codex Prompt For Each Phase 7 Session
 
@@ -690,12 +690,12 @@ Use this prompt at the start of each implementation session, replacing the task
 number and title:
 
 ```text
-请执行 docs/PHASE_7_TASKS.md 中的 Task 7.x: <任务标题>。
+请执行 docs/TASKS/PHASE_7_TASKS.md 中的 Task 7.x: <任务标题>。
 
 先阅读：
-- docs/PHASE_7_TASKS.md
-- docs/PHASE_6_TASKS.md
-- docs/PHASE_6_ACCEPTANCE.md
+- docs/TASKS/PHASE_7_TASKS.md
+- docs/TASKS/PHASE_6_TASKS.md
+- docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md
 - docs/DEVELOPMENT.md
 - docs/ARCHITECTURE.md
 - docs/API_MANUAL_TESTING.md

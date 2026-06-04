@@ -21,7 +21,7 @@ deployment step, not a completed repository verification step.
 - [Environment](docs/ENVIRONMENT.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
-- [Phase 7 Acceptance](docs/PHASE_7_ACCEPTANCE.md)
+- [Phase 7 Acceptance](docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md)
 
 ## Implemented Areas
 

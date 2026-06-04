@@ -536,7 +536,7 @@ manual browser smoke test.
 - `web/`
 - `docs/DEVELOPMENT.md`
 - `docs/API_MANUAL_TESTING.md`
-- `docs/PHASE_0_1_ACCEPTANCE.md` or a new Phase 2 acceptance note if Phase 2 is
+- `docs/ACCEPTANCE/PHASE_0_1_ACCEPTANCE.md` or a new Phase 2 acceptance note if Phase 2 is
   being closed
 
 ### Dependencies

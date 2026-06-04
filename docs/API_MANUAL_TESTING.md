@@ -849,7 +849,7 @@ Expected tag suggestion closure result:
 - No tags are created by the suggestion endpoint.
 
 Record the backend, Web, and Android manual verification results in
-`docs/PHASE_6_ACCEPTANCE.md`. Phase 6 is not accepted until the Web AI
+`docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md`. Phase 6 is not accepted until the Web AI
 Assistant and Android natural-language recommendation flows have both been
 manually verified.
 

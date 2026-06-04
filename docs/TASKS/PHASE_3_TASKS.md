@@ -587,7 +587,7 @@ Document and run the end-to-end Phase 3 Android verification flow.
 
 ### Main Files
 
-- `docs/PHASE_3_ACCEPTANCE.md`
+- `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`
 - `docs/DEVELOPMENT.md`
 - Android Gradle files or test files only if needed for documented checks.
 
@@ -597,7 +597,7 @@ Document and run the end-to-end Phase 3 Android verification flow.
 
 ### Acceptance Criteria
 
-- `docs/PHASE_3_ACCEPTANCE.md` records automated and manual verification.
+- `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md` records automated and manual verification.
 - The manual flow starts the accepted backend, uploads/processes a ready track
   if needed, logs into Android, loads library, opens detail, streams a ready
   track, backgrounds playback, uses notification controls, verifies lock screen
@@ -630,6 +630,6 @@ Phase 3 is complete when:
 8. Playback continues in the background through Media3.
 9. Notification controls, lock screen controls, and headset play/pause controls
    work.
-10. `docs/PHASE_3_ACCEPTANCE.md` records the automated and manual verification
+10. `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md` records the automated and manual verification
     result.
 
