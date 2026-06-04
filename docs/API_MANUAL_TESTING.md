@@ -188,6 +188,12 @@ Expected result:
 - A missing or unowned `track_id` filter returns `404 Not Found`.
 - The endpoint never mutates track data.
 
+For V1.1 duplicate-detection acceptance, pair this API check with the Web smoke
+flow in `docs/DEVELOPMENT.md` and record results in
+`docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md`. Duplicate detection
+must not be marked accepted until the Web upload warning and Library duplicate
+review have both been manually verified.
+
 ## Stream A Ready Track
 
 Download the full stream:

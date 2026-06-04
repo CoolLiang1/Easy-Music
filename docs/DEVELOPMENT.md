@@ -459,6 +459,41 @@ Expected result:
 - Ready tracks play in the browser.
 - Non-ready tracks keep playback disabled.
 
+## V1.1 Duplicate Detection Web Smoke Test
+
+Use this flow to verify the advisory duplicate-detection Web workflow after
+applying the V1.1 duplicate backend and Web tasks. Do not commit generated test
+media or local media/database state.
+
+1. Start PostgreSQL, apply migrations, start the API, and create or reuse a
+   local user.
+2. From `web/`, start Vite against the local API:
+
+   ```powershell
+   $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+   npm run dev
+   ```
+
+3. Log in through the Web console.
+4. Upload a unique supported audio file and confirm the upload result shows no
+   duplicate warning after the duplicate check finishes.
+5. Process the uploaded track with the worker until it is `ready`.
+6. Upload the same audio file again and confirm upload completion is not
+   blocked.
+7. Confirm the upload result shows an advisory duplicate warning with candidate
+   metadata and match reason.
+8. Open Library, then open `Review duplicates` or the sidebar `Duplicates`
+   route.
+9. Confirm `/duplicates` shows grouped exact or likely candidates.
+10. Open a candidate Track Detail link and confirm the existing detail page
+    still loads.
+11. Confirm no duplicate workflow deletes, merges, overwrites, hides, or
+    modifies tracks automatically.
+
+Record the result in
+`docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md`. Do not mark duplicate
+detection accepted until this browser smoke has passed.
+
 ## Automated Checks
 
 Run all Phase 1 backend tests from `backend/`:
