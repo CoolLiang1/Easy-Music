@@ -252,6 +252,8 @@ Expected result:
   the deleted track are removed.
 - Stored media files referenced by that track are deleted one explicit file at
   a time after path validation; no directory or recursive cleanup is performed.
+- If a stored media file cannot be deleted, the endpoint returns an error with
+  a clear `detail` message instead of reporting a successful delete.
 - A missing token returns `401 Unauthorized`.
 - A track owned by another user returns `404 Not Found`.
 

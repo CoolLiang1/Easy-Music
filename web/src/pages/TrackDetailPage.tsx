@@ -152,7 +152,7 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
       });
       window.setTimeout(() => navigateTo("/library"), 800);
     } catch (error: unknown) {
-      setDeleteError(getErrorMessage(error));
+      setDeleteError(`Delete failed: ${getErrorMessage(error)}`);
     } finally {
       setIsDeleting(false);
     }

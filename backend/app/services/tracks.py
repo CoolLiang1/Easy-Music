@@ -19,6 +19,10 @@ from app.schemas.track import TrackResponse, TrackUpdate
 logger = logging.getLogger(__name__)
 
 
+class TrackMediaDeletionError(RuntimeError):
+    pass
+
+
 def list_tracks(db: Session, user: User) -> list[Track]:
     return list(
         db.scalars(
@@ -84,28 +88,38 @@ def update_track(db: Session, user: User, track: Track, payload: TrackUpdate) ->
 def delete_track(db: Session, track: Track, storage: MediaStorage | None = None) -> None:
     track_id = track.id
     media_paths = _track_media_paths(track, storage) if storage is not None else []
+    failed_media_path = "unknown"
 
-    db.execute(delete(FeedbackEvent).where(FeedbackEvent.track_id == track_id))
-    db.execute(delete(PlaybackEvent).where(PlaybackEvent.track_id == track_id))
-    db.execute(delete(ProcessingJob).where(ProcessingJob.track_id == track_id))
-    db.execute(delete(TrackTag).where(TrackTag.track_id == track_id))
-    db.delete(track)
-    db.commit()
+    try:
+        db.execute(delete(FeedbackEvent).where(FeedbackEvent.track_id == track_id))
+        db.execute(delete(PlaybackEvent).where(PlaybackEvent.track_id == track_id))
+        db.execute(delete(ProcessingJob).where(ProcessingJob.track_id == track_id))
+        db.execute(delete(TrackTag).where(TrackTag.track_id == track_id))
+        db.delete(track)
+        db.flush()
 
-    for media_path in media_paths:
-        try:
+        for media_path, display_path in media_paths:
+            failed_media_path = display_path
             media_path.unlink(missing_ok=True)
-        except OSError:
-            logger.warning(
-                "Unable to delete media file %s for deleted track %s.",
-                media_path,
-                track_id,
-                exc_info=True,
+
+        db.commit()
+    except OSError as exc:
+        db.rollback()
+        logger.warning(
+            "Unable to delete media file for track %s.",
+            track_id,
+            exc_info=True,
+        )
+        raise TrackMediaDeletionError(
+            (
+                f"Unable to delete stored media file '{failed_media_path}'. "
+                "Check backend media volume permissions and try again."
             )
+        ) from exc
 
 
-def _track_media_paths(track: Track, storage: MediaStorage) -> list[Path]:
-    paths: list[Path] = []
+def _track_media_paths(track: Track, storage: MediaStorage) -> list[tuple[Path, str]]:
+    paths: list[tuple[Path, str]] = []
     seen_paths: set[str] = set()
 
     for relative_path in (
@@ -118,18 +132,20 @@ def _track_media_paths(track: Track, storage: MediaStorage) -> list[Path]:
 
         try:
             media_path = storage.stored_media_path(relative_path)
-        except UnsafeMediaPathError:
+        except UnsafeMediaPathError as exc:
             logger.warning(
                 "Skipping unsafe media path while deleting track %s.",
                 track.id,
             )
-            continue
+            raise TrackMediaDeletionError(
+                "Track references an unsafe stored media path and was not deleted.",
+            ) from exc
 
         path_key = media_path.as_posix()
         if path_key in seen_paths:
             continue
 
         seen_paths.add(path_key)
-        paths.append(media_path)
+        paths.append((media_path, relative_path))
 
     return paths

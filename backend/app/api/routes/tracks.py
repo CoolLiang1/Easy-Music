@@ -103,5 +103,12 @@ def delete_track(
     if track is None:
         raise track_not_found_error()
 
-    track_service.delete_track(db, track, storage)
+    try:
+        track_service.delete_track(db, track, storage)
+    except track_service.TrackMediaDeletionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)

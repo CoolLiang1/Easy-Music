@@ -278,6 +278,64 @@ def test_delete_track_removes_related_rows_and_media_files(
         assert not media_path.exists()
 
 
+def test_delete_track_reports_media_file_failure(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    tag = create_tag(db_session, user)
+    db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
+    db_session.commit()
+
+    original_path = tmp_path / track.original_file_path
+    original_path.parent.mkdir(parents=True, exist_ok=True)
+    original_path.write_bytes(b"original")
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True, exist_ok=True)
+    playback_path.write_bytes(b"playback")
+
+    def failing_unlink(self: Path, missing_ok: bool = False) -> None:
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+    track_id = track.id
+    tag_id = tag.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "Unable to delete stored media file 'originals/track.mp3'. "
+        "Check backend media volume permissions and try again."
+    )
+    assert db_session.get(Track, track_id) is not None
+    assert db_session.get(TrackTag, (track_id, tag_id)) is not None
+    assert original_path.exists()
+    assert playback_path.exists()
+
+
+def test_delete_track_rejects_unsafe_media_path(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.original_file_path = "../outside.mp3"
+    db_session.commit()
+    track_id = track.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "Track references an unsafe stored media path and was not deleted."
+    )
+    assert db_session.get(Track, track_id) is not None
+
+
 def test_cannot_delete_another_users_track(
     client: TestClient,
     db_session: Session,

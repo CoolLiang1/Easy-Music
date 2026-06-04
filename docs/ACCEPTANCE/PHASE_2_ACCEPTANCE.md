@@ -37,6 +37,8 @@ The documented flow covers:
 - A successful delete clears the stale detail state and returns the user to the
   Library route, where the list is fetched again.
 - Delete failures are shown on the Track Detail page.
+- Backend media deletion failures are surfaced to the Web client instead of
+  being reported as successful deletes.
 
 ## Actual Manual Result
 
