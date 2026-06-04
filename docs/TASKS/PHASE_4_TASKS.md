@@ -591,7 +591,7 @@ flow.
 
 ### Main Files
 
-- `docs/PHASE_4_ACCEPTANCE.md`
+- `docs/ACCEPTANCE/PHASE_4_ACCEPTANCE.md`
 - `docs/DEVELOPMENT.md`
 - `docs/API_MANUAL_TESTING.md`
 - Android Gradle or test files only if needed for documented checks.
@@ -602,7 +602,7 @@ flow.
 
 ### Acceptance Criteria
 
-- `docs/PHASE_4_ACCEPTANCE.md` records automated backend checks, automated
+- `docs/ACCEPTANCE/PHASE_4_ACCEPTANCE.md` records automated backend checks, automated
   Android checks, and manual emulator/device verification.
 - Manual flow starts the accepted backend, uploads/processes a ready track if
   needed, logs into Android, caches one ready track manually, confirms the
@@ -645,7 +645,7 @@ Phase 4 is complete when:
 7. User can delete one selected cached track without deleting server data.
 8. Offline playback events are recorded locally and synced after reconnecting.
 9. Backend and Android automated checks pass.
-10. `docs/PHASE_4_ACCEPTANCE.md` records the manual emulator/device
+10. `docs/ACCEPTANCE/PHASE_4_ACCEPTANCE.md` records the manual emulator/device
     verification result.
 
 ## General Codex Prompt For Each Phase 4 Session
@@ -654,12 +654,12 @@ Use this prompt at the start of each implementation session, replacing the task
 number and title:
 
 ```text
-请执行 docs/PHASE_4_TASKS.md 中的 Task 4.x: <任务标题>。
+请执行 docs/TASKS/PHASE_4_TASKS.md 中的 Task 4.x: <任务标题>。
 
 先阅读：
-- docs/PHASE_4_TASKS.md
-- docs/PHASE_3_TASKS.md
-- docs/PHASE_3_ACCEPTANCE.md
+- docs/TASKS/PHASE_4_TASKS.md
+- docs/TASKS/PHASE_3_TASKS.md
+- docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md
 - docs/DEVELOPMENT.md
 - docs/API_MANUAL_TESTING.md
 - 与本任务 Directories/Main Files 相关的现有代码

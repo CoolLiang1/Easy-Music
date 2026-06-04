@@ -652,7 +652,7 @@ Document and run the end-to-end Phase 5 Recommendation V1 verification flow.
 
 ### Main Files
 
-- `docs/PHASE_5_ACCEPTANCE.md`
+- `docs/ACCEPTANCE/PHASE_5_ACCEPTANCE.md`
 - `docs/DEVELOPMENT.md`
 - `docs/API_MANUAL_TESTING.md`
 
@@ -662,7 +662,7 @@ Document and run the end-to-end Phase 5 Recommendation V1 verification flow.
 
 ### Acceptance Criteria
 
-- `docs/PHASE_5_ACCEPTANCE.md` records backend, Web, and Android automated
+- `docs/ACCEPTANCE/PHASE_5_ACCEPTANCE.md` records backend, Web, and Android automated
   checks.
 - Manual backend flow verifies feedback events and structured recommendation
   requests with a local user and at least three ready tagged tracks.
@@ -714,7 +714,7 @@ Phase 5 is complete when:
 8. Android can send Recommendation V1 feedback actions.
 9. Web recommendation test panel can request recommendations and send feedback.
 10. Backend, Android, and Web automated checks pass.
-11. `docs/PHASE_5_ACCEPTANCE.md` records manual Android and Web verification.
+11. `docs/ACCEPTANCE/PHASE_5_ACCEPTANCE.md` records manual Android and Web verification.
 
 ## General Codex Prompt For Each Phase 5 Session
 
@@ -722,12 +722,12 @@ Use this prompt at the start of each implementation session, replacing the task
 number and title:
 
 ```text
-请执行 docs/PHASE_5_TASKS.md 中的 Task 5.x: <任务标题>。
+请执行 docs/TASKS/PHASE_5_TASKS.md 中的 Task 5.x: <任务标题>。
 
 先阅读：
-- docs/PHASE_5_TASKS.md
-- docs/PHASE_4_TASKS.md
-- docs/PHASE_4_ACCEPTANCE.md
+- docs/TASKS/PHASE_5_TASKS.md
+- docs/TASKS/PHASE_4_TASKS.md
+- docs/ACCEPTANCE/PHASE_4_ACCEPTANCE.md
 - docs/DEVELOPMENT.md
 - docs/API_MANUAL_TESTING.md
 - 与本任务 Directories/Main Files 相关的现有 backend / android / web 代码

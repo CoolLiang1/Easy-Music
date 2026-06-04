@@ -265,7 +265,7 @@ Phase 7 is complete because:
 9. ✅ All existing automated checks pass (190 backend, Web typecheck + build,
    Android test + build) and production configuration artifacts are
    syntactically valid.
-10. ✅ `docs/PHASE_7_ACCEPTANCE.md` (this document) records the verification
+10. ✅ `docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md` (this document) records the verification
     results.
 
 Phase 7 does not change Phase 3–6 business logic, playback, caching, ranking,

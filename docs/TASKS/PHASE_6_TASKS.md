@@ -820,7 +820,7 @@ Document and run the end-to-end Phase 6 AI Assistant V1 verification flow.
 
 ### Main Files
 
-- `docs/PHASE_6_ACCEPTANCE.md`
+- `docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md`
 - `docs/DEVELOPMENT.md`
 - `docs/API_MANUAL_TESTING.md`
 
@@ -830,7 +830,7 @@ Document and run the end-to-end Phase 6 AI Assistant V1 verification flow.
 
 ### Acceptance Criteria
 
-- `docs/PHASE_6_ACCEPTANCE.md` records backend, Web, and Android automated
+- `docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md` records backend, Web, and Android automated
   checks.
 - Acceptance doc records development-only AI provider configuration and states
   that no real secret should be committed.
@@ -898,7 +898,7 @@ Phase 6 is complete when:
     Phase 4 cached playback source selection.
 12. Android AI loading and error states are clear.
 13. Backend, Web, and Android automated checks pass.
-14. `docs/PHASE_6_ACCEPTANCE.md` records manual backend, Web, and Android
+14. `docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md` records manual backend, Web, and Android
     verification.
 
 ## General Codex Prompt For Each Phase 6 Session
@@ -907,12 +907,12 @@ Use this prompt at the start of each implementation session, replacing the task
 number and title:
 
 ```text
-请执行 docs/PHASE_6_TASKS.md 中的 Task 6.x: <任务标题>。
+请执行 docs/TASKS/PHASE_6_TASKS.md 中的 Task 6.x: <任务标题>。
 
 先阅读：
-- docs/PHASE_6_TASKS.md
-- docs/PHASE_5_TASKS.md
-- docs/PHASE_5_ACCEPTANCE.md
+- docs/TASKS/PHASE_6_TASKS.md
+- docs/TASKS/PHASE_5_TASKS.md
+- docs/ACCEPTANCE/PHASE_5_ACCEPTANCE.md
 - docs/DEVELOPMENT.md
 - docs/API_MANUAL_TESTING.md
 - 与本任务 Directories/Main Files 相关的现有 backend / android / web 代码

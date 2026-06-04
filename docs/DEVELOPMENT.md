@@ -558,7 +558,7 @@ Phase 1 backend:
 11. Confirm foreground controls, mini player state, background playback,
     notification controls, lock screen controls, and headset/media-button
     play-pause behavior.
-12. Record the emulator or device result in `docs/PHASE_3_ACCEPTANCE.md`.
+12. Record the emulator or device result in `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`.
 
 Phase 3 acceptance must not be marked complete without an actual emulator or
 device playback run. Offline cache, recommendation, AI Assistant, playback
@@ -625,7 +625,7 @@ local backend while preserving the Phase 3 Media3 playback architecture:
     confirm the app asks for confirmation first.
 19. Refresh Library or fetch `GET /api/tracks/{track_id}` to confirm deleting
     the local cache did not delete the server track.
-20. Record the emulator or device result in `docs/PHASE_4_ACCEPTANCE.md`.
+20. Record the emulator or device result in `docs/ACCEPTANCE/PHASE_4_ACCEPTANCE.md`.
 
 Phase 4 acceptance must not be marked complete without an actual emulator or
 device offline playback run. Recommendation, AI Assistant, Web new features,
@@ -691,7 +691,7 @@ architecture and Phase 4 cached playback source selection:
     cached playback source selection.
 13. Send Recommendation V1 feedback actions from Android and manually request
     recommendations again to confirm subsequent results can change.
-14. Record the automated and manual results in `docs/PHASE_5_ACCEPTANCE.md`.
+14. Record the automated and manual results in `docs/ACCEPTANCE/PHASE_5_ACCEPTANCE.md`.
 
 Phase 5 acceptance must not be marked complete without actual Android and Web
 manual structured recommendation verification. AI Assistant, natural-language
@@ -750,7 +750,7 @@ playback, and Phase 4 cached playback source selection:
     cached playback source selection.
 13. Confirm AI loading, unauthorized, offline, provider unavailable, backend
     error, and empty-result states are understandable.
-14. Record the automated and manual results in `docs/PHASE_6_ACCEPTANCE.md`.
+14. Record the automated and manual results in `docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md`.
 
 Phase 6 acceptance must not be marked complete without actual Web AI Assistant
 verification and actual Android natural-language recommendation verification.
