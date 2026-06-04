@@ -425,7 +425,8 @@ backend:
 5. Open the Vite URL, usually `http://localhost:5173/`, and log in with the
    local user.
 6. Visit `Upload`, upload an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
-   upload result creates a track with an initial processing status.
+   page shows per-file browser upload progress, then creates a track with an
+   initial processing status.
 7. Run a worker from the repository root:
 
    ```powershell
@@ -438,9 +439,10 @@ backend:
    docker compose up -d worker-loop
    ```
 
-8. Return to `Library` or the track detail page and use refresh, or wait for
-   lightweight polling while the track is processing, until the status becomes
-   `ready`.
+8. Return to `Upload`, `Library`, or the track detail page and use refresh, or
+   wait for lightweight polling while the track is processing, until the status
+   becomes `ready`. Failed processing should show the backend processing error
+   message when one is available.
 9. Open the track detail page and edit title, artist, album, content type,
    source URL, liked state, cooldown date, and assigned tags as needed.
 10. Visit `Tags`, create a tag in one of the supported groups (`scenario`,

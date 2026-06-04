@@ -1,7 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 
 import { listDuplicateCandidates } from "../api/duplicates";
-import { uploadTrack } from "../api/tracks";
+import { getTrack, uploadTrack } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import { UploadForm } from "../components/UploadForm";
 import {
@@ -33,29 +33,35 @@ export function UploadPage() {
 
     for (const [index, file] of files.entries()) {
       const resultId = buildUploadResultId(file, index);
+      setResults((currentResults) => [
+        ...currentResults,
+        {
+          id: resultId,
+          fileName: file.name,
+          state: "uploading",
+          uploadProgress: { percent: 0 },
+        },
+      ]);
+
       try {
-        const track = await uploadTrack(accessToken, file);
-        setResults((currentResults) => [
-          ...currentResults,
-          {
-            id: resultId,
-            duplicateCheck: { state: "loading" },
-            fileName: file.name,
-            state: "success",
-            track,
-          },
-        ]);
+        const track = await uploadTrack(accessToken, file, (progress) => {
+          updateUploadResult(setResults, resultId, {
+            uploadProgress: { percent: progress.percent },
+          });
+        });
+        updateUploadResult(setResults, resultId, {
+          duplicateCheck: { state: "loading" },
+          state: "success",
+          track,
+          uploadProgress: { percent: 100 },
+        });
         void checkDuplicateCandidates(accessToken, track.id, resultId, setResults);
+        void pollTrackStatus(accessToken, track.id, resultId, setResults);
       } catch (error) {
-        setResults((currentResults) => [
-          ...currentResults,
-          {
-            id: resultId,
-            fileName: file.name,
-            message: getErrorMessage(error),
-            state: "error",
-          },
-        ]);
+        updateUploadResult(setResults, resultId, {
+          message: getErrorMessage(error),
+          state: "error",
+        });
       }
     }
 
@@ -136,6 +142,49 @@ function updateDuplicateCheck(
   setResults((currentResults) =>
     currentResults.map((result) =>
       result.id === resultId ? { ...result, duplicateCheck } : result,
+    ),
+  );
+}
+
+async function pollTrackStatus(
+  accessToken: string,
+  trackId: number,
+  resultId: string,
+  setResults: Dispatch<SetStateAction<UploadResult[]>>,
+) {
+  const maxAttempts = 40;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const track = await getTrack(accessToken, trackId);
+      updateUploadResult(setResults, resultId, { track });
+
+      if (track.status === "ready" || track.status === "failed") {
+        return;
+      }
+    } catch (error) {
+      updateUploadResult(setResults, resultId, {
+        statusMessage: getErrorMessage(error),
+      });
+      return;
+    }
+
+    await delay(3000);
+  }
+
+  updateUploadResult(setResults, resultId, {
+    statusMessage: "Processing is still running. Check the Library page for later updates.",
+  });
+}
+
+function updateUploadResult(
+  setResults: Dispatch<SetStateAction<UploadResult[]>>,
+  resultId: string,
+  updates: Partial<UploadResult>,
+) {
+  setResults((currentResults) =>
+    currentResults.map((result) =>
+      result.id === resultId ? { ...result, ...updates } : result,
     ),
   );
 }

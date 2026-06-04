@@ -16,6 +16,8 @@ export type Track = {
   format: string | null;
   bitrate: number | null;
   status: TrackStatus;
+  processing_job_status: string | null;
+  processing_error_message: string | null;
   liked: boolean;
   cooldown_until: string | null;
   created_at: string;

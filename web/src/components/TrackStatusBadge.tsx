@@ -9,6 +9,7 @@ const statusLabels: Record<string, string> = {
   processing: "Processing",
   ready: "Ready",
   uploaded: "Uploaded",
+  uploading: "Uploading",
 };
 
 const statusStyles: Record<string, { background: string; color: string }> = {
@@ -16,6 +17,7 @@ const statusStyles: Record<string, { background: string; color: string }> = {
   processing: { background: "#fef3c7", color: "#92400e" },
   ready: { background: "#dcfce7", color: "#166534" },
   uploaded: { background: "#dbeafe", color: "#1e40af" },
+  uploading: { background: "#dbeafe", color: "#1e40af" },
 };
 
 export function TrackStatusBadge({ status }: TrackStatusBadgeProps) {

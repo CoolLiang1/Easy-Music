@@ -79,6 +79,8 @@ def test_upload_audio_creates_track_and_saves_original(
     assert body["title"] == "My Song"
     assert body["format"] == "mp3"
     assert body["status"] == "processing"
+    assert body["processing_job_status"] == "pending"
+    assert body["processing_error_message"] is None
     assert body["original_file_path"].startswith("originals/user-")
     assert body["original_file_size_bytes"] == len(b"audio bytes")
     assert body["original_file_sha256"] == hashlib.sha256(b"audio bytes").hexdigest()

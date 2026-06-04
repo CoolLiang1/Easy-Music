@@ -1,6 +1,12 @@
-import { apiRequest } from "./http";
+import { ApiClientError, apiRequest } from "./http";
 import { env } from "../config/env";
 import type { Track, TrackUpdate } from "../types/track";
+
+export type UploadProgress = {
+  loaded: number;
+  percent: number | null;
+  total: number | null;
+};
 
 export function listTracks(accessToken: string) {
   return apiRequest<Track[]>("/api/tracks", {
@@ -33,14 +39,62 @@ export function deleteTrack(accessToken: string, trackId: number | string) {
   });
 }
 
-export function uploadTrack(accessToken: string, file: File) {
+export function uploadTrack(
+  accessToken: string,
+  file: File,
+  onProgress?: (progress: UploadProgress) => void,
+) {
   const formData = new FormData();
   formData.append("file", file);
 
-  return apiRequest<Track>("/api/tracks/upload", {
-    method: "POST",
-    accessToken,
-    body: formData,
+  return new Promise<Track>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `${env.apiBaseUrl}/api/tracks/upload`);
+    request.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+    request.responseType = "json";
+
+    request.upload.onprogress = (event) => {
+      if (!onProgress) {
+        return;
+      }
+
+      const total = event.lengthComputable ? event.total : file.size || null;
+      const percent =
+        total && total > 0 ? Math.min(100, Math.round((event.loaded / total) * 100)) : null;
+
+      onProgress({
+        loaded: event.loaded,
+        percent,
+        total,
+      });
+    };
+
+    request.onerror = () => {
+      reject(new Error("Network error while uploading this file."));
+    };
+
+    request.onload = () => {
+      const payload = request.response ?? null;
+      if (request.status < 200 || request.status >= 300) {
+        reject(
+          new ApiClientError(
+            getUploadErrorMessage(payload, request.statusText),
+            request.status,
+            payload,
+          ),
+        );
+        return;
+      }
+
+      onProgress?.({
+        loaded: file.size,
+        percent: 100,
+        total: file.size,
+      });
+      resolve(payload as Track);
+    };
+
+    request.send(formData);
   });
 }
 
@@ -87,4 +141,20 @@ async function getStreamErrorMessage(response: Response) {
   }
 
   return response.statusText || "Unable to load audio stream.";
+}
+
+function getUploadErrorMessage(payload: unknown, fallback: string) {
+  if (typeof payload === "object" && payload !== null) {
+    const detail = "detail" in payload ? payload.detail : undefined;
+    if (typeof detail === "string") {
+      return detail;
+    }
+
+    const message = "message" in payload ? payload.message : undefined;
+    if (typeof message === "string") {
+      return message;
+    }
+  }
+
+  return fallback || "Upload failed.";
 }

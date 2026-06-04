@@ -36,6 +36,8 @@ class TrackResponse(BaseModel):
     bitrate: int | None
     normalized_metadata_key: str | None
     status: str
+    processing_job_status: str | None = None
+    processing_error_message: str | None = None
     liked: bool
     cooldown_until: datetime | None
     created_at: datetime

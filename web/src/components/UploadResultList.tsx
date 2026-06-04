@@ -8,8 +8,12 @@ export type UploadResult = {
   duplicateCheck?: DuplicateCheckState;
   fileName: string;
   message?: string;
-  state: "success" | "error";
+  state: "uploading" | "success" | "error";
+  statusMessage?: string;
   track?: Track;
+  uploadProgress?: {
+    percent: number | null;
+  };
 };
 
 type DuplicateCheckState =
@@ -46,7 +50,7 @@ export function UploadResultList({ results }: UploadResultListProps) {
             style={{
               border: "1px solid #d5dde8",
               borderRadius: "8px",
-              background: result.state === "success" ? "#f8fafc" : "#fef2f2",
+              background: result.state === "error" ? "#fef2f2" : "#f8fafc",
               padding: "16px",
             }}
           >
@@ -62,11 +66,16 @@ export function UploadResultList({ results }: UploadResultListProps) {
               <strong style={{ color: "#18212f", overflowWrap: "anywhere" }}>
                 {result.track?.title || result.fileName}
               </strong>
-              {result.track ? <TrackStatusBadge status={result.track.status} /> : null}
+              {result.state === "uploading" ? (
+                <TrackStatusBadge status="uploading" />
+              ) : result.track ? (
+                <TrackStatusBadge status={result.track.status} />
+              ) : null}
             </div>
+            {result.state === "uploading" ? <UploadProgressBar result={result} /> : null}
             <p
               style={{
-                color: result.state === "success" ? "#526174" : "#991b1b",
+                color: result.state === "error" ? "#991b1b" : "#526174",
                 lineHeight: 1.55,
                 margin: "8px 0 0",
                 overflowWrap: "anywhere",
@@ -74,10 +83,52 @@ export function UploadResultList({ results }: UploadResultListProps) {
             >
               {getResultMessage(result)}
             </p>
+            {result.statusMessage ? (
+              <p role="status" style={{ color: "#92400e", margin: "8px 0 0" }}>
+                {result.statusMessage}
+              </p>
+            ) : null}
             {result.state === "success" ? <DuplicateWarning result={result} /> : null}
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function UploadProgressBar({ result }: { result: UploadResult }) {
+  const percent = result.uploadProgress?.percent;
+  const width = percent === null || percent === undefined ? 8 : Math.max(4, percent);
+
+  return (
+    <div style={{ marginTop: "12px" }}>
+      <div
+        aria-label={`Upload progress for ${result.fileName}`}
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={percent ?? undefined}
+        role="progressbar"
+        style={{
+          background: "#dbeafe",
+          borderRadius: "999px",
+          height: "10px",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            background: "#2563eb",
+            height: "100%",
+            transition: "width 160ms ease",
+            width: `${width}%`,
+          }}
+        />
+      </div>
+      <p style={{ color: "#526174", fontSize: "0.9rem", margin: "6px 0 0" }}>
+        {percent === null || percent === undefined
+          ? "Uploading..."
+          : `Uploading... ${percent}%`}
+      </p>
     </div>
   );
 }
@@ -166,13 +217,29 @@ function getResultMessage(result: UploadResult) {
     return result.message ?? "Upload failed.";
   }
 
+  if (result.state === "uploading") {
+    return "Sending this file to the server.";
+  }
+
   if (!result.track) {
     return "Upload completed.";
   }
 
-  return `Track #${result.track.id} was created with ${formatStatus(
-    result.track.status,
-  )} status.`;
+  if (result.track.status === "processing") {
+    return `Track #${result.track.id} was uploaded. Backend processing is running.`;
+  }
+
+  if (result.track.status === "ready") {
+    return `Track #${result.track.id} is ready for playback.`;
+  }
+
+  if (result.track.status === "failed") {
+    return result.track.processing_error_message
+      ? `Track #${result.track.id} processing failed: ${result.track.processing_error_message}`
+      : `Track #${result.track.id} processing failed.`;
+  }
+
+  return `Track #${result.track.id} is ${formatStatus(result.track.status)}.`;
 }
 
 function formatStatus(status: string) {

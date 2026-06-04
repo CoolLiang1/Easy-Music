@@ -110,6 +110,8 @@ Expected result:
 
 - HTTP response creates a track.
 - `status` is `processing`.
+- `processing_job_status` is `pending`.
+- `processing_error_message` is `null`.
 - `original_file_path` is under the configured media root.
 - `playback_file_path` is `null`.
 - A pending processing job exists in the database.
@@ -146,6 +148,8 @@ Invoke-RestMethod `
 Expected result:
 
 - `status` is `ready`.
+- `processing_job_status` is `succeeded`.
+- `processing_error_message` is `null`.
 - `duration_seconds`, `format`, or `bitrate` are populated when ffprobe can
   read them.
 - `playback_file_path` points at a generated MP3 playback file.

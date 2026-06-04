@@ -122,6 +122,33 @@ def test_get_track_detail(client: TestClient, db_session: Session) -> None:
     assert body["title"] == "Track One"
     assert body["artist"] == "Artist"
     assert body["tags"][0]["name"] == "Focus"
+    assert body["processing_job_status"] is None
+    assert body["processing_error_message"] is None
+
+
+def test_get_track_detail_includes_latest_processing_failure(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.status = "failed"
+    db_session.add(
+        ProcessingJob(
+            track_id=track.id,
+            status="failed",
+            error_message="ffmpeg could not decode the uploaded file",
+        ),
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/tracks/{track.id}", headers=auth_headers(user))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "failed"
+    assert body["processing_job_status"] == "failed"
+    assert body["processing_error_message"] == "ffmpeg could not decode the uploaded file"
 
 
 def test_update_track_metadata(client: TestClient, db_session: Session) -> None:

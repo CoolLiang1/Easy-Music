@@ -49,11 +49,24 @@ def get_track_tags(db: Session, track: Track) -> list[Tag]:
 
 
 def build_track_response(db: Session, track: Track) -> TrackResponse:
+    processing_job = get_latest_processing_job(db, track)
     return TrackResponse.model_validate(
         {
             **track.__dict__,
+            "processing_job_status": processing_job.status if processing_job else None,
+            "processing_error_message": (
+                processing_job.error_message if processing_job else None
+            ),
             "tags": get_track_tags(db, track),
         },
+    )
+
+
+def get_latest_processing_job(db: Session, track: Track) -> ProcessingJob | None:
+    return db.scalar(
+        select(ProcessingJob)
+        .where(ProcessingJob.track_id == track.id)
+        .order_by(ProcessingJob.created_at.desc(), ProcessingJob.id.desc())
     )
 
 
