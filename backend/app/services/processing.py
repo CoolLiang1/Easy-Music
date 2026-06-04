@@ -7,6 +7,10 @@ from app.media.metadata import MediaMetadata, extract_metadata
 from app.media.paths import resolve_media_path
 from app.media.storage import MediaStorage
 from app.models.track import Track
+from app.services.duplicate_signals import (
+    build_normalized_metadata_key,
+    collect_file_duplicate_signal,
+)
 
 
 MetadataExtractor = Callable[..., MediaMetadata]
@@ -57,6 +61,19 @@ def process_track(
 
         _apply_metadata(track, metadata)
         track.playback_file_path = storage.relative_media_path(playback_path)
+        track.normalized_metadata_key = build_normalized_metadata_key(
+            title=track.title,
+            artist=track.artist,
+            album=track.album,
+            duration_seconds=track.duration_seconds,
+        )
+        original_signal = collect_file_duplicate_signal(original_path)
+        if original_signal is not None:
+            track.original_file_size_bytes = original_signal.size_bytes
+            track.original_file_sha256 = original_signal.sha256
+        playback_signal = collect_file_duplicate_signal(playback_path)
+        if playback_signal is not None:
+            track.playback_file_sha256 = playback_signal.sha256
         track.status = "ready"
         db.commit()
         db.refresh(track)

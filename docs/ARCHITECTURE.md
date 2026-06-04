@@ -197,11 +197,15 @@ Version 1 is single-user, but tables should still include `user_id`.
 - `duration_seconds`
 - `content_type`
 - `original_file_path`
+- `original_file_size_bytes`
+- `original_file_sha256`
 - `playback_file_path`
+- `playback_file_sha256`
 - `cover_path`
 - `source_url`
 - `format`
 - `bitrate`
+- `normalized_metadata_key`
 - `status`
 - `liked`
 - `cooldown_until`
@@ -314,18 +318,33 @@ Supported upload formats:
 ### 9.2 Processing Pipeline
 
 1. Save original file.
-2. Extract metadata.
-3. Generate normalized MP3 playback file.
-4. Extract or generate cover if available.
-5. Create or update Track.
-6. Ask AI for tag suggestions.
-7. Mark track as ready or failed.
+2. Store advisory duplicate signals for the original, including file size and
+   SHA-256 hash when the saved file is readable.
+3. Extract metadata.
+4. Generate normalized MP3 playback file.
+5. Store a normalized metadata key and playback SHA-256 hash when available.
+6. Extract or generate cover if available.
+7. Create or update Track.
+8. Ask AI for tag suggestions.
+9. Mark track as ready or failed.
 
 ### 9.3 Playback Format
 
 Version 1 uses MP3 playback files for compatibility.
 
 Original files are preserved for future reprocessing.
+
+### 9.4 Duplicate Signals
+
+V1.1 stores duplicate-detection signals on each track for later advisory
+duplicate review. The signals are scoped through the existing `tracks.user_id`
+ownership boundary and include original file size, original file SHA-256,
+normalized metadata key, and playback file SHA-256 when processing has produced
+a playback file. These values do not include local filesystem paths, secrets, or
+media contents.
+
+Duplicate detection remains advisory. Signal storage must not block uploads and
+must not delete, merge, overwrite, or hide tracks automatically.
 
 ## 10. Recommendation System
 

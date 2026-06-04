@@ -1,4 +1,5 @@
 from collections.abc import Generator
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -100,6 +101,13 @@ def test_process_track_extracts_metadata_generates_playback_and_marks_ready(
     assert processed.format == "flac"
     assert processed.bitrate == 900000
     assert processed.playback_file_path == "playback/user-1/track-1/playback.mp3"
+    assert processed.original_file_size_bytes == len(b"audio")
+    assert processed.original_file_sha256 == hashlib.sha256(b"audio").hexdigest()
+    assert processed.playback_file_sha256 == hashlib.sha256(b"mp3").hexdigest()
+    assert (
+        processed.normalized_metadata_key
+        == "title=tagged title|artist=tagged artist|album=tagged album|duration=124"
+    )
     assert generated_paths == [(original, tmp_path / processed.playback_file_path)]
 
 
@@ -131,6 +139,7 @@ def test_process_track_can_be_rerun_without_corrupting_track_state(
     assert processed.status == "ready"
     assert processed.title == "Uploaded Name"
     assert processed.playback_file_path == "playback/user-1/track-1/playback.mp3"
+    assert processed.playback_file_sha256 is None
 
 
 def test_process_track_marks_failed_when_media_processing_fails(

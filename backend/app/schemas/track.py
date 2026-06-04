@@ -26,11 +26,15 @@ class TrackResponse(BaseModel):
     duration_seconds: int | None
     content_type: str
     original_file_path: str | None
+    original_file_size_bytes: int | None
+    original_file_sha256: str | None
     playback_file_path: str | None
+    playback_file_sha256: str | None
     cover_path: str | None
     source_url: str | None
     format: str | None
     bitrate: int | None
+    normalized_metadata_key: str | None
     status: str
     liked: bool
     cooldown_until: datetime | None
