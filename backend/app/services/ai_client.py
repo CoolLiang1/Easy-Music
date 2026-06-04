@@ -19,6 +19,7 @@ from app.core.config import Settings
 from app.schemas.ai import AiCompletionRequest, AiCompletionResult
 
 _TIMEOUT_SECONDS = 60
+_NETWORK_ATTEMPTS = 2
 
 
 class OpenAiCompatibleClient:
@@ -55,7 +56,7 @@ class OpenAiCompatibleClient:
         )
 
         try:
-            with self._opener.open(http_request, timeout=_TIMEOUT_SECONDS) as resp:
+            with _open_with_network_retry(self._opener, http_request) as resp:
                 raw = resp.read().decode("utf-8")
                 response_data = json.loads(raw)
                 content = _extract_content(response_data)
@@ -137,6 +138,22 @@ def _is_truncated_completion(data: dict[str, Any]) -> bool:
     if not choices:
         return False
     return choices[0].get("finish_reason") == "length"
+
+
+def _open_with_network_retry(
+    opener: urllib.request.OpenerDirector,
+    request: urllib.request.Request,
+):
+    for attempt in range(_NETWORK_ATTEMPTS):
+        try:
+            return opener.open(request, timeout=_TIMEOUT_SECONDS)
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, socket.timeout, OSError):
+            if attempt >= _NETWORK_ATTEMPTS - 1:
+                raise
+
+    return opener.open(request, timeout=_TIMEOUT_SECONDS)
 
 
 def _build_opener() -> urllib.request.OpenerDirector:
