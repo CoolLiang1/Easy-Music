@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 
+import { listDuplicateCandidates } from "../api/duplicates";
 import { uploadTrack } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import { UploadForm } from "../components/UploadForm";
@@ -17,7 +18,8 @@ export function UploadPage() {
   const handleUpload = async (files: File[]) => {
     if (!accessToken) {
       setResults(
-        files.map((file) => ({
+        files.map((file, index) => ({
+          id: buildUploadResultId(file, index),
           fileName: file.name,
           message: "Sign in again before uploading files.",
           state: "error",
@@ -29,26 +31,34 @@ export function UploadPage() {
     setIsUploading(true);
     setResults([]);
 
-    const uploadResults: UploadResult[] = [];
-
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
+      const resultId = buildUploadResultId(file, index);
       try {
         const track = await uploadTrack(accessToken, file);
-        uploadResults.push({
-          fileName: file.name,
-          state: "success",
-          track,
-        });
+        setResults((currentResults) => [
+          ...currentResults,
+          {
+            id: resultId,
+            duplicateCheck: { state: "loading" },
+            fileName: file.name,
+            state: "success",
+            track,
+          },
+        ]);
+        void checkDuplicateCandidates(accessToken, track.id, resultId, setResults);
       } catch (error) {
-        uploadResults.push({
-          fileName: file.name,
-          message: getErrorMessage(error),
-          state: "error",
-        });
+        setResults((currentResults) => [
+          ...currentResults,
+          {
+            id: resultId,
+            fileName: file.name,
+            message: getErrorMessage(error),
+            state: "error",
+          },
+        ]);
       }
     }
 
-    setResults(uploadResults);
     setIsUploading(false);
   };
 
@@ -82,6 +92,68 @@ export function UploadPage() {
       ) : null}
     </section>
   );
+}
+
+async function checkDuplicateCandidates(
+  accessToken: string,
+  trackId: number,
+  resultId: string,
+  setResults: Dispatch<SetStateAction<UploadResult[]>>,
+) {
+  const maxAttempts = 4;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const groups = await listDuplicateCandidates(accessToken, trackId);
+      if (groups.length > 0) {
+        updateDuplicateCheck(setResults, resultId, {
+          state: "found",
+          groups,
+        });
+        return;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await delay(2500);
+      }
+    } catch (error) {
+      updateDuplicateCheck(setResults, resultId, {
+        state: "error",
+        message: getDuplicateCheckErrorMessage(error),
+      });
+      return;
+    }
+  }
+
+  updateDuplicateCheck(setResults, resultId, { state: "none" });
+}
+
+function updateDuplicateCheck(
+  setResults: Dispatch<SetStateAction<UploadResult[]>>,
+  resultId: string,
+  duplicateCheck: NonNullable<UploadResult["duplicateCheck"]>,
+) {
+  setResults((currentResults) =>
+    currentResults.map((result) =>
+      result.id === resultId ? { ...result, duplicateCheck } : result,
+    ),
+  );
+}
+
+function buildUploadResultId(file: File, index: number) {
+  return `${Date.now()}-${index}-${file.name}`;
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function getDuplicateCheckErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Unable to check duplicate candidates.";
 }
 
 function getErrorMessage(error: unknown) {
