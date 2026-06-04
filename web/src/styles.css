@@ -364,6 +364,29 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.duplicate-candidate-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+
+.duplicate-candidate-meta div {
+  min-width: 0;
+}
+
+.duplicate-candidate-meta dt {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.duplicate-candidate-meta dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;

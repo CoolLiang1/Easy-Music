@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackTable } from "../components/TrackTable";
+import { RouteLink } from "../routes/RouteLink";
 import type { Track } from "../types/track";
 
 type LibraryState =
@@ -80,6 +81,9 @@ export function LibraryPage() {
         >
           {isRefreshing ? "Refreshing..." : "Refresh status"}
         </button>
+        <RouteLink className="button secondary" to="/duplicates">
+          Review duplicates
+        </RouteLink>
       </div>
 
       {libraryState.name === "loading" ? (

@@ -1,5 +1,6 @@
 import { AiAssistantPage } from "./pages/AiAssistantPage";
 import { AppLayout } from "./layout/AppLayout";
+import { DuplicateReviewPage } from "./pages/DuplicateReviewPage";
 import { LoginPage } from "./pages/LoginPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { RecommendationPage } from "./pages/RecommendationPage";
@@ -44,6 +45,7 @@ export default function App() {
     >
       <AppLayout onSignOut={() => setPlaceholderAuth(false)}>
         {route.name === "library" ? <LibraryPage /> : null}
+        {route.name === "duplicates" ? <DuplicateReviewPage /> : null}
         {route.name === "upload" ? <UploadPage /> : null}
         {route.name === "tags" ? <TagsPage /> : null}
         {route.name === "aiAssistant" ? <AiAssistantPage /> : null}

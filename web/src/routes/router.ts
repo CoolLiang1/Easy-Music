@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export type AppRoute =
   | { name: "login" }
   | { name: "aiAssistant" }
+  | { name: "duplicates" }
   | { name: "library" }
   | { name: "upload" }
   | { name: "tags" }
@@ -28,6 +29,10 @@ export function getRoute(path: string): AppRoute {
 
   if (normalizedPath === "/upload") {
     return { name: "upload" };
+  }
+
+  if (normalizedPath === "/duplicates") {
+    return { name: "duplicates" };
   }
 
   if (normalizedPath === "/tags") {

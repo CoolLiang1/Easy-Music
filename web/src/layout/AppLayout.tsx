@@ -9,6 +9,7 @@ type AppLayoutProps = {
 
 const navItems = [
   { label: "Library", path: "/library" },
+  { label: "Duplicates", path: "/duplicates" },
   { label: "Upload", path: "/upload" },
   { label: "Tags", path: "/tags" },
   { label: "AI Assistant", path: "/ai-assistant" },
