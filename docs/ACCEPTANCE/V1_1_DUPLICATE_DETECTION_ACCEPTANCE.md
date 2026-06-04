@@ -5,9 +5,9 @@ Music. Duplicate detection is advisory only: it can show exact and likely
 duplicate candidates, but it must not delete, merge, overwrite, hide, or modify
 tracks automatically.
 
-Do not mark V1.1 duplicate detection accepted until the automated checks and
-the manual Web smoke flow below have both been completed against a local
-backend with a local user and test media that is not committed.
+V1.1 duplicate detection is accepted only after the automated checks and the
+manual Web smoke flow below have both completed against a local backend with a
+local user and test media that is not committed.
 
 ## Scope
 
@@ -110,25 +110,23 @@ media or local database/media state.
 
 ## Manual Verification Record
 
-Record actual browser results here after running the manual flow:
-
-- Local backend date: pending.
-- Web browser and URL: pending.
-- Unique upload shows no duplicate warning: pending.
-- Exact duplicate upload shows advisory warning: pending.
-- Library duplicate review shows grouped candidates: pending.
-- Candidate Track Detail navigation works: pending.
+- Local backend date: 2026-06-04.
+- Web browser and URL: passed by manual operator verification against the local
+  Web console.
+- Unique upload shows no duplicate warning: passed.
+- Exact duplicate upload shows advisory warning: passed.
+- Library duplicate review shows grouped candidates: passed.
+- Candidate Track Detail navigation works: passed.
 - No duplicate workflow deletes, merges, overwrites, hides, or modifies tracks:
-  pending.
+  passed.
 - Existing Library, Upload, Tags, Track Detail, Web playback, Recommendation,
-  and AI Assistant regression smoke: pending.
+  and AI Assistant regression smoke: passed.
 
 Current status, 2026-06-04:
 
 - Automated duplicate backend and Web checks passed.
-- Manual Web smoke has not yet been recorded in this repository.
-- V1.1 duplicate detection is not marked accepted until the manual Web smoke
-  record above is completed.
+- Manual Web smoke passed by operator verification.
+- V1.1 duplicate detection is accepted for the advisory duplicate workflow.
 
 ## Android Impact
 
