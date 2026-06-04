@@ -97,10 +97,11 @@ def delete_track(
     track_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
 ) -> Response:
     track = track_service.get_track(db, current_user, track_id)
     if track is None:
         raise track_not_found_error()
 
-    track_service.delete_track(db, track)
+    track_service.delete_track(db, track, storage)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { listTags } from "../api/tags";
-import { getTrack, updateTrack } from "../api/tracks";
+import { deleteTrack, getTrack, updateTrack } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import { TrackTagEditor } from "../components/TrackTagEditor";
 import { WebAudioPlayer } from "../components/WebAudioPlayer";
+import { navigateTo } from "../routes/router";
 import type { Tag } from "../types/tag";
 import type { Track, TrackMetadataUpdate, TrackTagUpdate } from "../types/track";
 
@@ -17,6 +18,7 @@ type TrackDetailPageProps = {
 type TrackDetailState =
   | { name: "loading" }
   | { name: "ready"; tags: Tag[]; track: Track }
+  | { name: "deleted"; message: string }
   | { name: "error"; message: string };
 
 export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
@@ -31,6 +33,8 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
   const [isSavingTags, setIsSavingTags] = useState(false);
   const [tagSaveError, setTagSaveError] = useState<string | null>(null);
   const [tagSaveSuccess, setTagSaveSuccess] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadTrack = useCallback(async (showLoading: boolean) => {
     if (!accessToken) {
@@ -115,6 +119,45 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
     }
   };
 
+  const handleDeleteTrack = async () => {
+    if (detailState.name !== "ready") {
+      return;
+    }
+
+    if (!accessToken) {
+      setDeleteError("Sign in again to delete this track.");
+      return;
+    }
+
+    const trackTitle = detailState.track.title || "Untitled track";
+    const shouldDelete = window.confirm(
+      `Delete track "${trackTitle}"? This removes the server track and its stored media files.`,
+    );
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+    setSaveError(null);
+    setSaveSuccess(null);
+    setTagSaveError(null);
+    setTagSaveSuccess(null);
+
+    try {
+      await deleteTrack(accessToken, detailState.track.id);
+      setDetailState({
+        name: "deleted",
+        message: "Track deleted. Returning to the library...",
+      });
+      window.setTimeout(() => navigateTo("/library"), 800);
+    } catch (error: unknown) {
+      setDeleteError(getErrorMessage(error));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
     void loadTrack(true);
   }, [loadTrack]);
@@ -140,6 +183,8 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
       <h1 id="track-detail-title">
         {detailState.name === "ready"
           ? detailState.track.title || "Untitled track"
+          : detailState.name === "deleted"
+            ? "Track deleted"
           : "Track metadata"}
       </h1>
       <p className="page-copy">
@@ -149,13 +194,34 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
       <div className="login-actions">
         <button
           className="button secondary"
-          disabled={detailState.name === "loading" || isRefreshing}
+          disabled={
+            detailState.name === "loading" ||
+            detailState.name === "deleted" ||
+            isRefreshing ||
+            isDeleting
+          }
           onClick={() => void loadTrack(false)}
           type="button"
         >
           {isRefreshing ? "Refreshing..." : "Refresh status"}
         </button>
+        {detailState.name === "ready" ? (
+          <button
+            className="button danger"
+            disabled={isDeleting || isSaving || isSavingTags}
+            onClick={() => void handleDeleteTrack()}
+            type="button"
+          >
+            {isDeleting ? "Deleting..." : "Delete track"}
+          </button>
+        ) : null}
       </div>
+
+      {deleteError ? (
+        <div className="empty-state" role="alert">
+          {deleteError}
+        </div>
+      ) : null}
 
       {detailState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
@@ -165,6 +231,12 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
 
       {detailState.name === "error" ? (
         <div className="empty-state" role="alert">
+          {detailState.message}
+        </div>
+      ) : null}
+
+      {detailState.name === "deleted" ? (
+        <div className="empty-state" aria-live="polite">
           {detailState.message}
         </div>
       ) : null}

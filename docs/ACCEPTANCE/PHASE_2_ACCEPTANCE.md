@@ -30,6 +30,14 @@ The documented flow covers:
 - Playing a ready track in the browser through the authenticated stream
   endpoint.
 
+## Post-Acceptance Update
+
+- Web Track Detail now includes a confirmed single-track delete action backed by
+  `DELETE /api/tracks/{track_id}`.
+- A successful delete clears the stale detail state and returns the user to the
+  Library route, where the list is fetched again.
+- Delete failures are shown on the Track Detail page.
+
 ## Actual Manual Result
 
 - Manual browser smoke test: passed.

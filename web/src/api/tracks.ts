@@ -26,6 +26,13 @@ export function updateTrack(
   });
 }
 
+export function deleteTrack(accessToken: string, trackId: number | string) {
+  return apiRequest<void>(`/api/tracks/${encodeURIComponent(trackId)}`, {
+    method: "DELETE",
+    accessToken,
+  });
+}
+
 export function uploadTrack(accessToken: string, file: File) {
   const formData = new FormData();
   formData.append("file", file);

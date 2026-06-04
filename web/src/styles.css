@@ -166,6 +166,12 @@ h2 {
   color: #274156;
 }
 
+.button.danger {
+  border-color: #fecaca;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
 .button:hover,
 .button:focus-visible {
   filter: brightness(0.96);

@@ -15,6 +15,9 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
 from app.media.storage import MediaStorage, get_media_storage
+from app.models.feedback_event import FeedbackEvent
+from app.models.playback_event import PlaybackEvent
+from app.models.processing_job import ProcessingJob
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
@@ -209,6 +212,85 @@ def test_delete_track(client: TestClient, db_session: Session) -> None:
     assert response.status_code == 204
     assert db_session.get(Track, track.id) is None
     assert db_session.get(TrackTag, (track.id, tag.id)) is None
+
+
+def test_delete_track_removes_related_rows_and_media_files(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.cover_path = "covers/track.jpg"
+    tag = create_tag(db_session, user)
+    db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
+    db_session.add(
+        PlaybackEvent(
+            user_id=user.id,
+            track_id=track.id,
+            client_event_id="playback-delete-test",
+            event_type="play",
+            position_seconds=0,
+            duration_seconds=180,
+            occurred_at=datetime.now(timezone.utc),
+            client="web",
+        ),
+    )
+    db_session.add(
+        FeedbackEvent(
+            user_id=user.id,
+            track_id=track.id,
+            client_event_id="feedback-delete-test",
+            feedback_type="like",
+            scenario_tag_ids=[],
+            state_tag_ids=[],
+            type_tag_ids=[],
+            attribute_tag_ids=[],
+            occurred_at=datetime.now(timezone.utc),
+            client="web",
+        ),
+    )
+    db_session.add(ProcessingJob(track_id=track.id, status="pending"))
+    db_session.commit()
+    db_session.refresh(track)
+
+    media_paths = [
+        tmp_path / track.original_file_path,
+        tmp_path / track.playback_file_path,
+        tmp_path / track.cover_path,
+    ]
+    for media_path in media_paths:
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        media_path.write_bytes(b"media")
+
+    track_id = track.id
+    tag_id = tag.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
+
+    assert response.status_code == 204
+    assert db_session.get(Track, track_id) is None
+    assert db_session.get(TrackTag, (track_id, tag_id)) is None
+    assert db_session.query(PlaybackEvent).filter_by(track_id=track_id).count() == 0
+    assert db_session.query(FeedbackEvent).filter_by(track_id=track_id).count() == 0
+    assert db_session.query(ProcessingJob).filter_by(track_id=track_id).count() == 0
+    for media_path in media_paths:
+        assert not media_path.exists()
+
+
+def test_cannot_delete_another_users_track(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    track = create_track(db_session, other_user)
+    track_id = track.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(owner))
+
+    assert response.status_code == 404
+    assert db_session.get(Track, track_id) is not None
 
 
 def test_tracks_require_authentication(client: TestClient) -> None:

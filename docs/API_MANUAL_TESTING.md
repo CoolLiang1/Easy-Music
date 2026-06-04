@@ -223,6 +223,38 @@ Expected result:
 - Response includes `Accept-Ranges: bytes`.
 - Invalid or missing auth returns `401 Unauthorized`.
 
+## Delete One Track
+
+Use a separate throwaway track for this smoke test so later playback checks can
+keep using `$trackId`.
+
+```powershell
+$deleteUpload = curl.exe `
+  -s `
+  -X POST `
+  -H "Authorization: Bearer $token" `
+  -F "file=@test-tone.wav;type=audio/wav" `
+  "http://127.0.0.1:8000/api/tracks/upload" | ConvertFrom-Json
+
+$deleteTrackId = $deleteUpload.id
+
+Invoke-RestMethod `
+  -Method Delete `
+  -Uri "http://127.0.0.1:8000/api/tracks/$deleteTrackId" `
+  -Headers $headers
+```
+
+Expected result:
+
+- The delete request returns `204 No Content`.
+- `GET /api/tracks/$deleteTrackId` for the same user returns `404 Not Found`.
+- Related track tags, playback events, feedback events, and processing jobs for
+  the deleted track are removed.
+- Stored media files referenced by that track are deleted one explicit file at
+  a time after path validation; no directory or recursive cleanup is performed.
+- A missing token returns `401 Unauthorized`.
+- A track owned by another user returns `404 Not Found`.
+
 ## Sync Playback Events
 
 Phase 4 adds one minimal authenticated endpoint for Android offline playback

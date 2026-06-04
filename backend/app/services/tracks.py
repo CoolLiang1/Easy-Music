@@ -1,11 +1,22 @@
+import logging
+from pathlib import Path
+
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.media.paths import UnsafeMediaPathError
+from app.media.storage import MediaStorage
+from app.models.feedback_event import FeedbackEvent
+from app.models.playback_event import PlaybackEvent
+from app.models.processing_job import ProcessingJob
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
 from app.schemas.track import TrackResponse, TrackUpdate
+
+
+logger = logging.getLogger(__name__)
 
 
 def list_tracks(db: Session, user: User) -> list[Track]:
@@ -70,7 +81,55 @@ def update_track(db: Session, user: User, track: Track, payload: TrackUpdate) ->
     return track
 
 
-def delete_track(db: Session, track: Track) -> None:
-    db.execute(delete(TrackTag).where(TrackTag.track_id == track.id))
+def delete_track(db: Session, track: Track, storage: MediaStorage | None = None) -> None:
+    track_id = track.id
+    media_paths = _track_media_paths(track, storage) if storage is not None else []
+
+    db.execute(delete(FeedbackEvent).where(FeedbackEvent.track_id == track_id))
+    db.execute(delete(PlaybackEvent).where(PlaybackEvent.track_id == track_id))
+    db.execute(delete(ProcessingJob).where(ProcessingJob.track_id == track_id))
+    db.execute(delete(TrackTag).where(TrackTag.track_id == track_id))
     db.delete(track)
     db.commit()
+
+    for media_path in media_paths:
+        try:
+            media_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning(
+                "Unable to delete media file %s for deleted track %s.",
+                media_path,
+                track_id,
+                exc_info=True,
+            )
+
+
+def _track_media_paths(track: Track, storage: MediaStorage) -> list[Path]:
+    paths: list[Path] = []
+    seen_paths: set[str] = set()
+
+    for relative_path in (
+        track.original_file_path,
+        track.playback_file_path,
+        track.cover_path,
+    ):
+        if not relative_path:
+            continue
+
+        try:
+            media_path = storage.stored_media_path(relative_path)
+        except UnsafeMediaPathError:
+            logger.warning(
+                "Skipping unsafe media path while deleting track %s.",
+                track.id,
+            )
+            continue
+
+        path_key = media_path.as_posix()
+        if path_key in seen_paths:
+            continue
+
+        seen_paths.add(path_key)
+        paths.append(media_path)
+
+    return paths
