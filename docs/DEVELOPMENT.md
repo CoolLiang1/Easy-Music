@@ -201,6 +201,21 @@ tag ownership and tag group compatibility, and returns a `request_id` plus up to
 three ordered results. Each result includes `rank`, `score`, deterministic
 rule-based `reason`, and the existing track response payload.
 
+Review advisory duplicate candidates after applying V1.1 duplicate migrations
+and processing uploads:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/duplicates" `
+  -Headers $headers
+```
+
+The duplicate endpoint is authenticated, current-user scoped, and read-only. It
+returns exact file-hash groups and conservative metadata/duration groups using a
+compact track payload that does not include internal media paths. Add
+`?track_id=$trackId` to filter groups for one owned track.
+
 ## Docker Compose Local Flow
 
 Docker Compose defines `postgres`, `api`, and `worker` services for local

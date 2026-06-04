@@ -396,6 +396,7 @@ The API should return:
 - `GET /api/tracks/{id}`
 - `PATCH /api/tracks/{id}`
 - `DELETE /api/tracks/{id}`
+- `GET /api/tracks/duplicates`
 - `GET /api/tracks/{id}/stream`
 - `GET /api/tracks/{id}/download-cache`
 

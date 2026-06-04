@@ -150,6 +150,44 @@ Expected result:
   read them.
 - `playback_file_path` points at a generated MP3 playback file.
 
+## Review Duplicate Candidates
+
+V1.1 adds a read-only duplicate-candidate endpoint. It is advisory only: it
+does not delete, merge, overwrite, hide, or update tracks.
+
+List all duplicate candidate groups for the authenticated user:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/duplicates" `
+  -Headers $headers
+```
+
+Filter duplicate candidate groups for one uploaded or existing track:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/duplicates?track_id=$trackId" `
+  -Headers $headers
+```
+
+Expected result:
+
+- The response is an array of duplicate groups, or an empty array when no
+  candidates are found.
+- Each group includes `group_id`, `match_type`, `confidence`, `reason`,
+  `candidate_track_ids`, and compact `candidates`.
+- `match_type` is `exact_file` for matching file hashes or
+  `metadata_duration` for conservative metadata/duration matches.
+- Compact candidates include safe track metadata such as `id`, `title`,
+  `artist`, `album`, `duration_seconds`, `content_type`, and `status`.
+- Internal media paths are not included in the compact candidate payload.
+- A missing token returns `401 Unauthorized`.
+- A missing or unowned `track_id` filter returns `404 Not Found`.
+- The endpoint never mutates track data.
+
 ## Stream A Ready Track
 
 Download the full stream:
