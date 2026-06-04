@@ -85,8 +85,13 @@ def create_track(db_session: Session, user: User, title: str = "Track One") -> T
     return track
 
 
-def create_tag(db_session: Session, user: User, name: str = "Focus") -> Tag:
-    tag = Tag(user_id=user.id, name=name, group="scenario")
+def create_tag(
+    db_session: Session,
+    user: User,
+    name: str = "Focus",
+    group: str = "scenario",
+) -> Tag:
+    tag = Tag(user_id=user.id, name=name, group=group)
     db_session.add(tag)
     db_session.commit()
     db_session.refresh(tag)
@@ -225,6 +230,173 @@ def test_cannot_associate_another_users_tag(
     )
 
     assert response.status_code == 404
+
+
+def test_batch_adds_tags_to_selected_tracks(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    tag = create_tag(db_session, user, name="Focus")
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [first.id, second.id], "add_tag_ids": [tag.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 2
+    assert body["updated_count"] == 2
+    assert body["results"] == [
+        {"track_id": first.id, "status": "updated", "error": None},
+        {"track_id": second.id, "status": "updated", "error": None},
+    ]
+    assert [track["id"] for track in body["tracks"]] == [first.id, second.id]
+    assert [tag["name"] for tag in body["tracks"][0]["tags"]] == ["Focus"]
+    assert [tag["name"] for tag in body["tracks"][1]["tags"]] == ["Focus"]
+
+
+def test_batch_removes_tags_from_selected_tracks(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    keep = create_tag(db_session, user, name="Keep", group="state")
+    remove = create_tag(db_session, user, name="Remove", group="attribute")
+    for track in (first, second):
+        db_session.add(TrackTag(track_id=track.id, tag_id=keep.id))
+        db_session.add(TrackTag(track_id=track.id, tag_id=remove.id))
+    db_session.commit()
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [first.id, second.id], "remove_tag_ids": [remove.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["updated_count"] == 2
+    assert [tag["name"] for tag in response.json()["tracks"][0]["tags"]] == ["Keep"]
+    assert [tag["name"] for tag in response.json()["tracks"][1]["tags"]] == ["Keep"]
+
+
+def test_batch_tag_update_rejects_invalid_tag(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    track = create_track(db_session, user)
+    hidden_tag = create_tag(db_session, other_user)
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [track.id], "add_tag_ids": [hidden_tag.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Tag not found for current user."
+    assert db_session.query(TrackTag).filter_by(track_id=track.id).count() == 0
+
+
+def test_batch_tag_update_reports_invalid_track_as_partial_failure(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    tag = create_tag(db_session, user)
+    missing_track_id = track.id + 100
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [track.id, missing_track_id], "add_tag_ids": [tag.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 2
+    assert body["updated_count"] == 1
+    assert body["results"] == [
+        {"track_id": track.id, "status": "updated", "error": None},
+        {
+            "track_id": missing_track_id,
+            "status": "failed",
+            "error": "Track not found for current user.",
+        },
+    ]
+    assert [tag["name"] for tag in body["tracks"][0]["tags"]] == ["Focus"]
+
+
+def test_batch_tag_update_is_scoped_to_current_user(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    owner_track = create_track(db_session, owner, title="Owner")
+    other_track = create_track(db_session, other_user, title="Hidden")
+    tag = create_tag(db_session, owner)
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [owner_track.id, other_track.id], "add_tag_ids": [tag.id]},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["updated_count"] == 1
+    assert body["results"][1] == {
+        "track_id": other_track.id,
+        "status": "failed",
+        "error": "Track not found for current user.",
+    }
+    assert db_session.query(TrackTag).filter_by(track_id=owner_track.id).count() == 1
+    assert db_session.query(TrackTag).filter_by(track_id=other_track.id).count() == 0
+
+
+def test_batch_tag_update_requires_authentication(client: TestClient) -> None:
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [1], "add_tag_ids": [1]},
+    )
+
+    assert response.status_code == 401
+
+
+def test_batch_tag_update_requires_selection_and_tag_action(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    no_tracks_response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [], "add_tag_ids": [1]},
+        headers=auth_headers(user),
+    )
+    no_tag_action_response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [track.id]},
+        headers=auth_headers(user),
+    )
+
+    assert no_tracks_response.status_code == 400
+    assert no_tracks_response.json()["detail"] == "Choose at least one track."
+    assert no_tag_action_response.status_code == 400
+    assert no_tag_action_response.json()["detail"] == (
+        "Choose at least one tag to add or remove."
+    )
 
 
 def test_delete_track(client: TestClient, db_session: Session) -> None:

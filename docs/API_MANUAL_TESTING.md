@@ -198,6 +198,54 @@ flow in `docs/DEVELOPMENT.md` and record results in
 must not be marked accepted until the Web upload warning and Library duplicate
 review have both been manually verified.
 
+## Batch Update Track Tags
+
+V1.1 adds an authenticated batch tag endpoint for explicit Web Library actions.
+It can add tags to selected tracks or remove tags from selected tracks. It never
+creates tags, deletes tracks, or changes unselected tracks.
+
+Add one or more existing tags to selected tracks:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/tracks/batch-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    track_ids = @($trackId, $anotherTrackId)
+    add_tag_ids = @($tagId)
+    remove_tag_ids = @()
+  } | ConvertTo-Json -Depth 4)
+```
+
+Remove one or more existing tags from selected tracks:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/tracks/batch-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    track_ids = @($trackId, $anotherTrackId)
+    add_tag_ids = @()
+    remove_tag_ids = @($tagId)
+  } | ConvertTo-Json -Depth 4)
+```
+
+Expected result:
+
+- The response includes `requested_track_count`, `updated_count`, per-track
+  `results`, and updated `tracks`.
+- Owned valid tracks return result status `updated`.
+- Missing or unowned track ids return per-track result status `failed` without
+  blocking valid selected tracks.
+- Missing or unowned tag ids return `400 Bad Request`.
+- A missing token returns `401 Unauthorized`.
+- The endpoint preserves existing tag ownership and track ownership checks.
+- No track, media file, tag, or duplicate candidate is deleted or merged.
+
 ## Stream A Ready Track
 
 Download the full stream:

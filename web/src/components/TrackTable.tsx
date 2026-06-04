@@ -5,10 +5,19 @@ import { WebAudioPlayer } from "./WebAudioPlayer";
 
 type TrackTableProps = {
   accessToken: string | null;
+  onToggleTrackSelection?: (trackId: number) => void;
+  selectedTrackIds?: Set<number>;
   tracks: Track[];
 };
 
-export function TrackTable({ accessToken, tracks }: TrackTableProps) {
+export function TrackTable({
+  accessToken,
+  onToggleTrackSelection,
+  selectedTrackIds = new Set(),
+  tracks,
+}: TrackTableProps) {
+  const canSelect = Boolean(onToggleTrackSelection);
+
   return (
     <div
       style={{
@@ -26,6 +35,7 @@ export function TrackTable({ accessToken, tracks }: TrackTableProps) {
         <thead>
           <tr>
             {[
+              canSelect ? "Select" : null,
               "Title",
               "Artist",
               "Album",
@@ -35,7 +45,7 @@ export function TrackTable({ accessToken, tracks }: TrackTableProps) {
               "Liked",
               "Updated",
               "Playback",
-            ].map((heading) => (
+            ].filter(Boolean).map((heading) => (
               <th
                 key={heading}
                 scope="col"
@@ -57,6 +67,16 @@ export function TrackTable({ accessToken, tracks }: TrackTableProps) {
         <tbody>
           {tracks.map((track) => (
             <tr key={track.id}>
+              {canSelect ? (
+                <td style={bodyCellStyle}>
+                  <input
+                    aria-label={`Select ${track.title || "untitled track"}`}
+                    checked={selectedTrackIds.has(track.id)}
+                    onChange={() => onToggleTrackSelection?.(track.id)}
+                    type="checkbox"
+                  />
+                </td>
+              ) : null}
               <td style={bodyCellStyle}>
                 <RouteLink
                   style={{

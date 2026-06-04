@@ -13,13 +13,23 @@ from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
-from app.schemas.track import TrackResponse, TrackUpdate
+from app.schemas.track import (
+    TrackBatchTagResult,
+    TrackBatchTagUpdate,
+    TrackBatchTagUpdateResponse,
+    TrackResponse,
+    TrackUpdate,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
 class TrackMediaDeletionError(RuntimeError):
+    pass
+
+
+class BatchTagValidationError(ValueError):
     pass
 
 
@@ -96,6 +106,75 @@ def update_track(db: Session, user: User, track: Track, payload: TrackUpdate) ->
     db.commit()
     db.refresh(track)
     return track
+
+
+def batch_update_track_tags(
+    db: Session,
+    user: User,
+    payload: TrackBatchTagUpdate,
+) -> TrackBatchTagUpdateResponse:
+    unique_track_ids = list(dict.fromkeys(payload.track_ids))
+    add_tag_ids = list(dict.fromkeys(payload.add_tag_ids))
+    remove_tag_ids = list(dict.fromkeys(payload.remove_tag_ids))
+    tag_ids = list(dict.fromkeys([*add_tag_ids, *remove_tag_ids]))
+
+    if not unique_track_ids:
+        raise BatchTagValidationError("Choose at least one track.")
+
+    if not add_tag_ids and not remove_tag_ids:
+        raise BatchTagValidationError("Choose at least one tag to add or remove.")
+
+    if tag_ids:
+        tags = list(
+            db.scalars(select(Tag).where(Tag.user_id == user.id, Tag.id.in_(tag_ids))),
+        )
+        if len(tags) != len(tag_ids):
+            raise BatchTagValidationError("Tag not found for current user.")
+
+    tracks_by_id = {
+        track.id: track
+        for track in db.scalars(
+            select(Track).where(Track.user_id == user.id, Track.id.in_(unique_track_ids)),
+        )
+    }
+
+    results: list[TrackBatchTagResult] = []
+    updated_tracks: list[Track] = []
+
+    for track_id in unique_track_ids:
+        track = tracks_by_id.get(track_id)
+        if track is None:
+            results.append(
+                TrackBatchTagResult(
+                    track_id=track_id,
+                    status="failed",
+                    error="Track not found for current user.",
+                ),
+            )
+            continue
+
+        current_tag_ids = set(
+            db.scalars(select(TrackTag.tag_id).where(TrackTag.track_id == track.id)),
+        )
+        next_tag_ids = (current_tag_ids - set(remove_tag_ids)) | set(add_tag_ids)
+
+        db.execute(delete(TrackTag).where(TrackTag.track_id == track.id))
+        for tag_id in sorted(next_tag_ids):
+            db.add(TrackTag(track_id=track.id, tag_id=tag_id))
+
+        results.append(TrackBatchTagResult(track_id=track.id, status="updated"))
+        updated_tracks.append(track)
+
+    db.commit()
+    for track in updated_tracks:
+        db.refresh(track)
+
+    return TrackBatchTagUpdateResponse(
+        requested_track_count=len(unique_track_ids),
+        updated_count=len(updated_tracks),
+        results=results,
+        tracks=[build_track_response(db, track) for track in updated_tracks],
+    )
 
 
 def delete_track(db: Session, track: Track, storage: MediaStorage | None = None) -> None:

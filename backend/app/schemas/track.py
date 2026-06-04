@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.tag import TagResponse
 
@@ -14,6 +14,25 @@ class TrackUpdate(BaseModel):
     liked: bool | None = None
     cooldown_until: datetime | None = None
     tag_ids: list[int] | None = None
+
+
+class TrackBatchTagUpdate(BaseModel):
+    track_ids: list[int]
+    add_tag_ids: list[int] = Field(default_factory=list)
+    remove_tag_ids: list[int] = Field(default_factory=list)
+
+
+class TrackBatchTagResult(BaseModel):
+    track_id: int
+    status: str
+    error: str | None = None
+
+
+class TrackBatchTagUpdateResponse(BaseModel):
+    requested_track_count: int
+    updated_count: int
+    results: list[TrackBatchTagResult]
+    tracks: list["TrackResponse"]
 
 
 class TrackResponse(BaseModel):

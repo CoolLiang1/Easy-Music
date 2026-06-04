@@ -1,6 +1,11 @@
 import { ApiClientError, apiRequest } from "./http";
 import { env } from "../config/env";
-import type { Track, TrackUpdate } from "../types/track";
+import type {
+  Track,
+  TrackBatchTagUpdate,
+  TrackBatchTagUpdateResponse,
+  TrackUpdate,
+} from "../types/track";
 
 export type UploadProgress = {
   loaded: number;
@@ -36,6 +41,17 @@ export function deleteTrack(accessToken: string, trackId: number | string) {
   return apiRequest<void>(`/api/tracks/${encodeURIComponent(trackId)}`, {
     method: "DELETE",
     accessToken,
+  });
+}
+
+export function batchUpdateTrackTags(
+  accessToken: string,
+  payload: TrackBatchTagUpdate,
+) {
+  return apiRequest<TrackBatchTagUpdateResponse>("/api/tracks/batch-tags", {
+    method: "POST",
+    accessToken,
+    body: payload,
   });
 }
 

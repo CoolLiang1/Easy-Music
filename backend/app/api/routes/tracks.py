@@ -10,7 +10,12 @@ from app.media.paths import UnsafeMediaPathError
 from app.media.responses import stream_file_response
 from app.media.storage import MediaStorage, get_media_storage
 from app.models.user import User
-from app.schemas.track import TrackResponse, TrackUpdate
+from app.schemas.track import (
+    TrackBatchTagUpdate,
+    TrackBatchTagUpdateResponse,
+    TrackResponse,
+    TrackUpdate,
+)
 from app.services import tracks as track_service
 
 
@@ -33,6 +38,21 @@ def list_tracks(
         track_service.build_track_response(db, track)
         for track in track_service.list_tracks(db, current_user)
     ]
+
+
+@router.post("/batch-tags", response_model=TrackBatchTagUpdateResponse)
+def batch_update_track_tags(
+    payload: TrackBatchTagUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TrackBatchTagUpdateResponse:
+    try:
+        return track_service.batch_update_track_tags(db, current_user, payload)
+    except track_service.BatchTagValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/{track_id}", response_model=TrackResponse)

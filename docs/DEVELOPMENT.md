@@ -443,12 +443,15 @@ backend:
    wait for lightweight polling while the track is processing, until the status
    becomes `ready`. Failed processing should show the backend processing error
    message when one is available.
-9. Open the track detail page and edit title, artist, album, content type,
+9. Select two or more tracks in Library, choose existing tags from the batch
+   tag panel, confirm adding and removing tags, and verify the affected rows
+   update without changing unselected tracks.
+10. Open the track detail page and edit title, artist, album, content type,
    source URL, liked state, cooldown date, and assigned tags as needed.
-10. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
+11. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
     `state`, `type`, `attribute`), rename it, change its group, and delete one
     explicit tag.
-11. For a ready track, use the playback control from the library row or track
+12. For a ready track, use the playback control from the library row or track
     detail page and confirm audio loads through the authenticated stream
     endpoint.
 

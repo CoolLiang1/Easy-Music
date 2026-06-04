@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { listTracks } from "../api/tracks";
+import { listTags } from "../api/tags";
+import { batchUpdateTrackTags, listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
+import {
+  BatchTagEditor,
+  summarizeBatchTagResponse,
+  type BatchTagOperation,
+} from "../components/BatchTagEditor";
 import { TrackTable } from "../components/TrackTable";
 import { RouteLink } from "../routes/RouteLink";
+import type { Tag } from "../types/tag";
 import type { Track } from "../types/track";
 
 type LibraryState =
   | { name: "loading" }
-  | { name: "ready"; tracks: Track[] }
+  | { name: "ready"; tags: Tag[]; tracks: Track[] }
   | { name: "error"; message: string };
 
 export function LibraryPage() {
@@ -17,6 +24,10 @@ export function LibraryPage() {
     name: "loading",
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
+  const [isApplyingTags, setIsApplyingTags] = useState(false);
+  const [batchTagError, setBatchTagError] = useState<string | null>(null);
+  const [batchTagSuccess, setBatchTagSuccess] = useState<string | null>(null);
 
   const loadTracks = useCallback(async (showLoading: boolean) => {
     if (!accessToken) {
@@ -34,8 +45,15 @@ export function LibraryPage() {
     }
 
     try {
-      const tracks = await listTracks(accessToken);
-      setLibraryState({ name: "ready", tracks });
+      const [tracks, tags] = await Promise.all([
+        listTracks(accessToken),
+        listTags(accessToken),
+      ]);
+      setLibraryState({ name: "ready", tags, tracks });
+      setSelectedTrackIds((current) => {
+        const availableTrackIds = new Set(tracks.map((track) => track.id));
+        return new Set([...current].filter((trackId) => availableTrackIds.has(trackId)));
+      });
     } catch (error: unknown) {
       setLibraryState({
         name: "error",
@@ -64,6 +82,75 @@ export function LibraryPage() {
 
     return () => window.clearInterval(intervalId);
   }, [libraryState, loadTracks]);
+
+  const toggleTrackSelection = (trackId: number) => {
+    setSelectedTrackIds((current) => {
+      const next = new Set(current);
+      if (next.has(trackId)) {
+        next.delete(trackId);
+      } else {
+        next.add(trackId);
+      }
+
+      return next;
+    });
+    setBatchTagError(null);
+    setBatchTagSuccess(null);
+  };
+
+  const applyBatchTags = async (operation: BatchTagOperation) => {
+    if (!accessToken) {
+      setBatchTagError("Sign in again to update tags.");
+      return;
+    }
+
+    const trackIds = [...selectedTrackIds];
+    if (trackIds.length === 0) {
+      setBatchTagError("Select at least one track.");
+      return;
+    }
+
+    setIsApplyingTags(true);
+    setBatchTagError(null);
+    setBatchTagSuccess(null);
+
+    try {
+      const response = await batchUpdateTrackTags(accessToken, {
+        track_ids: trackIds,
+        add_tag_ids: operation.mode === "add" ? operation.tagIds : [],
+        remove_tag_ids: operation.mode === "remove" ? operation.tagIds : [],
+      });
+      setLibraryState((current) => {
+        if (current.name !== "ready") {
+          return current;
+        }
+
+        const updatedTracksById = new Map(
+          response.tracks.map((track) => [track.id, track]),
+        );
+
+        return {
+          ...current,
+          tracks: current.tracks.map((track) => updatedTracksById.get(track.id) ?? track),
+        };
+      });
+
+      const failedResults = response.results.filter((result) => result.status === "failed");
+      if (failedResults.length > 0) {
+        setBatchTagError(
+          `${summarizeBatchTagResponse(response)} ${failedResults
+            .map((result) => `#${result.track_id}: ${result.error}`)
+            .join(" ")}`,
+        );
+      } else {
+        setBatchTagSuccess(summarizeBatchTagResponse(response));
+      }
+    } catch (error: unknown) {
+      setBatchTagError(getErrorMessage(error));
+    } finally {
+      setIsApplyingTags(false);
+    }
+  };
 
   return (
     <section className="page-panel" aria-labelledby="library-title">
@@ -103,7 +190,22 @@ export function LibraryPage() {
       ) : null}
 
       {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
-        <TrackTable accessToken={accessToken} tracks={libraryState.tracks} />
+        <>
+          <BatchTagEditor
+            disabled={isApplyingTags}
+            errorMessage={batchTagError}
+            onApply={applyBatchTags}
+            selectedCount={selectedTrackIds.size}
+            successMessage={batchTagSuccess}
+            tags={libraryState.tags}
+          />
+          <TrackTable
+            accessToken={accessToken}
+            onToggleTrackSelection={toggleTrackSelection}
+            selectedTrackIds={selectedTrackIds}
+            tracks={libraryState.tracks}
+          />
+        </>
       ) : null}
     </section>
   );
