@@ -1,7 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -92,6 +92,47 @@ def stream_track(
         request.headers.get("range"),
         media_type="audio/mpeg",
     )
+
+
+@router.get("/{track_id}/cover")
+def get_track_cover(
+    track_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
+) -> FileResponse:
+    track = track_service.get_track(db, current_user, track_id)
+    if track is None or not track.cover_path:
+        raise track_not_found_error()
+
+    try:
+        cover_path = storage.stored_media_path(track.cover_path)
+    except UnsafeMediaPathError as exc:
+        raise track_not_found_error() from exc
+
+    if not cover_path.is_file():
+        raise track_not_found_error()
+
+    return FileResponse(
+        cover_path,
+        media_type=track_service.cover_media_type(track),
+    )
+
+
+@router.put("/{track_id}/cover", response_model=TrackResponse)
+def update_track_cover(
+    track_id: int,
+    file: Annotated[UploadFile, File()],
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
+) -> TrackResponse:
+    track = track_service.get_track(db, current_user, track_id)
+    if track is None:
+        raise track_not_found_error()
+
+    updated_track = track_service.update_track_cover(db, track, file, storage)
+    return track_service.build_track_response(db, updated_track)
 
 
 @router.patch("/{track_id}", response_model=TrackResponse)

@@ -31,6 +31,17 @@ class MediaStorage:
             "playback.mp3",
         )
 
+    def cover_image_path(self, user_id: int, track_id: int, suffix: str) -> Path:
+        normalized_suffix = suffix if suffix.startswith(".") else f".{suffix}"
+        stored_name = f"{uuid4().hex}_cover{normalized_suffix.lower()}"
+        return resolve_media_path(
+            self.settings.media_root,
+            self.settings.covers_dir,
+            f"user-{user_id}",
+            f"track-{track_id}",
+            stored_name,
+        )
+
     def relative_media_path(self, path: Path) -> str:
         root = Path(self.settings.media_root).resolve(strict=False)
         return path.resolve(strict=False).relative_to(root).as_posix()

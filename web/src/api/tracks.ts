@@ -44,6 +44,21 @@ export function deleteTrack(accessToken: string, trackId: number | string) {
   });
 }
 
+export function updateTrackCover(
+  accessToken: string,
+  trackId: number | string,
+  file: File,
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiRequest<Track>(`/api/tracks/${encodeURIComponent(trackId)}/cover`, {
+    method: "PUT",
+    accessToken,
+    body: formData,
+  });
+}
+
 export function batchUpdateTrackTags(
   accessToken: string,
   payload: TrackBatchTagUpdate,
@@ -134,6 +149,26 @@ export async function getTrackStreamBlob(
   return response.blob();
 }
 
+export async function getTrackCoverBlob(
+  accessToken: string,
+  trackId: number | string,
+) {
+  const response = await fetch(
+    `${env.apiBaseUrl}/api/tracks/${encodeURIComponent(trackId)}/cover`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(await getCoverErrorMessage(response));
+  }
+
+  return response.blob();
+}
+
 async function getStreamErrorMessage(response: Response) {
   if (response.status === 401 || response.status === 403) {
     return "Your session expired. Sign in again to play this track.";
@@ -173,4 +208,28 @@ function getUploadErrorMessage(payload: unknown, fallback: string) {
   }
 
   return fallback || "Upload failed.";
+}
+
+async function getCoverErrorMessage(response: Response) {
+  if (response.status === 401 || response.status === 403) {
+    return "Your session expired. Sign in again to load this cover.";
+  }
+
+  if (response.status === 404) {
+    return "No cover image is stored for this track yet.";
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (contentType.includes("application/json")) {
+    const payload = (await response.json()) as { detail?: unknown; message?: unknown };
+    if (typeof payload.detail === "string") {
+      return payload.detail;
+    }
+
+    if (typeof payload.message === "string") {
+      return payload.message;
+    }
+  }
+
+  return response.statusText || "Unable to load cover image.";
 }

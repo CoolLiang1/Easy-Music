@@ -677,3 +677,146 @@ def test_cannot_stream_missing_playback_file(
     response = client.get(f"/api/tracks/{track.id}/stream", headers=auth_headers(user))
 
     assert response.status_code == 404
+
+
+def test_update_track_cover_saves_valid_image(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={
+            "file": (
+                "../cover.png",
+                b"\x89PNG\r\n\x1a\ncover bytes",
+                "image/png",
+            ),
+        },
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["cover_path"].startswith(f"covers/user-{user.id}/track-{track.id}/")
+    assert body["cover_path"].endswith("_cover.png")
+    assert ".." not in body["cover_path"]
+
+    db_session.refresh(track)
+    assert track.cover_path == body["cover_path"]
+    assert (tmp_path / track.cover_path).read_bytes() == b"\x89PNG\r\n\x1a\ncover bytes"
+
+
+def test_update_track_cover_requires_authentication(client: TestClient) -> None:
+    response = client.put(
+        "/api/tracks/1/cover",
+        files={"file": ("cover.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+    )
+
+    assert response.status_code == 401
+
+
+def test_update_track_cover_is_scoped_to_current_user(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    hidden_track = create_track(db_session, other_user)
+
+    response = client.put(
+        f"/api/tracks/{hidden_track.id}/cover",
+        files={"file": ("cover.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 404
+
+
+def test_update_track_cover_rejects_invalid_content_type(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.txt", b"not an image", "text/plain")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"] == "Unsupported cover image type."
+
+
+def test_update_track_cover_rejects_mismatched_image_content(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.png", b"not a png", "image/png")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"] == "Uploaded cover image content does not match its type."
+
+
+def test_update_track_cover_rejects_oversized_file(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    content = b"\x89PNG\r\n\x1a\n" + b"x" * (10 * 1024 * 1024 + 1)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.png", content, "image/png")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Cover image exceeds the configured size limit."
+
+
+def test_get_track_cover_returns_stored_image(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.cover_path = "covers/user-1/track-1/cover.jpg"
+    db_session.commit()
+    cover_path = tmp_path / track.cover_path
+    cover_path.parent.mkdir(parents=True)
+    cover_path.write_bytes(b"\xff\xd8\xffjpeg")
+
+    response = client.get(f"/api/tracks/{track.id}/cover", headers=auth_headers(user))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/jpeg")
+    assert response.content == b"\xff\xd8\xffjpeg"
+
+
+def test_get_track_cover_rejects_unsafe_path(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.cover_path = "../outside.jpg"
+    db_session.commit()
+
+    response = client.get(f"/api/tracks/{track.id}/cover", headers=auth_headers(user))
+
+    assert response.status_code == 404

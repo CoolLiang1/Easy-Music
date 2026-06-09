@@ -328,6 +328,11 @@ Supported upload formats:
 8. Ask AI for tag suggestions.
 9. Mark track as ready or failed.
 
+V1.1 also allows the owner to replace a track cover image from the Web Track
+Detail page. Replacement covers are stored under the configured cover media
+directory and update only `tracks.cover_path`; they do not regenerate playback
+audio or modify the preserved original audio file.
+
 ### 9.3 Playback Format
 
 Version 1 uses MP3 playback files for compatibility.
@@ -395,6 +400,8 @@ The API should return:
 - `POST /api/tracks/upload`
 - `GET /api/tracks/{id}`
 - `PATCH /api/tracks/{id}`
+- `PUT /api/tracks/{id}/cover`
+- `GET /api/tracks/{id}/cover`
 - `DELETE /api/tracks/{id}`
 - `GET /api/tracks/duplicates`
 - `GET /api/tracks/{id}/stream`

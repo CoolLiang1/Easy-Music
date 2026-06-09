@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +32,14 @@ class TrackMediaDeletionError(RuntimeError):
 
 class BatchTagValidationError(ValueError):
     pass
+
+
+ALLOWED_COVER_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+COVER_CHUNK_SIZE = 1024 * 1024
 
 
 def list_tracks(db: Session, user: User) -> list[Track]:
@@ -108,6 +117,44 @@ def update_track(db: Session, user: User, track: Track, payload: TrackUpdate) ->
     return track
 
 
+def update_track_cover(
+    db: Session,
+    track: Track,
+    file: UploadFile,
+    storage: MediaStorage,
+) -> Track:
+    suffix = _validate_cover_upload(file)
+    destination = storage.cover_image_path(track.user_id, track.id, suffix)
+    max_bytes = storage.settings.max_cover_mb * 1024 * 1024
+
+    try:
+        _save_cover_upload(file, destination, max_bytes)
+        _validate_saved_cover_signature(destination, file.content_type or "")
+    except Exception:
+        if destination.exists():
+            destination.unlink()
+        raise
+
+    track.cover_path = storage.relative_media_path(destination)
+    db.commit()
+    db.refresh(track)
+    return track
+
+
+def cover_media_type(track: Track) -> str:
+    if not track.cover_path:
+        return "application/octet-stream"
+
+    suffix = Path(track.cover_path).suffix.lower()
+    if suffix in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if suffix == ".png":
+        return "image/png"
+    if suffix == ".webp":
+        return "image/webp"
+    return "application/octet-stream"
+
+
 def batch_update_track_tags(
     db: Session,
     user: User,
@@ -175,6 +222,46 @@ def batch_update_track_tags(
         results=results,
         tracks=[build_track_response(db, track) for track in updated_tracks],
     )
+
+
+def _validate_cover_upload(file: UploadFile) -> str:
+    content_type = (file.content_type or "").lower()
+    suffix = ALLOWED_COVER_TYPES.get(content_type)
+    if suffix is None:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported cover image type.",
+        )
+    return suffix
+
+
+def _save_cover_upload(source: UploadFile, destination: Path, max_bytes: int) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    bytes_written = 0
+
+    with destination.open("xb") as output:
+        while chunk := source.file.read(COVER_CHUNK_SIZE):
+            bytes_written += len(chunk)
+            if bytes_written > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    detail="Cover image exceeds the configured size limit.",
+                )
+            output.write(chunk)
+
+
+def _validate_saved_cover_signature(path: Path, content_type: str) -> None:
+    header = path.read_bytes()[:16]
+    is_valid = (
+        (content_type == "image/jpeg" and header.startswith(b"\xff\xd8\xff"))
+        or (content_type == "image/png" and header.startswith(b"\x89PNG\r\n\x1a\n"))
+        or (content_type == "image/webp" and header.startswith(b"RIFF") and header[8:12] == b"WEBP")
+    )
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Uploaded cover image content does not match its type.",
+        )
 
 
 def delete_track(db: Session, track: Track, storage: MediaStorage | None = None) -> None:

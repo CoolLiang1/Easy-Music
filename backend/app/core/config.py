@@ -26,7 +26,9 @@ class Settings(BaseSettings):
     media_root: str = Field(default="/app/media", validation_alias="MEDIA_ROOT")
     originals_dir: str = Field(default="originals", validation_alias="ORIGINALS_DIR")
     playback_dir: str = Field(default="playback", validation_alias="PLAYBACK_DIR")
+    covers_dir: str = Field(default="covers", validation_alias="COVERS_DIR")
     max_upload_mb: int = Field(default=200, validation_alias="MAX_UPLOAD_MB")
+    max_cover_mb: int = Field(default=10, validation_alias="MAX_COVER_MB")
     ffmpeg_path: str = Field(default="ffmpeg", validation_alias="FFMPEG_PATH")
     ffprobe_path: str = Field(default="ffprobe", validation_alias="FFPROBE_PATH")
     cors_origins: Annotated[list[str], NoDecode] = Field(
@@ -52,7 +54,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("originals_dir", "playback_dir")
+    @field_validator("originals_dir", "playback_dir", "covers_dir")
     @classmethod
     def validate_media_subdir(cls, value: str) -> str:
         return validate_storage_dir(value)

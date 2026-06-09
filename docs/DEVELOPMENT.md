@@ -450,7 +450,8 @@ backend:
     untagged ready tracks, missing metadata, processing attention, duplicate
     candidates, never played, rarely played, and expired cooldowns.
 11. Open the track detail page and edit title, artist, album, content type,
-   source URL, liked state, cooldown date, and assigned tags as needed.
+   source URL, liked state, cooldown date, cover image, and assigned tags as
+   needed.
 12. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
     `state`, `type`, `attribute`), rename it, change its group, and delete one
     explicit tag.

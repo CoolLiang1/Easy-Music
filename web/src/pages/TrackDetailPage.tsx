@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { listTags } from "../api/tags";
-import { deleteTrack, getTrack, updateTrack } from "../api/tracks";
+import { deleteTrack, getTrack, updateTrack, updateTrackCover } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
+import { TrackCoverEditor } from "../components/TrackCoverEditor";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import { TrackTagEditor } from "../components/TrackTagEditor";
@@ -33,6 +34,9 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
   const [isSavingTags, setIsSavingTags] = useState(false);
   const [tagSaveError, setTagSaveError] = useState<string | null>(null);
   const [tagSaveSuccess, setTagSaveSuccess] = useState<string | null>(null);
+  const [isSavingCover, setIsSavingCover] = useState(false);
+  const [coverSaveError, setCoverSaveError] = useState<string | null>(null);
+  const [coverSaveSuccess, setCoverSaveSuccess] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -116,6 +120,31 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
       setTagSaveError(getErrorMessage(error));
     } finally {
       setIsSavingTags(false);
+    }
+  };
+
+  const saveCover = async (file: File) => {
+    if (!accessToken) {
+      setCoverSaveError("Sign in again to upload this track's cover.");
+      return;
+    }
+
+    setIsSavingCover(true);
+    setCoverSaveError(null);
+    setCoverSaveSuccess(null);
+
+    try {
+      const track = await updateTrackCover(accessToken, trackId, file);
+      setDetailState((current) =>
+        current.name === "ready"
+          ? { name: "ready", tags: current.tags, track }
+          : { name: "ready", tags: [], track },
+      );
+      setCoverSaveSuccess("Cover updated.");
+    } catch (error: unknown) {
+      setCoverSaveError(getErrorMessage(error));
+    } finally {
+      setIsSavingCover(false);
     }
   };
 
@@ -252,6 +281,14 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
             errorMessage={saveError}
             onSave={saveMetadata}
             successMessage={saveSuccess}
+            track={detailState.track}
+          />
+          <TrackCoverEditor
+            accessToken={accessToken}
+            disabled={isSavingCover}
+            errorMessage={coverSaveError}
+            onSave={saveCover}
+            successMessage={coverSaveSuccess}
             track={detailState.track}
           />
           <TrackTagEditor

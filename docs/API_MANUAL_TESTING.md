@@ -275,6 +275,50 @@ Expected result:
 - The endpoint is current-user scoped and does not modify tracks, tags,
   playback events, feedback events, media files, or duplicate candidates.
 
+## Update A Track Cover
+
+V1.1 adds an explicit authenticated cover upload endpoint for owner-managed
+cover replacement. It stores the new image under the configured cover media
+directory, updates the track `cover_path`, and does not regenerate playback
+audio or modify the original audio file.
+
+Upload a PNG, JPEG, or WebP cover:
+
+```powershell
+$coverUpdate = curl.exe `
+  -s `
+  -X PUT `
+  -H "Authorization: Bearer $token" `
+  -F "file=@cover.png;type=image/png" `
+  "http://127.0.0.1:8000/api/tracks/$trackId/cover" | ConvertFrom-Json
+
+$coverUpdate.cover_path
+```
+
+Fetch the stored cover:
+
+```powershell
+curl.exe `
+  -L `
+  -H "Authorization: Bearer $token" `
+  "http://127.0.0.1:8000/api/tracks/$trackId/cover" `
+  --output downloaded-cover.png
+```
+
+Expected result:
+
+- The upload response is the normal track response with an updated `cover_path`.
+- The stored path is under the configured cover directory, such as
+  `covers/user-1/track-1/..._cover.png`.
+- JPEG, PNG, and WebP uploads are accepted when the content type and image
+  signature match.
+- Unsupported content types return `415 Unsupported Media Type`.
+- Oversized images return `413 Content Too Large`.
+- A missing token returns `401 Unauthorized`.
+- An unowned or missing track returns `404 Not Found`.
+- Updating a cover does not change `original_file_path`, `playback_file_path`,
+  or processing status.
+
 ## Stream A Ready Track
 
 Download the full stream:
