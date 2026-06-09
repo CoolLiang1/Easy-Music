@@ -65,7 +65,7 @@ class ApiClient(
             }
         } catch (exception: IOException) {
             return ApiResult.NetworkError(
-                message = exception.message ?: "Network request failed.",
+                message = exception.message ?: "网络请求失败。",
                 cause = exception,
             )
         }
@@ -77,18 +77,18 @@ class ApiClient(
             when {
                 statusCode in 200..299 -> ApiResult.Success(responseBody)
                 statusCode == HttpURLConnection.HTTP_UNAUTHORIZED -> ApiResult.Unauthorized(
-                    message = responseBody.errorMessageOrDefault("Authentication is required."),
+                    message = responseBody.errorMessageOrDefault("需要登录后继续。"),
                 )
 
                 else -> ApiResult.HttpError(
                     statusCode = statusCode,
-                    message = responseBody.errorMessageOrDefault("Request failed."),
+                    message = responseBody.errorMessageOrDefault("请求失败。"),
                     body = responseBody,
                 )
             }
         } catch (exception: IOException) {
             ApiResult.NetworkError(
-                message = exception.message ?: "Network request failed.",
+                message = exception.message ?: "网络请求失败。",
                 cause = exception,
             )
         } finally {

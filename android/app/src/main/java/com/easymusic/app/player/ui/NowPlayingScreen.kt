@@ -61,7 +61,7 @@ fun NowPlayingScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         SectionHeader(
-            title = "Now Playing",
+            title = "播放中",
             subtitle = uiState.playbackSource.sourceLabel(isNetworkAvailable),
             action = {
                 OutlinedButton(onClick = onBackToLibrary) {
@@ -70,7 +70,7 @@ fun NowPlayingScreen(
                         contentDescription = null,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Library")
+                    Text("曲库")
                 }
             },
         )
@@ -107,7 +107,7 @@ fun NowPlayingScreen(
 
         if (uiState.status == PlaybackStatus.Buffering) {
             StatusBanner(
-                text = "Buffering audio",
+                text = "正在缓冲音频",
                 tone = BannerTone.Warning,
                 action = { CircularProgressIndicator() },
             )
@@ -138,7 +138,7 @@ fun NowPlayingScreen(
                     contentDescription = null,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (uiState.status == PlaybackStatus.Ended) "Replay" else "Play")
+                Text(if (uiState.status == PlaybackStatus.Ended) "重新播放" else "播放")
             }
             OutlinedButton(
                 enabled = uiState.isPlaying,
@@ -149,7 +149,7 @@ fun NowPlayingScreen(
                     contentDescription = null,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Pause")
+                Text("暂停")
             }
         }
     }
@@ -191,14 +191,14 @@ private fun EmptyNowPlaying(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "No track loaded",
+                text = "还没有加载音轨",
                 style = MaterialTheme.typography.titleLarge,
             )
             Button(
                 modifier = Modifier.padding(top = 16.dp),
                 onClick = onBackToLibrary,
             ) {
-                Text("Back to Library")
+                Text("返回曲库")
             }
         }
     }
@@ -218,7 +218,7 @@ private fun TrackSummary(track: TrackResponse) {
             text = listOfNotNull(track.artist, track.album)
                 .filter { it.isNotBlank() }
                 .joinToString(separator = " - ")
-                .ifBlank { "Unknown artist or album" },
+                .ifBlank { "未知艺人或专辑" },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -259,10 +259,10 @@ private fun Long.formatTime(): String {
 
 private fun PlaybackSource.sourceLabel(isNetworkAvailable: Boolean): String =
     when (this) {
-        PlaybackSource.OfflineCache -> "Offline cached playback"
+        PlaybackSource.OfflineCache -> "离线缓存播放"
         PlaybackSource.OnlineStream -> if (isNetworkAvailable) {
-            "Online stream"
+            "在线播放"
         } else {
-            "Online stream unavailable while offline"
+            "离线时无法在线播放"
         }
     }

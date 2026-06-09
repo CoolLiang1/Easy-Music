@@ -157,10 +157,10 @@ fun publishState(
 private fun PlaybackException.toPlaybackMessage(): String {
     val responseCode = findInvalidResponseCode()
     return when (responseCode) {
-        401 -> "The stream request was unauthorized. Please sign in again."
-        404 -> "The stream for this track was not found."
-        null -> message ?: "Playback failed."
-        else -> "Playback failed with HTTP $responseCode."
+        401 -> "音频流请求未授权，请重新登录。"
+        404 -> "没有找到这个音轨的音频流。"
+        null -> message ?: "播放失败。"
+        else -> "播放失败，HTTP $responseCode。"
     }
 }
 

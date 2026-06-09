@@ -1,15 +1,16 @@
 import type { TrackStatus } from "../types/track";
+import { formatTrackStatusLabel } from "../i18n/zh";
 
 type TrackStatusBadgeProps = {
   status: TrackStatus;
 };
 
 const statusLabels: Record<string, string> = {
-  failed: "Failed",
-  processing: "Processing",
-  ready: "Ready",
-  uploaded: "Uploaded",
-  uploading: "Uploading",
+  failed: "处理失败",
+  processing: "处理中",
+  ready: "可播放",
+  uploaded: "已上传",
+  uploading: "上传中",
 };
 
 export function TrackStatusBadge({ status }: TrackStatusBadgeProps) {
@@ -20,15 +21,7 @@ export function TrackStatusBadge({ status }: TrackStatusBadgeProps) {
 
   return (
     <span className={`status-badge ${statusClass}`}>
-      {statusLabels[normalizedStatus] ?? formatUnknownStatus(status)}
+      {statusLabels[normalizedStatus] ?? formatTrackStatusLabel(status)}
     </span>
   );
-}
-
-function formatUnknownStatus(status: string) {
-  return status
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }

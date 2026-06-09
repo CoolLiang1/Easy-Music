@@ -62,10 +62,10 @@ export function TrackMetadataForm({
   return (
     <form className="panel" onSubmit={handleSubmit}>
       <div className="form-card">
-        <h2>Editable metadata</h2>
+        <h2>可编辑元数据</h2>
         <div className="form-grid">
           <label className="field" htmlFor={titleId}>
-            Title
+            标题
             <input
               disabled={disabled}
               id={titleId}
@@ -83,7 +83,7 @@ export function TrackMetadataForm({
           </label>
 
           <label className="field" htmlFor={artistId}>
-            Artist
+            艺人
             <input
               disabled={disabled}
               id={artistId}
@@ -100,7 +100,7 @@ export function TrackMetadataForm({
           </label>
 
           <label className="field" htmlFor={albumId}>
-            Album
+            专辑
             <input
               disabled={disabled}
               id={albumId}
@@ -117,7 +117,7 @@ export function TrackMetadataForm({
           </label>
 
           <label className="field" htmlFor={contentTypeId}>
-            Content type
+            内容类型
             <input
               disabled={disabled}
               id={contentTypeId}
@@ -135,7 +135,7 @@ export function TrackMetadataForm({
           </label>
 
           <label className="field" htmlFor={sourceUrlId}>
-            Source URL
+            来源 URL
             <input
               disabled={disabled}
               id={sourceUrlId}
@@ -152,7 +152,7 @@ export function TrackMetadataForm({
           </label>
 
           <label className="field" htmlFor={cooldownUntilId}>
-            Cooldown date
+            冷却截止时间
             <input
               disabled={disabled}
               id={cooldownUntilId}
@@ -191,7 +191,7 @@ export function TrackMetadataForm({
             }
             type="checkbox"
           />
-          Liked
+          喜欢
         </label>
 
         {message ? (
@@ -215,7 +215,7 @@ export function TrackMetadataForm({
 
       <div className="toolbar">
         <button className="button primary" disabled={disabled} type="submit">
-          {disabled ? "Saving..." : "Save metadata"}
+          {disabled ? "正在保存..." : "保存元数据"}
         </button>
       </div>
     </form>
@@ -236,11 +236,11 @@ function buildFormState(track: Track): FormState {
 
 function getValidationError(formState: FormState) {
   if (!formState.title.trim()) {
-    return "Title is required.";
+    return "请输入标题。";
   }
 
   if (!formState.contentType.trim()) {
-    return "Content type is required.";
+    return "请输入内容类型。";
   }
 
   return null;

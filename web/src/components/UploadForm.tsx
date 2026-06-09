@@ -45,7 +45,7 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
     <form className="panel" onSubmit={handleSubmit}>
       <div className="form-card">
         <label className="field" htmlFor={fileInputId}>
-          Audio files
+          音频文件
           <input
             accept={acceptedAudioExtensions.join(",")}
             disabled={disabled}
@@ -56,11 +56,11 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
           />
         </label>
         <p className="recommendation-muted">
-          Accepted formats: MP3, FLAC, M4A, WAV, and OGG.
+          支持格式：MP3、FLAC、M4A、WAV、OGG。
         </p>
         {selectedFiles.length > 0 ? (
           <p className="status-message">
-            {selectedFiles.length} file{selectedFiles.length === 1 ? "" : "s"} selected.
+            已选择 {selectedFiles.length} 个文件。
           </p>
         ) : null}
         {validationError ? (
@@ -76,7 +76,7 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
           disabled={disabled || selectedFiles.length === 0}
           type="submit"
         >
-          {disabled ? "Uploading..." : "Upload selected files"}
+          {disabled ? "正在上传..." : "上传选中文件"}
         </button>
       </div>
     </form>
@@ -85,12 +85,12 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
 
 function getValidationError(files: File[]) {
   if (files.length === 0) {
-    return "Choose at least one supported audio file.";
+    return "请选择至少一个支持的音频文件。";
   }
 
   const unsupportedFile = files.find((file) => !isSupportedAudioFile(file));
   if (unsupportedFile) {
-    return `${unsupportedFile.name} is not a supported audio file.`;
+    return `${unsupportedFile.name} 不是支持的音频文件。`;
   }
 
   return null;

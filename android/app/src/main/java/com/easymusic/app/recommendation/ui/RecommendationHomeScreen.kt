@@ -144,9 +144,9 @@ fun RecommendationHomeScreen(
         when {
             uiState.isLoadingTags -> RecommendationLoading()
             uiState.tagErrorMessage != null -> RecommendationError(
-                title = if (uiState.needsSignIn) "Sign in required" else "Could not load tags",
+                title = if (uiState.needsSignIn) "需要登录" else "无法加载标签",
                 message = uiState.tagErrorMessage,
-                actionLabel = if (isNetworkAvailable) "Try Again" else "Offline",
+                actionLabel = if (isNetworkAvailable) "重试" else "离线",
                 actionEnabled = isNetworkAvailable,
                 onAction = onRefreshTags,
             )
@@ -179,11 +179,11 @@ private fun RecommendationHeader(
     onRefreshTags: () -> Unit,
 ) {
     SectionHeader(
-        title = "Recommendations",
+        title = "推荐",
         subtitle = if (isNetworkAvailable) {
-            "Ask in plain text or choose structured tags"
+            "输入自然语言，或选择结构化标签"
         } else {
-            "Recommendation tags and requests need the backend"
+            "推荐标签和推荐请求需要连接后端"
         },
         action = {
             OutlinedButton(
@@ -197,9 +197,9 @@ private fun RecommendationHeader(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     when {
-                        !isNetworkAvailable -> "Offline"
-                        isLoading -> "Loading"
-                        else -> "Reload"
+                        !isNetworkAvailable -> "离线"
+                        isLoading -> "加载中"
+                        else -> "重新加载"
                     },
                 )
             }
@@ -217,7 +217,7 @@ private fun RecommendationLoading() {
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(12.dp))
-        Text("Loading tags")
+        Text("正在加载标签")
     }
 }
 
@@ -230,12 +230,12 @@ private fun RecommendationEmptyTags(onRefreshTags: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "No recommendation tags yet",
+            text = "还没有推荐标签",
             style = MaterialTheme.typography.titleLarge,
         )
         Text(
             modifier = Modifier.padding(top = 8.dp),
-            text = "Create scenario, state, type, or attribute tags from the Web console, then reload.",
+            text = "请先在 Web 控制台创建场景、状态、类型或属性标签，然后重新加载。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -243,7 +243,7 @@ private fun RecommendationEmptyTags(onRefreshTags: () -> Unit) {
             modifier = Modifier.padding(top = 16.dp),
             onClick = onRefreshTags,
         ) {
-            Text("Reload Tags")
+            Text("重新加载标签")
         }
     }
 }
@@ -312,30 +312,30 @@ private fun RecommendationControls(
         )
 
         SectionHeader(
-            title = "Structured Controls",
-            subtitle = "Use exact tags when you want predictable matching",
+            title = "结构化控制",
+            subtitle = "需要可预测匹配时，使用明确标签",
         )
 
         // ── Structured Tag Controls (unchanged) ───────────────────────
         TagSection(
-            title = "Scenario",
+            title = "场景",
             tags = uiState.groupedTags.scenarios,
             selectedTagIds = uiState.selectedScenarioTagIds,
-            emptyText = "No scenario tags",
+            emptyText = "暂无场景标签",
             onToggleTag = onToggleScenario,
         )
         TagSection(
-            title = "State",
+            title = "状态",
             tags = uiState.groupedTags.states,
             selectedTagIds = uiState.selectedStateTagIds,
-            emptyText = "No state tags",
+            emptyText = "暂无状态标签",
             onToggleTag = onToggleState,
         )
         TagSection(
-            title = "Type",
+            title = "类型",
             tags = uiState.groupedTags.types,
             selectedTagIds = uiState.selectedTypeTagIds,
-            emptyText = "No type tags",
+            emptyText = "暂无类型标签",
             onToggleTag = onToggleType,
         )
         AttributeSection(
@@ -363,7 +363,7 @@ private fun RecommendationControls(
                 enabled = uiState.selectedContextCount > 0 && !uiState.isRequestingRecommendations,
                 onClick = onClearSelections,
             ) {
-                Text("Clear")
+                Text("清空")
             }
             Button(
                 modifier = Modifier.padding(start = 12.dp),
@@ -372,9 +372,9 @@ private fun RecommendationControls(
             ) {
                 Text(
                     when {
-                        !isNetworkAvailable -> "Offline"
-                        uiState.isRequestingRecommendations -> "Requesting"
-                        else -> "Request Recommendation"
+                        !isNetworkAvailable -> "离线"
+                        uiState.isRequestingRecommendations -> "请求中"
+                        else -> "请求推荐"
                     },
                 )
             }
@@ -391,7 +391,7 @@ private fun RecommendationResults(
 ) {
     val results = uiState.recommendationResults
     if (results.isEmpty()) {
-        if (uiState.recommendationMessage?.startsWith("No recommendations") == true) {
+        if (uiState.recommendationMessage?.startsWith("当前条件还没有匹配的推荐") == true) {
             EmptyRecommendationResults()
         }
         return
@@ -400,7 +400,7 @@ private fun RecommendationResults(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         results.firstOrNull()?.let { result ->
             Text(
-                text = "Primary Recommendation",
+                text = "首选推荐",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -420,7 +420,7 @@ private fun RecommendationResults(
         if (alternatives.isNotEmpty()) {
             Text(
                 modifier = Modifier.padding(top = 4.dp),
-                text = "Alternatives",
+                text = "备选推荐",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -453,12 +453,12 @@ private fun EmptyRecommendationResults() {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = "No matching recommendation",
+                text = "没有匹配的推荐",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Adjust the selected tags, then request recommendations again.",
+                text = "调整已选标签后，再次请求推荐。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -543,7 +543,7 @@ private fun RecommendationResultCard(
                 onSendFeedback = onSendFeedback,
             )
             Text(
-                text = "Tap to play",
+                text = "点按播放",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -564,27 +564,27 @@ private fun RecommendationFeedbackActions(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             FeedbackButton(
-                label = "Like",
+                label = "喜欢",
                 enabled = isNetworkAvailable && !isSending,
                 onClick = { onSendFeedback(FeedbackType.Like) },
             )
             FeedbackButton(
-                label = "Tired",
+                label = "听腻了",
                 enabled = isNetworkAvailable && !isSending,
                 onClick = { onSendFeedback(FeedbackType.Tired) },
             )
             FeedbackButton(
-                label = "Not Today",
+                label = "今天不听",
                 enabled = isNetworkAvailable && !isSending,
                 onClick = { onSendFeedback(FeedbackType.NotToday) },
             )
             FeedbackButton(
-                label = "Not Suitable",
+                label = "不适合",
                 enabled = isNetworkAvailable && !isSending,
                 onClick = { onSendFeedback(FeedbackType.NotSuitableForContext) },
             )
             FeedbackButton(
-                label = "Skip",
+                label = "跳过",
                 enabled = isNetworkAvailable && !isSending,
                 onClick = { onSendFeedback(FeedbackType.SkipRecommendation) },
             )
@@ -595,7 +595,7 @@ private fun RecommendationFeedbackActions(
                 CircularProgressIndicator()
                 Text(
                     modifier = Modifier.padding(start = 12.dp),
-                    text = "Sending feedback",
+                    text = "正在发送反馈",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -683,8 +683,8 @@ private fun AiAssistantSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(
-            title = "AI Assistant",
-            subtitle = "Natural language is parsed into the same rule-based recommendation flow",
+            title = "AI 助手",
+            subtitle = "自然语言会解析为同一套规则推荐流程",
         )
 
         Column(
@@ -696,8 +696,8 @@ private fun AiAssistantSection(
                 onValueChange = onTextChanged,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !aiState.isRequesting && isNetworkAvailable,
-                label = { Text("Describe what to listen to") },
-                placeholder = { Text("e.g. calm instrumental focus music") },
+                label = { Text("描述现在想听什么") },
+                placeholder = { Text("例如：安静的纯音乐，适合专注") },
                 singleLine = true,
             )
             Button(
@@ -714,9 +714,9 @@ private fun AiAssistantSection(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     when {
-                        !isNetworkAvailable -> "Offline"
+                        !isNetworkAvailable -> "离线"
                         aiState.isRequesting -> "..."
-                        else -> "Get"
+                        else -> "获取"
                     },
                 )
             }
@@ -767,7 +767,7 @@ private fun AiAssistantSection(
 @Composable
 private fun AiLoadingBanner() {
     StatusBanner(
-        text = "AI is parsing your request...",
+        text = "AI 正在解析你的请求...",
         tone = BannerTone.Warning,
         action = {
             CircularProgressIndicator(modifier = Modifier.height(16.dp).width(16.dp))
@@ -783,10 +783,10 @@ private fun AiErrorBanner(message: String) {
 @Composable
 private fun AiProviderStatusBanner(status: String) {
     val message = when (status) {
-        "disabled" -> "AI provider is disabled. Set AI_ENABLED=true in backend config."
-        "unconfigured" -> "AI provider is not configured. Check AI_API_KEY and AI_MODEL."
-        "error" -> "AI provider encountered an error. Check backend logs."
-        else -> "AI provider status: $status"
+        "disabled" -> "AI provider 已禁用。请在后端配置中设置 AI_ENABLED=true。"
+        "unconfigured" -> "AI provider 尚未配置。请检查 AI_API_KEY 和 AI_MODEL。"
+        "error" -> "AI provider 发生错误。请查看后端日志。"
+        else -> "AI provider 状态：$status"
     }
 
     StatusBanner(text = message, tone = BannerTone.Error)
@@ -814,10 +814,10 @@ private fun AiParsedContextSection(context: AiParsedContext) {
         // Matched tags by group
         val groupOrder = listOf("scenario", "state", "type", "attribute")
         val groupLabels = mapOf(
-            "scenario" to "Scenario",
-            "state" to "State",
-            "type" to "Type",
-            "attribute" to "Attribute",
+            "scenario" to "场景",
+            "state" to "状态",
+            "type" to "类型",
+            "attribute" to "属性",
         )
 
         FlowRow(
@@ -841,7 +841,7 @@ private fun AiParsedContextSection(context: AiParsedContext) {
         // Unmatched terms
         if (context.unmatchedTerms.isNotEmpty()) {
             Text(
-                text = "Unmatched: ${context.unmatchedTerms.joinToString(", ")}",
+                text = "未匹配：${context.unmatchedTerms.joinToString(", ")}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -860,7 +860,7 @@ private fun AiResultsSection(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         results.firstOrNull()?.let { result ->
             Text(
-                text = "AI Recommendation",
+                text = "AI 推荐",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -880,7 +880,7 @@ private fun AiResultsSection(
         if (alternatives.isNotEmpty()) {
             Text(
                 modifier = Modifier.padding(top = 4.dp),
-                text = "AI Alternatives",
+                text = "AI 备选",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -910,7 +910,7 @@ private fun EmptyAiResults() {
     ) {
         Text(
             modifier = Modifier.padding(16.dp),
-            text = "No recommendations matched your request. Try different wording or check that ready tracks with matching tags exist.",
+            text = "没有匹配你请求的推荐。可以换个说法，或检查是否存在带有匹配标签的可播放音轨。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -921,7 +921,7 @@ private fun TrackResponse.artistAlbumLabel(): String =
     listOfNotNull(artist, album)
         .filter { value -> value.isNotBlank() }
         .joinToString(separator = " - ")
-        .ifBlank { "Unknown artist or album" }
+        .ifBlank { "未知艺人或专辑" }
 
 private fun Double.formatScore(): String =
     String.format(Locale.US, "%.1f", this)
@@ -936,26 +936,26 @@ private fun AttributeSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "Attributes",
+            text = "属性",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
         if (tags.isEmpty()) {
             Text(
-                text = "No attribute tags",
+                text = "暂无属性标签",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             return
         }
         AttributeChipRow(
-            title = "Desired",
+            title = "期望",
             tags = tags,
             selectedTagIds = desiredTagIds,
             onToggleTag = onToggleDesired,
         )
         AttributeChipRow(
-            title = "Excluded",
+            title = "排除",
             tags = tags,
             selectedTagIds = excludedTagIds,
             onToggleTag = onToggleExcluded,
@@ -1010,7 +1010,7 @@ private fun RecommendationStatus(uiState: RecommendationHomeUiState) {
                 CircularProgressIndicator()
                 Text(
                     modifier = Modifier.padding(start = 12.dp),
-                    text = "Requesting recommendation",
+                    text = "正在请求推荐",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

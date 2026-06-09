@@ -48,7 +48,7 @@ class PlaybackSourceSelector(
         if (!isNetworkAvailable) {
             return SelectedPlaybackSource.Failure(
                 track = track,
-                message = "You are offline. This track is not cached on this device.",
+                message = "当前离线。这个音轨还没有缓存在这台设备上。",
             )
         }
 
@@ -59,7 +59,7 @@ class PlaybackSourceSelector(
         if (token == null) {
             return SelectedPlaybackSource.Failure(
                 track = track,
-                message = "Please sign in again before streaming this track.",
+                message = "请重新登录后在线播放这个音轨。",
             )
         }
 

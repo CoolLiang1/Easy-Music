@@ -101,7 +101,7 @@ export function uploadTrack(
     };
 
     request.onerror = () => {
-      reject(new Error("Network error while uploading this file."));
+      reject(new Error("上传这个文件时网络异常。"));
     };
 
     request.onload = () => {
@@ -171,11 +171,11 @@ export async function getTrackCoverBlob(
 
 async function getStreamErrorMessage(response: Response) {
   if (response.status === 401 || response.status === 403) {
-    return "Your session expired. Sign in again to play this track.";
+    return "登录状态已过期，请重新登录后播放这个音轨。";
   }
 
   if (response.status === 404) {
-    return "The playback file is missing. Refresh the track status or rerun backend processing.";
+    return "播放文件不存在。请刷新音轨状态，或重新运行后端处理。";
   }
 
   const contentType = response.headers.get("Content-Type") ?? "";
@@ -191,7 +191,7 @@ async function getStreamErrorMessage(response: Response) {
     }
   }
 
-  return response.statusText || "Unable to load audio stream.";
+  return response.statusText || "无法加载音频流。";
 }
 
 function getUploadErrorMessage(payload: unknown, fallback: string) {
@@ -207,16 +207,16 @@ function getUploadErrorMessage(payload: unknown, fallback: string) {
     }
   }
 
-  return fallback || "Upload failed.";
+  return fallback || "上传失败。";
 }
 
 async function getCoverErrorMessage(response: Response) {
   if (response.status === 401 || response.status === 403) {
-    return "Your session expired. Sign in again to load this cover.";
+    return "登录状态已过期，请重新登录后加载封面。";
   }
 
   if (response.status === 404) {
-    return "No cover image is stored for this track yet.";
+    return "这个音轨还没有保存封面。";
   }
 
   const contentType = response.headers.get("Content-Type") ?? "";
@@ -231,5 +231,5 @@ async function getCoverErrorMessage(response: Response) {
     }
   }
 
-  return response.statusText || "Unable to load cover image.";
+  return response.statusText || "无法加载封面图片。";
 }

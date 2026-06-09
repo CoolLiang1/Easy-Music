@@ -85,12 +85,12 @@ export function TrackCoverEditor({
     event.preventDefault();
 
     if (!selectedFile) {
-      setValidationError("Choose a cover image before uploading.");
+      setValidationError("请先选择封面图片。");
       return;
     }
 
     if (!["image/jpeg", "image/png", "image/webp"].includes(selectedFile.type)) {
-      setValidationError("Choose a JPEG, PNG, or WebP image.");
+      setValidationError("请选择 JPEG、PNG 或 WebP 图片。");
       return;
     }
 
@@ -103,7 +103,7 @@ export function TrackCoverEditor({
   return (
     <form className="panel" onSubmit={handleSubmit}>
       <div className="form-card">
-        <h2>Cover image</h2>
+        <h2>封面图片</h2>
         <div
           style={{
             display: "grid",
@@ -113,19 +113,19 @@ export function TrackCoverEditor({
           }}
         >
           <CoverPreview
-            alt={`Current cover for ${track.title || "untitled track"}`}
-            label="Current cover"
+            alt={`当前封面：${track.title || "未命名音轨"}`}
+            label="当前封面"
             src={currentCoverUrl}
           />
           <CoverPreview
-            alt="Selected replacement cover"
-            label="Selected image"
+            alt="已选择的新封面"
+            label="已选择图片"
             src={selectedPreviewUrl}
           />
         </div>
 
         <label htmlFor={inputId} style={fieldStyle}>
-          Replacement image
+          替换图片
           <input
             accept="image/jpeg,image/png,image/webp"
             disabled={disabled}
@@ -157,7 +157,7 @@ export function TrackCoverEditor({
 
       <div className="toolbar">
         <button className="button primary" disabled={disabled} type="submit">
-          {disabled ? "Uploading..." : "Upload cover"}
+          {disabled ? "正在上传..." : "上传封面"}
         </button>
       </div>
     </form>
@@ -195,7 +195,7 @@ function CoverPreview({ alt, label, src }: CoverPreviewProps) {
             style={{ height: "100%", objectFit: "cover", width: "100%" }}
           />
         ) : (
-          <span style={{ color: "#64748b", fontWeight: 800 }}>No cover</span>
+          <span style={{ color: "#64748b", fontWeight: 800 }}>暂无封面</span>
         )}
       </div>
     </div>
@@ -224,5 +224,5 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Unable to load this track cover.";
+  return "无法加载这个音轨的封面。";
 }

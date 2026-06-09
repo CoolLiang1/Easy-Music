@@ -21,7 +21,7 @@ export function UploadPage() {
         files.map((file, index) => ({
           id: buildUploadResultId(file, index),
           fileName: file.name,
-          message: "Sign in again before uploading files.",
+          message: "请重新登录后再上传文件。",
           state: "error",
         })),
       );
@@ -74,21 +74,20 @@ export function UploadPage() {
     <section className="page-panel" aria-labelledby="upload-title">
       <div className="page-header-row">
         <div>
-          <p className="eyebrow">Upload</p>
-          <h1 id="upload-title">Upload audio</h1>
+          <p className="eyebrow">上传</p>
+          <h1 id="upload-title">上传音频</h1>
           <p className="page-copy">
-            Add supported audio files to the library and keep an eye on upload,
-            duplicate checks, and worker processing.
+            将支持的音频文件加入曲库，并查看上传进度、重复检查和后台处理状态。
           </p>
         </div>
         {results.length > 0 ? (
-          <span className="score-pill">{results.length} files</span>
+          <span className="score-pill">{results.length} 个文件</span>
         ) : null}
       </div>
       <UploadForm disabled={isUploading} onUpload={handleUpload} />
       {isUploading ? (
         <div className="empty-state" aria-live="polite">
-          Uploading selected files...
+          正在上传选中文件...
         </div>
       ) : null}
       <UploadResultList results={results} />
@@ -99,7 +98,7 @@ export function UploadPage() {
             onClick={() => navigateTo("/library")}
             type="button"
           >
-            Return to library
+            返回曲库
           </button>
         </div>
       ) : null}
@@ -180,7 +179,7 @@ async function pollTrackStatus(
   }
 
   updateUploadResult(setResults, resultId, {
-    statusMessage: "Processing is still running. Check the Library page for later updates.",
+    statusMessage: "后台仍在处理。稍后可到曲库页面查看最新状态。",
   });
 }
 
@@ -209,7 +208,7 @@ function getDuplicateCheckErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Unable to check duplicate candidates.";
+  return "无法检查可能重复的音轨。";
 }
 
 function getErrorMessage(error: unknown) {
@@ -217,5 +216,5 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Upload failed.";
+  return "上传失败。";
 }

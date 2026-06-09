@@ -57,13 +57,13 @@ export default function App() {
         ) : null}
         {route.name === "notFound" ? (
           <section className="page-panel">
-            <p className="eyebrow">Not found</p>
-            <h1>Page unavailable</h1>
+            <p className="eyebrow">未找到页面</p>
+            <h1>页面不可用</h1>
             <p className="page-copy">
-              This route is not part of the Easy Music Web console.
+              当前地址不属于 Easy Music Web 控制台。
             </p>
             <RouteLink className="button primary" to="/library">
-              Go to library
+              回到曲库
             </RouteLink>
           </section>
         ) : null}

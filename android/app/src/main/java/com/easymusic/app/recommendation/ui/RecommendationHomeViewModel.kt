@@ -170,7 +170,7 @@ class RecommendationHomeViewModel(
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
                 recommendationMessage = null,
-                recommendationErrorMessage = "You are offline. Recommendation requests need the backend.",
+                recommendationErrorMessage = "当前离线。推荐请求需要连接后端。",
                 recommendationResults = emptyList(),
                 feedbackStates = emptyMap(),
             )
@@ -243,7 +243,7 @@ class RecommendationHomeViewModel(
         if (text.isEmpty()) {
             uiState = uiState.copy(
                 aiState = uiState.aiState.copy(
-                    errorMessage = "Type a natural-language request first.",
+                    errorMessage = "请先输入想听什么。",
                 ),
             )
             return
@@ -252,7 +252,7 @@ class RecommendationHomeViewModel(
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
                 aiState = uiState.aiState.copy(
-                    errorMessage = "You are offline. AI recommendations need the backend.",
+                    errorMessage = "当前离线。AI 推荐需要连接后端。",
                     isRequesting = false,
                     results = emptyList(),
                     parsedContext = null,
@@ -344,7 +344,7 @@ class RecommendationHomeViewModel(
             uiState = uiState.withFeedbackState(
                 trackId = trackId,
                 state = RecommendationFeedbackUiState(
-                    errorMessage = "You are offline. Recommendation feedback needs the backend.",
+                    errorMessage = "当前离线。推荐反馈需要连接后端。",
                 ),
             )
             return
@@ -399,7 +399,7 @@ class RecommendationHomeViewModel(
                         else -> uiState.withFeedbackState(
                             trackId = trackId,
                             state = RecommendationFeedbackUiState(
-                                errorMessage = "Feedback response did not include a result.",
+                                errorMessage = "反馈响应中没有结果。",
                             ),
                         )
                     }
@@ -437,7 +437,7 @@ class RecommendationHomeViewModel(
             uiState = uiState.withFeedbackState(
                 trackId = trackId,
                 state = RecommendationFeedbackUiState(
-                    errorMessage = "You are offline. Recommendation feedback needs the backend.",
+                    errorMessage = "当前离线。推荐反馈需要连接后端。",
                 ),
             )
             return
@@ -485,7 +485,7 @@ class RecommendationHomeViewModel(
                         else -> uiState.withFeedbackState(
                             trackId = trackId,
                             state = RecommendationFeedbackUiState(
-                                errorMessage = "Feedback response did not include a result.",
+                                errorMessage = "反馈响应中没有结果。",
                             ),
                         )
                     }
@@ -518,7 +518,7 @@ class RecommendationHomeViewModel(
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
                 isLoadingTags = false,
-                tagErrorMessage = "You are offline. Tag loading needs the backend.",
+                tagErrorMessage = "当前离线。加载标签需要连接后端。",
                 needsSignIn = false,
             )
             return
@@ -538,7 +538,7 @@ class RecommendationHomeViewModel(
             if (token == null) {
                 uiState = uiState.copy(
                     isLoadingTags = false,
-                    tagErrorMessage = "Please sign in again to load recommendation tags.",
+                    tagErrorMessage = "请重新登录后加载推荐标签。",
                     needsSignIn = true,
                 )
                 return@launch
@@ -627,16 +627,16 @@ private fun Set<Int>.toggled(tagId: Int): Set<Int> =
 
 private fun Int.resultMessage(): String =
     when (this) {
-        0 -> "No recommendations matched this context yet. Adjust the selected tags and request again."
-        1 -> "Recommendation request completed with 1 candidate."
-        else -> "Recommendation request completed with $this candidates."
+        0 -> "当前条件还没有匹配的推荐。调整已选标签后再试一次。"
+        1 -> "推荐请求完成，找到 1 个候选音轨。"
+        else -> "推荐请求完成，找到 $this 个候选音轨。"
     }
 
 private fun FeedbackType.successMessage(): String =
     when (this) {
-        FeedbackType.Like -> "Liked. Playback and cache behavior were not changed."
-        FeedbackType.Tired -> "Marked tired. Request again when you want a refreshed recommendation."
-        FeedbackType.NotToday -> "Marked not today. Request again to refresh."
-        FeedbackType.NotSuitableForContext -> "Marked not suitable for this context. Request again to refresh."
-        FeedbackType.SkipRecommendation -> "Skipped for recommendation. Request again to refresh."
+        FeedbackType.Like -> "已标记喜欢。播放和离线缓存不会受影响。"
+        FeedbackType.Tired -> "已标记听腻了。再次请求可刷新推荐。"
+        FeedbackType.NotToday -> "已标记今天不听。再次请求可刷新推荐。"
+        FeedbackType.NotSuitableForContext -> "已标记不适合当前场景。再次请求可刷新推荐。"
+        FeedbackType.SkipRecommendation -> "已跳过这个推荐。再次请求可刷新推荐。"
     }

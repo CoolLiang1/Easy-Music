@@ -41,7 +41,7 @@ class PlayerController(
                 PlayerUiState(
                     track = track,
                     status = PlaybackStatus.Error,
-                    errorMessage = "Only ready tracks can stream. This track is ${track.status}.",
+                    errorMessage = "只有已就绪的音轨可以在线播放。当前状态：${track.status}。",
                 ),
             )
             return
@@ -70,7 +70,7 @@ class PlayerController(
                 PlayerUiState(
                     track = track,
                     status = PlaybackStatus.Error,
-                    errorMessage = "Only ready tracks can play. This track is ${track.status}.",
+                    errorMessage = "只有已就绪的音轨可以播放。当前状态：${track.status}。",
                 ),
             )
             return
@@ -180,7 +180,7 @@ class PlayerController(
                 isPlaying = false,
                 isBuffering = false,
                 positionMs = 0L,
-                errorMessage = "Cached copy was deleted.",
+                errorMessage = "离线缓存已删除。",
             ),
         )
     }

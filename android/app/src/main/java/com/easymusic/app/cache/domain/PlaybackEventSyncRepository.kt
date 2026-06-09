@@ -85,7 +85,7 @@ class PlaybackEventSyncRepository(
 
     private companion object {
         const val DEFAULT_BATCH_SIZE = 25
-        const val SIGN_IN_REQUIRED_MESSAGE = "Sign in is required to sync playback events."
+        const val SIGN_IN_REQUIRED_MESSAGE = "同步播放事件需要先登录。"
     }
 }
 

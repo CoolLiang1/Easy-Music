@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
+import { tagGroupLabels } from "../i18n/zh";
 import { AiTagSuggestions } from "./AiTagSuggestions";
 import type { Tag, TagGroup } from "../types/tag";
 import type { Track, TrackTagUpdate } from "../types/track";
@@ -15,13 +16,6 @@ type TrackTagEditorProps = {
 };
 
 const tagGroups: TagGroup[] = ["scenario", "state", "type", "attribute"];
-
-const groupLabels: Record<TagGroup, string> = {
-  scenario: "Scenario",
-  state: "State",
-  type: "Type",
-  attribute: "Attribute",
-};
 
 export function TrackTagEditor({
   accessToken,
@@ -63,18 +57,17 @@ export function TrackTagEditor({
   return (
     <form className="panel" onSubmit={handleSubmit}>
       <div className="form-card">
-        <h2>Assigned tags</h2>
+        <h2>已分配标签</h2>
 
         {allTags.length === 0 ? (
           <p className="page-copy" style={{ marginTop: "14px" }}>
-            No tags exist yet. Create tags from the tag management page before
-            assigning them to tracks.
+            还没有标签。请先在标签管理页面创建标签，再分配给音轨。
           </p>
         ) : null}
 
         {allTags.length > 0 && selectedTagIds.length === 0 ? (
           <p className="page-copy" style={{ marginTop: "14px" }}>
-            This track has no assigned tags.
+            这个音轨还没有分配标签。
           </p>
         ) : null}
 
@@ -109,7 +102,7 @@ export function TrackTagEditor({
                     padding: "0 6px",
                   }}
                 >
-                  {groupLabels[group]}
+                  {tagGroupLabels[group]}
                 </legend>
                 {tags.length === 0 ? (
                   <p
@@ -119,7 +112,7 @@ export function TrackTagEditor({
                       margin: "8px 0 0",
                     }}
                   >
-                    No tags in this group.
+                    这个分组暂无标签。
                   </p>
                 ) : (
                   <div style={{ display: "grid", gap: "10px" }}>
@@ -179,7 +172,7 @@ export function TrackTagEditor({
           disabled={disabled || allTags.length === 0}
           type="submit"
         >
-          {disabled ? "Saving..." : "Save tags"}
+          {disabled ? "正在保存..." : "保存标签"}
         </button>
       </div>
 

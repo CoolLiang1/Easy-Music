@@ -48,7 +48,7 @@ class RecommendationHomeViewModelTest {
         viewModel.requestAiRecommendation(isNetworkAvailable = true)
 
         assertEquals(
-            "Type a natural-language request first.",
+            "请先输入想听什么。",
             viewModel.uiState.aiState.errorMessage,
         )
         assertTrue(viewModel.uiState.aiState.results.isEmpty())
@@ -62,7 +62,7 @@ class RecommendationHomeViewModelTest {
         viewModel.requestAiRecommendation(isNetworkAvailable = true)
 
         assertEquals(
-            "Type a natural-language request first.",
+            "请先输入想听什么。",
             viewModel.uiState.aiState.errorMessage,
         )
     }
@@ -79,7 +79,7 @@ class RecommendationHomeViewModelTest {
         viewModel.requestAiRecommendation(isNetworkAvailable = false)
 
         assertEquals(
-            "You are offline. AI recommendations need the backend.",
+            "当前离线。AI 推荐需要连接后端。",
             viewModel.uiState.aiState.errorMessage,
         )
         assertFalse(viewModel.uiState.aiState.isRequesting)

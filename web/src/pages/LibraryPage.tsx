@@ -33,7 +33,7 @@ export function LibraryPage() {
     if (!accessToken) {
       setLibraryState({
         name: "error",
-        message: "Sign in again to load the library.",
+        message: "请重新登录后再加载曲库。",
       });
       return;
     }
@@ -100,13 +100,13 @@ export function LibraryPage() {
 
   const applyBatchTags = async (operation: BatchTagOperation) => {
     if (!accessToken) {
-      setBatchTagError("Sign in again to update tags.");
+      setBatchTagError("请重新登录后再更新标签。");
       return;
     }
 
     const trackIds = [...selectedTrackIds];
     if (trackIds.length === 0) {
-      setBatchTagError("Select at least one track.");
+      setBatchTagError("请至少选择一个音轨。");
       return;
     }
 
@@ -156,15 +156,14 @@ export function LibraryPage() {
     <section className="page-panel" aria-labelledby="library-title">
       <div className="page-header-row">
         <div>
-          <p className="eyebrow">Library</p>
-          <h1 id="library-title">Music library</h1>
+          <p className="eyebrow">曲库</p>
+          <h1 id="library-title">音乐曲库</h1>
           <p className="page-copy">
-            Browse uploaded tracks, watch processing status, play ready files,
-            and apply tags in batch.
+            浏览已上传音轨、查看处理状态、播放可用文件，并批量应用标签。
           </p>
         </div>
         {libraryState.name === "ready" ? (
-          <span className="score-pill">{libraryState.tracks.length} tracks</span>
+          <span className="score-pill">{libraryState.tracks.length} 个音轨</span>
         ) : null}
       </div>
       <div className="toolbar">
@@ -174,22 +173,22 @@ export function LibraryPage() {
           onClick={() => void loadTracks(false)}
           type="button"
         >
-          {isRefreshing ? "Refreshing..." : "Refresh status"}
+          {isRefreshing ? "正在刷新..." : "刷新状态"}
         </button>
         <RouteLink className="button secondary" to="/upload">
-          Upload audio
+          上传音频
         </RouteLink>
         <RouteLink className="button secondary" to="/reports">
-          Organization reports
+          整理报告
         </RouteLink>
         <RouteLink className="button secondary" to="/duplicates">
-          Review duplicates
+          查看重复音轨
         </RouteLink>
       </div>
 
       {libraryState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Loading tracks...
+          正在加载音轨...
         </div>
       ) : null}
 
@@ -200,7 +199,7 @@ export function LibraryPage() {
       ) : null}
 
       {libraryState.name === "ready" && libraryState.tracks.length === 0 ? (
-        <div className="empty-state">No tracks have been uploaded yet.</div>
+        <div className="empty-state">还没有上传任何音轨。</div>
       ) : null}
 
       {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
@@ -235,5 +234,5 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Unable to load tracks.";
+  return "无法加载音轨。";
 }

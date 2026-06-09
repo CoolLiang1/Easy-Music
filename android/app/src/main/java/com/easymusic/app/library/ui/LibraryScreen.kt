@@ -132,8 +132,8 @@ private fun LibraryHeader(
     onRefresh: () -> Unit,
 ) {
     SectionHeader(
-        title = "Library",
-        subtitle = if (isNetworkAvailable) "Cloud tracks, cache state, and current playback" else "Cloud refresh is unavailable while offline",
+        title = "曲库",
+        subtitle = if (isNetworkAvailable) "云端音轨、离线缓存状态和当前播放" else "离线时无法刷新云端曲库",
         action = {
             OutlinedButton(
                 enabled = !isRefreshing && isNetworkAvailable,
@@ -146,9 +146,9 @@ private fun LibraryHeader(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     when {
-                        !isNetworkAvailable -> "Offline"
-                        isRefreshing -> "Refreshing"
-                        else -> "Refresh"
+                        !isNetworkAvailable -> "离线"
+                        isRefreshing -> "刷新中"
+                        else -> "刷新"
                     },
                 )
             }
@@ -165,7 +165,7 @@ private fun LibraryLoading() {
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(12.dp))
-        Text("Loading tracks")
+        Text("正在加载音轨")
     }
 }
 
@@ -177,12 +177,12 @@ private fun LibraryEmpty(onRefresh: () -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "No tracks yet",
+            text = "还没有音轨",
             style = MaterialTheme.typography.titleLarge,
         )
         Text(
             modifier = Modifier.padding(top = 8.dp),
-            text = "Uploaded tracks will appear here after the backend processes them.",
+            text = "上传后的音轨会在后端处理完成后显示在这里。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -190,7 +190,7 @@ private fun LibraryEmpty(onRefresh: () -> Unit) {
             modifier = Modifier.padding(top = 16.dp),
             onClick = onRefresh,
         ) {
-            Text("Refresh")
+            Text("刷新")
         }
     }
 }
@@ -206,7 +206,7 @@ private fun LibraryError(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Could not load tracks",
+            text = "无法加载音轨",
             style = MaterialTheme.typography.titleLarge,
         )
         Text(
@@ -219,7 +219,7 @@ private fun LibraryError(
             modifier = Modifier.padding(top = 16.dp),
             onClick = onRefresh,
         ) {
-            Text("Try Again")
+            Text("重试")
         }
     }
 }
@@ -271,7 +271,7 @@ private fun InlineError(
         tone = BannerTone.Error,
         action = {
             OutlinedButton(onClick = onRefresh) {
-                Text("Retry")
+                Text("重试")
             }
         },
     )
@@ -332,7 +332,7 @@ private fun TrackRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = track.durationSeconds?.formatDuration() ?: "Duration unknown",
+                    text = track.durationSeconds?.formatDuration() ?: "时长未知",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -393,35 +393,35 @@ private fun TrackResponse.rowPlaybackLabel(
     status: PlaybackStatus,
 ): String {
     if (!isCurrentTrack) {
-        return if (isReady) "Tap to open" else "Not playable yet"
+        return if (isReady) "点按打开" else "尚不可播放"
     }
 
     return when (status) {
-        PlaybackStatus.Buffering -> "Current track - buffering"
-        PlaybackStatus.Playing -> "Current track - playing"
-        PlaybackStatus.Paused -> "Current track - paused"
-        PlaybackStatus.Ended -> "Current track - finished"
-        PlaybackStatus.Error -> "Current track - error"
-        PlaybackStatus.Idle -> "Current track"
+        PlaybackStatus.Buffering -> "当前音轨 - 缓冲中"
+        PlaybackStatus.Playing -> "当前音轨 - 播放中"
+        PlaybackStatus.Paused -> "当前音轨 - 已暂停"
+        PlaybackStatus.Ended -> "当前音轨 - 已结束"
+        PlaybackStatus.Error -> "当前音轨 - 播放错误"
+        PlaybackStatus.Idle -> "当前音轨"
     }
 }
 
 private fun PlaybackStatus.currentTrackChipLabel(): String =
     when (this) {
-        PlaybackStatus.Buffering -> "Buffering"
-        PlaybackStatus.Playing -> "Playing now"
-        PlaybackStatus.Paused -> "Paused"
-        PlaybackStatus.Ended -> "Finished"
-        PlaybackStatus.Error -> "Playback error"
-        PlaybackStatus.Idle -> "Loaded"
+        PlaybackStatus.Buffering -> "缓冲中"
+        PlaybackStatus.Playing -> "播放中"
+        PlaybackStatus.Paused -> "已暂停"
+        PlaybackStatus.Ended -> "已结束"
+        PlaybackStatus.Error -> "播放错误"
+        PlaybackStatus.Idle -> "已加载"
     }
 
 private fun LibraryCacheUiState.cacheLabel(): String =
     when (status) {
-        CacheStatus.NotCached -> "Not cached"
-        CacheStatus.Caching -> "Caching"
-        CacheStatus.Cached -> "Cached"
-        CacheStatus.Failed -> "Cache failed"
+        CacheStatus.NotCached -> "未缓存"
+        CacheStatus.Caching -> "缓存中"
+        CacheStatus.Cached -> "已缓存"
+        CacheStatus.Failed -> "缓存失败"
     }
 
 @Composable
@@ -429,7 +429,7 @@ private fun TrackSubtitle(track: TrackResponse) {
     val subtitle = listOfNotNull(track.artist, track.album)
         .filter { value -> value.isNotBlank() }
         .joinToString(separator = " - ")
-        .ifBlank { "Unknown artist or album" }
+        .ifBlank { "未知艺人或专辑" }
 
     Text(
         text = subtitle,
@@ -445,11 +445,19 @@ private fun StatusChip(track: TrackResponse) {
     AssistChip(
         onClick = {},
         label = {
-            Text(if (track.isReady) "Ready" else track.status.replaceFirstChar { it.uppercase() })
+            Text(if (track.isReady) "可播放" else formatStatus(track.status))
         },
         enabled = track.isReady,
     )
 }
+
+private fun formatStatus(status: String): String =
+    when (status.lowercase()) {
+        "uploaded" -> "已上传"
+        "processing" -> "处理中"
+        "failed" -> "处理失败"
+        else -> status
+    }
 
 private fun Int.formatDuration(): String {
     val minutes = this / 60

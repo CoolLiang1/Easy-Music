@@ -5,10 +5,10 @@ type RecommendationExplanationDetailsProps = {
 };
 
 const groupLabels: Record<string, string> = {
-  scenario: "Scenario matches",
-  state: "State matches",
-  type: "Type matches",
-  attribute: "Attribute matches",
+  scenario: "匹配场景",
+  state: "匹配状态",
+  type: "匹配类型",
+  attribute: "匹配属性",
 };
 
 export function RecommendationExplanationDetails({
@@ -39,19 +39,19 @@ export function RecommendationExplanationDetails({
   return (
     <dl
       className="recommendation-meta"
-      aria-label="Structured recommendation explanation"
+      aria-label="结构化推荐解释"
     >
       {matchedEntries.map(([group, tags]) => (
         <div key={group}>
-          <dt>{groupLabels[group] ?? `${formatLabel(group)} matches`}</dt>
+          <dt>{groupLabels[group] ?? `${formatLabel(group)} 匹配`}</dt>
           <dd>{tags.map((tag) => tag.name).join(", ")}</dd>
         </div>
       ))}
 
-      <ExplanationPartList label="Boosts" parts={boosts} />
-      <ExplanationPartList label="Penalties" parts={penalties} />
-      <ExplanationPartList label="Feedback impact" parts={feedbackImpacts} />
-      <ExplanationPartList label="Avoidance" parts={avoidanceReasons} />
+      <ExplanationPartList label="加分项" parts={boosts} />
+      <ExplanationPartList label="扣分项" parts={penalties} />
+      <ExplanationPartList label="反馈影响" parts={feedbackImpacts} />
+      <ExplanationPartList label="规避原因" parts={avoidanceReasons} />
     </dl>
   );
 }
@@ -66,8 +66,8 @@ export function RecommendationExclusionsNotice({
   }
 
   return (
-    <div className="empty-state" aria-label="Recommendation exclusions considered">
-      <strong>Filtered before ranking:</strong> {exclusions.join(" ")}
+    <div className="empty-state" aria-label="推荐排序前过滤项">
+      <strong>排序前已过滤：</strong> {exclusions.join(" ")}
     </div>
   );
 }

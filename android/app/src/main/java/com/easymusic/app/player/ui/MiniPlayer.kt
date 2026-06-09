@@ -89,7 +89,7 @@ fun MiniPlayer(
                             contentDescription = null,
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Pause")
+                        Text("暂停")
                     }
                 } else {
                     Button(
@@ -101,7 +101,7 @@ fun MiniPlayer(
                             contentDescription = null,
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Play")
+                        Text("播放")
                     }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -111,7 +111,7 @@ fun MiniPlayer(
                         contentDescription = null,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Now")
+                    Text("播放中")
                 }
             }
 
@@ -125,12 +125,12 @@ fun MiniPlayer(
 
 private fun PlaybackStatus.label(): String =
     when (this) {
-        PlaybackStatus.Idle -> "Ready"
-        PlaybackStatus.Buffering -> "Buffering"
-        PlaybackStatus.Playing -> "Playing"
-        PlaybackStatus.Paused -> "Paused"
-        PlaybackStatus.Ended -> "Finished"
-        PlaybackStatus.Error -> "Playback error"
+        PlaybackStatus.Idle -> "就绪"
+        PlaybackStatus.Buffering -> "缓冲中"
+        PlaybackStatus.Playing -> "播放中"
+        PlaybackStatus.Paused -> "已暂停"
+        PlaybackStatus.Ended -> "已结束"
+        PlaybackStatus.Error -> "播放错误"
     }
 
 private fun PlayerUiState.progressFraction(): Float {

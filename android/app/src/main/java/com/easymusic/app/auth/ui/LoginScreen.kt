@@ -45,7 +45,7 @@ fun LoginScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "Sign in to your music library",
+            text = "登录你的音乐曲库",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -54,7 +54,7 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp),
-                text = "You are offline. Sign in needs the backend, but cached tracks remain available after a restored session.",
+                text = "当前离线。登录需要连接后端；已恢复会话后仍可使用离线缓存音轨。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -66,7 +66,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
             value = uiState.username,
             onValueChange = onUsernameChange,
-            label = { Text("Username") },
+            label = { Text("用户名") },
             singleLine = true,
             enabled = !uiState.isLoading,
             keyboardOptions = KeyboardOptions(
@@ -80,7 +80,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
             value = uiState.password,
             onValueChange = onPasswordChange,
-            label = { Text("Password") },
+            label = { Text("密码") },
             singleLine = true,
             enabled = !uiState.isLoading,
             visualTransformation = PasswordVisualTransformation(),
@@ -121,7 +121,7 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
-                Text("Sign In")
+                Text("登录")
             }
         }
     }

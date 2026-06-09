@@ -54,7 +54,7 @@ fun AppScaffold(
                         Text("Easy Music")
                         Text(
                             text = if (session.isOfflineRestored) {
-                                "Offline session"
+                                "离线会话"
                             } else {
                                 session.currentUser.username
                             },
@@ -68,7 +68,7 @@ fun AppScaffold(
                         Text(
                             modifier = Modifier.padding(end = 8.dp),
                             text = playbackEventSyncMessage
-                                ?: "$pendingPlaybackEventCount events pending",
+                                ?: "$pendingPlaybackEventCount 条播放事件待同步",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -76,7 +76,7 @@ fun AppScaffold(
                             IconButton(onClick = onRetryPlaybackEventSync) {
                                 Icon(
                                     imageVector = Icons.Default.Sync,
-                                    contentDescription = "Retry playback event sync",
+                                    contentDescription = "重试播放事件同步",
                                 )
                             }
                         }
@@ -88,7 +88,7 @@ fun AppScaffold(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = if (isLoggingOut) "Signing out" else "Sign out",
+                            contentDescription = if (isLoggingOut) "正在退出登录" else "退出登录",
                         )
                     }
                 },
@@ -111,7 +111,7 @@ fun AppScaffold(
                                     contentDescription = null,
                                 )
                             },
-                            label = { Text("Library") },
+                            label = { Text("曲库") },
                         )
                     }
                     onNavigateToCachedTracks?.let {
@@ -124,7 +124,7 @@ fun AppScaffold(
                                     contentDescription = null,
                                 )
                             },
-                            label = { Text("Cached") },
+                            label = { Text("离线") },
                         )
                     }
                     onNavigateToRecommendations?.let {
@@ -137,7 +137,7 @@ fun AppScaffold(
                                     contentDescription = null,
                                 )
                             },
-                            label = { Text("Recommend") },
+                            label = { Text("推荐") },
                         )
                     }
                 }
@@ -148,9 +148,9 @@ fun AppScaffold(
                 if (!isNetworkAvailable || session.isOfflineRestored) {
                     StatusBanner(
                         text = if (!isNetworkAvailable) {
-                            "Offline: library refresh, login, online playback, and new cache downloads need network. Cached Tracks still works."
+                            "当前离线：曲库刷新、登录、在线播放和新的离线缓存下载需要网络；已缓存音轨仍可播放。"
                         } else {
-                            "Session restored without reaching the backend. Server actions may need you to reconnect."
+                            "已在未连接后端的情况下恢复会话；服务器操作可能需要重新联网。"
                         },
                         tone = if (!isNetworkAvailable) BannerTone.Warning else BannerTone.Neutral,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

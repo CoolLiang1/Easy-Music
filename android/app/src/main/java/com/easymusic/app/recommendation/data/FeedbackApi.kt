@@ -32,7 +32,7 @@ private fun ApiResult<String>.parseFeedbackResponse(): ApiResult<FeedbackRespons
             ApiResult.Success(FeedbackResponse.fromJson(JSONObject(value)))
         } catch (exception: JSONException) {
             ApiResult.SerializationError(
-                message = exception.message ?: "Feedback response could not be parsed.",
+                message = exception.message ?: "无法解析反馈响应。",
                 body = value,
                 cause = exception,
             )

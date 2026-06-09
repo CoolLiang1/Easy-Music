@@ -49,7 +49,7 @@ class NowPlayingViewModel(
             if (!isNetworkAvailable && state.playbackSource != PlaybackSource.OfflineCache) {
                 playerController.fail(
                     track = state.track,
-                    message = "You are offline. Online playback needs the backend stream; play a cached track instead.",
+                    message = "当前离线。在线播放需要连接后端音频流，请改为播放已缓存音轨。",
                 )
                 return
             }

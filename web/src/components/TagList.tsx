@@ -1,5 +1,6 @@
 import type { Tag } from "../types/tag";
-import { tagGroupLabels, tagGroups } from "./TagForm";
+import { formatDateTime, tagGroupLabels } from "../i18n/zh";
+import { tagGroups } from "./TagForm";
 
 type TagListProps = {
   disabled?: boolean;
@@ -28,7 +29,7 @@ export function TagList({
             <h2 id={`tag-group-${group}`}>{tagGroupLabels[group]}</h2>
             {groupTags.length === 0 ? (
               <p className="recommendation-muted">
-                No tags in this group.
+                这个分组暂无标签。
               </p>
             ) : (
               <div className="item-list">
@@ -56,7 +57,7 @@ export function TagList({
                           margin: "6px 0 0",
                         }}
                       >
-                        Created {formatDateTime(tag.created_at)}
+                        创建于 {formatDateTime(tag.created_at)}
                       </p>
                     </div>
                     <div
@@ -73,7 +74,7 @@ export function TagList({
                         onClick={() => onEdit(tag)}
                         type="button"
                       >
-                        Edit
+                        编辑
                       </button>
                       <button
                         className="button secondary"
@@ -81,7 +82,7 @@ export function TagList({
                         onClick={() => void onDelete(tag)}
                         type="button"
                       >
-                        Delete
+                        删除
                       </button>
                     </div>
                   </article>
@@ -93,16 +94,4 @@ export function TagList({
       })}
     </div>
   );
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }

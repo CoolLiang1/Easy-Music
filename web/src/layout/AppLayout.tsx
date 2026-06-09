@@ -9,25 +9,25 @@ type AppLayoutProps = {
 
 const navGroups = [
   {
-    label: "Manage",
+    label: "管理",
     items: [
-      { label: "Library", path: "/library" },
-      { label: "Upload", path: "/upload" },
-      { label: "Tags", path: "/tags" },
+      { label: "曲库", path: "/library" },
+      { label: "上传", path: "/upload" },
+      { label: "标签", path: "/tags" },
     ],
   },
   {
-    label: "Organize",
+    label: "整理",
     items: [
-      { label: "Reports", path: "/reports" },
-      { label: "Duplicates", path: "/duplicates" },
+      { label: "报告", path: "/reports" },
+      { label: "重复音轨", path: "/duplicates" },
     ],
   },
   {
-    label: "Listen",
+    label: "收听",
     items: [
-      { label: "Recommendations", path: "/recommendations" },
-      { label: "AI Assistant", path: "/ai-assistant" },
+      { label: "推荐", path: "/recommendations" },
+      { label: "AI 助手", path: "/ai-assistant" },
     ],
   },
 ];
@@ -37,9 +37,9 @@ export function AppLayout({ children, onSignOut }: AppLayoutProps) {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar" aria-label="Primary navigation">
+      <aside className="sidebar" aria-label="主导航">
         <div>
-          <p className="eyebrow">Music Library</p>
+          <p className="eyebrow">个人曲库</p>
           <RouteLink className="brand" to="/library">
             Easy Music
           </RouteLink>
@@ -66,7 +66,7 @@ export function AppLayout({ children, onSignOut }: AppLayoutProps) {
 
         <div className="sidebar-footer">
           <button className="button secondary" onClick={onSignOut} type="button">
-            Sign out
+            退出登录
           </button>
         </div>
       </aside>

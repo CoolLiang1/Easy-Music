@@ -46,15 +46,15 @@ function LoginForm() {
   return (
     <main className="login-shell">
       <section className="login-panel" aria-labelledby="login-title">
-        <p className="eyebrow">Music Library</p>
+        <p className="eyebrow">个人曲库</p>
         <h1 id="login-title">Easy Music</h1>
         <p className="page-copy">
-          Sign in with the owner account for your Easy Music server.
+          使用 Easy Music 服务器的管理员账号登录。
         </p>
 
         <form className="login-actions" onSubmit={handleSubmit}>
           <label>
-            Username
+            用户名
             <input
               autoComplete="username"
               disabled={isSubmitting || status === "checking"}
@@ -67,7 +67,7 @@ function LoginForm() {
           </label>
 
           <label>
-            Password
+            密码
             <input
               autoComplete="current-password"
               disabled={isSubmitting || status === "checking"}
@@ -91,10 +91,10 @@ function LoginForm() {
               disabled={isSubmitting || status === "checking"}
               type="submit"
             >
-              {isSubmitting ? "Signing in..." : "Sign in"}
+              {isSubmitting ? "正在登录..." : "登录"}
             </button>
             <RouteLink className="button secondary" to="/library">
-              Back to library
+              返回曲库
             </RouteLink>
           </div>
         </form>
@@ -108,5 +108,5 @@ function getLoginErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Sign in failed. Check the username and password, then try again.";
+  return "登录失败。请检查用户名和密码后重试。";
 }

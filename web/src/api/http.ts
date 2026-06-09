@@ -105,7 +105,7 @@ function getErrorMessage(payload: unknown, fallback: string) {
     }
   }
 
-  return fallback || "Request failed.";
+  return fallback || "请求失败。";
 }
 
 function isApiErrorPayload(payload: unknown): payload is ApiErrorPayload {

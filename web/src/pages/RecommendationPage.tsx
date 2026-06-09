@@ -12,7 +12,8 @@ import {
   RecommendationExclusionsNotice,
   RecommendationExplanationDetails,
 } from "../components/RecommendationExplanationDetails";
-import { tagGroupLabels, tagGroups } from "../components/TagForm";
+import { tagGroups } from "../components/TagForm";
+import { feedbackLabels, formatDateTime, tagGroupLabels } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
 import type { FeedbackType } from "../types/feedback";
 import type {
@@ -62,10 +63,10 @@ const feedbackActions: Array<{
     "like" | "not_today" | "tired" | "not_suitable_for_context"
   >;
 }> = [
-  { label: "Like", type: "like" },
-  { label: "Not today", type: "not_today" },
-  { label: "Tired", type: "tired" },
-  { label: "Not suitable", type: "not_suitable_for_context" },
+  { label: feedbackLabels.like ?? "喜欢", type: "like" },
+  { label: feedbackLabels.not_today ?? "今天不听", type: "not_today" },
+  { label: feedbackLabels.tired ?? "听腻了", type: "tired" },
+  { label: feedbackLabels.not_suitable_for_context ?? "不适合", type: "not_suitable_for_context" },
 ];
 
 export function RecommendationPage() {
@@ -88,7 +89,7 @@ export function RecommendationPage() {
     if (!accessToken) {
       setTagsState({
         name: "error",
-        message: "Sign in again to load recommendation tags.",
+        message: "请重新登录后再加载推荐标签。",
       });
       return;
     }
@@ -101,7 +102,7 @@ export function RecommendationPage() {
     } catch (error: unknown) {
       setTagsState({
         name: "error",
-        message: getErrorMessage(error, "Unable to load tags."),
+        message: getErrorMessage(error, "无法加载标签。"),
       });
     }
   }, [accessToken]);
@@ -114,7 +115,7 @@ export function RecommendationPage() {
     if (!accessToken) {
       setRevivedState({
         name: "error",
-        message: "Sign in again to load revived tracks.",
+        message: "请重新登录后再加载复听音轨。",
       });
       return;
     }
@@ -131,7 +132,7 @@ export function RecommendationPage() {
     } catch (error: unknown) {
       setRevivedState({
         name: "error",
-        message: getErrorMessage(error, "Unable to load revived tracks."),
+        message: getErrorMessage(error, "无法加载复听音轨。"),
       });
     } finally {
       setIsRefreshingRevived(false);
@@ -178,7 +179,7 @@ export function RecommendationPage() {
     if (!accessToken) {
       setRecommendationState({
         name: "error",
-        message: "Sign in again to request recommendations.",
+        message: "请重新登录后再请求推荐。",
       });
       return;
     }
@@ -194,7 +195,7 @@ export function RecommendationPage() {
         name: "error",
         message: getErrorMessage(
           error,
-          "Recommendation request failed. Check that the backend is running.",
+          "推荐请求失败。请确认后端正在运行。",
         ),
       });
     }
@@ -207,7 +208,7 @@ export function RecommendationPage() {
     if (!accessToken) {
       setFeedbackState({
         key: `${result.track.id}:${feedbackType}`,
-        message: "Sign in again to send feedback.",
+        message: "请重新登录后再发送反馈。",
         status: "error",
       });
       return;
@@ -216,7 +217,7 @@ export function RecommendationPage() {
     const key = `${result.track.id}:${feedbackType}`;
     setFeedbackState({
       key,
-      message: "Sending feedback...",
+      message: "正在发送反馈...",
       status: "sending",
     });
 
@@ -241,7 +242,7 @@ export function RecommendationPage() {
       if (failed) {
         setFeedbackState({
           key,
-          message: failed.error || "Feedback was not accepted.",
+          message: failed.error || "反馈未被接受。",
           status: "error",
         });
         return;
@@ -252,14 +253,14 @@ export function RecommendationPage() {
         key,
         message:
           accepted?.status === "duplicate"
-            ? "Feedback was already recorded."
-            : "Feedback recorded.",
+            ? "反馈已记录过。"
+            : "反馈已记录。",
         status: "success",
       });
     } catch (error: unknown) {
       setFeedbackState({
         key,
-        message: getErrorMessage(error, "Feedback request failed."),
+        message: getErrorMessage(error, "反馈请求失败。"),
         status: "error",
       });
     }
@@ -272,16 +273,15 @@ export function RecommendationPage() {
     <section className="page-panel" aria-labelledby="recommendation-title">
       <div className="page-header-row">
         <div>
-          <p className="eyebrow">Recommendations</p>
-          <h1 id="recommendation-title">Structured recommendations</h1>
+          <p className="eyebrow">推荐</p>
+          <h1 id="recommendation-title">结构化推荐</h1>
           <p className="page-copy">
-            Test rule-based recommendations with explicit scenario, state, type,
-            desired attribute, and excluded attribute tags.
+            使用明确的场景、状态、类型、期望属性和排除属性标签测试规则推荐。
           </p>
         </div>
         {recommendationState.name === "ready" ? (
           <span className="score-pill">
-            {recommendationState.response.results.length} results
+            {recommendationState.response.results.length} 个结果
           </span>
         ) : null}
       </div>
@@ -293,7 +293,7 @@ export function RecommendationPage() {
           onClick={() => void loadTags()}
           type="button"
         >
-          {tagsState.name === "loading" ? "Loading tags..." : "Reload tags"}
+          {tagsState.name === "loading" ? "正在加载标签..." : "重新加载标签"}
         </button>
         <button
           className="button secondary"
@@ -306,13 +306,13 @@ export function RecommendationPage() {
           }}
           type="button"
         >
-          Clear selections
+          清空选择
         </button>
       </div>
 
       {tagsState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Loading structured tags...
+          正在加载结构化标签...
         </div>
       ) : null}
 
@@ -324,8 +324,7 @@ export function RecommendationPage() {
 
       {tagsState.name === "ready" && !hasAnyTags ? (
         <div className="empty-state">
-          No scenario, state, type, or attribute tags are available yet. Create
-          tags before testing structured recommendations.
+          还没有可用的场景、状态、类型或属性标签。请先创建标签，再测试结构化推荐。
         </div>
       ) : null}
 
@@ -376,8 +375,8 @@ export function RecommendationPage() {
               type="button"
             >
               {recommendationState.name === "loading"
-                ? "Requesting..."
-                : "Request recommendations"}
+                ? "正在请求..."
+                : "请求推荐"}
             </button>
           </div>
         </>
@@ -385,13 +384,13 @@ export function RecommendationPage() {
 
       {recommendationState.name === "idle" ? (
         <div className="empty-state">
-          Choose any structured context and request recommendations when ready.
+          选择任意结构化上下文后，即可请求推荐。
         </div>
       ) : null}
 
       {recommendationState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Requesting structured recommendations...
+          正在请求结构化推荐...
         </div>
       ) : null}
 
@@ -410,9 +409,8 @@ export function RecommendationPage() {
       {recommendationState.name === "ready" &&
       recommendationState.response.results.length === 0 ? (
         <div className="empty-state">
-          No recommendations were returned. There may be no ready tracks for
-          this account, or all ready tracks may be filtered by cooldown,
-          feedback, or excluded attributes.
+          没有返回推荐。可能还没有可播放音轨，或所有可播放音轨都被冷却、
+          反馈、排除属性等规则过滤了。
         </div>
       ) : null}
 
@@ -455,8 +453,8 @@ function RevivedTracksSection({
     <section className="recommendation-card revived-tracks-panel">
       <div className="recommendation-result-heading">
         <div>
-          <p className="eyebrow">Recently revived</p>
-          <h2>Quiet tracks worth revisiting</h2>
+          <p className="eyebrow">复听推荐</p>
+          <h2>值得重新听听的安静音轨</h2>
         </div>
         <button
           className="button secondary"
@@ -464,13 +462,13 @@ function RevivedTracksSection({
           onClick={onRefresh}
           type="button"
         >
-          {isRefreshing ? "Refreshing..." : "Refresh"}
+          {isRefreshing ? "正在刷新..." : "刷新"}
         </button>
       </div>
 
       {state.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Loading revived tracks...
+          正在加载复听音轨...
         </div>
       ) : null}
 
@@ -482,18 +480,15 @@ function RevivedTracksSection({
 
       {state.name === "ready" && state.response.candidates.length === 0 ? (
         <div className="empty-state">
-          No quiet ready tracks are available right now. Active cooldown,
-          same-day not-today feedback, and recent strong negative feedback are
-          suppressed.
+          当前没有适合复听的可播放音轨。仍在冷却、今天不听、近期强负反馈的音轨会被隐藏。
         </div>
       ) : null}
 
       {state.name === "ready" && state.response.candidates.length > 0 ? (
         <>
           <p className="recommendation-muted">
-            Generated {formatDateTime(state.response.generated_at)}. Long-unplayed
-            tracks use a {state.response.long_unplayed_threshold_days}-day
-            threshold; never-played tracks appear after them.
+            生成于 {formatDateTime(state.response.generated_at)}。长期未播放阈值为{" "}
+            {state.response.long_unplayed_threshold_days} 天；从未播放的音轨会排在其后。
           </p>
           <div className="recommendation-results revived-track-list">
             {state.response.candidates.slice(0, 6).map((candidate) => (
@@ -519,25 +514,25 @@ function RevivedTrackCard({ candidate }: { candidate: RevivedTrackCandidate }) {
         <div>
           <p className="eyebrow">
             {candidate.days_since_last_played === null
-              ? "Never played"
-              : `${candidate.days_since_last_played} days quiet`}
+              ? "从未播放"
+              : `${candidate.days_since_last_played} 天未播放`}
           </p>
           <h3>
             <RouteLink to={`/tracks/${encodeURIComponent(track.id)}`}>
-              {track.title || "Untitled track"}
+              {track.title || "未命名音轨"}
             </RouteLink>
           </h3>
         </div>
-        <span className="score-pill">{candidate.playback_count} plays</span>
+        <span className="score-pill">{candidate.playback_count} 次播放</span>
       </div>
 
       <dl className="recommendation-meta">
         <div>
-          <dt>Artist</dt>
-          <dd>{track.artist || "Not set"}</dd>
+          <dt>艺人</dt>
+          <dd>{track.artist || "未设置"}</dd>
         </div>
         <div>
-          <dt>Last played</dt>
+          <dt>上次播放</dt>
           <dd>{formatDateTime(candidate.last_played_at)}</dd>
         </div>
       </dl>
@@ -545,7 +540,7 @@ function RevivedTrackCard({ candidate }: { candidate: RevivedTrackCandidate }) {
       <p className="recommendation-reason">{candidate.reason}</p>
 
       {tags.length > 0 ? (
-        <div className="tag-chip-list" aria-label="Revived track tags">
+        <div className="tag-chip-list" aria-label="复听音轨标签">
           {tags.slice(0, 6).map((tagName) => (
             <span className="tag-chip readonly" key={tagName}>
               {tagName}
@@ -553,7 +548,7 @@ function RevivedTrackCard({ candidate }: { candidate: RevivedTrackCandidate }) {
           ))}
         </div>
       ) : (
-        <p className="recommendation-muted">No tags attached to this track.</p>
+        <p className="recommendation-muted">这个音轨没有分配标签。</p>
       )}
     </article>
   );
@@ -575,14 +570,14 @@ function TagPicker({
   tags,
 }: TagPickerProps) {
   const title = isExcludedPicker
-    ? "Excluded attributes"
+    ? "排除属性"
     : tagGroupLabels[group];
 
   return (
     <section className="recommendation-card" aria-labelledby={`picker-${title}`}>
       <h2 id={`picker-${title}`}>{title}</h2>
       {tags.length === 0 ? (
-        <p className="recommendation-muted">No tags in this group.</p>
+        <p className="recommendation-muted">这个分组暂无标签。</p>
       ) : (
         <div className="tag-chip-list">
           {tags.map((tag) => {
@@ -627,22 +622,22 @@ function RecommendationResultCard({
     <article className="recommendation-result-card">
       <div className="recommendation-result-heading">
         <div>
-          <p className="eyebrow">{isPrimary ? "Primary" : "Alternative"}</p>
-          <h2>{track.title || "Untitled track"}</h2>
+          <p className="eyebrow">{isPrimary ? "首选" : "备选"}</p>
+          <h2>{track.title || "未命名音轨"}</h2>
         </div>
         <span className="score-pill">
-          Rank {result.rank} / {formatScore(result.score)}
+          排名 {result.rank} / {formatScore(result.score)}
         </span>
       </div>
 
       <dl className="recommendation-meta">
         <div>
-          <dt>Artist</dt>
-          <dd>{track.artist || "Not set"}</dd>
+          <dt>艺人</dt>
+          <dd>{track.artist || "未设置"}</dd>
         </div>
         <div>
-          <dt>Album</dt>
-          <dd>{track.album || "Not set"}</dd>
+          <dt>专辑</dt>
+          <dd>{track.album || "未设置"}</dd>
         </div>
       </dl>
 
@@ -650,7 +645,7 @@ function RecommendationResultCard({
       <RecommendationExplanationDetails explanation={result.explanation} />
 
       {track.tags.length > 0 ? (
-        <div className="tag-chip-list" aria-label="Track tags">
+        <div className="tag-chip-list" aria-label="音轨标签">
           {track.tags.map((tag) => (
             <span className="tag-chip readonly" key={tag.id}>
               {tag.name}
@@ -658,7 +653,7 @@ function RecommendationResultCard({
           ))}
         </div>
       ) : (
-        <p className="recommendation-muted">No tags attached to this track.</p>
+        <p className="recommendation-muted">这个音轨没有分配标签。</p>
       )}
 
       <div className="recommendation-feedback-actions">
@@ -675,7 +670,7 @@ function RecommendationResultCard({
               onClick={() => void onFeedback(result, action.type)}
               type="button"
             >
-              {isSending ? "Sending..." : action.label}
+              {isSending ? "正在发送..." : action.label}
             </button>
           );
         })}
@@ -708,28 +703,12 @@ function createClientEventId() {
 }
 
 function formatScore(score: number) {
-  return `Score ${Number.isInteger(score) ? score : score.toFixed(2)}`;
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) {
-    return "Not available";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return `评分 ${Number.isInteger(score) ? score : score.toFixed(2)}`;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiClientError && error.status === 401) {
-    return "Your session is unauthorized. Sign in again and retry.";
+    return "当前会话未授权。请重新登录后重试。";
   }
 
   if (error instanceof Error && error.message) {

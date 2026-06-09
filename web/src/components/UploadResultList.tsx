@@ -1,6 +1,7 @@
 import { RouteLink } from "../routes/RouteLink";
 import type { DuplicateCandidateGroup, DuplicateCandidateTrack } from "../types/duplicate";
 import type { Track } from "../types/track";
+import { formatDuration, formatTrackStatusLabel } from "../i18n/zh";
 import { TrackStatusBadge } from "./TrackStatusBadge";
 
 export type UploadResult = {
@@ -33,7 +34,7 @@ export function UploadResultList({ results }: UploadResultListProps) {
 
   return (
     <div className="panel">
-      <h2>Upload results</h2>
+      <h2>上传结果</h2>
       <ul aria-live="polite" className="item-list">
         {results.map((result) => (
           <li
@@ -80,7 +81,7 @@ function UploadProgressBar({ result }: { result: UploadResult }) {
   return (
     <div style={{ marginTop: "12px" }}>
       <div
-        aria-label={`Upload progress for ${result.fileName}`}
+        aria-label={`${result.fileName} 的上传进度`}
         aria-valuemax={100}
         aria-valuemin={0}
         aria-valuenow={percent ?? undefined}
@@ -103,8 +104,8 @@ function UploadProgressBar({ result }: { result: UploadResult }) {
       </div>
       <p style={{ color: "#526174", fontSize: "0.9rem", margin: "6px 0 0" }}>
         {percent === null || percent === undefined
-          ? "Uploading..."
-          : `Uploading... ${percent}%`}
+          ? "正在上传..."
+          : `正在上传... ${percent}%`}
       </p>
     </div>
   );
@@ -119,19 +120,19 @@ function DuplicateWarning({ result }: { result: UploadResult }) {
   if (duplicateCheck.state === "loading") {
     return (
       <p style={duplicateStatusStyle} aria-live="polite">
-        Checking duplicate candidates...
+        正在检查可能重复的音轨...
       </p>
     );
   }
 
   if (duplicateCheck.state === "none") {
-    return <p style={duplicateStatusStyle}>No duplicate candidates found.</p>;
+    return <p style={duplicateStatusStyle}>未发现可能重复的音轨。</p>;
   }
 
   if (duplicateCheck.state === "error") {
     return (
       <p role="status" style={{ ...duplicateStatusStyle, color: "#92400e" }}>
-        Duplicate check unavailable: {duplicateCheck.message}
+        无法检查重复音轨：{duplicateCheck.message}
       </p>
     );
   }
@@ -149,7 +150,7 @@ function DuplicateWarning({ result }: { result: UploadResult }) {
       }}
     >
       <strong style={{ display: "block", marginBottom: "8px" }}>
-        Possible duplicate upload
+        可能重复上传
       </strong>
       <div style={{ display: "grid", gap: "12px" }}>
         {duplicateCheck.groups.map((group) => (
@@ -176,7 +177,7 @@ function DuplicateWarning({ result }: { result: UploadResult }) {
                     }}
                     to={`/tracks/${encodeURIComponent(candidate.id)}`}
                   >
-                    {candidate.title || "Untitled track"}
+                    {candidate.title || "未命名音轨"}
                   </RouteLink>
                   <span> - {formatCandidateSummary(candidate)}</span>
                 </li>
@@ -191,32 +192,32 @@ function DuplicateWarning({ result }: { result: UploadResult }) {
 
 function getResultMessage(result: UploadResult) {
   if (result.state === "error") {
-    return result.message ?? "Upload failed.";
+    return result.message ?? "上传失败。";
   }
 
   if (result.state === "uploading") {
-    return "Sending this file to the server.";
+    return "正在把文件发送到服务器。";
   }
 
   if (!result.track) {
-    return "Upload completed.";
+    return "上传完成。";
   }
 
   if (result.track.status === "processing") {
-    return `Track #${result.track.id} was uploaded. Backend processing is running.`;
+    return `音轨 #${result.track.id} 已上传，后台正在处理。`;
   }
 
   if (result.track.status === "ready") {
-    return `Track #${result.track.id} is ready for playback.`;
+    return `音轨 #${result.track.id} 已可播放。`;
   }
 
   if (result.track.status === "failed") {
     return result.track.processing_error_message
-      ? `Track #${result.track.id} processing failed: ${result.track.processing_error_message}`
-      : `Track #${result.track.id} processing failed.`;
+      ? `音轨 #${result.track.id} 处理失败：${result.track.processing_error_message}`
+      : `音轨 #${result.track.id} 处理失败。`;
   }
 
-  return `Track #${result.track.id} is ${formatStatus(result.track.status)}.`;
+  return `音轨 #${result.track.id} 当前状态：${formatTrackStatusLabel(result.track.status)}。`;
 }
 
 function formatStatus(status: string) {
@@ -242,33 +243,22 @@ function getOtherCandidates(
 
 function formatMatchType(matchType: string) {
   if (matchType === "exact_file") {
-    return "Exact file match";
+    return "文件完全一致";
   }
 
   if (matchType === "metadata_duration") {
-    return "Likely metadata match";
+    return "元数据疑似一致";
   }
 
-  return formatStatus(matchType);
+  return formatTrackStatusLabel(matchType);
 }
 
 function formatCandidateSummary(candidate: DuplicateCandidateTrack) {
   const parts = [
-    candidate.artist || "Artist not set",
-    candidate.album || "Album not set",
+    candidate.artist || "艺人未设置",
+    candidate.album || "专辑未设置",
     formatDuration(candidate.duration_seconds),
   ];
 
   return parts.join(" / ");
-}
-
-function formatDuration(durationSeconds: number | null) {
-  if (durationSeconds === null) {
-    return "Duration not available";
-  }
-
-  const wholeSeconds = Math.max(0, Math.round(durationSeconds));
-  const minutes = Math.floor(wholeSeconds / 60);
-  const seconds = wholeSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }

@@ -165,7 +165,7 @@ class EasyMusicDatabaseTest {
 
         val updated = requireNotNull(cachedTrackDao.getTrack(42))
         assertEquals(CacheStatus.Failed.value, updated.cacheStatus)
-        assertEquals("Cached audio file is missing or unreadable.", updated.lastError)
+        assertEquals("离线缓存音频文件缺失或无法读取。", updated.lastError)
     }
 
     @Test
@@ -232,7 +232,7 @@ class EasyMusicDatabaseTest {
 
         val failure = source as SelectedPlaybackSource.Failure
         assertEquals(42, failure.track.id)
-        assertEquals("You are offline. This track is not cached on this device.", failure.message)
+        assertEquals("当前离线。这个音轨还没有缓存在这台设备上。", failure.message)
     }
 
     @Test
@@ -424,7 +424,7 @@ class EasyMusicDatabaseTest {
         val pending = offlinePlaybackEventDao.listPending(limit = 10).single()
         assertEquals("event-1", pending.clientEventId)
         assertEquals(1, pending.retryCount)
-        assertEquals("Sign in is required to sync playback events.", pending.lastError)
+        assertEquals("同步播放事件需要先登录。", pending.lastError)
     }
 
     @Test

@@ -3,6 +3,11 @@ import { useCallback, useEffect, useState } from "react";
 import { listDuplicateCandidates } from "../api/duplicates";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
+import {
+  formatContentTypeLabel,
+  formatDuration,
+  formatTrackStatusLabel,
+} from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
 import type { DuplicateCandidateGroup } from "../types/duplicate";
 
@@ -22,7 +27,7 @@ export function DuplicateReviewPage() {
     if (!accessToken) {
       setReviewState({
         name: "error",
-        message: "Sign in again to review duplicate candidates.",
+        message: "请重新登录后再查看重复音轨候选。",
       });
       return;
     }
@@ -54,16 +59,15 @@ export function DuplicateReviewPage() {
     <section className="page-panel" aria-labelledby="duplicate-review-title">
       <div className="page-header-row">
         <div>
-          <p className="eyebrow">Duplicate review</p>
-          <h1 id="duplicate-review-title">Duplicate candidates</h1>
+          <p className="eyebrow">重复检查</p>
+          <h1 id="duplicate-review-title">重复音轨候选</h1>
           <p className="page-copy">
-            Review exact and likely duplicate groups across the library. Matches
-            are advisory only; this view never deletes, merges, hides, or
-            modifies tracks.
+            查看曲库中完全一致或疑似重复的音轨组。这里只提供参考，不会删除、
+            合并、隐藏或修改任何音轨。
           </p>
         </div>
         {reviewState.name === "ready" ? (
-          <span className="score-pill">{reviewState.groups.length} groups</span>
+          <span className="score-pill">{reviewState.groups.length} 组</span>
         ) : null}
       </div>
       <div className="toolbar">
@@ -73,16 +77,16 @@ export function DuplicateReviewPage() {
           onClick={() => void loadDuplicateGroups(false)}
           type="button"
         >
-          {isRefreshing ? "Refreshing..." : "Refresh duplicates"}
+          {isRefreshing ? "正在刷新..." : "刷新重复音轨"}
         </button>
         <RouteLink className="button secondary" to="/library">
-          Back to library
+          返回曲库
         </RouteLink>
       </div>
 
       {reviewState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Loading duplicate candidates...
+          正在加载重复音轨候选...
         </div>
       ) : null}
 
@@ -93,7 +97,7 @@ export function DuplicateReviewPage() {
       ) : null}
 
       {reviewState.name === "ready" && reviewState.groups.length === 0 ? (
-        <div className="empty-state">No duplicate candidate groups found.</div>
+        <div className="empty-state">未发现重复音轨候选组。</div>
       ) : null}
 
       {reviewState.name === "ready" && reviewState.groups.length > 0 ? (
@@ -171,20 +175,20 @@ function DuplicateGroupList({ groups }: { groups: DuplicateCandidateGroup[] }) {
                     }}
                     to={`/tracks/${encodeURIComponent(candidate.id)}`}
                   >
-                    {candidate.title || "Untitled track"}
+                    {candidate.title || "未命名音轨"}
                   </RouteLink>
                   <TrackStatusBadge status={candidate.status} />
                 </div>
                 <dl className="duplicate-candidate-meta">
-                  <CandidateMeta label="Artist" value={candidate.artist || "Not set"} />
-                  <CandidateMeta label="Album" value={candidate.album || "Not set"} />
+                  <CandidateMeta label="艺人" value={candidate.artist || "未设置"} />
+                  <CandidateMeta label="专辑" value={candidate.album || "未设置"} />
                   <CandidateMeta
-                    label="Duration"
+                    label="时长"
                     value={formatDuration(candidate.duration_seconds)}
                   />
                   <CandidateMeta
-                    label="Type"
-                    value={formatContentType(candidate.content_type)}
+                    label="类型"
+                    value={formatContentTypeLabel(candidate.content_type)}
                   />
                 </dl>
               </li>
@@ -207,42 +211,19 @@ function CandidateMeta({ label, value }: { label: string; value: string }) {
 
 function formatMatchType(matchType: string) {
   if (matchType === "exact_file") {
-    return "Exact file match";
+    return "文件完全一致";
   }
 
   if (matchType === "metadata_duration") {
-    return "Likely metadata and duration match";
+    return "元数据和时长疑似一致";
   }
 
-  return matchType
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return formatTrackStatusLabel(matchType);
 }
 
 function formatConfidence(confidence: number) {
   const percentage = Math.round(Math.max(0, Math.min(1, confidence)) * 100);
-  return `${percentage}% confidence`;
-}
-
-function formatContentType(contentType: string) {
-  return contentType
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatDuration(durationSeconds: number | null) {
-  if (durationSeconds === null) {
-    return "Not available";
-  }
-
-  const wholeSeconds = Math.max(0, Math.round(durationSeconds));
-  const minutes = Math.floor(wholeSeconds / 60);
-  const seconds = wholeSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  return `${percentage}% 可信度`;
 }
 
 function getErrorMessage(error: unknown) {
@@ -250,5 +231,5 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Unable to load duplicate candidates.";
+  return "无法加载重复音轨候选。";
 }

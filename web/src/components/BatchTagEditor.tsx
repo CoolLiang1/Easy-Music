@@ -1,5 +1,6 @@
 import { type FormEvent, useMemo, useState } from "react";
 
+import { tagGroupLabels } from "../i18n/zh";
 import type { Tag, TagGroup } from "../types/tag";
 import type { TrackBatchTagUpdateResponse } from "../types/track";
 
@@ -18,13 +19,6 @@ export type BatchTagOperation = {
 };
 
 const tagGroups: TagGroup[] = ["scenario", "state", "type", "attribute"];
-
-const groupLabels: Record<TagGroup, string> = {
-  scenario: "Scenario",
-  state: "State",
-  type: "Type",
-  attribute: "Attribute",
-};
 
 export function BatchTagEditor({
   disabled = false,
@@ -50,11 +44,9 @@ export function BatchTagEditor({
       return;
     }
 
-    const action = mode === "add" ? "Add" : "Remove";
+    const action = mode === "add" ? "添加" : "移除";
     const confirmed = window.confirm(
-      `${action} ${selectedTagIds.length} tag${selectedTagIds.length === 1 ? "" : "s"} ${
-        mode === "add" ? "to" : "from"
-      } ${selectedCount} selected track${selectedCount === 1 ? "" : "s"}?`,
+      `确定要为 ${selectedCount} 个已选音轨${action} ${selectedTagIds.length} 个标签吗？`,
     );
     if (!confirmed) {
       return;
@@ -86,9 +78,9 @@ export function BatchTagEditor({
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>Batch tags</h2>
+          <h2 style={{ margin: 0 }}>批量标签</h2>
           <p className="page-copy" style={{ margin: "8px 0 0" }}>
-            {selectedCount} selected track{selectedCount === 1 ? "" : "s"}.
+            已选择 {selectedCount} 个音轨。
           </p>
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
@@ -100,7 +92,7 @@ export function BatchTagEditor({
               onChange={() => setMode("add")}
               type="radio"
             />
-            Add
+            添加
           </label>
           <label style={modeLabelStyle}>
             <input
@@ -110,14 +102,14 @@ export function BatchTagEditor({
               onChange={() => setMode("remove")}
               type="radio"
             />
-            Remove
+            移除
           </label>
         </div>
       </div>
 
       {tags.length === 0 ? (
         <p className="page-copy" style={{ marginTop: "14px" }}>
-          No tags exist yet. Create tags before applying them in batch.
+          还没有标签。请先创建标签，再进行批量应用。
         </p>
       ) : null}
 
@@ -144,9 +136,9 @@ export function BatchTagEditor({
                 padding: "12px",
               }}
             >
-              <legend style={legendStyle}>{groupLabels[group]}</legend>
+              <legend style={legendStyle}>{tagGroupLabels[group]}</legend>
               {groupTags.length === 0 ? (
-                <p style={emptyGroupStyle}>No tags.</p>
+                <p style={emptyGroupStyle}>暂无标签。</p>
               ) : (
                 <div style={{ display: "grid", gap: "8px" }}>
                   {groupTags.map((tag) => (
@@ -181,7 +173,7 @@ export function BatchTagEditor({
 
       <div className="toolbar">
         <button className="button primary" disabled={!canSubmit} type="submit">
-          {disabled ? "Applying..." : mode === "add" ? "Add tags" : "Remove tags"}
+          {disabled ? "正在应用..." : mode === "add" ? "添加标签" : "移除标签"}
         </button>
       </div>
     </form>
@@ -191,10 +183,10 @@ export function BatchTagEditor({
 export function summarizeBatchTagResponse(response: TrackBatchTagUpdateResponse) {
   const failedCount = response.results.filter((result) => result.status === "failed").length;
   if (failedCount > 0) {
-    return `Updated ${response.updated_count} of ${response.requested_track_count} tracks. ${failedCount} failed.`;
+    return `已更新 ${response.updated_count}/${response.requested_track_count} 个音轨，${failedCount} 个失败。`;
   }
 
-  return `Updated ${response.updated_count} track${response.updated_count === 1 ? "" : "s"}.`;
+  return `已更新 ${response.updated_count} 个音轨。`;
 }
 
 const modeLabelStyle = {

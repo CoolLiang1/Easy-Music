@@ -109,8 +109,8 @@ fun TrackDetailScreen(
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
         SectionHeader(
-            title = "Track Detail",
-            subtitle = if (isNetworkAvailable) "Cloud metadata and local cache state" else "Cloud metadata is unavailable while offline",
+            title = "音轨详情",
+            subtitle = if (isNetworkAvailable) "云端元数据和本地离线缓存状态" else "离线时无法获取云端元数据",
             action = {
                 OutlinedButton(onClick = onBackToLibrary) {
                     Icon(
@@ -118,7 +118,7 @@ fun TrackDetailScreen(
                         contentDescription = null,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Library")
+                    Text("曲库")
                 }
             },
         )
@@ -156,7 +156,7 @@ private fun DetailLoading() {
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(12.dp))
-        Text("Loading track detail")
+        Text("正在加载音轨详情")
     }
 }
 
@@ -168,11 +168,11 @@ private fun DetailError(
     onRefresh: () -> Unit,
 ) {
     val title = when (kind) {
-        TrackDetailErrorKind.NotFound -> "Track not found"
-        TrackDetailErrorKind.Unauthorized -> "Sign in required"
+        TrackDetailErrorKind.NotFound -> "未找到音轨"
+        TrackDetailErrorKind.Unauthorized -> "需要登录"
         TrackDetailErrorKind.Other,
         null,
-        -> "Could not load track"
+        -> "无法加载音轨"
     }
 
     Column(
@@ -195,7 +195,7 @@ private fun DetailError(
             enabled = isNetworkAvailable,
             onClick = onRefresh,
         ) {
-            Text(if (isNetworkAvailable) "Try Again" else "Offline")
+            Text(if (isNetworkAvailable) "重试" else "离线")
         }
     }
 }
@@ -216,8 +216,8 @@ private fun DetailContent(
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
-            title = { Text("Delete Cached Copy") },
-            text = { Text("Remove the local cached file for \"${track.title}\" from this device?") },
+            title = { Text("删除离线缓存") },
+            text = { Text("要从这台设备删除“${track.title}”的本地缓存文件吗？") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -225,12 +225,12 @@ private fun DetailContent(
                         onDeleteCachedTrack()
                     },
                 ) {
-                    Text("Delete")
+                    Text("删除")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text("Cancel")
+                    Text("取消")
                 }
             },
         )
@@ -254,14 +254,14 @@ private fun DetailContent(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                MetadataRow(label = "Artist", value = track.artist.orUnknown())
-                MetadataRow(label = "Album", value = track.album.orUnknown())
-                MetadataRow(label = "Duration", value = track.durationSeconds?.formatDuration() ?: "Unknown")
-                MetadataRow(label = "Content Type", value = track.contentType)
-                MetadataRow(label = "Liked", value = if (track.liked) "Yes" else "No")
-                MetadataRow(label = "Cooldown", value = track.cooldownUntil ?: "None")
-                MetadataRow(label = "Created", value = track.createdAt)
-                MetadataRow(label = "Updated", value = track.updatedAt)
+                MetadataRow(label = "艺人", value = track.artist.orUnknown())
+                MetadataRow(label = "专辑", value = track.album.orUnknown())
+                MetadataRow(label = "时长", value = track.durationSeconds?.formatDuration() ?: "未知")
+                MetadataRow(label = "内容类型", value = track.contentType)
+                MetadataRow(label = "喜欢", value = if (track.liked) "是" else "否")
+                MetadataRow(label = "冷却截止", value = track.cooldownUntil ?: "无")
+                MetadataRow(label = "创建时间", value = track.createdAt)
+                MetadataRow(label = "更新时间", value = track.updatedAt)
             }
         }
 
@@ -271,7 +271,7 @@ private fun DetailContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "Playback",
+                    text = "播放",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -279,9 +279,9 @@ private fun DetailContent(
                     text = if (isCurrentTrack) {
                         playbackState.detailPlaybackLabel()
                     } else if (track.isReady) {
-                        "Ready to stream."
+                        "已可在线播放。"
                     } else {
-                        "Only ready tracks can stream. This track is ${track.status}."
+                        "只有可播放音轨才能在线播放。当前状态：${formatStatus(track.status)}。"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -292,7 +292,7 @@ private fun DetailContent(
                 ) {
                     AssistChip(
                         onClick = {},
-                        label = { Text(if (track.isReady) "Ready" else track.status.replaceFirstChar { it.uppercase() }) },
+                        label = { Text(if (track.isReady) "可播放" else formatStatus(track.status)) },
                         enabled = track.isReady,
                     )
                     if (isCurrentTrack) {
@@ -312,7 +312,7 @@ private fun DetailContent(
                         contentDescription = null,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isCurrentTrack) "Open Now Playing" else "Play")
+                    Text(if (isCurrentTrack) "打开播放中" else "播放")
                 }
             }
         }
@@ -323,7 +323,7 @@ private fun DetailContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "Offline Cache",
+                    text = "离线缓存",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -351,11 +351,11 @@ private fun DetailContent(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         when {
-                            !isNetworkAvailable -> "Offline"
-                            !track.isReady -> "Cache Unavailable"
-                            cacheState.status == CacheStatus.Cached -> "Cached"
-                            cacheState.status == CacheStatus.Failed -> "Retry Cache"
-                            else -> "Cache Track"
+                            !isNetworkAvailable -> "离线"
+                            !track.isReady -> "暂不可缓存"
+                            cacheState.status == CacheStatus.Cached -> "已缓存"
+                            cacheState.status == CacheStatus.Failed -> "重试缓存"
+                            else -> "缓存音轨"
                         },
                     )
                 }
@@ -364,7 +364,7 @@ private fun DetailContent(
                         enabled = !cacheState.isCaching,
                         onClick = { showDeleteConfirmation = true },
                     ) {
-                        Text("Delete Cache")
+                        Text("删除缓存")
                     }
                 }
             }
@@ -376,13 +376,13 @@ private fun DetailContent(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "Tags",
+                    text = "标签",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 if (track.tags.isEmpty()) {
                     Text(
-                        text = "No tags",
+                        text = "暂无标签",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -412,12 +412,12 @@ private fun CacheMetadata(cacheState: TrackCacheUiState) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         MetadataRow(
-            label = "File Size",
-            value = cacheState.byteSize?.formatBytes() ?: "Unknown",
+            label = "文件大小",
+            value = cacheState.byteSize?.formatBytes() ?: "未知",
         )
         MetadataRow(
-            label = "Cached",
-            value = cacheState.cachedAt ?: "Unknown",
+            label = "缓存时间",
+            value = cacheState.cachedAt ?: "未知",
         )
     }
 }
@@ -451,18 +451,18 @@ private fun MetadataRow(
 }
 
 private fun String?.orUnknown(): String =
-    if (isNullOrBlank()) "Unknown" else this
+    if (isNullOrBlank()) "未知" else this
 
 private fun TrackResponse.cacheLabel(cacheState: TrackCacheUiState): String {
     if (!isReady) {
-        return "Only ready tracks can be cached. This track is $status."
+        return "只有可播放音轨才能缓存。当前状态：${formatStatus(status)}。"
     }
 
     return when (cacheState.status) {
-        CacheStatus.NotCached -> "Not cached on this device."
-        CacheStatus.Caching -> cacheState.message ?: "Caching track"
-        CacheStatus.Cached -> cacheState.message ?: "Cached for offline playback."
-        CacheStatus.Failed -> cacheState.errorMessage ?: "Cache download failed."
+        CacheStatus.NotCached -> "这台设备尚未缓存。"
+        CacheStatus.Caching -> cacheState.message ?: "正在缓存音轨"
+        CacheStatus.Cached -> cacheState.message ?: "已缓存，可离线播放。"
+        CacheStatus.Failed -> cacheState.errorMessage ?: "缓存下载失败。"
     }
 }
 
@@ -475,22 +475,22 @@ private fun Long.formatBytes(): String =
 
 private fun PlayerUiState.detailPlaybackLabel(): String =
     when (status) {
-        PlaybackStatus.Buffering -> "This track is buffering."
-        PlaybackStatus.Playing -> "This track is playing."
-        PlaybackStatus.Paused -> "This track is paused."
-        PlaybackStatus.Ended -> "Playback finished for this track."
-        PlaybackStatus.Error -> errorMessage ?: "Playback failed for this track."
-        PlaybackStatus.Idle -> "This track is loaded."
+        PlaybackStatus.Buffering -> "这个音轨正在缓冲。"
+        PlaybackStatus.Playing -> "这个音轨正在播放。"
+        PlaybackStatus.Paused -> "这个音轨已暂停。"
+        PlaybackStatus.Ended -> "这个音轨已播放结束。"
+        PlaybackStatus.Error -> errorMessage ?: "这个音轨播放失败。"
+        PlaybackStatus.Idle -> "这个音轨已加载。"
     }
 
 private fun PlaybackStatus.detailChipLabel(): String =
     when (this) {
-        PlaybackStatus.Buffering -> "Buffering"
-        PlaybackStatus.Playing -> "Playing now"
-        PlaybackStatus.Paused -> "Paused"
-        PlaybackStatus.Ended -> "Finished"
-        PlaybackStatus.Error -> "Error"
-        PlaybackStatus.Idle -> "Loaded"
+        PlaybackStatus.Buffering -> "缓冲中"
+        PlaybackStatus.Playing -> "播放中"
+        PlaybackStatus.Paused -> "已暂停"
+        PlaybackStatus.Ended -> "已结束"
+        PlaybackStatus.Error -> "错误"
+        PlaybackStatus.Idle -> "已加载"
     }
 
 private fun Int.formatDuration(): String {
@@ -498,3 +498,12 @@ private fun Int.formatDuration(): String {
     val seconds = this % 60
     return "$minutes:${seconds.toString().padStart(2, '0')}"
 }
+
+private fun formatStatus(status: String): String =
+    when (status.lowercase()) {
+        "uploaded" -> "已上传"
+        "processing" -> "处理中"
+        "ready" -> "可播放"
+        "failed" -> "处理失败"
+        else -> status
+    }

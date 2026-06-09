@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { getLibraryOrganizationReport } from "../api/libraryReports";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
+import { formatDateTime, formatDuration } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
 import type {
   LibraryOrganizationReport,
@@ -25,7 +26,7 @@ export function LibraryReportsPage() {
     if (!accessToken) {
       setReportState({
         name: "error",
-        message: "Sign in again to load library reports.",
+        message: "请重新登录后再加载曲库报告。",
       });
       return;
     }
@@ -57,11 +58,10 @@ export function LibraryReportsPage() {
     <section className="page-panel" aria-labelledby="library-reports-title">
       <div className="page-header-row">
         <div>
-          <p className="eyebrow">Reports</p>
-          <h1 id="library-reports-title">Library organization</h1>
+          <p className="eyebrow">报告</p>
+          <h1 id="library-reports-title">曲库整理</h1>
           <p className="page-copy">
-            Find tracks that need metadata, tags, processing attention, or a
-            fresh listen.
+            找出需要补元数据、补标签、关注处理状态，或值得重新听听的音轨。
           </p>
         </div>
       </div>
@@ -72,16 +72,16 @@ export function LibraryReportsPage() {
           onClick={() => void loadReport(false)}
           type="button"
         >
-          {isRefreshing ? "Refreshing..." : "Refresh reports"}
+          {isRefreshing ? "正在刷新..." : "刷新报告"}
         </button>
         <RouteLink className="button secondary" to="/library">
-          Back to library
+          返回曲库
         </RouteLink>
       </div>
 
       {reportState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Loading library reports...
+          正在加载曲库报告...
         </div>
       ) : null}
 
@@ -100,39 +100,39 @@ function ReportSections({ report }: { report: LibraryOrganizationReport }) {
   return (
     <div className="recommendation-results">
       <p className="page-copy" style={{ margin: 0 }}>
-        Generated {formatDateTime(report.generated_at)}.
+        生成于 {formatDateTime(report.generated_at)}。
       </p>
 
       <TrackSection
-        emptyMessage="No untagged ready tracks."
-        title="Untagged ready tracks"
+        emptyMessage="没有缺少标签的可播放音轨。"
+        title="未打标签的可播放音轨"
         tracks={report.untagged_ready_tracks}
       />
       <IssueSection
-        emptyMessage="No ready tracks are missing core metadata."
+        emptyMessage="没有缺少核心元数据的可播放音轨。"
         issues={report.missing_metadata_tracks}
-        title="Missing metadata"
+        title="缺少元数据"
       />
       <IssueSection
-        emptyMessage="No uploads are currently processing or failed."
+        emptyMessage="当前没有处理中或处理失败的上传。"
         issues={report.processing_tracks}
-        title="Processing attention"
+        title="处理状态关注"
       />
       <DuplicateSection groups={report.duplicate_groups} />
       <TrackSection
-        emptyMessage="No ready tracks are waiting for a first play."
-        title="Never played ready tracks"
+        emptyMessage="没有等待首次播放的可播放音轨。"
+        title="从未播放的可播放音轨"
         tracks={report.never_played_ready_tracks}
       />
       <TrackSection
-        emptyMessage="No ready tracks are past the rarely played threshold."
-        title="Rarely played ready tracks"
+        emptyMessage="没有超过低频播放阈值的可播放音轨。"
+        title="很少播放的可播放音轨"
         tracks={report.rarely_played_ready_tracks}
       />
       <IssueSection
-        emptyMessage="No ready tracks have expired cooldowns."
+        emptyMessage="没有冷却期已过的可播放音轨。"
         issues={report.stale_cooldown_tracks}
-        title="Expired cooldowns"
+        title="已过期冷却"
       />
     </div>
   );
@@ -189,9 +189,9 @@ function IssueSection({
 
 function DuplicateSection({ groups }: { groups: LibraryOrganizationReport["duplicate_groups"] }) {
   return (
-    <ReportPanel count={groups.length} title="Duplicate candidates">
+    <ReportPanel count={groups.length} title="重复音轨候选">
       {groups.length === 0 ? (
-        <p style={emptyTextStyle}>No duplicate candidate groups.</p>
+        <p style={emptyTextStyle}>没有重复音轨候选组。</p>
       ) : (
         <ul style={listStyle}>
           {groups.map((group) => (
@@ -207,11 +207,11 @@ function DuplicateSection({ groups }: { groups: LibraryOrganizationReport["dupli
                       style={trackLinkStyle}
                       to={`/tracks/${encodeURIComponent(candidate.id)}`}
                     >
-                      {candidate.title || "Untitled track"}
+                      {candidate.title || "未命名音轨"}
                     </RouteLink>
                     <span style={{ color: "#526174" }}>
                       {" "}
-                      / {candidate.artist || "Artist not set"} /{" "}
+                      / {candidate.artist || "艺人未设置"} /{" "}
                       {formatDuration(candidate.duration_seconds)}
                     </span>
                   </li>
@@ -277,17 +277,17 @@ function TrackSummary({ track }: { track: LibraryReportTrack }) {
         }}
       >
         <RouteLink style={trackLinkStyle} to={`/tracks/${encodeURIComponent(track.id)}`}>
-          {track.title || "Untitled track"}
+          {track.title || "未命名音轨"}
         </RouteLink>
         <TrackStatusBadge status={track.status} />
       </div>
       <dl className="duplicate-candidate-meta">
-        <Meta label="Artist" value={track.artist || "Not set"} />
-        <Meta label="Album" value={track.album || "Not set"} />
-        <Meta label="Duration" value={formatDuration(track.duration_seconds)} />
-        <Meta label="Plays" value={track.playback_count.toString()} />
-        <Meta label="Last played" value={formatDateTime(track.last_played_at)} />
-        <Meta label="Updated" value={formatDateTime(track.updated_at)} />
+        <Meta label="艺人" value={track.artist || "未设置"} />
+        <Meta label="专辑" value={track.album || "未设置"} />
+        <Meta label="时长" value={formatDuration(track.duration_seconds)} />
+        <Meta label="播放次数" value={track.playback_count.toString()} />
+        <Meta label="上次播放" value={formatDateTime(track.last_played_at)} />
+        <Meta label="更新时间" value={formatDateTime(track.updated_at)} />
       </dl>
     </div>
   );
@@ -304,11 +304,11 @@ function Meta({ label, value }: { label: string; value: string }) {
 
 function formatMatchType(matchType: string) {
   if (matchType === "exact_file") {
-    return "Exact file match";
+    return "文件完全一致";
   }
 
   if (matchType === "metadata_duration") {
-    return "Likely metadata and duration match";
+    return "元数据和时长疑似一致";
   }
 
   return matchType
@@ -318,39 +318,12 @@ function formatMatchType(matchType: string) {
     .join(" ");
 }
 
-function formatDuration(durationSeconds: number | null) {
-  if (durationSeconds === null) {
-    return "Not available";
-  }
-
-  const wholeSeconds = Math.max(0, Math.round(durationSeconds));
-  const minutes = Math.floor(wholeSeconds / 60);
-  const seconds = wholeSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) {
-    return "Not available";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
-  return "Unable to load library reports.";
+  return "无法加载曲库报告。";
 }
 
 const listStyle = {

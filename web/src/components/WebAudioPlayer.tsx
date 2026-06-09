@@ -51,7 +51,7 @@ export function WebAudioPlayer({
     if (!accessToken) {
       setPlayerState({
         name: "error",
-        message: "Sign in again to play this track.",
+        message: "请重新登录后再播放这个音轨。",
       });
       return;
     }
@@ -90,7 +90,7 @@ export function WebAudioPlayer({
 
       {!isReadyTrack ? (
         <span className={compact ? "hint-text compact" : "hint-text"}>
-          Track is not ready for playback.
+          音轨尚未可播放。
         </span>
       ) : null}
 
@@ -101,7 +101,7 @@ export function WebAudioPlayer({
           preload="metadata"
           src={playerState.objectUrl}
         >
-          Your browser cannot play this audio stream.
+          当前浏览器无法播放这个音频流。
         </audio>
       ) : null}
 
@@ -119,18 +119,18 @@ export function WebAudioPlayer({
 
 function getButtonLabel(playerState: PlayerState, isReadyTrack: boolean) {
   if (!isReadyTrack) {
-    return "Play unavailable";
+    return "暂不可播放";
   }
 
   if (playerState.name === "loading") {
-    return "Loading...";
+    return "正在加载...";
   }
 
   if (playerState.name === "ready") {
-    return "Reload audio";
+    return "重新加载音频";
   }
 
-  return "Play";
+  return "播放";
 }
 
 function getErrorMessage(error: unknown) {
@@ -138,7 +138,7 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Unable to load audio stream.";
+  return "无法加载音频流。";
 }
 
 function releaseObjectUrl(objectUrlRef: MutableRefObject<string | null>) {

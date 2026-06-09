@@ -47,7 +47,7 @@ class LoginViewModel(
         }
 
         if (username.isBlank() || password.isBlank()) {
-            uiState = uiState.copy(errorMessage = "Enter your username and password.")
+            uiState = uiState.copy(errorMessage = "请输入用户名和密码。")
             return
         }
 
@@ -73,7 +73,7 @@ class LoginViewModel(
                 is ApiResult.Unauthorized -> {
                     uiState = uiState.copy(
                         isLoading = false,
-                        errorMessage = "Invalid username or password.",
+                        errorMessage = "用户名或密码不正确。",
                     )
                 }
 
@@ -94,7 +94,7 @@ class LoginViewModel(
                 is ApiResult.SerializationError -> {
                     uiState = uiState.copy(
                         isLoading = false,
-                        errorMessage = "Login response could not be read.",
+                        errorMessage = "无法读取登录响应。",
                     )
                 }
             }

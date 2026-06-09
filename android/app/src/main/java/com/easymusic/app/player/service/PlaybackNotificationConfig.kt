@@ -25,12 +25,12 @@ object PlaybackNotificationConfig {
         return listOf(
             CommandButton.Builder(CommandButton.ICON_PLAY)
                 .setPlayerCommand(Player.COMMAND_PLAY_PAUSE)
-                .setDisplayName("Play/Pause")
+                .setDisplayName("播放/暂停")
                 .setSlots(CommandButton.SLOT_CENTRAL)
                 .build(),
             CommandButton.Builder(CommandButton.ICON_STOP)
                 .setPlayerCommand(Player.COMMAND_STOP)
-                .setDisplayName("Stop")
+                .setDisplayName("停止")
                 .setSlots(CommandButton.SLOT_BACK)
                 .build(),
         )

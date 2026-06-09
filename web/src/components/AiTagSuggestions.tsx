@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { suggestTrackTags } from "../api/ai";
 import { ApiClientError } from "../api/http";
+import { tagGroupLabels } from "../i18n/zh";
 import type {
   AiProviderStatus,
   ExistingTagSuggestion,
@@ -37,13 +38,6 @@ type SuggestState =
 
 const GROUP_ORDER: TagGroup[] = ["scenario", "state", "type", "attribute"];
 
-const GROUP_LABELS: Record<TagGroup, string> = {
-  scenario: "Scenario",
-  state: "State",
-  type: "Type",
-  attribute: "Attribute",
-};
-
 // ---------------------------------------------------------------------------
 // component
 // ---------------------------------------------------------------------------
@@ -67,7 +61,7 @@ export function AiTagSuggestions({
     if (!accessToken) {
       setSuggestState({
         name: "error",
-        message: "Sign in again to request tag suggestions.",
+        message: "请重新登录后再请求标签建议。",
       });
       return;
     }
@@ -107,33 +101,32 @@ export function AiTagSuggestions({
           justifyContent: "space-between",
         }}
       >
-        <h2 style={{ margin: 0 }}>AI tag suggestions</h2>
+        <h2 style={{ margin: 0 }}>AI 标签建议</h2>
         <button
           className="button secondary"
           disabled={isLoading}
           onClick={() => void handleRequest()}
           type="button"
         >
-          {isLoading ? "Asking AI..." : "Get AI tag suggestions"}
+          {isLoading ? "正在询问 AI..." : "获取 AI 标签建议"}
         </button>
       </div>
 
       <p className="page-copy" style={{ marginTop: "8px" }}>
-        Let the AI Assistant analyse this track&apos;s metadata and suggest
-        tags from your catalogue. No tags are applied until you save them
-        explicitly.
+        让 AI 助手分析这个音轨的元数据，并从已有标签中给出建议。只有保存后，
+        标签才会真正应用。
       </p>
 
       {/* ---- states ---- */}
       {suggestState.name === "idle" ? (
         <p className="recommendation-muted" style={{ marginTop: "14px" }}>
-          Click the button above to request AI tag suggestions for this track.
+          点击上方按钮，为这个音轨请求 AI 标签建议。
         </p>
       ) : null}
 
       {suggestState.name === "loading" ? (
         <p className="recommendation-muted" style={{ marginTop: "14px" }}>
-          Analysing track metadata and matching against your tag catalogue...
+          正在分析音轨元数据，并匹配你的标签库...
         </p>
       ) : null}
 
@@ -205,7 +198,7 @@ function AiSuggestionsReady({
       {/* no existing suggestions */}
       {Object.keys(existing).length === 0 ? (
         <p className="recommendation-muted">
-          No existing-tag suggestions were returned.
+          没有返回已有标签建议。
         </p>
       ) : null}
 
@@ -229,11 +222,11 @@ function ProviderWarning({ status }: { status: AiProviderStatus }) {
   const messages: Record<AiProviderStatus, string> = {
     ok: "",
     disabled:
-      "AI provider is disabled. Suggestions may be incomplete.",
+      "AI provider 已禁用，建议可能不完整。",
     unconfigured:
-      "AI provider is not configured. Check AI_API_KEY and AI_MODEL.",
+      "AI provider 尚未配置。请检查 AI_API_KEY 和 AI_MODEL。",
     error:
-      "AI provider encountered an error. Suggestions may be incomplete.",
+      "AI provider 发生错误，建议可能不完整。",
   };
 
   return (
@@ -278,7 +271,7 @@ function SuggestionGroup({
       }}
     >
       <h3 style={{ fontSize: "0.95rem", margin: "0 0 10px" }}>
-        {GROUP_LABELS[group]}
+        {tagGroupLabels[group]}
       </h3>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
         {items.map((suggestion) => {
@@ -297,7 +290,7 @@ function SuggestionGroup({
                 gap: "8px",
                 padding: "6px 12px",
               }}
-              title={`${suggestion.reason} (confidence: ${suggestion.confidence.toFixed(2)})`}
+              title={`${suggestion.reason}（置信度：${suggestion.confidence.toFixed(2)}）`}
             >
               <span style={{ fontWeight: 800, fontSize: "0.9rem" }}>
                 {suggestion.name}
@@ -319,7 +312,7 @@ function SuggestionGroup({
                     fontWeight: 800,
                   }}
                 >
-                  &#10003; Added
+                  &#10003; 已添加
                 </span>
               ) : (
                 <button
@@ -331,7 +324,7 @@ function SuggestionGroup({
                   }}
                   type="button"
                 >
-                  + Add
+                  + 添加
                 </button>
               )}
             </div>
@@ -354,11 +347,10 @@ function NewTagSuggestionsPanel({ items }: { items: NewTagSuggestion[] }) {
       }}
     >
       <h3 style={{ fontSize: "0.95rem", margin: "0 0 8px" }}>
-        New tag ideas (suggestions only — not created)
+        新标签想法（仅建议，不会自动创建）
       </h3>
       <p className="recommendation-muted" style={{ marginBottom: "10px" }}>
-        These tag names do not exist yet. Create them on the Tags page before
-        assigning them to this track.
+        这些标签名称尚不存在。请先在标签页面创建，再分配给这个音轨。
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
         {items.map((suggestion, index) => (
@@ -373,7 +365,7 @@ function NewTagSuggestionsPanel({ items }: { items: NewTagSuggestion[] }) {
               fontWeight: 700,
               padding: "4px 10px",
             }}
-            title={`${suggestion.reason} (confidence: ${suggestion.confidence.toFixed(2)})`}
+            title={`${suggestion.reason}（置信度：${suggestion.confidence.toFixed(2)}）`}
           >
             {suggestion.name}{" "}
             <span style={{ color: "#a16207", fontWeight: 600 }}>
@@ -393,14 +385,14 @@ function NewTagSuggestionsPanel({ items }: { items: NewTagSuggestion[] }) {
 function getSuggestionError(error: unknown) {
   if (error instanceof ApiClientError) {
     if (error.status === 401) {
-      return "Your session is unauthorized. Sign in again and retry.";
+      return "当前会话未授权。请重新登录后重试。";
     }
     if (error.status === 503) {
-      return "AI provider is unavailable. Check backend AI configuration.";
+      return "AI provider 不可用。请检查后端 AI 配置。";
     }
   }
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "Unable to load tag suggestions.";
+  return "无法加载标签建议。";
 }

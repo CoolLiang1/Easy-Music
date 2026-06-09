@@ -66,7 +66,7 @@ class TrackCacheRepository(
         cachedTrackDao.upsert(
             cached.copy(
                 cacheStatus = CacheStatus.Failed.value,
-                lastError = "Cached audio file is missing or unreadable.",
+                lastError = "离线缓存音频文件缺失或无法读取。",
             ),
         )
         return CachedPlaybackSource.Unavailable
@@ -79,7 +79,7 @@ class TrackCacheRepository(
         onProgress: (CacheDownloadProgress) -> Unit = {},
     ): TrackCacheResult {
         if (!track.isReady) {
-            return TrackCacheResult.Failure("Only ready tracks can be cached.")
+            return TrackCacheResult.Failure("只有已就绪的音轨可以缓存。")
         }
 
         cachedTrackDao.upsert(
@@ -106,7 +106,7 @@ class TrackCacheRepository(
                     localFilePath = null,
                     byteSize = null,
                     cachedAt = null,
-                    lastError = "Cache download was canceled.",
+                    lastError = "缓存下载已取消。",
                 ),
             )
             throw exception
