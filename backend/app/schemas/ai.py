@@ -165,6 +165,7 @@ class AiRecommendResponse(BaseModel):
     parsed_intent: ParsedIntentResponse
     request_id: str
     results: list[RecommendationResult] = Field(default_factory=list)
+    exclusions_considered: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

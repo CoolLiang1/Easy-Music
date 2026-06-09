@@ -4,6 +4,10 @@ import { aiRecommend } from "../api/ai";
 import { syncFeedbackEvents } from "../api/feedback";
 import { ApiClientError } from "../api/http";
 import { useAuth } from "../auth/AuthProvider";
+import {
+  RecommendationExclusionsNotice,
+  RecommendationExplanationDetails,
+} from "../components/RecommendationExplanationDetails";
 import type { AiRecommendResponse, AiProviderStatus } from "../types/ai";
 import type { FeedbackType } from "../types/feedback";
 import type { RecommendationResult, RecommendationRequest } from "../types/recommendation";
@@ -269,6 +273,8 @@ function AiReadyContent({
       <ParsedIntentSection parsed={parsed} />
 
       {/* ---- results ---- */}
+      <RecommendationExclusionsNotice exclusions={response.exclusions_considered} />
+
       {results.length === 0 ? (
         <div className="empty-state">
           No recommendations were returned. There may be no ready tracks for
@@ -438,6 +444,7 @@ function AiResultCard({
 
       {/* Phase 5 deterministic rule reason */}
       <p className="recommendation-reason">{result.reason}</p>
+      <RecommendationExplanationDetails explanation={result.explanation} />
 
       {track.tags.length > 0 ? (
         <div className="tag-chip-list" aria-label="Track tags">

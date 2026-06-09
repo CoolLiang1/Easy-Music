@@ -167,12 +167,17 @@ def recommend_via_ai(
     structured_req.limit = min(limit, 3)
 
     # 4. Delegate to Phase 5 rule-based ranking — LLM never selects tracks
-    results = recommendation_service.recommend_tracks(db, user, structured_req)
+    recommendation_context = recommendation_service.recommend_tracks_with_context(
+        db,
+        user,
+        structured_req,
+    )
 
     return AiRecommendResponse(
         parsed_intent=parsed,
         request_id=str(uuid4()),
-        results=results,
+        results=recommendation_context.results,
+        exclusions_considered=recommendation_context.exclusions_considered,
     )
 
 

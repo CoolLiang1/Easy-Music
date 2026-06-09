@@ -31,7 +31,13 @@ def create_recommendations(
             detail=tag_error,
         )
 
+    recommendation_context = recommendation_service.recommend_tracks_with_context(
+        db,
+        current_user,
+        payload,
+    )
     return RecommendationResponse(
         request_id=str(uuid4()),
-        results=recommendation_service.recommend_tracks(db, current_user, payload),
+        results=recommendation_context.results,
+        exclusions_considered=recommendation_context.exclusions_considered,
     )

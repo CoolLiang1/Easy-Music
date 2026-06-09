@@ -199,7 +199,9 @@ Invoke-RestMethod `
 The endpoint is authenticated, accepts only structured tag id groups, validates
 tag ownership and tag group compatibility, and returns a `request_id` plus up to
 three ordered results. Each result includes `rank`, `score`, deterministic
-rule-based `reason`, and the existing track response payload.
+rule-based `reason`, structured explanation details, and the existing track
+response payload. The response also includes `exclusions_considered` for tracks
+filtered before ranking, such as cooldown and same-day `not_today` feedback.
 
 Review advisory duplicate candidates after applying V1.1 duplicate migrations
 and processing uploads:

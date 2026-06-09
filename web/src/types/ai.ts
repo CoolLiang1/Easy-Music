@@ -45,6 +45,7 @@ export type AiRecommendResponse = {
   parsed_intent: ParsedIntentResponse;
   request_id: string;
   results: RecommendationResult[];
+  exclusions_considered?: string[];
 };
 
 // ---------------------------------------------------------------------------

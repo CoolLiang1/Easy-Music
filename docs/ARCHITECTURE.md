@@ -385,6 +385,14 @@ The API should return:
 - One primary recommendation
 - Two alternatives
 - Reason for each result
+- Structured explanation details for each result, including matched tags,
+  boosts, penalties, feedback impact, and avoidance reasons.
+- Top-level exclusions considered, such as active cooldown or same-day
+  `not_today` feedback filters.
+
+The structured explanation is derived from the same rule-based ranking inputs
+as the score and concise `reason` text. It does not change ranking order and
+does not let AI select tracks.
 
 ## 11. API Draft
 

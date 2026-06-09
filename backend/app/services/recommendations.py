@@ -10,7 +10,13 @@ from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
-from app.schemas.recommendation import RecommendationRequest, RecommendationResult
+from app.schemas.recommendation import (
+    RecommendationExplanation,
+    RecommendationExplanationPart,
+    RecommendationExplanationTag,
+    RecommendationRequest,
+    RecommendationResult,
+)
 from app.services.tracks import build_track_response
 
 
@@ -45,9 +51,17 @@ TAG_REQUEST_FIELDS = {
 class _ScoredTrack:
     track: Track
     score: float = 0.0
-    matched: dict[str, list[str]] = field(default_factory=dict)
-    penalties: list[str] = field(default_factory=list)
-    boosts: list[str] = field(default_factory=list)
+    matched: dict[str, list[RecommendationExplanationTag]] = field(default_factory=dict)
+    penalties: list[RecommendationExplanationPart] = field(default_factory=list)
+    boosts: list[RecommendationExplanationPart] = field(default_factory=list)
+    feedback_impacts: list[RecommendationExplanationPart] = field(default_factory=list)
+    avoidance_reasons: list[RecommendationExplanationPart] = field(default_factory=list)
+
+
+@dataclass
+class RecommendationContext:
+    results: list[RecommendationResult]
+    exclusions_considered: list[str] = field(default_factory=list)
 
 
 def validate_recommendation_request_tags(
@@ -82,6 +96,15 @@ def recommend_tracks(
     request: RecommendationRequest,
     now: datetime | None = None,
 ) -> list[RecommendationResult]:
+    return recommend_tracks_with_context(db, user, request, now=now).results
+
+
+def recommend_tracks_with_context(
+    db: Session,
+    user: User,
+    request: RecommendationRequest,
+    now: datetime | None = None,
+) -> RecommendationContext:
     ranking_time = _as_naive_utc(now or datetime.now(timezone.utc))
     limit = min(request.limit or DEFAULT_RECOMMENDATION_LIMIT, MAX_RECOMMENDATION_LIMIT)
     tracks = list(
@@ -92,7 +115,7 @@ def recommend_tracks(
         ),
     )
     if not tracks:
-        return []
+        return RecommendationContext(results=[])
 
     track_ids = [track.id for track in tracks]
     tags_by_id = _load_user_tags(db, user)
@@ -102,13 +125,20 @@ def recommend_tracks(
     requested_tag_ids = _requested_tag_ids(request)
 
     scored_tracks: list[_ScoredTrack] = []
+    exclusions_considered: list[str] = []
     for track in tracks:
         cooldown_until = _as_naive_utc(track.cooldown_until)
         if cooldown_until is not None and cooldown_until > ranking_time:
+            exclusions_considered.append(
+                f"{track.title} excluded by active cooldown.",
+            )
             continue
 
         feedback_for_track = feedback_events.get(track.id, [])
         if _has_not_today_feedback(feedback_for_track, ranking_time):
+            exclusions_considered.append(
+                f"{track.title} excluded by not_today feedback for today.",
+            )
             continue
 
         scored = _ScoredTrack(track=track)
@@ -125,15 +155,19 @@ def recommend_tracks(
         scored_tracks.append(scored)
 
     scored_tracks.sort(key=lambda item: (-item.score, item.track.created_at, item.track.id))
-    return [
-        RecommendationResult(
-            rank=index + 1,
-            score=round(scored.score, 2),
-            reason=_build_reason(scored),
-            track=build_track_response(db, scored.track),
-        )
-        for index, scored in enumerate(scored_tracks[:limit])
-    ]
+    return RecommendationContext(
+        results=[
+            RecommendationResult(
+                rank=index + 1,
+                score=round(scored.score, 2),
+                reason=_build_reason(scored),
+                explanation=_build_explanation(scored),
+                track=build_track_response(db, scored.track),
+            )
+            for index, scored in enumerate(scored_tracks[:limit])
+        ],
+        exclusions_considered=exclusions_considered,
+    )
 
 
 def _load_user_tags(db: Session, user: User) -> dict[int, Tag]:
@@ -222,13 +256,25 @@ def _score_tag_matches(
             continue
 
         scored.score += TAG_MATCH_WEIGHTS[group] * len(matching_ids)
-        scored.matched[group] = [tags_by_id[tag_id].name for tag_id in matching_ids]
+        scored.matched[group] = [
+            RecommendationExplanationTag(
+                id=tag_id,
+                name=tags_by_id[tag_id].name,
+                group=group,
+            )
+            for tag_id in matching_ids
+        ]
 
 
 def _score_liked(scored: _ScoredTrack) -> None:
     if scored.track.liked:
         scored.score += LIKED_BOOST
-        scored.boosts.append("liked track boost")
+        scored.boosts.append(
+            RecommendationExplanationPart(
+                label="liked track boost",
+                score_delta=LIKED_BOOST,
+            ),
+        )
 
 
 def _score_excluded_attributes(
@@ -249,7 +295,18 @@ def _score_excluded_attributes(
 
     scored.score -= EXCLUDED_ATTRIBUTE_PENALTY * len(matching_ids)
     tag_names = ", ".join(tags_by_id[tag_id].name for tag_id in matching_ids)
-    scored.penalties.append(f"excluded attribute penalty: {tag_names}")
+    scored.penalties.append(
+        RecommendationExplanationPart(
+            label=f"excluded attribute penalty: {tag_names}",
+            score_delta=-(EXCLUDED_ATTRIBUTE_PENALTY * len(matching_ids)),
+        ),
+    )
+    scored.avoidance_reasons.append(
+        RecommendationExplanationPart(
+            label=f"matched excluded attributes: {tag_names}",
+            score_delta=-(EXCLUDED_ATTRIBUTE_PENALTY * len(matching_ids)),
+        ),
+    )
 
 
 def _score_recent_playback(
@@ -268,7 +325,12 @@ def _score_recent_playback(
     for window, penalty in RECENT_PLAYBACK_WINDOWS:
         if timedelta(0) <= age <= window:
             scored.score -= penalty
-            scored.penalties.append("recently played penalty")
+            scored.penalties.append(
+                RecommendationExplanationPart(
+                    label="recently played penalty",
+                    score_delta=-penalty,
+                ),
+            )
             return
 
 
@@ -292,7 +354,12 @@ def _score_feedback_penalties(
             and _feedback_context_ids(event) & requested_tag_ids
         ):
             scored.score -= NOT_SUITABLE_CONTEXT_PENALTY
-            scored.penalties.append("not suitable for this context penalty")
+            part = RecommendationExplanationPart(
+                label="not suitable for this context penalty",
+                score_delta=-NOT_SUITABLE_CONTEXT_PENALTY,
+            )
+            scored.penalties.append(part)
+            scored.feedback_impacts.append(part)
             applied_not_suitable = True
 
         if (
@@ -301,7 +368,12 @@ def _score_feedback_penalties(
             and timedelta(0) <= now - occurred_at <= RECENT_SKIP_RECOMMENDATION_WINDOW
         ):
             scored.score -= RECENT_SKIP_RECOMMENDATION_PENALTY
-            scored.penalties.append("recent recommendation skip penalty")
+            part = RecommendationExplanationPart(
+                label="recent recommendation skip penalty",
+                score_delta=-RECENT_SKIP_RECOMMENDATION_PENALTY,
+            )
+            scored.penalties.append(part)
+            scored.feedback_impacts.append(part)
             applied_skip = True
 
 
@@ -341,16 +413,26 @@ def _feedback_context_ids(event: FeedbackEvent) -> set[int]:
 def _build_reason(scored: _ScoredTrack) -> str:
     parts: list[str] = []
     for group in ("scenario", "state", "type", "attribute"):
-        names = scored.matched.get(group)
-        if names:
-            parts.append(f"matched {group} tags: {', '.join(names)}")
+        tags = scored.matched.get(group)
+        if tags:
+            parts.append(f"matched {group} tags: {', '.join(tag.name for tag in tags)}")
 
-    parts.extend(scored.boosts)
-    parts.extend(scored.penalties)
+    parts.extend(part.label for part in scored.boosts)
+    parts.extend(part.label for part in scored.penalties)
     if not parts:
         parts.append("no requested tag matches")
 
     return "; ".join(parts) + "."
+
+
+def _build_explanation(scored: _ScoredTrack) -> RecommendationExplanation:
+    return RecommendationExplanation(
+        matched_tags=scored.matched,
+        boosts=scored.boosts,
+        penalties=scored.penalties,
+        feedback_impacts=scored.feedback_impacts,
+        avoidance_reasons=scored.avoidance_reasons,
+    )
 
 
 def _unique_ids(tag_ids: list[int] | None) -> list[int]:

@@ -13,13 +13,38 @@ class RecommendationRequest(BaseModel):
     client: str | None = Field(default=None, max_length=50)
 
 
+class RecommendationExplanationTag(BaseModel):
+    id: int
+    name: str
+    group: str
+
+
+class RecommendationExplanationPart(BaseModel):
+    label: str
+    score_delta: float | None = None
+
+
+class RecommendationExplanation(BaseModel):
+    matched_tags: dict[str, list[RecommendationExplanationTag]] = Field(
+        default_factory=dict,
+    )
+    boosts: list[RecommendationExplanationPart] = Field(default_factory=list)
+    penalties: list[RecommendationExplanationPart] = Field(default_factory=list)
+    feedback_impacts: list[RecommendationExplanationPart] = Field(default_factory=list)
+    avoidance_reasons: list[RecommendationExplanationPart] = Field(default_factory=list)
+
+
 class RecommendationResult(BaseModel):
     rank: int
     score: float
     reason: str
+    explanation: RecommendationExplanation = Field(
+        default_factory=RecommendationExplanation,
+    )
     track: TrackResponse
 
 
 class RecommendationResponse(BaseModel):
     request_id: str
     results: list[RecommendationResult]
+    exclusions_considered: list[str] = Field(default_factory=list)

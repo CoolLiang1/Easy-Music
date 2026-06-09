@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ from app.auth.tokens import create_access_token
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
+from app.models.feedback_event import FeedbackEvent
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
@@ -62,6 +64,7 @@ def create_track(
     *,
     status: str = "ready",
     liked: bool = False,
+    cooldown_until: datetime | None = None,
 ) -> Track:
     track = Track(
         user_id=user.id,
@@ -78,6 +81,7 @@ def create_track(
         bitrate=320,
         status=status,
         liked=liked,
+        cooldown_until=cooldown_until,
     )
     db_session.add(track)
     db_session.commit()
@@ -224,5 +228,59 @@ def test_create_recommendations_includes_deterministic_reason_fields(
     assert response.status_code == 200
     result = response.json()["results"][0]
     assert result["reason"] == "matched scenario tags: Focus; liked track boost."
+    assert result["explanation"]["matched_tags"]["scenario"][0] == {
+        "id": focus.id,
+        "name": "Focus",
+        "group": "scenario",
+    }
+    assert result["explanation"]["boosts"] == [
+        {"label": "liked track boost", "score_delta": 1.0},
+    ]
+    assert result["explanation"]["penalties"] == []
+    assert result["explanation"]["feedback_impacts"] == []
+    assert result["explanation"]["avoidance_reasons"] == []
     assert result["track"]["id"] == track.id
     assert "playback_file_path" in result["track"]
+
+
+def test_create_recommendations_reports_exclusions_considered(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scenario", "Focus")
+    available = create_track(db_session, user, "Available")
+    cooldown = create_track(
+        db_session,
+        user,
+        "Cooldown",
+        cooldown_until=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    not_today = create_track(db_session, user, "Not Today")
+    assign_tags(db_session, available, focus)
+    assign_tags(db_session, cooldown, focus)
+    assign_tags(db_session, not_today, focus)
+    db_session.add(
+        FeedbackEvent(
+            user_id=user.id,
+            track_id=not_today.id,
+            feedback_type="not_today",
+            occurred_at=datetime.now(timezone.utc),
+            client="web",
+        ),
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/recommendations",
+        json={"scenario_tag_ids": [focus.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [result["track"]["title"] for result in body["results"]] == ["Available"]
+    assert body["exclusions_considered"] == [
+        "Cooldown excluded by active cooldown.",
+        "Not Today excluded by not_today feedback for today.",
+    ]

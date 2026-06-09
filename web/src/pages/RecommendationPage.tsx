@@ -5,6 +5,10 @@ import { ApiClientError } from "../api/http";
 import { requestRecommendations } from "../api/recommendations";
 import { listTags } from "../api/tags";
 import { useAuth } from "../auth/AuthProvider";
+import {
+  RecommendationExclusionsNotice,
+  RecommendationExplanationDetails,
+} from "../components/RecommendationExplanationDetails";
 import { tagGroupLabels, tagGroups } from "../components/TagForm";
 import type { FeedbackType } from "../types/feedback";
 import type {
@@ -341,6 +345,12 @@ export function RecommendationPage() {
         </div>
       ) : null}
 
+      {recommendationState.name === "ready" ? (
+        <RecommendationExclusionsNotice
+          exclusions={recommendationState.response.exclusions_considered}
+        />
+      ) : null}
+
       {recommendationState.name === "ready" &&
       recommendationState.response.results.length === 0 ? (
         <div className="empty-state">
@@ -456,6 +466,7 @@ function RecommendationResultCard({
       </dl>
 
       <p className="recommendation-reason">{result.reason}</p>
+      <RecommendationExplanationDetails explanation={result.explanation} />
 
       {track.tags.length > 0 ? (
         <div className="tag-chip-list" aria-label="Track tags">

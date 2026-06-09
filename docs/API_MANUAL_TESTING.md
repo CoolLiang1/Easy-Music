@@ -599,6 +599,11 @@ Expected result:
 - `results` is ordered by the rule-based ranking service.
 - Each result includes `rank`, `score`, deterministic `reason`, and a `track`
   payload compatible with `GET /api/tracks`.
+- Each result also includes structured `explanation` details:
+  `matched_tags`, `boosts`, `penalties`, `feedback_impacts`, and
+  `avoidance_reasons`.
+- The response includes `exclusions_considered` for ready tracks filtered before
+  ranking, such as active cooldown or same-day `not_today` feedback.
 - When there are no ready recommendation candidates, `results` is an empty
   array and the response is still `200 OK`.
 - A missing token returns `401 Unauthorized`.
@@ -688,6 +693,8 @@ Expected closure result:
 
 - The first request returns up to three ordered recommendation results.
 - Results include deterministic rule-based reasons, not AI-generated text.
+- Results include structured explanation fields derived from the same
+  rule-based ranking inputs as the score and reason text.
 - Feedback for the recommended track is accepted.
 - A repeated recommendation request can reflect feedback penalties such as
   `not_today`, `not_suitable_for_context`, `skip_recommendation`, or `tired`.
@@ -819,7 +826,8 @@ Expected result with a working provider and matching tracks:
 - `request_id` is a UUID string.
 - `results` is ordered by the Phase 5 rule-based ranking service.
 - Each result includes `rank`, `score`, deterministic Phase 5 `reason` text,
-  and a `track` payload compatible with `GET /api/tracks`.
+  structured `explanation` details, and a `track` payload compatible with
+  `GET /api/tracks`.
 - Phase 5 reason text is **not** replaced by any AI explanation — the AI
   explanation lives in `parsed_intent.explanation`.
 

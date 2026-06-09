@@ -184,6 +184,10 @@ def test_tag_matches_rank_above_liked_but_contextless_track(
     assert "matched scenario tags: Focus" in results[0].reason
     assert "matched type tags: Instrumental" in results[0].reason
     assert "liked track boost" in results[1].reason
+    assert results[0].explanation.matched_tags["scenario"][0].name == "Focus"
+    assert results[0].explanation.matched_tags["type"][0].name == "Instrumental"
+    assert results[1].explanation.boosts[0].label == "liked track boost"
+    assert results[1].explanation.boosts[0].score_delta == 1.0
 
 
 def test_excluded_attribute_penalty_changes_order(db_session: Session) -> None:
@@ -207,6 +211,11 @@ def test_excluded_attribute_penalty_changes_order(db_session: Session) -> None:
 
     assert [result.track.title for result in results[:2]] == ["Clean", "Noisy"]
     assert "excluded attribute penalty: Noisy" in results[1].reason
+    assert results[1].explanation.penalties[0].label == "excluded attribute penalty: Noisy"
+    assert results[1].explanation.penalties[0].score_delta == -4.0
+    assert results[1].explanation.avoidance_reasons[0].label == (
+        "matched excluded attributes: Noisy"
+    )
 
 
 def test_future_cooldown_and_same_day_not_today_are_excluded(
@@ -309,6 +318,8 @@ def test_recent_playback_penalty_is_applied(db_session: Session) -> None:
 
     assert [result.track.title for result in results[:2]] == ["Fresh", "Recent"]
     assert "recently played penalty" in results[1].reason
+    assert results[1].explanation.penalties[0].label == "recently played penalty"
+    assert results[1].explanation.penalties[0].score_delta == -4.0
 
 
 def test_not_suitable_context_overlap_penalizes_track(db_session: Session) -> None:
@@ -336,6 +347,9 @@ def test_not_suitable_context_overlap_penalizes_track(db_session: Session) -> No
 
     assert [result.track.title for result in results[:2]] == ["Candidate", "Penalized"]
     assert "not suitable for this context penalty" in results[1].reason
+    assert results[1].explanation.feedback_impacts[0].label == (
+        "not suitable for this context penalty"
+    )
 
 
 def test_recent_skip_recommendation_penalty_is_applied(db_session: Session) -> None:
@@ -362,6 +376,9 @@ def test_recent_skip_recommendation_penalty_is_applied(db_session: Session) -> N
 
     assert [result.track.title for result in results[:2]] == ["Candidate", "Skipped"]
     assert "recent recommendation skip penalty" in results[1].reason
+    assert results[1].explanation.feedback_impacts[0].label == (
+        "recent recommendation skip penalty"
+    )
 
 
 def test_returns_at_most_three_without_placeholders(db_session: Session) -> None:
