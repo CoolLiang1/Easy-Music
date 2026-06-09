@@ -203,6 +203,20 @@ rule-based `reason`, structured explanation details, and the existing track
 response payload. The response also includes `exclusions_considered` for tracks
 filtered before ranking, such as cooldown and same-day `not_today` feedback.
 
+Review recently revived ready tracks after playback and feedback events exist:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/recommendations/revived" `
+  -Headers $headers
+```
+
+The revived endpoint is authenticated, current-user scoped, and read-only. It
+returns long-unplayed ready tracks before never-played ready tracks, includes
+track tags when available, and suppresses tracks with active cooldown,
+same-day `not_today`, or recent strong negative feedback.
+
 Review advisory duplicate candidates after applying V1.1 duplicate migrations
 and processing uploads:
 
@@ -454,10 +468,13 @@ backend:
 11. Open the track detail page and edit title, artist, album, content type,
    source URL, liked state, cooldown date, cover image, and assigned tags as
    needed.
-12. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
+12. Visit `Recommendations` and confirm the read-only Recently Revived section
+    loads quiet ready tracks, links to Track Detail, and does not auto-play,
+    auto-cache, or modify feedback.
+13. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
     `state`, `type`, `attribute`), rename it, change its group, and delete one
     explicit tag.
-13. For a ready track, use the playback control from the library row or track
+14. For a ready track, use the playback control from the library row or track
     detail page and confirm audio loads through the authenticated stream
     endpoint.
 

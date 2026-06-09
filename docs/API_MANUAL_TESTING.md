@@ -609,6 +609,35 @@ Expected result:
 - A missing token returns `401 Unauthorized`.
 - An unowned tag id or tag id in the wrong group returns `400 Bad Request`.
 
+## Review Recently Revived Tracks
+
+V1.1 adds a read-only revived-tracks endpoint for ready tracks that have gone
+quiet and may be worth revisiting:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/recommendations/revived" `
+  -Headers $headers
+```
+
+Expected result:
+
+- The response includes `generated_at`, `long_unplayed_threshold_days`, and
+  `candidates`.
+- Long-unplayed ready tracks appear before never-played ready tracks.
+- Each candidate includes the normal safe track response, `last_played_at`,
+  `playback_count`, `days_since_last_played`, a reason, and tag names when
+  available.
+- Recently played ready tracks are omitted.
+- Tracks with active cooldown, same-day `not_today`, or recent strong negative
+  feedback (`tired`, `not_suitable_for_context`, `skip_recommendation`) are
+  suppressed.
+- A missing token returns `401 Unauthorized`.
+- The endpoint is current-user scoped and does not modify tracks, playback
+  events, feedback events, tags, media files, recommendation state, or Android
+  cache state.
+
 ## Phase 5 Structured Recommendation Closure
 
 Before accepting Phase 5, verify the feedback and recommendation endpoints with

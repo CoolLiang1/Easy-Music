@@ -8,10 +8,20 @@ from app.auth.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
+from app.schemas.revived import RevivedTracksResponse
 from app.services import recommendations as recommendation_service
+from app.services import revived_tracks as revived_tracks_service
 
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
+
+
+@router.get("/revived", response_model=RevivedTracksResponse)
+def get_recently_revived_tracks(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> RevivedTracksResponse:
+    return revived_tracks_service.find_recently_revived_tracks(db, current_user)
 
 
 @router.post("", response_model=RecommendationResponse)

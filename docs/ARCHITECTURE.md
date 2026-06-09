@@ -431,6 +431,7 @@ does not let AI select tracks.
 ### Recommendation
 
 - `POST /api/recommendations`
+- `GET /api/recommendations/revived`
 
 ### AI
 

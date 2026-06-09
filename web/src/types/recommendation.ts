@@ -24,6 +24,22 @@ export type RecommendationResponse = {
   exclusions_considered?: string[];
 };
 
+export type RevivedTrackCandidate = {
+  track: Track;
+  last_played_at: string | null;
+  playback_count: number;
+  days_since_last_played: number | null;
+  reason: string;
+  tag_summary: string[];
+};
+
+export type RevivedTracksResponse = {
+  generated_at: string;
+  long_unplayed_threshold_days: number;
+  never_played_included: boolean;
+  candidates: RevivedTrackCandidate[];
+};
+
 export type RecommendationExplanationTag = {
   id: number;
   name: string;

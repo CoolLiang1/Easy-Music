@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { syncFeedbackEvents } from "../api/feedback";
 import { ApiClientError } from "../api/http";
-import { requestRecommendations } from "../api/recommendations";
+import {
+  getRecentlyRevivedTracks,
+  requestRecommendations,
+} from "../api/recommendations";
 import { listTags } from "../api/tags";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -10,11 +13,14 @@ import {
   RecommendationExplanationDetails,
 } from "../components/RecommendationExplanationDetails";
 import { tagGroupLabels, tagGroups } from "../components/TagForm";
+import { RouteLink } from "../routes/RouteLink";
 import type { FeedbackType } from "../types/feedback";
 import type {
   RecommendationRequest,
   RecommendationResult,
   RecommendationResponse,
+  RevivedTrackCandidate,
+  RevivedTracksResponse,
 } from "../types/recommendation";
 import type { Tag, TagGroup } from "../types/tag";
 
@@ -27,6 +33,11 @@ type RecommendationState =
   | { name: "idle" }
   | { name: "loading" }
   | { name: "ready"; response: RecommendationResponse }
+  | { name: "error"; message: string };
+
+type RevivedState =
+  | { name: "loading" }
+  | { name: "ready"; response: RevivedTracksResponse }
   | { name: "error"; message: string };
 
 type SelectionState = Record<TagGroup, number[]>;
@@ -67,6 +78,10 @@ export function RecommendationPage() {
   >([]);
   const [recommendationState, setRecommendationState] =
     useState<RecommendationState>({ name: "idle" });
+  const [revivedState, setRevivedState] = useState<RevivedState>({
+    name: "loading",
+  });
+  const [isRefreshingRevived, setIsRefreshingRevived] = useState(false);
   const [feedbackState, setFeedbackState] = useState<FeedbackState>(null);
 
   const loadTags = useCallback(async () => {
@@ -94,6 +109,38 @@ export function RecommendationPage() {
   useEffect(() => {
     void loadTags();
   }, [loadTags]);
+
+  const loadRevivedTracks = useCallback(async (showLoading: boolean) => {
+    if (!accessToken) {
+      setRevivedState({
+        name: "error",
+        message: "Sign in again to load revived tracks.",
+      });
+      return;
+    }
+
+    if (showLoading) {
+      setRevivedState({ name: "loading" });
+    } else {
+      setIsRefreshingRevived(true);
+    }
+
+    try {
+      const response = await getRecentlyRevivedTracks(accessToken);
+      setRevivedState({ name: "ready", response });
+    } catch (error: unknown) {
+      setRevivedState({
+        name: "error",
+        message: getErrorMessage(error, "Unable to load revived tracks."),
+      });
+    } finally {
+      setIsRefreshingRevived(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    void loadRevivedTracks(true);
+  }, [loadRevivedTracks]);
 
   const groupedTags = useMemo(() => {
     const groups: Record<TagGroup, Tag[]> = {
@@ -374,7 +421,132 @@ export function RecommendationPage() {
           ))}
         </div>
       ) : null}
+
+      <RevivedTracksSection
+        isRefreshing={isRefreshingRevived}
+        onRefresh={() => void loadRevivedTracks(false)}
+        state={revivedState}
+      />
     </section>
+  );
+}
+
+type RevivedTracksSectionProps = {
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  state: RevivedState;
+};
+
+function RevivedTracksSection({
+  isRefreshing,
+  onRefresh,
+  state,
+}: RevivedTracksSectionProps) {
+  return (
+    <section className="recommendation-card revived-tracks-panel">
+      <div className="recommendation-result-heading">
+        <div>
+          <p className="eyebrow">Recently revived</p>
+          <h2>Quiet tracks worth revisiting</h2>
+        </div>
+        <button
+          className="button secondary"
+          disabled={state.name === "loading" || isRefreshing}
+          onClick={onRefresh}
+          type="button"
+        >
+          {isRefreshing ? "Refreshing..." : "Refresh"}
+        </button>
+      </div>
+
+      {state.name === "loading" ? (
+        <div className="empty-state" aria-live="polite">
+          Loading revived tracks...
+        </div>
+      ) : null}
+
+      {state.name === "error" ? (
+        <div className="empty-state" role="alert">
+          {state.message}
+        </div>
+      ) : null}
+
+      {state.name === "ready" && state.response.candidates.length === 0 ? (
+        <div className="empty-state">
+          No quiet ready tracks are available right now. Active cooldown,
+          same-day not-today feedback, and recent strong negative feedback are
+          suppressed.
+        </div>
+      ) : null}
+
+      {state.name === "ready" && state.response.candidates.length > 0 ? (
+        <>
+          <p className="recommendation-muted">
+            Generated {formatDateTime(state.response.generated_at)}. Long-unplayed
+            tracks use a {state.response.long_unplayed_threshold_days}-day
+            threshold; never-played tracks appear after them.
+          </p>
+          <div className="recommendation-results revived-track-list">
+            {state.response.candidates.slice(0, 6).map((candidate) => (
+              <RevivedTrackCard candidate={candidate} key={candidate.track.id} />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function RevivedTrackCard({ candidate }: { candidate: RevivedTrackCandidate }) {
+  const track = candidate.track;
+  const tags =
+    candidate.tag_summary.length > 0
+      ? candidate.tag_summary
+      : track.tags.map((tag) => tag.name);
+
+  return (
+    <article className="recommendation-result-card">
+      <div className="recommendation-result-heading">
+        <div>
+          <p className="eyebrow">
+            {candidate.days_since_last_played === null
+              ? "Never played"
+              : `${candidate.days_since_last_played} days quiet`}
+          </p>
+          <h3>
+            <RouteLink to={`/tracks/${encodeURIComponent(track.id)}`}>
+              {track.title || "Untitled track"}
+            </RouteLink>
+          </h3>
+        </div>
+        <span className="score-pill">{candidate.playback_count} plays</span>
+      </div>
+
+      <dl className="recommendation-meta">
+        <div>
+          <dt>Artist</dt>
+          <dd>{track.artist || "Not set"}</dd>
+        </div>
+        <div>
+          <dt>Last played</dt>
+          <dd>{formatDateTime(candidate.last_played_at)}</dd>
+        </div>
+      </dl>
+
+      <p className="recommendation-reason">{candidate.reason}</p>
+
+      {tags.length > 0 ? (
+        <div className="tag-chip-list" aria-label="Revived track tags">
+          {tags.slice(0, 6).map((tagName) => (
+            <span className="tag-chip readonly" key={tagName}>
+              {tagName}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="recommendation-muted">No tags attached to this track.</p>
+      )}
+    </article>
   );
 }
 
@@ -528,6 +700,22 @@ function createClientEventId() {
 
 function formatScore(score: number) {
   return `Score ${Number.isInteger(score) ? score : score.toFixed(2)}`;
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Not available";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
