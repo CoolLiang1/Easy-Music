@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="library"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_library"
+        android:shortcutShortLabel="@string/shortcut_library_short_label"
+        android:shortcutLongLabel="@string/shortcut_library_long_label">
+        <intent
+            android:action="com.easymusic.app.action.OPEN_SHORTCUT"
+            android:targetPackage="com.easymusic.app"
+            android:targetClass="com.easymusic.app.MainActivity">
+            <extra
+                android:name="com.easymusic.app.extra.SHORTCUT_DESTINATION"
+                android:value="library" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="recommendations"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_recommend"
+        android:shortcutShortLabel="@string/shortcut_recommend_short_label"
+        android:shortcutLongLabel="@string/shortcut_recommend_long_label">
+        <intent
+            android:action="com.easymusic.app.action.OPEN_SHORTCUT"
+            android:targetPackage="com.easymusic.app"
+            android:targetClass="com.easymusic.app.MainActivity">
+            <extra
+                android:name="com.easymusic.app.extra.SHORTCUT_DESTINATION"
+                android:value="recommendations" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="cached_tracks"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_cached"
+        android:shortcutShortLabel="@string/shortcut_cached_short_label"
+        android:shortcutLongLabel="@string/shortcut_cached_long_label">
+        <intent
+            android:action="com.easymusic.app.action.OPEN_SHORTCUT"
+            android:targetPackage="com.easymusic.app"
+            android:targetClass="com.easymusic.app.MainActivity">
+            <extra
+                android:name="com.easymusic.app.extra.SHORTCUT_DESTINATION"
+                android:value="cached_tracks" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="now_playing"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_now_playing"
+        android:shortcutShortLabel="@string/shortcut_now_playing_short_label"
+        android:shortcutLongLabel="@string/shortcut_now_playing_long_label">
+        <intent
+            android:action="com.easymusic.app.action.OPEN_SHORTCUT"
+            android:targetPackage="com.easymusic.app"
+            android:targetClass="com.easymusic.app.MainActivity">
+            <extra
+                android:name="com.easymusic.app.extra.SHORTCUT_DESTINATION"
+                android:value="now_playing" />
+        </intent>
+    </shortcut>
+</shortcuts>

@@ -6,18 +6,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.easymusic.app.ShortcutRoutes
 import com.easymusic.app.core.config.AppConfig
 
 @Composable
 fun EasyMusicApp(
     config: AppConfig = AppConfig.default(),
+    startRoute: String = ShortcutRoutes.DESTINATION_LIBRARY,
 ) {
     MaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
-            AppNavGraph(config = config)
+            AppNavGraph(config = config, startRoute = startRoute)
         }
     }
 }

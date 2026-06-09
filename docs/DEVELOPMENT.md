@@ -578,6 +578,13 @@ cd android
 .\gradlew.bat test
 ```
 
+V1.1 Android launcher shortcuts are static shortcuts for Library,
+Recommendations, Cached Tracks, and Now Playing. They route through
+`MainActivity` and the existing auth/session recovery flow: signed-out launches
+show Login, while authenticated launches open the requested screen. The Now
+Playing shortcut opens the existing Now Playing screen and does not auto-start
+playback or create a new playback service.
+
 The Android backend base URL must stay configurable. Do not write production
 hosts, usernames, passwords, or bearer tokens into source files.
 
@@ -835,6 +842,21 @@ verification and actual Android natural-language recommendation verification.
 Production deployment hardening, embeddings, audio analysis, training
 platforms, social features, automatic downloads, and playback rewrites remain
 outside this phase.
+
+## V1.1 Android Shortcut Smoke Test
+
+Use this flow after installing a debug build on an emulator or device:
+
+1. Long-press the Easy Music launcher icon and confirm shortcuts appear for
+   Library, Recommendations, Cached Tracks, and Now Playing.
+2. While signed out, open each shortcut and confirm the app lands on the
+   existing Login flow.
+3. Sign in, then open each shortcut again and confirm it routes to the named
+   screen.
+4. Open the Now Playing shortcut and confirm it does not auto-start playback;
+   it should show the existing Now Playing state or its empty state.
+5. Confirm normal Library navigation, cached playback selection, recommendation
+   selection, and background playback behavior still work.
 
 ## Database Migrations
 

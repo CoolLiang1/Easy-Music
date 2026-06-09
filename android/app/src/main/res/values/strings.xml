@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Easy Music</string>
+    <string name="shortcut_library_short_label">Library</string>
+    <string name="shortcut_library_long_label">Open Library</string>
+    <string name="shortcut_recommend_short_label">Recommend</string>
+    <string name="shortcut_recommend_long_label">Open Recommendations</string>
+    <string name="shortcut_cached_short_label">Cached</string>
+    <string name="shortcut_cached_long_label">Open Cached Tracks</string>
+    <string name="shortcut_now_playing_short_label">Playing</string>
+    <string name="shortcut_now_playing_long_label">Open Now Playing</string>
 </resources>
