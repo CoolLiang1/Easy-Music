@@ -270,12 +270,21 @@ export function RecommendationPage() {
 
   return (
     <section className="page-panel" aria-labelledby="recommendation-title">
-      <p className="eyebrow">Recommendation V1</p>
-      <h1 id="recommendation-title">Structured recommendations</h1>
-      <p className="page-copy">
-        Manually test rule-based recommendations with explicit scenario, state,
-        type, and attribute tag context.
-      </p>
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">Recommendations</p>
+          <h1 id="recommendation-title">Structured recommendations</h1>
+          <p className="page-copy">
+            Test rule-based recommendations with explicit scenario, state, type,
+            desired attribute, and excluded attribute tags.
+          </p>
+        </div>
+        {recommendationState.name === "ready" ? (
+          <span className="score-pill">
+            {recommendationState.response.results.length} results
+          </span>
+        ) : null}
+      </div>
 
       <div className="recommendation-toolbar">
         <button
@@ -308,7 +317,7 @@ export function RecommendationPage() {
       ) : null}
 
       {tagsState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {tagsState.message}
         </div>
       ) : null}
@@ -387,7 +396,7 @@ export function RecommendationPage() {
       ) : null}
 
       {recommendationState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {recommendationState.message}
         </div>
       ) : null}
@@ -622,7 +631,7 @@ function RecommendationResultCard({
           <h2>{track.title || "Untitled track"}</h2>
         </div>
         <span className="score-pill">
-          Rank {result.rank} · {formatScore(result.score)}
+          Rank {result.rank} / {formatScore(result.score)}
         </span>
       </div>
 

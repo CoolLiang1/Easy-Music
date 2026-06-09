@@ -7,45 +7,68 @@ type AppLayoutProps = {
   onSignOut: () => void;
 };
 
-const navItems = [
-  { label: "Library", path: "/library" },
-  { label: "Reports", path: "/reports" },
-  { label: "Duplicates", path: "/duplicates" },
-  { label: "Upload", path: "/upload" },
-  { label: "Tags", path: "/tags" },
-  { label: "AI Assistant", path: "/ai-assistant" },
-  { label: "Recommendations", path: "/recommendations" },
-  { label: "Track detail", path: "/tracks/placeholder-track" },
+const navGroups = [
+  {
+    label: "Manage",
+    items: [
+      { label: "Library", path: "/library" },
+      { label: "Upload", path: "/upload" },
+      { label: "Tags", path: "/tags" },
+    ],
+  },
+  {
+    label: "Organize",
+    items: [
+      { label: "Reports", path: "/reports" },
+      { label: "Duplicates", path: "/duplicates" },
+    ],
+  },
+  {
+    label: "Listen",
+    items: [
+      { label: "Recommendations", path: "/recommendations" },
+      { label: "AI Assistant", path: "/ai-assistant" },
+    ],
+  },
 ];
 
 export function AppLayout({ children, onSignOut }: AppLayoutProps) {
+  const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary navigation">
         <div>
-          <p className="eyebrow">Phase 2 Web Console</p>
+          <p className="eyebrow">Music Library</p>
           <RouteLink className="brand" to="/library">
             Easy Music
           </RouteLink>
         </div>
 
         <nav className="nav-list">
-          {navItems.map((item) => (
-            <RouteLink
-              className={
-                window.location.pathname === item.path ? "nav-link active" : "nav-link"
-              }
-              key={item.path}
-              to={item.path}
-            >
-              {item.label}
-            </RouteLink>
+          {navGroups.map((group) => (
+            <div key={group.label}>
+              <p className="nav-group-label">{group.label}</p>
+              {group.items.map((item) => (
+                <RouteLink
+                  className={
+                    currentPath === item.path ? "nav-link active" : "nav-link"
+                  }
+                  key={item.path}
+                  to={item.path}
+                >
+                  {item.label}
+                </RouteLink>
+              ))}
+            </div>
           ))}
         </nav>
 
-        <button className="button secondary" onClick={onSignOut} type="button">
-          Clear placeholder session
-        </button>
+        <div className="sidebar-footer">
+          <button className="button secondary" onClick={onSignOut} type="button">
+            Sign out
+          </button>
+        </div>
       </aside>
 
       <main className="content-shell">{children}</main>

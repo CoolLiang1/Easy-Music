@@ -32,38 +32,18 @@ export function UploadResultList({ results }: UploadResultListProps) {
   }
 
   return (
-    <div style={{ display: "grid", gap: "12px", marginTop: "24px" }}>
-      <h2 style={{ margin: 0 }}>Upload results</h2>
-      <ul
-        aria-live="polite"
-        style={{
-          display: "grid",
-          gap: "12px",
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-        }}
-      >
+    <div className="panel">
+      <h2>Upload results</h2>
+      <ul aria-live="polite" className="item-list">
         {results.map((result) => (
           <li
             key={result.id}
-            style={{
-              border: "1px solid #d5dde8",
-              borderRadius: "8px",
-              background: result.state === "error" ? "#fef2f2" : "#f8fafc",
-              padding: "16px",
-            }}
+            className={
+              result.state === "error" ? "item-card empty-state error" : "item-card"
+            }
           >
-            <div
-              style={{
-                alignItems: "center",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "10px",
-                justifyContent: "space-between",
-              }}
-            >
-              <strong style={{ color: "#18212f", overflowWrap: "anywhere" }}>
+            <div className="item-heading">
+              <strong>
                 {result.track?.title || result.fileName}
               </strong>
               {result.state === "uploading" ? (
@@ -74,17 +54,14 @@ export function UploadResultList({ results }: UploadResultListProps) {
             </div>
             {result.state === "uploading" ? <UploadProgressBar result={result} /> : null}
             <p
-              style={{
-                color: result.state === "error" ? "#991b1b" : "#526174",
-                lineHeight: 1.55,
-                margin: "8px 0 0",
-                overflowWrap: "anywhere",
-              }}
+              className={
+                result.state === "error" ? "status-message error" : "status-message"
+              }
             >
               {getResultMessage(result)}
             </p>
             {result.statusMessage ? (
-              <p role="status" style={{ color: "#92400e", margin: "8px 0 0" }}>
+              <p className="status-message warning" role="status">
                 {result.statusMessage}
               </p>
             ) : null}

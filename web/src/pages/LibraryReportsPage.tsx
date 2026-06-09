@@ -55,12 +55,17 @@ export function LibraryReportsPage() {
 
   return (
     <section className="page-panel" aria-labelledby="library-reports-title">
-      <p className="eyebrow">Reports</p>
-      <h1 id="library-reports-title">Library organization</h1>
-      <p className="page-copy">
-        Find tracks that need metadata, tags, processing attention, or a fresh listen.
-      </p>
-      <div className="login-actions">
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">Reports</p>
+          <h1 id="library-reports-title">Library organization</h1>
+          <p className="page-copy">
+            Find tracks that need metadata, tags, processing attention, or a
+            fresh listen.
+          </p>
+        </div>
+      </div>
+      <div className="toolbar">
         <button
           className="button secondary"
           disabled={reportState.name === "loading" || isRefreshing}
@@ -81,7 +86,7 @@ export function LibraryReportsPage() {
       ) : null}
 
       {reportState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {reportState.message}
         </div>
       ) : null}
@@ -93,7 +98,7 @@ export function LibraryReportsPage() {
 
 function ReportSections({ report }: { report: LibraryOrganizationReport }) {
   return (
-    <div style={{ display: "grid", gap: "18px", marginTop: "28px" }}>
+    <div className="recommendation-results">
       <p className="page-copy" style={{ margin: 0 }}>
         Generated {formatDateTime(report.generated_at)}.
       </p>
@@ -230,12 +235,7 @@ function ReportPanel({
   title: string;
 }) {
   return (
-    <section
-      style={{
-        borderTop: "1px solid #d5dde8",
-        paddingTop: "20px",
-      }}
-    >
+    <section className="panel">
       <div
         style={{
           alignItems: "center",
@@ -244,7 +244,7 @@ function ReportPanel({
           justifyContent: "space-between",
         }}
       >
-        <h2 style={{ margin: 0 }}>{title}</h2>
+          <h2>{title}</h2>
         <span className="score-pill">{count}</span>
       </div>
       <div style={{ marginTop: "16px" }}>{children}</div>

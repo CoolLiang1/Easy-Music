@@ -72,12 +72,19 @@ export function UploadPage() {
 
   return (
     <section className="page-panel" aria-labelledby="upload-title">
-      <p className="eyebrow">Upload</p>
-      <h1 id="upload-title">Upload audio</h1>
-      <p className="page-copy">
-        Add supported audio files to the library. New tracks appear immediately
-        with their initial processing status.
-      </p>
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">Upload</p>
+          <h1 id="upload-title">Upload audio</h1>
+          <p className="page-copy">
+            Add supported audio files to the library and keep an eye on upload,
+            duplicate checks, and worker processing.
+          </p>
+        </div>
+        {results.length > 0 ? (
+          <span className="score-pill">{results.length} files</span>
+        ) : null}
+      </div>
       <UploadForm disabled={isUploading} onUpload={handleUpload} />
       {isUploading ? (
         <div className="empty-state" aria-live="polite">

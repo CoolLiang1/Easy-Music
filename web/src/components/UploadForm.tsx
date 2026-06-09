@@ -42,50 +42,35 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: "28px" }}>
-      <div
-        style={{
-          border: "1px solid #d5dde8",
-          borderRadius: "8px",
-          background: "#f8fafc",
-          padding: "22px",
-        }}
-      >
-        <label
-          htmlFor={fileInputId}
-          style={{
-            color: "#18212f",
-            display: "block",
-            fontWeight: 800,
-            marginBottom: "10px",
-          }}
-        >
+    <form className="panel" onSubmit={handleSubmit}>
+      <div className="form-card">
+        <label className="field" htmlFor={fileInputId}>
           Audio files
+          <input
+            accept={acceptedAudioExtensions.join(",")}
+            disabled={disabled}
+            id={fileInputId}
+            multiple
+            onChange={handleFileChange}
+            type="file"
+          />
         </label>
-        <input
-          accept={acceptedAudioExtensions.join(",")}
-          disabled={disabled}
-          id={fileInputId}
-          multiple
-          onChange={handleFileChange}
-          type="file"
-        />
-        <p style={{ color: "#526174", lineHeight: 1.55, margin: "12px 0 0" }}>
+        <p className="recommendation-muted">
           Accepted formats: MP3, FLAC, M4A, WAV, and OGG.
         </p>
         {selectedFiles.length > 0 ? (
-          <p style={{ color: "#334155", fontWeight: 700, margin: "12px 0 0" }}>
+          <p className="status-message">
             {selectedFiles.length} file{selectedFiles.length === 1 ? "" : "s"} selected.
           </p>
         ) : null}
         {validationError ? (
-          <p role="alert" style={{ color: "#991b1b", fontWeight: 700, margin: "12px 0 0" }}>
+          <p className="status-message error" role="alert">
             {validationError}
           </p>
         ) : null}
       </div>
 
-      <div className="login-actions">
+      <div className="toolbar">
         <button
           className="button primary"
           disabled={disabled || selectedFiles.length === 0}

@@ -148,11 +148,19 @@ export function TagsPage() {
 
   return (
     <section className="page-panel" aria-labelledby="tags-title">
-      <p className="eyebrow">Tags</p>
-      <h1 id="tags-title">Tag management</h1>
-      <p className="page-copy">
-        Create and maintain the tags used by the Web console.
-      </p>
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">Tags</p>
+          <h1 id="tags-title">Tag management</h1>
+          <p className="page-copy">
+            Maintain the scenario, state, type, and attribute tags that power
+            editing and recommendations.
+          </p>
+        </div>
+        {tagsState.name === "ready" ? (
+          <span className="score-pill">{tagsState.tags.length} tags</span>
+        ) : null}
+      </div>
       <TagForm
         disabled={isMutating}
         errorMessage={createError}
@@ -184,7 +192,7 @@ export function TagsPage() {
       ) : null}
 
       {tagsState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {tagsState.message}
         </div>
       ) : null}

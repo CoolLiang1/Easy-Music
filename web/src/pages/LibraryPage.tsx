@@ -154,12 +154,20 @@ export function LibraryPage() {
 
   return (
     <section className="page-panel" aria-labelledby="library-title">
-      <p className="eyebrow">Library</p>
-      <h1 id="library-title">Music library</h1>
-      <p className="page-copy">
-        Browse every uploaded track, including items still processing or failed.
-      </p>
-      <div className="login-actions">
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">Library</p>
+          <h1 id="library-title">Music library</h1>
+          <p className="page-copy">
+            Browse uploaded tracks, watch processing status, play ready files,
+            and apply tags in batch.
+          </p>
+        </div>
+        {libraryState.name === "ready" ? (
+          <span className="score-pill">{libraryState.tracks.length} tracks</span>
+        ) : null}
+      </div>
+      <div className="toolbar">
         <button
           className="button secondary"
           disabled={libraryState.name === "loading" || isRefreshing}
@@ -168,11 +176,14 @@ export function LibraryPage() {
         >
           {isRefreshing ? "Refreshing..." : "Refresh status"}
         </button>
-        <RouteLink className="button secondary" to="/duplicates">
-          Review duplicates
+        <RouteLink className="button secondary" to="/upload">
+          Upload audio
         </RouteLink>
         <RouteLink className="button secondary" to="/reports">
           Organization reports
+        </RouteLink>
+        <RouteLink className="button secondary" to="/duplicates">
+          Review duplicates
         </RouteLink>
       </div>
 
@@ -183,7 +194,7 @@ export function LibraryPage() {
       ) : null}
 
       {libraryState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {libraryState.message}
         </div>
       ) : null}

@@ -166,7 +166,7 @@ export function AiAssistantPage() {
 
   return (
     <section className="page-panel" aria-labelledby="ai-assistant-title">
-      <p className="eyebrow">AI Assistant V1</p>
+      <p className="eyebrow">AI Assistant</p>
       <h1 id="ai-assistant-title">Natural-language recommendations</h1>
       <p className="page-copy">
         Describe what you want to listen to in your own words. The AI Assistant
@@ -220,7 +220,7 @@ export function AiAssistantPage() {
 
       {/* ---- states: error ---- */}
       {aiState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {aiState.message}
         </div>
       ) : null}
@@ -317,7 +317,7 @@ function ProviderStatusBadge({ status }: { status: AiProviderStatus }) {
   };
 
   return (
-    <div className="empty-state" role="alert">
+    <div className="empty-state error" role="alert">
       {messages[status]}
     </div>
   );
@@ -427,7 +427,7 @@ function AiResultCard({
           <h2>{track.title || "Untitled track"}</h2>
         </div>
         <span className="score-pill">
-          Rank {result.rank} · {formatScore(result.score)}
+          Rank {result.rank} / {formatScore(result.score)}
         </span>
       </div>
 

@@ -60,7 +60,7 @@ export default function App() {
             <p className="eyebrow">Not found</p>
             <h1>Page unavailable</h1>
             <p className="page-copy">
-              This route is not part of the Phase 2 Web console.
+              This route is not part of the Easy Music Web console.
             </p>
             <RouteLink className="button primary" to="/library">
               Go to library

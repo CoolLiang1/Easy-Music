@@ -15,46 +15,27 @@ export function TagList({
   tags,
 }: TagListProps) {
   return (
-    <div style={{ display: "grid", gap: "18px", marginTop: "30px" }}>
+    <div className="recommendation-results">
       {tagGroups.map((group) => {
         const groupTags = tags.filter((tag) => tag.group === group);
 
         return (
           <section
             aria-labelledby={`tag-group-${group}`}
+            className="panel"
             key={group}
-            style={{
-              border: "1px solid #d5dde8",
-              borderRadius: "8px",
-              background: "#f8fafc",
-              padding: "22px",
-            }}
           >
             <h2 id={`tag-group-${group}`}>{tagGroupLabels[group]}</h2>
             {groupTags.length === 0 ? (
-              <p
-                style={{
-                  color: "#64748b",
-                  fontWeight: 700,
-                  margin: "12px 0 0",
-                }}
-              >
+              <p className="recommendation-muted">
                 No tags in this group.
               </p>
             ) : (
-              <div style={{ display: "grid", gap: "12px", marginTop: "16px" }}>
+              <div className="item-list">
                 {groupTags.map((tag) => (
                   <article
+                    className="item-card"
                     key={tag.id}
-                    style={{
-                      alignItems: "center",
-                      border: "1px solid #d5dde8",
-                      borderRadius: "8px",
-                      display: "grid",
-                      gap: "14px",
-                      gridTemplateColumns: "minmax(0, 1fr) auto",
-                      padding: "14px",
-                    }}
                   >
                     <div style={{ minWidth: 0 }}>
                       <p

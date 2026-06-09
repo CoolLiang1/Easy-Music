@@ -73,14 +73,8 @@ export function BatchTagEditor({
 
   return (
     <form
+      className="panel"
       onSubmit={handleSubmit}
-      style={{
-        border: "1px solid #d5dde8",
-        borderRadius: "8px",
-        background: "#f8fafc",
-        marginTop: "24px",
-        padding: "18px",
-      }}
     >
       <div
         style={{
@@ -174,18 +168,18 @@ export function BatchTagEditor({
       </div>
 
       {errorMessage ? (
-        <p role="alert" style={{ color: "#991b1b", fontWeight: 700, margin: "14px 0 0" }}>
+        <p className="status-message error" role="alert">
           {errorMessage}
         </p>
       ) : null}
 
       {successMessage ? (
-        <p aria-live="polite" style={{ color: "#166534", fontWeight: 800, margin: "14px 0 0" }}>
+        <p aria-live="polite" className="status-message success">
           {successMessage}
         </p>
       ) : null}
 
-      <div className="login-actions">
+      <div className="toolbar">
         <button className="button primary" disabled={!canSubmit} type="submit">
           {disabled ? "Applying..." : mode === "add" ? "Add tags" : "Remove tags"}
         </button>

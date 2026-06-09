@@ -72,25 +72,11 @@ export function TagForm({
   const message = validationError ?? errorMessage;
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: "30px" }}>
-      <div
-        style={{
-          border: "1px solid #d5dde8",
-          borderRadius: "8px",
-          background: "#f8fafc",
-          padding: "22px",
-        }}
-      >
+    <form className="panel" onSubmit={handleSubmit}>
+      <div className="form-card">
         <h2>{mode === "create" ? "Create tag" : "Edit tag"}</h2>
-        <div
-          style={{
-            display: "grid",
-            gap: "16px",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            marginTop: "18px",
-          }}
-        >
-          <label htmlFor={nameId} style={fieldStyle}>
+        <div className="form-grid">
+          <label className="field" htmlFor={nameId}>
             Name
             <input
               disabled={disabled}
@@ -103,13 +89,12 @@ export function TagForm({
                 }))
               }
               required
-              style={inputStyle}
               type="text"
               value={formState.name}
             />
           </label>
 
-          <label htmlFor={groupId} style={fieldStyle}>
+          <label className="field" htmlFor={groupId}>
             Group
             <select
               disabled={disabled}
@@ -121,7 +106,6 @@ export function TagForm({
                 }))
               }
               required
-              style={inputStyle}
               value={formState.group}
             >
               {tagGroups.map((group) => (
@@ -135,8 +119,8 @@ export function TagForm({
 
         {message ? (
           <p
+            className="status-message error"
             role="alert"
-            style={{ color: "#991b1b", fontWeight: 700, margin: "16px 0 0" }}
           >
             {message}
           </p>
@@ -145,14 +129,14 @@ export function TagForm({
         {successMessage ? (
           <p
             aria-live="polite"
-            style={{ color: "#166534", fontWeight: 800, margin: "16px 0 0" }}
+            className="status-message success"
           >
             {successMessage}
           </p>
         ) : null}
       </div>
 
-      <div className="login-actions">
+      <div className="toolbar">
         <button className="button primary" disabled={disabled} type="submit">
           {disabled
             ? mode === "create"
@@ -176,22 +160,6 @@ export function TagForm({
     </form>
   );
 }
-
-const fieldStyle = {
-  color: "#18212f",
-  display: "grid",
-  fontWeight: 800,
-  gap: "8px",
-} as const;
-
-const inputStyle = {
-  border: "1px solid #b9c5d4",
-  borderRadius: "8px",
-  color: "#18212f",
-  minHeight: "42px",
-  padding: "9px 11px",
-  width: "100%",
-} as const;
 
 function buildFormState(tag?: Tag): FormState {
   return {

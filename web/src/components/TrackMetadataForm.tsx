@@ -60,25 +60,11 @@ export function TrackMetadataForm({
   const message = validationError ?? errorMessage;
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: "30px" }}>
-      <div
-        style={{
-          border: "1px solid #d5dde8",
-          borderRadius: "8px",
-          background: "#f8fafc",
-          padding: "22px",
-        }}
-      >
+    <form className="panel" onSubmit={handleSubmit}>
+      <div className="form-card">
         <h2>Editable metadata</h2>
-        <div
-          style={{
-            display: "grid",
-            gap: "16px",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            marginTop: "18px",
-          }}
-        >
-          <label style={fieldStyle} htmlFor={titleId}>
+        <div className="form-grid">
+          <label className="field" htmlFor={titleId}>
             Title
             <input
               disabled={disabled}
@@ -91,13 +77,12 @@ export function TrackMetadataForm({
                 }))
               }
               required
-              style={inputStyle}
               type="text"
               value={formState.title}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={artistId}>
+          <label className="field" htmlFor={artistId}>
             Artist
             <input
               disabled={disabled}
@@ -109,13 +94,12 @@ export function TrackMetadataForm({
                   artist: event.target.value,
                 }))
               }
-              style={inputStyle}
               type="text"
               value={formState.artist}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={albumId}>
+          <label className="field" htmlFor={albumId}>
             Album
             <input
               disabled={disabled}
@@ -127,13 +111,12 @@ export function TrackMetadataForm({
                   album: event.target.value,
                 }))
               }
-              style={inputStyle}
               type="text"
               value={formState.album}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={contentTypeId}>
+          <label className="field" htmlFor={contentTypeId}>
             Content type
             <input
               disabled={disabled}
@@ -146,13 +129,12 @@ export function TrackMetadataForm({
                 }))
               }
               required
-              style={inputStyle}
               type="text"
               value={formState.contentType}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={sourceUrlId}>
+          <label className="field" htmlFor={sourceUrlId}>
             Source URL
             <input
               disabled={disabled}
@@ -164,13 +146,12 @@ export function TrackMetadataForm({
                 }))
               }
               placeholder="https://example.com"
-              style={inputStyle}
               type="url"
               value={formState.sourceUrl}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={cooldownUntilId}>
+          <label className="field" htmlFor={cooldownUntilId}>
             Cooldown date
             <input
               disabled={disabled}
@@ -181,7 +162,6 @@ export function TrackMetadataForm({
                   cooldownUntil: event.target.value,
                 }))
               }
-              style={inputStyle}
               type="datetime-local"
               value={formState.cooldownUntil}
             />
@@ -216,8 +196,8 @@ export function TrackMetadataForm({
 
         {message ? (
           <p
+            className="status-message error"
             role="alert"
-            style={{ color: "#991b1b", fontWeight: 700, margin: "16px 0 0" }}
           >
             {message}
           </p>
@@ -226,14 +206,14 @@ export function TrackMetadataForm({
         {successMessage ? (
           <p
             aria-live="polite"
-            style={{ color: "#166534", fontWeight: 800, margin: "16px 0 0" }}
+            className="status-message success"
           >
             {successMessage}
           </p>
         ) : null}
       </div>
 
-      <div className="login-actions">
+      <div className="toolbar">
         <button className="button primary" disabled={disabled} type="submit">
           {disabled ? "Saving..." : "Save metadata"}
         </button>
@@ -241,22 +221,6 @@ export function TrackMetadataForm({
     </form>
   );
 }
-
-const fieldStyle = {
-  color: "#18212f",
-  display: "grid",
-  fontWeight: 800,
-  gap: "8px",
-} as const;
-
-const inputStyle = {
-  border: "1px solid #b9c5d4",
-  borderRadius: "8px",
-  color: "#18212f",
-  minHeight: "42px",
-  padding: "9px 11px",
-  width: "100%",
-} as const;
 
 function buildFormState(track: Track): FormState {
   return {

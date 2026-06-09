@@ -208,19 +208,26 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
 
   return (
     <section className="page-panel" aria-labelledby="track-detail-title">
-      <p className="eyebrow">Track detail</p>
-      <h1 id="track-detail-title">
-        {detailState.name === "ready"
-          ? detailState.track.title || "Untitled track"
-          : detailState.name === "deleted"
-            ? "Track deleted"
-          : "Track metadata"}
-      </h1>
-      <p className="page-copy">
-        Review the latest backend processing state for this track and update
-        owner-managed metadata.
-      </p>
-      <div className="login-actions">
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">Track detail</p>
+          <h1 id="track-detail-title">
+            {detailState.name === "ready"
+              ? detailState.track.title || "Untitled track"
+              : detailState.name === "deleted"
+                ? "Track deleted"
+              : "Track metadata"}
+          </h1>
+          <p className="page-copy">
+            Review processing state, play ready audio, and update owner-managed
+            metadata for this track.
+          </p>
+        </div>
+        {detailState.name === "ready" ? (
+          <TrackStatusBadge status={detailState.track.status} />
+        ) : null}
+      </div>
+      <div className="toolbar">
         <button
           className="button secondary"
           disabled={
@@ -247,7 +254,7 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
       </div>
 
       {deleteError ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {deleteError}
         </div>
       ) : null}
@@ -259,7 +266,7 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
       ) : null}
 
       {detailState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {detailState.message}
         </div>
       ) : null}
@@ -272,10 +279,13 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
 
       {detailState.name === "ready" ? (
         <>
-          <p className="page-copy" aria-live="polite">
-            {getStatusSummary(detailState.track.status)}
-          </p>
-          <WebAudioPlayer accessToken={accessToken} track={detailState.track} />
+          <section className="panel white" aria-live="polite">
+            <h2>Playback</h2>
+            <p className="recommendation-muted">
+              {getStatusSummary(detailState.track.status)}
+            </p>
+            <WebAudioPlayer accessToken={accessToken} track={detailState.track} />
+          </section>
           <TrackMetadataForm
             disabled={isSaving}
             errorMessage={saveError}
@@ -300,51 +310,53 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
             successMessage={tagSaveSuccess}
             track={detailState.track}
           />
-          <h2 style={{ marginTop: "34px" }}>Technical fields</h2>
-          <dl className="detail-list">
-            <div>
-              <dt>Track ID</dt>
-              <dd>{detailState.track.id}</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>
-                <TrackStatusBadge status={detailState.track.status} />
-              </dd>
-            </div>
-            <div>
-              <dt>Duration</dt>
-              <dd>{formatDuration(detailState.track.duration_seconds)}</dd>
-            </div>
-            <div>
-              <dt>Format</dt>
-              <dd>{detailState.track.format || "Not available"}</dd>
-            </div>
-            <div>
-              <dt>Bitrate</dt>
-              <dd>{formatBitrate(detailState.track.bitrate)}</dd>
-            </div>
-            <div>
-              <dt>Original file path</dt>
-              <dd>{detailState.track.original_file_path || "Not available"}</dd>
-            </div>
-            <div>
-              <dt>Playback file path</dt>
-              <dd>{detailState.track.playback_file_path || "Not available"}</dd>
-            </div>
-            <div>
-              <dt>Cover path</dt>
-              <dd>{detailState.track.cover_path || "Not available"}</dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd>{formatDateTime(detailState.track.created_at)}</dd>
-            </div>
-            <div>
-              <dt>Updated</dt>
-              <dd>{formatDateTime(detailState.track.updated_at)}</dd>
-            </div>
-          </dl>
+          <section className="panel">
+            <h2>Technical fields</h2>
+            <dl className="detail-list">
+              <div>
+                <dt>Track ID</dt>
+                <dd>{detailState.track.id}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>
+                  <TrackStatusBadge status={detailState.track.status} />
+                </dd>
+              </div>
+              <div>
+                <dt>Duration</dt>
+                <dd>{formatDuration(detailState.track.duration_seconds)}</dd>
+              </div>
+              <div>
+                <dt>Format</dt>
+                <dd>{detailState.track.format || "Not available"}</dd>
+              </div>
+              <div>
+                <dt>Bitrate</dt>
+                <dd>{formatBitrate(detailState.track.bitrate)}</dd>
+              </div>
+              <div>
+                <dt>Original file path</dt>
+                <dd>{detailState.track.original_file_path || "Not available"}</dd>
+              </div>
+              <div>
+                <dt>Playback file path</dt>
+                <dd>{detailState.track.playback_file_path || "Not available"}</dd>
+              </div>
+              <div>
+                <dt>Cover path</dt>
+                <dd>{detailState.track.cover_path || "Not available"}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatDateTime(detailState.track.created_at)}</dd>
+              </div>
+              <div>
+                <dt>Updated</dt>
+                <dd>{formatDateTime(detailState.track.updated_at)}</dd>
+              </div>
+            </dl>
+          </section>
         </>
       ) : null}
     </section>

@@ -46,10 +46,10 @@ function LoginForm() {
   return (
     <main className="login-shell">
       <section className="login-panel" aria-labelledby="login-title">
-        <p className="eyebrow">Phase 2 Web Console</p>
+        <p className="eyebrow">Music Library</p>
         <h1 id="login-title">Easy Music</h1>
         <p className="page-copy">
-          Sign in with the local owner account created for the Phase 1 backend.
+          Sign in with the owner account for your Easy Music server.
         </p>
 
         <form className="login-actions" onSubmit={handleSubmit}>

@@ -78,19 +78,18 @@ export function WebAudioPlayer({
   };
 
   return (
-    <div style={compact ? compactWrapperStyle : wrapperStyle}>
+    <div className={compact ? "audio-player compact" : "audio-player"}>
       <button
-        className="button secondary"
+        className={compact ? "button secondary small" : "button secondary"}
         disabled={!isReadyTrack || playerState.name === "loading"}
         onClick={() => void loadPlayer()}
-        style={compact ? compactButtonStyle : undefined}
         type="button"
       >
         {getButtonLabel(playerState, isReadyTrack)}
       </button>
 
       {!isReadyTrack ? (
-        <span style={compact ? compactHintStyle : hintStyle}>
+        <span className={compact ? "hint-text compact" : "hint-text"}>
           Track is not ready for playback.
         </span>
       ) : null}
@@ -101,14 +100,16 @@ export function WebAudioPlayer({
           controls
           preload="metadata"
           src={playerState.objectUrl}
-          style={compact ? compactAudioStyle : audioStyle}
         >
           Your browser cannot play this audio stream.
         </audio>
       ) : null}
 
       {playerState.name === "error" ? (
-        <span role="alert" style={compact ? compactErrorStyle : errorStyle}>
+        <span
+          className={compact ? "status-message error compact" : "status-message error"}
+          role="alert"
+        >
           {playerState.message}
         </span>
       ) : null}
@@ -146,50 +147,3 @@ function releaseObjectUrl(objectUrlRef: MutableRefObject<string | null>) {
     objectUrlRef.current = null;
   }
 }
-
-const wrapperStyle = {
-  display: "grid",
-  gap: "12px",
-  marginTop: "28px",
-  maxWidth: "620px",
-} as const;
-
-const compactWrapperStyle = {
-  display: "grid",
-  gap: "8px",
-  minWidth: "220px",
-} as const;
-
-const audioStyle = {
-  width: "100%",
-} as const;
-
-const compactAudioStyle = {
-  width: "220px",
-} as const;
-
-const hintStyle = {
-  color: "#64748b",
-  fontWeight: 700,
-} as const;
-
-const compactHintStyle = {
-  ...hintStyle,
-  fontSize: "0.86rem",
-} as const;
-
-const errorStyle = {
-  color: "#991b1b",
-  fontWeight: 700,
-} as const;
-
-const compactErrorStyle = {
-  ...errorStyle,
-  fontSize: "0.86rem",
-} as const;
-
-const compactButtonStyle = {
-  minHeight: "36px",
-  padding: "8px 10px",
-  width: "fit-content",
-} as const;

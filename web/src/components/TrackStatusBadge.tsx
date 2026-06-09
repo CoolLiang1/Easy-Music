@@ -12,34 +12,14 @@ const statusLabels: Record<string, string> = {
   uploading: "Uploading",
 };
 
-const statusStyles: Record<string, { background: string; color: string }> = {
-  failed: { background: "#fee2e2", color: "#991b1b" },
-  processing: { background: "#fef3c7", color: "#92400e" },
-  ready: { background: "#dcfce7", color: "#166534" },
-  uploaded: { background: "#dbeafe", color: "#1e40af" },
-  uploading: { background: "#dbeafe", color: "#1e40af" },
-};
-
 export function TrackStatusBadge({ status }: TrackStatusBadgeProps) {
   const normalizedStatus = status.toLowerCase();
-  const statusStyle = statusStyles[normalizedStatus] ?? {
-    background: "#e2e8f0",
-    color: "#334155",
-  };
+  const statusClass = statusLabels[normalizedStatus]
+    ? normalizedStatus
+    : "unknown";
 
   return (
-    <span
-      style={{
-        ...statusStyle,
-        borderRadius: "999px",
-        display: "inline-flex",
-        fontSize: "0.78rem",
-        fontWeight: 800,
-        lineHeight: 1,
-        padding: "7px 9px",
-        whiteSpace: "nowrap",
-      }}
-    >
+    <span className={`status-badge ${statusClass}`}>
       {statusLabels[normalizedStatus] ?? formatUnknownStatus(status)}
     </span>
   );

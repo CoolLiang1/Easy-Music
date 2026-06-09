@@ -19,19 +19,8 @@ export function TrackTable({
   const canSelect = Boolean(onToggleTrackSelection);
 
   return (
-    <div
-      style={{
-        marginTop: "28px",
-        overflowX: "auto",
-      }}
-    >
-      <table
-        style={{
-          borderCollapse: "collapse",
-          minWidth: "920px",
-          width: "100%",
-        }}
-      >
+    <div className="table-wrap">
+      <table className="track-table">
         <thead>
           <tr>
             {[
@@ -46,19 +35,7 @@ export function TrackTable({
               "Updated",
               "Playback",
             ].filter(Boolean).map((heading) => (
-              <th
-                key={heading}
-                scope="col"
-                style={{
-                  borderBottom: "1px solid #d5dde8",
-                  color: "#475569",
-                  fontSize: "0.78rem",
-                  padding: "0 12px 12px",
-                  textAlign: "left",
-                  textTransform: "uppercase",
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <th key={heading} scope="col">
                 {heading}
               </th>
             ))}
@@ -68,7 +45,7 @@ export function TrackTable({
           {tracks.map((track) => (
             <tr key={track.id}>
               {canSelect ? (
-                <td style={bodyCellStyle}>
+                <td>
                   <input
                     aria-label={`Select ${track.title || "untitled track"}`}
                     checked={selectedTrackIds.has(track.id)}
@@ -77,29 +54,24 @@ export function TrackTable({
                   />
                 </td>
               ) : null}
-              <td style={bodyCellStyle}>
+              <td className="track-title-cell">
                 <RouteLink
-                  style={{
-                    color: "#0f766e",
-                    fontWeight: 800,
-                    textDecoration: "underline",
-                    textUnderlineOffset: "3px",
-                  }}
+                  className="track-title-link"
                   to={`/tracks/${encodeURIComponent(track.id)}`}
                 >
                   {track.title || "Untitled track"}
                 </RouteLink>
               </td>
-              <td style={bodyCellStyle}>{track.artist || "Not set"}</td>
-              <td style={bodyCellStyle}>{track.album || "Not set"}</td>
-              <td style={bodyCellStyle}>{formatContentType(track.content_type)}</td>
-              <td style={bodyCellStyle}>
+              <td>{track.artist || <span className="meta-muted">Not set</span>}</td>
+              <td>{track.album || <span className="meta-muted">Not set</span>}</td>
+              <td>{formatContentType(track.content_type)}</td>
+              <td>
                 <TrackStatusBadge status={track.status} />
               </td>
-              <td style={bodyCellStyle}>{formatDuration(track.duration_seconds)}</td>
-              <td style={bodyCellStyle}>{track.liked ? "Yes" : "No"}</td>
-              <td style={bodyCellStyle}>{formatDateTime(track.updated_at)}</td>
-              <td style={bodyCellStyle}>
+              <td>{formatDuration(track.duration_seconds)}</td>
+              <td>{track.liked ? "Yes" : "No"}</td>
+              <td>{formatDateTime(track.updated_at)}</td>
+              <td>
                 <WebAudioPlayer accessToken={accessToken} compact track={track} />
               </td>
             </tr>
@@ -109,13 +81,6 @@ export function TrackTable({
     </div>
   );
 }
-
-const bodyCellStyle = {
-  borderBottom: "1px solid #e2e8f0",
-  color: "#334155",
-  padding: "14px 12px",
-  verticalAlign: "top",
-} as const;
 
 function formatContentType(contentType: string) {
   return contentType

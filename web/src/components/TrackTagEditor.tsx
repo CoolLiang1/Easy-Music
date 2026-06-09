@@ -61,15 +61,8 @@ export function TrackTagEditor({
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: "30px" }}>
-      <div
-        style={{
-          border: "1px solid #d5dde8",
-          borderRadius: "8px",
-          background: "#f8fafc",
-          padding: "22px",
-        }}
-      >
+    <form className="panel" onSubmit={handleSubmit}>
+      <div className="form-card">
         <h2>Assigned tags</h2>
 
         {allTags.length === 0 ? (
@@ -163,8 +156,8 @@ export function TrackTagEditor({
 
         {errorMessage ? (
           <p
+            className="status-message error"
             role="alert"
-            style={{ color: "#991b1b", fontWeight: 700, margin: "16px 0 0" }}
           >
             {errorMessage}
           </p>
@@ -173,14 +166,14 @@ export function TrackTagEditor({
         {successMessage ? (
           <p
             aria-live="polite"
-            style={{ color: "#166534", fontWeight: 800, margin: "16px 0 0" }}
+            className="status-message success"
           >
             {successMessage}
           </p>
         ) : null}
       </div>
 
-      <div className="login-actions">
+      <div className="toolbar">
         <button
           className="button primary"
           disabled={disabled || allTags.length === 0}

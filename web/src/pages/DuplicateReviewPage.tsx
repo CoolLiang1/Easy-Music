@@ -52,14 +52,21 @@ export function DuplicateReviewPage() {
 
   return (
     <section className="page-panel" aria-labelledby="duplicate-review-title">
-      <p className="eyebrow">Duplicate Review</p>
-      <h1 id="duplicate-review-title">Duplicate candidates</h1>
-      <p className="page-copy">
-        Review exact and likely duplicate groups across the library. These
-        matches are advisory only; tracks are never deleted, merged, overwritten,
-        hidden, or changed from this view.
-      </p>
-      <div className="login-actions">
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">Duplicate review</p>
+          <h1 id="duplicate-review-title">Duplicate candidates</h1>
+          <p className="page-copy">
+            Review exact and likely duplicate groups across the library. Matches
+            are advisory only; this view never deletes, merges, hides, or
+            modifies tracks.
+          </p>
+        </div>
+        {reviewState.name === "ready" ? (
+          <span className="score-pill">{reviewState.groups.length} groups</span>
+        ) : null}
+      </div>
+      <div className="toolbar">
         <button
           className="button secondary"
           disabled={reviewState.name === "loading" || isRefreshing}
@@ -80,7 +87,7 @@ export function DuplicateReviewPage() {
       ) : null}
 
       {reviewState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {reviewState.message}
         </div>
       ) : null}
