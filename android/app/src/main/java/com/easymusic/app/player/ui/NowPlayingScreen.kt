@@ -9,8 +9,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.OfflinePin
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -28,6 +38,9 @@ import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlaybackSource
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.ui.theme.BannerTone
+import com.easymusic.app.ui.theme.SectionHeader
+import com.easymusic.app.ui.theme.StatusBanner
 
 @Composable
 fun NowPlayingScreen(
@@ -47,61 +60,63 @@ fun NowPlayingScreen(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Now Playing",
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                Text(
-                    text = when (uiState.playbackSource) {
-                        PlaybackSource.OfflineCache -> "Offline cached playback"
-                        PlaybackSource.OnlineStream -> if (isNetworkAvailable) {
-                            "Online stream"
-                        } else {
-                            "Online stream unavailable while offline"
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (uiState.playbackSource == PlaybackSource.OnlineStream && !isNetworkAvailable) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-            OutlinedButton(onClick = onBackToLibrary) {
-                Text("Library")
-            }
-        }
+        SectionHeader(
+            title = "Now Playing",
+            subtitle = uiState.playbackSource.sourceLabel(isNetworkAvailable),
+            action = {
+                OutlinedButton(onClick = onBackToLibrary) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Library")
+                }
+            },
+        )
 
         if (track == null) {
             EmptyNowPlaying(onBackToLibrary = onBackToLibrary)
             return@Column
         }
 
-        TrackSummary(track = track)
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                TrackSummary(track = track)
 
-        if (uiState.status == PlaybackStatus.Buffering) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator()
-                Text(
-                    modifier = Modifier.padding(start = 12.dp),
-                    text = "Buffering",
-                    style = MaterialTheme.typography.bodyMedium,
+                AssistChip(
+                    onClick = {},
+                    label = { Text(uiState.playbackSource.sourceLabel(isNetworkAvailable)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (uiState.playbackSource == PlaybackSource.OfflineCache) {
+                                Icons.Default.OfflinePin
+                            } else {
+                                Icons.Default.CloudQueue
+                            },
+                            contentDescription = null,
+                        )
+                    },
+                    enabled = uiState.playbackSource == PlaybackSource.OfflineCache || isNetworkAvailable,
                 )
             }
         }
 
+        if (uiState.status == PlaybackStatus.Buffering) {
+            StatusBanner(
+                text = "Buffering audio",
+                tone = BannerTone.Warning,
+                action = { CircularProgressIndicator() },
+            )
+        }
+
         if (uiState.errorMessage != null) {
-            Text(
+            StatusBanner(
                 text = uiState.errorMessage,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
+                tone = BannerTone.Error,
             )
         }
 
@@ -118,12 +133,22 @@ fun NowPlayingScreen(
                     (isNetworkAvailable || uiState.playbackSource == PlaybackSource.OfflineCache),
                 onClick = onPlay,
             ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(if (uiState.status == PlaybackStatus.Ended) "Replay" else "Play")
             }
             OutlinedButton(
                 enabled = uiState.isPlaying,
                 onClick = onPause,
             ) {
+                Icon(
+                    imageVector = Icons.Default.Pause,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("Pause")
             }
         }
@@ -231,3 +256,13 @@ private fun Long.formatTime(): String {
     val seconds = totalSeconds % 60
     return "$minutes:${seconds.toString().padStart(2, '0')}"
 }
+
+private fun PlaybackSource.sourceLabel(isNetworkAvailable: Boolean): String =
+    when (this) {
+        PlaybackSource.OfflineCache -> "Offline cached playback"
+        PlaybackSource.OnlineStream -> if (isNetworkAvailable) {
+            "Online stream"
+        } else {
+            "Online stream unavailable while offline"
+        }
+    }

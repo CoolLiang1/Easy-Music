@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -38,6 +41,9 @@ import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.cache.domain.CachedTrack
 import com.easymusic.app.cache.domain.TrackCacheRepository
 import com.easymusic.app.player.domain.PlayerController
+import com.easymusic.app.ui.theme.BannerTone
+import com.easymusic.app.ui.theme.SectionHeader
+import com.easymusic.app.ui.theme.StatusBanner
 
 @Composable
 fun CachedTracksRoute(
@@ -107,36 +113,28 @@ fun CachedTracksScreen(
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        Text(
-            text = "Cached Tracks",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            text = if (isNetworkAvailable) {
+        SectionHeader(
+            title = "Cached Tracks",
+            subtitle = if (isNetworkAvailable) {
                 "Stored on this device"
             } else {
                 "Stored on this device and playable while offline"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isNetworkAvailable) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.primary
             },
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         uiState.deleteErrorMessage?.let { message ->
-            Text(
-                modifier = Modifier.padding(bottom = 12.dp),
+            StatusBanner(
                 text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
+                tone = BannerTone.Error,
+                modifier = Modifier.padding(bottom = 12.dp),
+                action = {
+                    TextButton(onClick = onClearDeleteError) {
+                        Text("Dismiss")
+                    }
+                },
             )
-            TextButton(onClick = onClearDeleteError) {
-                Text("Dismiss")
-            }
         }
 
         if (uiState.cachedTracks.isEmpty()) {
@@ -169,8 +167,8 @@ private fun CachedTracksEmpty() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = "No cached tracks yet",
+            Text(
+                text = "No cached tracks yet",
             style = MaterialTheme.typography.titleLarge,
         )
         Text(
@@ -251,9 +249,20 @@ private fun CachedTrackRow(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(
+                    text = "Tap card to play offline",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 OutlinedButton(onClick = onDeleteClick) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Delete Cache")
                 }
             }

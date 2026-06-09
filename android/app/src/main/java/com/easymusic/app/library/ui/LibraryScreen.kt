@@ -2,6 +2,7 @@ package com.easymusic.app.library.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,14 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,6 +43,9 @@ import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerController
 import com.easymusic.app.player.domain.PlayerUiState
 import com.easymusic.app.player.ui.MiniPlayer
+import com.easymusic.app.ui.theme.BannerTone
+import com.easymusic.app.ui.theme.SectionHeader
+import com.easymusic.app.ui.theme.StatusBanner
 
 @Composable
 fun LibraryScreen(
@@ -85,7 +91,7 @@ fun LibraryScreen(
             onRefresh = onRefresh,
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             when {
@@ -107,6 +113,8 @@ fun LibraryScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(12.dp))
+
         LibraryMiniPlayer(
             uiState = playbackState,
             playerController = playerController,
@@ -123,39 +131,29 @@ private fun LibraryHeader(
     isNetworkAvailable: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Library",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = if (isNetworkAvailable) "Cloud tracks" else "Cloud tracks unavailable while offline",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isNetworkAvailable) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-            )
-        }
-        OutlinedButton(
-            enabled = !isRefreshing && isNetworkAvailable,
-            onClick = onRefresh,
-        ) {
-            Text(
-                when {
-                    !isNetworkAvailable -> "Offline"
-                    isRefreshing -> "Refreshing"
-                    else -> "Refresh"
-                },
-            )
-        }
-    }
+    SectionHeader(
+        title = "Library",
+        subtitle = if (isNetworkAvailable) "Cloud tracks, cache state, and current playback" else "Cloud refresh is unavailable while offline",
+        action = {
+            OutlinedButton(
+                enabled = !isRefreshing && isNetworkAvailable,
+                onClick = onRefresh,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    when {
+                        !isNetworkAvailable -> "Offline"
+                        isRefreshing -> "Refreshing"
+                        else -> "Refresh"
+                    },
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -268,27 +266,15 @@ private fun InlineError(
     message: String,
     onRefresh: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                modifier = Modifier.weight(1f),
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
+    StatusBanner(
+        text = message,
+        tone = BannerTone.Error,
+        action = {
             OutlinedButton(onClick = onRefresh) {
                 Text("Retry")
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -316,22 +302,28 @@ private fun TrackRow(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+            Text(
+                text = track.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TrackSubtitle(track = track)
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (isCurrentTrack) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(playbackState.status.currentTrackChipLabel()) },
+                        enabled = true,
                     )
-                    TrackSubtitle(track = track)
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CacheStatusChip(cacheState = cacheState)
-                    StatusChip(track = track)
-                }
+                CacheStatusChip(cacheState = cacheState)
+                StatusChip(track = track)
             }
 
             Row(
@@ -358,7 +350,7 @@ private fun TrackRow(
                 )
             }
 
-            val tags = track.tags.take(3)
+            val tags = track.tags.take(4)
             if (tags.isNotEmpty()) {
                 Text(
                     text = tags.joinToString(separator = " / ") { tag -> tag.name },
@@ -413,6 +405,16 @@ private fun TrackResponse.rowPlaybackLabel(
         PlaybackStatus.Idle -> "Current track"
     }
 }
+
+private fun PlaybackStatus.currentTrackChipLabel(): String =
+    when (this) {
+        PlaybackStatus.Buffering -> "Buffering"
+        PlaybackStatus.Playing -> "Playing now"
+        PlaybackStatus.Paused -> "Paused"
+        PlaybackStatus.Ended -> "Finished"
+        PlaybackStatus.Error -> "Playback error"
+        PlaybackStatus.Idle -> "Loaded"
+    }
 
 private fun LibraryCacheUiState.cacheLabel(): String =
     when (status) {

@@ -9,13 +9,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -45,6 +51,7 @@ import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
 import com.easymusic.app.player.domain.PlayerController
+import com.easymusic.app.ui.theme.SectionHeader
 
 @Composable
 fun TrackDetailRoute(
@@ -101,30 +108,20 @@ fun TrackDetailScreen(
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Track Detail",
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                Text(
-                    text = if (isNetworkAvailable) "Fresh cloud metadata" else "Cloud metadata unavailable while offline",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isNetworkAvailable) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
-                )
-            }
-            OutlinedButton(onClick = onBackToLibrary) {
-                Text("Library")
-            }
-        }
+        SectionHeader(
+            title = "Track Detail",
+            subtitle = if (isNetworkAvailable) "Cloud metadata and local cache state" else "Cloud metadata is unavailable while offline",
+            action = {
+                OutlinedButton(onClick = onBackToLibrary) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Library")
+                }
+            },
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -289,10 +286,32 @@ private fun DetailContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(if (track.isReady) "Ready" else track.status.replaceFirstChar { it.uppercase() }) },
+                        enabled = track.isReady,
+                    )
+                    if (isCurrentTrack) {
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(playbackState.status.detailChipLabel()) },
+                            enabled = true,
+                        )
+                    }
+                }
                 Button(
                     enabled = track.isReady,
                     onClick = { onOpenNowPlaying(track) },
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(if (isCurrentTrack) "Open Now Playing" else "Play")
                 }
             }
@@ -325,6 +344,11 @@ private fun DetailContent(
                         isNetworkAvailable,
                     onClick = onCacheTrack,
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         when {
                             !isNetworkAvailable -> "Offline"
@@ -457,6 +481,16 @@ private fun PlayerUiState.detailPlaybackLabel(): String =
         PlaybackStatus.Ended -> "Playback finished for this track."
         PlaybackStatus.Error -> errorMessage ?: "Playback failed for this track."
         PlaybackStatus.Idle -> "This track is loaded."
+    }
+
+private fun PlaybackStatus.detailChipLabel(): String =
+    when (this) {
+        PlaybackStatus.Buffering -> "Buffering"
+        PlaybackStatus.Playing -> "Playing now"
+        PlaybackStatus.Paused -> "Paused"
+        PlaybackStatus.Ended -> "Finished"
+        PlaybackStatus.Error -> "Error"
+        PlaybackStatus.Idle -> "Loaded"
     }
 
 private fun Int.formatDuration(): String {

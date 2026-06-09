@@ -8,13 +8,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.easymusic.app.ShortcutRoutes
 import com.easymusic.app.core.config.AppConfig
+import com.easymusic.app.ui.theme.EasyMusicTheme
 
 @Composable
 fun EasyMusicApp(
     config: AppConfig = AppConfig.default(),
     startRoute: String = ShortcutRoutes.DESTINATION_LIBRARY,
 ) {
-    MaterialTheme {
+    EasyMusicTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,

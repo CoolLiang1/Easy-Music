@@ -12,11 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -43,6 +47,9 @@ import com.easymusic.app.recommendation.data.FeedbackType
 import com.easymusic.app.recommendation.data.MatchedTagItem
 import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
+import com.easymusic.app.ui.theme.BannerTone
+import com.easymusic.app.ui.theme.SectionHeader
+import com.easymusic.app.ui.theme.StatusBanner
 import java.util.Locale
 
 @Composable
@@ -171,43 +178,33 @@ private fun RecommendationHeader(
     isLoading: Boolean,
     onRefreshTags: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Recommendations",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = if (isNetworkAvailable) {
-                    "Choose tags, then request a structured recommendation"
-                } else {
-                    "Recommendation tags and requests need the backend"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isNetworkAvailable) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-            )
-        }
-        OutlinedButton(
-            enabled = !isLoading && isNetworkAvailable,
-            onClick = onRefreshTags,
-        ) {
-            Text(
-                when {
-                    !isNetworkAvailable -> "Offline"
-                    isLoading -> "Loading"
-                    else -> "Reload Tags"
-                },
-            )
-        }
-    }
+    SectionHeader(
+        title = "Recommendations",
+        subtitle = if (isNetworkAvailable) {
+            "Ask in plain text or choose structured tags"
+        } else {
+            "Recommendation tags and requests need the backend"
+        },
+        action = {
+            OutlinedButton(
+                enabled = !isLoading && isNetworkAvailable,
+                onClick = onRefreshTags,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    when {
+                        !isNetworkAvailable -> "Offline"
+                        isLoading -> "Loading"
+                        else -> "Reload"
+                    },
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -314,13 +311,9 @@ private fun RecommendationControls(
             onTrackSelected = onTrackSelected,
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Structured Controls",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        SectionHeader(
+            title = "Structured Controls",
+            subtitle = "Use exact tags when you want predictable matching",
         )
 
         // ── Structured Tag Controls (unchanged) ───────────────────────
@@ -689,34 +682,36 @@ private fun AiAssistantSection(
     onTrackSelected: (TrackResponse) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Section header
-        Text(
-            text = "AI Assistant",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+        SectionHeader(
+            title = "AI Assistant",
+            subtitle = "Natural language is parsed into the same rule-based recommendation flow",
         )
 
-        // Text input + button
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             OutlinedTextField(
                 value = aiState.textInput,
                 onValueChange = onTextChanged,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 enabled = !aiState.isRequesting && isNetworkAvailable,
                 label = { Text("Describe what to listen to") },
                 placeholder = { Text("e.g. calm instrumental focus music") },
                 singleLine = true,
             )
             Button(
+                modifier = Modifier.align(Alignment.End),
                 enabled = aiState.textInput.isNotBlank() &&
                     !aiState.isRequesting &&
                     isNetworkAvailable,
                 onClick = onRequestRecommendation,
             ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     when {
                         !isNetworkAvailable -> "Offline"
@@ -771,40 +766,18 @@ private fun AiAssistantSection(
 
 @Composable
 private fun AiLoadingBanner() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    StatusBanner(
+        text = "AI is parsing your request...",
+        tone = BannerTone.Warning,
+        action = {
             CircularProgressIndicator(modifier = Modifier.height(16.dp).width(16.dp))
-            Text(
-                modifier = Modifier.padding(start = 12.dp),
-                text = "AI is parsing your request...",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
+        },
+    )
 }
 
 @Composable
 private fun AiErrorBanner(message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Text(
-            modifier = Modifier.padding(12.dp),
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
+    StatusBanner(text = message, tone = BannerTone.Error)
 }
 
 @Composable
@@ -816,18 +789,7 @@ private fun AiProviderStatusBanner(status: String) {
         else -> "AI provider status: $status"
     }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Text(
-            modifier = Modifier.padding(12.dp),
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
+    StatusBanner(text = message, tone = BannerTone.Error)
 }
 
 @Composable

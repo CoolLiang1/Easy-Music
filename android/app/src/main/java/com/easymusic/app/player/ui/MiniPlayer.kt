@@ -7,7 +7,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -79,6 +84,11 @@ fun MiniPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
                 if (uiState.isPlaying) {
                     OutlinedButton(onClick = onPause) {
+                        Icon(
+                            imageVector = Icons.Default.Pause,
+                            contentDescription = null,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text("Pause")
                     }
                 } else {
@@ -86,12 +96,22 @@ fun MiniPlayer(
                         enabled = track.isReady,
                         onClick = onPlay,
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text("Play")
                     }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 OutlinedButton(onClick = onOpenNowPlaying) {
-                    Text("Open")
+                    Icon(
+                        imageVector = Icons.Default.OpenInFull,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Now")
                 }
             }
 
