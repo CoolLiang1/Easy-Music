@@ -65,6 +65,8 @@ The backend keeps these modules separated at a high level:
 - Tracks: library metadata, playback file references, status, and track updates.
 - Tags: tag taxonomy, tag groups, and track-tag assignment.
 - Uploads: audio upload validation, original file persistence, and upload lifecycle state.
+- Video uploads: user-provided video validation, temporary media storage, and
+  creation of video extraction processing jobs.
 - Imports: optional administrator-configured local import roots, path safety
   checks, read-only scan preview, explicit confirmed import, and small batch
   history for Web status display.
@@ -98,6 +100,7 @@ Recommended mounted paths:
 - `/srv/easy-music/media/originals`
 - `/srv/easy-music/media/playback`
 - `/srv/easy-music/media/covers`
+- `/srv/easy-music/media/temp-videos`
 - `/srv/easy-music/postgres`
 
 ## 5. Backend
@@ -334,6 +337,19 @@ Possible feedback types:
 - `created_at`
 - `updated_at`
 
+### 8.11 ProcessingJob
+
+- `id`
+- `track_id`
+- `status`
+- `job_type`
+- `source_path`
+- `error_message`
+- `started_at`
+- `finished_at`
+- `created_at`
+- `updated_at`
+
 ## 9. Media Processing
 
 ### 9.1 Upload
@@ -345,6 +361,13 @@ Supported upload formats:
 - M4A
 - WAV
 - OGG
+
+Supported user-provided video upload formats:
+
+- MP4
+- MKV
+- MOV
+- WEBM
 
 ### 9.2 Processing Pipeline
 
@@ -414,6 +437,21 @@ absolute import source paths. Imported item track details are built from the
 existing safe track response, and track processing status remains the source of
 truth for transcoding results.
 
+### 9.6 Temporary Video Uploads
+
+`POST /api/tracks/upload-video` accepts explicit user-provided video files for
+later audio extraction. The request validates extension, content type, upload
+size, and a basic file signature, then stores the video under
+`MEDIA_ROOT/TEMP_VIDEOS_DIR` using media storage helpers.
+
+Video uploads create a normal `Track` with `processing` status and a pending
+`ProcessingJob` with `job_type="video_extraction"` and a safe relative
+`source_path` to the temporary video. The track response does not expose the
+temporary path, and the video is not stored as `tracks.original_file_path`,
+playback media, or cover media. Worker extraction is handled separately by the
+V2 worker task; until then, the existing audio worker only claims
+`audio_processing` jobs and leaves video extraction jobs pending.
+
 ## 10. Recommendation System
 
 Version 1 uses hybrid recommendation:
@@ -469,6 +507,7 @@ does not let AI select tracks.
 
 - `GET /api/tracks`
 - `POST /api/tracks/upload`
+- `POST /api/tracks/upload-video`
 - `GET /api/tracks/{id}`
 - `PATCH /api/tracks/{id}`
 - `PUT /api/tracks/{id}/cover`

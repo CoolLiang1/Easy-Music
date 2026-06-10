@@ -24,7 +24,9 @@ contain placeholders only, not production-ready secrets.
 | `ORIGINALS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for preserved original uploads. |
 | `PLAYBACK_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for generated playback files. |
 | `COVERS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for uploaded and extracted cover images. |
+| `TEMP_VIDEOS_DIR` | No | Yes | Directory name under `MEDIA_ROOT` for temporary user-provided video uploads before worker extraction. Defaults to `temp-videos`. |
 | `MAX_UPLOAD_MB` | Yes | Yes | Maximum accepted upload size in megabytes. Deployment should choose a value that fits storage and reverse proxy limits. |
+| `MAX_VIDEO_UPLOAD_MB` | No | Yes | Maximum accepted user-provided video upload size in megabytes. Defaults to `1024`; keep deployment reverse proxy limits compatible. |
 | `MAX_COVER_MB` | Yes | Yes | Maximum accepted cover-image upload size in megabytes. |
 | `IMPORT_ALLOWED_ROOTS` | No | No | Optional semicolon- or comma-separated allowlist of server-side import roots. Empty disables import tools. Use explicit directories outside the repository, outside user home roots, and outside `MEDIA_ROOT`; never commit private machine-specific paths. |
 | `IMPORT_SCAN_MAX_FILES` | No | No | Maximum supported audio candidates returned by one import scan. Defaults to `1000`. |
@@ -44,7 +46,9 @@ contain placeholders only, not production-ready secrets.
 | `MEDIA_HOST_ORIGINALS` | No | Yes | Production host directory bind-mounted to `/app/media/originals`. |
 | `MEDIA_HOST_PLAYBACK` | No | Yes | Production host directory bind-mounted to `/app/media/playback`. |
 | `MEDIA_HOST_COVERS` | No | Yes | Production host directory bind-mounted to `/app/media/covers`. |
+| `MEDIA_HOST_TEMP_VIDEOS` | No | Yes | Production host directory bind-mounted to `/app/media/temp-videos` for temporary video extraction inputs. |
 | `POSTGRES_DATA_DIR` | No | Yes | Production host directory for PostgreSQL data. |
+| `CADDY_VIDEO_UPLOAD_LIMIT` | No | Yes | Caddy request-body limit for `/api/tracks/upload-video`, using a Caddy size string such as `1024MB`. |
 | `BACKUP_RETENTION_DAYS` | No | No | Documentation value for operator-managed database backup retention. The bundled backup script does not delete files. |
 
 ## Development Defaults
@@ -72,6 +76,11 @@ The scan endpoint is read-only and controlled by `IMPORT_SCAN_MAX_FILES`,
 `IMPORT_SCAN_MAX_DEPTH`, and `IMPORT_SCAN_MAX_FILE_MB`. These limits do not
 create tracks or copy files; they only constrain preview responses.
 
+User-provided video upload is controlled by `MAX_VIDEO_UPLOAD_MB` and
+`TEMP_VIDEOS_DIR`. Uploaded videos are temporary extraction inputs under
+`MEDIA_ROOT`; they are not exposed through track stream/download APIs and are
+not stored as track originals.
+
 ## Deployment Expectations
 
 Deployment configuration should provide the same variable names through
@@ -81,6 +90,8 @@ Deployment values must:
 
 - Use strong unique values for `POSTGRES_PASSWORD` and `APP_SECRET_KEY`.
 - Use storage paths that point to the mounted persistent media location.
+- Mount `MEDIA_HOST_TEMP_VIDEOS` read-write into the API and worker containers
+  if video upload/extraction is enabled.
 - Leave `IMPORT_ALLOWED_ROOTS` empty unless import directories have been
   explicitly created and mounted read-only into the API container.
 - Restrict `CORS_ORIGINS` to trusted deployed origins.

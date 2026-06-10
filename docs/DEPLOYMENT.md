@@ -118,7 +118,10 @@ CADDY_DOMAIN=music.example.com
 MEDIA_HOST_ORIGINALS=/srv/easy-music/media/originals
 MEDIA_HOST_PLAYBACK=/srv/easy-music/media/playback
 MEDIA_HOST_COVERS=/srv/easy-music/media/covers
+MEDIA_HOST_TEMP_VIDEOS=/srv/easy-music/media/temp-videos
 POSTGRES_DATA_DIR=/srv/easy-music/postgres
+MAX_VIDEO_UPLOAD_MB=1024
+CADDY_VIDEO_UPLOAD_LIMIT=1024MB
 
 LOG_LEVEL=INFO
 LOG_FORMAT=text
@@ -150,6 +153,9 @@ Rules:
 - Keep scan limits conservative for the first deployment. The scan endpoint is
   read-only and reports supported audio candidates plus skipped files; confirmed
   import remains a later V2 flow.
+- Keep `MAX_VIDEO_UPLOAD_MB` compatible with `CADDY_VIDEO_UPLOAD_LIMIT` if
+  enabling user-provided video upload. Uploaded videos are temporary extraction
+  inputs, not library originals.
 
 Check for unfinished placeholders before continuing:
 
@@ -176,6 +182,7 @@ Verify:
 ls -ld /srv/easy-music/media/originals
 ls -ld /srv/easy-music/media/playback
 ls -ld /srv/easy-music/media/covers
+ls -ld /srv/easy-music/media/temp-videos
 ls -ld /srv/easy-music/postgres
 ls -ld /srv/easy-music/backups
 ```
@@ -194,6 +201,11 @@ mount them read-only into both `api` and `worker`, and set
 `/srv/easy-music/media`, the repository checkout, and user home roots.
 Use `IMPORT_SCAN_MAX_FILES`, `IMPORT_SCAN_MAX_DEPTH`, and
 `IMPORT_SCAN_MAX_FILE_MB` to keep read-only preview scans bounded.
+
+The temporary video directory is created by `deploy/setup-host.sh` and mounted
+read-write into both API and worker containers. It is reserved for user-provided
+video extraction inputs and should stay separate from originals, playback, and
+covers.
 
 ## Step 4 - Build the Web App
 

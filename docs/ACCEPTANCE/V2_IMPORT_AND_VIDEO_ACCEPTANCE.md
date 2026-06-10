@@ -669,6 +669,71 @@ Acceptance status:
   complete.
 - V2 user-provided video-to-audio processing is still not accepted.
 
+### 2026-06-10 - Task V2.6 Video Upload API And Temporary Storage
+
+Implemented:
+
+- Added authenticated `POST /api/tracks/upload-video` backend endpoint.
+- Supported first-version video formats are MP4, MKV, MOV, and WEBM.
+- Added `MAX_VIDEO_UPLOAD_MB` and `TEMP_VIDEOS_DIR` backend configuration.
+- Added `MediaStorage.temporary_video_path()` so temporary videos are stored
+  under controlled `MEDIA_ROOT/TEMP_VIDEOS_DIR` using the existing path-safety
+  helpers.
+- Added `job_type` and `source_path` to processing jobs. Normal audio uploads
+  keep `job_type="audio_processing"` with no source path. Video uploads create
+  pending `job_type="video_extraction"` jobs with a safe relative temp-video
+  source path.
+- The existing audio worker now claims only `audio_processing` jobs so
+  `video_extraction` jobs stay pending until V2.7 worker support is
+  implemented.
+- Video upload validates extension, content type, configured size limit, and a
+  basic container signature before committing the track/job.
+- API response reuses the existing safe track response and does not expose the
+  temporary video path. Uploaded videos are not stored as track originals,
+  playback media, or cover media.
+- Updated production compose, Caddy video upload body limit, host directory
+  setup, env examples, and operational docs for temporary video storage.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_video_uploads_api.py tests\test_media_storage.py tests\test_uploads_api.py
+.\.venv\Scripts\python.exe -m pytest tests\test_video_uploads_api.py tests\test_media_storage.py tests\test_uploads_api.py tests\test_worker_jobs.py tests\test_processing_service.py
+.\.venv\Scripts\python.exe -m alembic heads
+.\.venv\Scripts\python.exe -m pytest
+docker compose -f docker-compose.prod.yml --env-file .env.production.example config --quiet
+```
+
+Results:
+
+- `tests\test_video_uploads_api.py tests\test_media_storage.py
+  tests\test_uploads_api.py`: 20 passed.
+- `tests\test_video_uploads_api.py tests\test_media_storage.py
+  tests\test_uploads_api.py tests\test_worker_jobs.py
+  tests\test_processing_service.py`: 28 passed.
+- Alembic heads: `20260610_0008 (head)`.
+- Full backend test suite: 289 passed, 2 skipped. The skipped checks were
+  symlink-escape coverage because Windows symlink creation was unavailable in
+  this environment.
+- Production Compose config validation with `.env.production.example`: passed.
+
+Manual checks:
+
+- No live API video upload smoke was run in this implementation pass.
+- No worker video extraction smoke was run because V2.7 is not implemented yet.
+- No Web video upload smoke was run because V2.8 is not implemented yet.
+- No Android impact check was run because this task adds an upload-only API and
+  does not change existing Track response fields used by Android.
+
+Acceptance status:
+
+- Gate 5 automated backend coverage is partially verified locally.
+- V2 user-provided video-to-audio processing is still not accepted because
+  worker extraction, Web video upload UI, and manual smoke checks are not
+  complete.
+- V2 Automatic import tools are unchanged by this task and still await manual
+  import smoke before acceptance.
+
 ## Android Impact
 
 No Android UI is required for the first version of these V2 features. Android

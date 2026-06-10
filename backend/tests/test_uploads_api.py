@@ -101,6 +101,8 @@ def test_upload_audio_creates_track_and_saves_original(
     job = db_session.query(ProcessingJob).one()
     assert job.track_id == track.id
     assert job.status == "pending"
+    assert job.job_type == "audio_processing"
+    assert job.source_path is None
     assert job.error_message is None
 
 

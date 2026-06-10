@@ -27,6 +27,7 @@ set -euo pipefail
 MEDIA_ORIGINALS="${MEDIA_HOST_ORIGINALS:-/srv/easy-music/media/originals}"
 MEDIA_PLAYBACK="${MEDIA_HOST_PLAYBACK:-/srv/easy-music/media/playback}"
 MEDIA_COVERS="${MEDIA_HOST_COVERS:-/srv/easy-music/media/covers}"
+MEDIA_TEMP_VIDEOS="${MEDIA_HOST_TEMP_VIDEOS:-/srv/easy-music/media/temp-videos}"
 POSTGRES_DATA="${POSTGRES_DATA_DIR:-/srv/easy-music/postgres}"
 BACKUP_DIR="${BACKUP_DIR:-/srv/easy-music/backups}"
 
@@ -49,10 +50,11 @@ if [ -f "$ENV_FILE" ]; then
     # Only export the variables we care about so unrelated shell escapes
     # in the env file cannot cause side effects.
     # shellcheck disable=SC2046
-    export $(grep -E '^(MEDIA_HOST_ORIGINALS|MEDIA_HOST_PLAYBACK|MEDIA_HOST_COVERS|POSTGRES_DATA_DIR|BACKUP_DIR)=' "$ENV_FILE" | xargs) 2>/dev/null || true
+    export $(grep -E '^(MEDIA_HOST_ORIGINALS|MEDIA_HOST_PLAYBACK|MEDIA_HOST_COVERS|MEDIA_HOST_TEMP_VIDEOS|POSTGRES_DATA_DIR|BACKUP_DIR)=' "$ENV_FILE" | xargs) 2>/dev/null || true
     MEDIA_ORIGINALS="${MEDIA_HOST_ORIGINALS:-$MEDIA_ORIGINALS}"
     MEDIA_PLAYBACK="${MEDIA_HOST_PLAYBACK:-$MEDIA_PLAYBACK}"
     MEDIA_COVERS="${MEDIA_HOST_COVERS:-$MEDIA_COVERS}"
+    MEDIA_TEMP_VIDEOS="${MEDIA_HOST_TEMP_VIDEOS:-$MEDIA_TEMP_VIDEOS}"
     POSTGRES_DATA="${POSTGRES_DATA_DIR:-$POSTGRES_DATA}"
     BACKUP_DIR="${BACKUP_DIR:-$BACKUP_DIR}"
 fi
@@ -62,6 +64,7 @@ echo "=== Easy Music host directory setup ==="
 echo "Media originals : ${MEDIA_ORIGINALS}"
 echo "Media playback  : ${MEDIA_PLAYBACK}"
 echo "Media covers    : ${MEDIA_COVERS}"
+echo "Temp videos     : ${MEDIA_TEMP_VIDEOS}"
 echo "PostgreSQL data : ${POSTGRES_DATA}"
 echo "Backups         : ${BACKUP_DIR}"
 echo "App UID:GID     : ${APP_UID}:${APP_GID}"
@@ -75,6 +78,7 @@ echo "[setup-host] Creating directories ..."
 mkdir -p "$MEDIA_ORIGINALS"
 mkdir -p "$MEDIA_PLAYBACK"
 mkdir -p "$MEDIA_COVERS"
+mkdir -p "$MEDIA_TEMP_VIDEOS"
 mkdir -p "$POSTGRES_DATA"
 mkdir -p "$BACKUP_DIR"
 
@@ -91,6 +95,7 @@ if [ "$(id -u)" -eq 0 ]; then
     chown "${APP_UID}:${APP_GID}" "$MEDIA_ORIGINALS"
     chown "${APP_UID}:${APP_GID}" "$MEDIA_PLAYBACK"
     chown "${APP_UID}:${APP_GID}" "$MEDIA_COVERS"
+    chown "${APP_UID}:${APP_GID}" "$MEDIA_TEMP_VIDEOS"
 
     # PostgreSQL writes its data directory as the postgres container user.
     chown "${POSTGRES_UID}:${POSTGRES_GID}" "$POSTGRES_DATA"

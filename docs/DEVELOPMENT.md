@@ -68,6 +68,18 @@ $env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@
 $env:MEDIA_ROOT = ".\media"
 ```
 
+User-provided video upload uses a separate size limit and temporary media
+subdirectory:
+
+```powershell
+$env:TEMP_VIDEOS_DIR = "temp-videos"
+$env:MAX_VIDEO_UPLOAD_MB = "1024"
+```
+
+The API stores accepted videos under `MEDIA_ROOT\temp-videos` and creates a
+`video_extraction` processing job. V2.6 does not run FFmpeg extraction inside
+the request; worker extraction is implemented by the following V2 task.
+
 V2 import tools are disabled by default. To test import-root safety, the
 read-only audio scan preview, confirmed audio import, and import batch history,
 configure throwaway directories outside the repository and outside
@@ -918,6 +930,7 @@ The recommended layout follows `docs/ARCHITECTURE.md`:
 | `/srv/easy-music/media/originals` | `/app/media/originals` | api, worker |
 | `/srv/easy-music/media/playback` | `/app/media/playback` | api, worker |
 | `/srv/easy-music/media/covers` | `/app/media/covers` | api, worker |
+| `/srv/easy-music/media/temp-videos` | `/app/media/temp-videos` | api, worker |
 | `/srv/easy-music/postgres` | `/var/lib/postgresql/data` | postgres |
 | `/srv/easy-music/backups` | (host only) | backup script |
 

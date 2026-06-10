@@ -9,22 +9,36 @@ from app.models.track import Track
 
 ACTIVE_JOB_STATUSES = {"pending", "running"}
 PROCESSING_JOB_STATUSES = {"pending", "running", "succeeded", "failed"}
+AUDIO_PROCESSING_JOB_TYPE = "audio_processing"
+VIDEO_EXTRACTION_JOB_TYPE = "video_extraction"
 MAX_ERROR_MESSAGE_LENGTH = 4000
 
 
-def create_processing_job(db: Session, track: Track) -> ProcessingJob:
+def create_processing_job(
+    db: Session,
+    track: Track,
+    *,
+    job_type: str = AUDIO_PROCESSING_JOB_TYPE,
+    source_path: str | None = None,
+) -> ProcessingJob:
     existing_job = db.scalar(
         select(ProcessingJob)
         .where(
             ProcessingJob.track_id == track.id,
             ProcessingJob.status.in_(ACTIVE_JOB_STATUSES),
+            ProcessingJob.job_type == job_type,
         )
         .order_by(ProcessingJob.created_at.asc(), ProcessingJob.id.asc())
     )
     if existing_job is not None:
         return existing_job
 
-    job = ProcessingJob(track_id=track.id, status="pending")
+    job = ProcessingJob(
+        track_id=track.id,
+        status="pending",
+        job_type=job_type,
+        source_path=source_path,
+    )
     db.add(job)
     db.flush()
     return job
@@ -33,7 +47,10 @@ def create_processing_job(db: Session, track: Track) -> ProcessingJob:
 def claim_next_pending_job(db: Session) -> ProcessingJob | None:
     job = db.scalar(
         select(ProcessingJob)
-        .where(ProcessingJob.status == "pending")
+        .where(
+            ProcessingJob.status == "pending",
+            ProcessingJob.job_type == AUDIO_PROCESSING_JOB_TYPE,
+        )
         .order_by(ProcessingJob.created_at.asc(), ProcessingJob.id.asc())
         .with_for_update(skip_locked=True)
     )

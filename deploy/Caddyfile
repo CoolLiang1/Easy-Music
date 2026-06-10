@@ -41,6 +41,15 @@
     }
 
     # -------------------------------------------------------------------
+    # Video upload  - separate request size limit for temporary video input
+    # -------------------------------------------------------------------
+    handle /api/tracks/upload-video {
+        @oversized request_body > {$CADDY_VIDEO_UPLOAD_LIMIT:1024MB}
+        respond @oversized 413
+        reverse_proxy api:8000
+    }
+
+    # -------------------------------------------------------------------
     # API routes  — reverse proxy to the FastAPI backend
     # -------------------------------------------------------------------
     # Every request whose path starts with /api/ is forwarded to the

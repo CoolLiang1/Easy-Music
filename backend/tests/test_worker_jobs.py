@@ -129,3 +129,43 @@ def test_process_next_job_marks_job_failed_with_error_message(
 
 def test_process_next_job_returns_none_when_no_pending_jobs(db_session: Session) -> None:
     assert worker_jobs.process_next_job(db_session, MediaStorage()) is None
+
+
+def test_process_next_job_ignores_video_extraction_jobs(
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(db_session)
+    track = Track(
+        user_id=user.id,
+        title="Video",
+        content_type="song",
+        status="processing",
+    )
+    db_session.add(track)
+    db_session.flush()
+    job = ProcessingJob(
+        track_id=track.id,
+        status="pending",
+        job_type="video_extraction",
+        source_path="temp-videos/user-1/track-1/source.mp4",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    def process_track_stub(*args, **kwargs) -> Track:
+        raise AssertionError("video extraction jobs should wait for V2.7 worker support")
+
+    monkeypatch.setattr(worker_jobs, "process_track", process_track_stub)
+
+    processed_job = worker_jobs.process_next_job(
+        db_session,
+        MediaStorage(Settings(media_root=str(tmp_path))),
+    )
+
+    assert processed_job is None
+    db_session.refresh(job)
+    db_session.refresh(track)
+    assert job.status == "pending"
+    assert track.status == "processing"

@@ -42,6 +42,19 @@ class MediaStorage:
             stored_name,
         )
 
+    def temporary_video_path(self, user_id: int, track_id: int, filename: str) -> Path:
+        safe_name = sanitize_filename(filename, fallback="video")
+        stem = Path(safe_name).stem or "video"
+        suffix = Path(safe_name).suffix.lower()
+        stored_name = f"{uuid4().hex}_{stem}{suffix}"
+        return resolve_media_path(
+            self.settings.media_root,
+            self.settings.temp_videos_dir,
+            f"user-{user_id}",
+            f"track-{track_id}",
+            stored_name,
+        )
+
     def relative_media_path(self, path: Path) -> str:
         root = Path(self.settings.media_root).resolve(strict=False)
         return path.resolve(strict=False).relative_to(root).as_posix()

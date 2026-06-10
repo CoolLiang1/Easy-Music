@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     originals_dir: str = Field(default="originals", validation_alias="ORIGINALS_DIR")
     playback_dir: str = Field(default="playback", validation_alias="PLAYBACK_DIR")
     covers_dir: str = Field(default="covers", validation_alias="COVERS_DIR")
+    temp_videos_dir: str = Field(default="temp-videos", validation_alias="TEMP_VIDEOS_DIR")
     max_upload_mb: int = Field(default=200, validation_alias="MAX_UPLOAD_MB")
+    max_video_upload_mb: int = Field(default=1024, validation_alias="MAX_VIDEO_UPLOAD_MB")
     max_cover_mb: int = Field(default=10, validation_alias="MAX_COVER_MB")
     import_allowed_roots: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
@@ -69,7 +71,7 @@ class Settings(BaseSettings):
             return [root.strip() for root in value.split(separator) if root.strip()]
         return value
 
-    @field_validator("originals_dir", "playback_dir", "covers_dir")
+    @field_validator("originals_dir", "playback_dir", "covers_dir", "temp_videos_dir")
     @classmethod
     def validate_media_subdir(cls, value: str) -> str:
         return validate_storage_dir(value)

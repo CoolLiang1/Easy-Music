@@ -341,6 +341,48 @@ Expected result:
   read them.
 - `playback_file_path` points at a generated MP3 playback file.
 
+## Upload A User-Provided Video File
+
+V2.6 accepts an explicit video upload as a temporary audio-extraction input. It
+does not run FFmpeg inside the request and does not store the video as the track
+original.
+
+Create a tiny video with FFmpeg:
+
+```powershell
+ffmpeg -y -f lavfi -i "testsrc=size=160x120:duration=1" -f lavfi -i "sine=frequency=440:duration=1" -shortest test-video.mp4
+```
+
+Upload it:
+
+```powershell
+$videoUpload = curl.exe `
+  -s `
+  -X POST `
+  -H "Authorization: Bearer $token" `
+  -F "file=@test-video.mp4;type=video/mp4" `
+  "http://127.0.0.1:8000/api/tracks/upload-video" | ConvertFrom-Json
+
+$videoTrackId = $videoUpload.id
+$videoUpload
+```
+
+Expected V2.6 result:
+
+- HTTP response creates a normal track response.
+- `status` is `processing`.
+- `processing_job_status` is `pending`.
+- `original_file_path`, `playback_file_path`, and `cover_path` are `null`.
+- The temporary video path is not exposed in the API response.
+- A pending `video_extraction` processing job exists in the database with a
+  safe relative source path under `TEMP_VIDEOS_DIR`.
+- Unsupported extensions/content types return `415 Unsupported Media Type`.
+- Oversized video uploads return `413 Content Too Large`.
+
+Worker extraction is not part of V2.6. Until the V2.7 worker task is
+implemented, the existing audio worker leaves `video_extraction` jobs pending;
+do not expect this uploaded video track to become `ready`.
+
 ## Review Duplicate Candidates
 
 V1.1 adds a read-only duplicate-candidate endpoint. It is advisory only: it
