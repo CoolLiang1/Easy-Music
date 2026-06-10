@@ -77,8 +77,11 @@ $env:MAX_VIDEO_UPLOAD_MB = "1024"
 ```
 
 The API stores accepted videos under `MEDIA_ROOT\temp-videos` and creates a
-`video_extraction` processing job. V2.6 does not run FFmpeg extraction inside
-the request; worker extraction is implemented by the following V2 task.
+`video_extraction` processing job. The worker extracts audio from accepted
+videos via `extract_audio_from_video` (FFmpeg with `-vn`), stores the
+extracted audio as a controlled original, and then runs the existing audio
+processing pipeline (metadata, playback MP3, duplicate signals). Temp videos
+are deleted on successful extraction and kept for retry/debug on failure.
 
 V2 import tools are disabled by default. To test import-root safety, the
 read-only audio scan preview, confirmed audio import, and import batch history,
@@ -417,11 +420,13 @@ Vite prints the local browser URL, usually `http://localhost:5173/`. The Web
 console calls the backend API after login, so run PostgreSQL, migrations, the
 API, and an initial local user before doing a full browser smoke test.
 
-The V2 audio import page is available at `/imports` after login. It reads the
+The V2 import page is available at `/imports` after login. It reads the
 configured import roots from the backend, scans one configured root and optional
 relative subdirectory, lets the user explicitly select supported audio
-candidates, confirms import, and refreshes the latest import batch status using
-the existing track processing status.
+and video candidates, confirms import, and refreshes the latest import batch
+status using the existing track processing status. Video candidates are copied
+into temporary video storage and create `video_extraction` processing jobs;
+the worker extracts audio from them into the normal audio processing pipeline.
 
 Run the Web type check from `web/`:
 

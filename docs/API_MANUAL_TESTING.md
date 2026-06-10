@@ -379,9 +379,132 @@ Expected V2.6 result:
 - Unsupported extensions/content types return `415 Unsupported Media Type`.
 - Oversized video uploads return `413 Content Too Large`.
 
-Worker extraction is not part of V2.6. Until the V2.7 worker task is
-implemented, the existing audio worker leaves `video_extraction` jobs pending;
-do not expect this uploaded video track to become `ready`.
+Worker extraction is implemented in V2.7. Process the video extraction job:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.worker
+```
+
+Or process the video track directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.worker --track-id $videoTrackId
+```
+
+Fetch the track to confirm extraction succeeded:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/$videoTrackId" `
+  -Headers $headers
+```
+
+Expected V2.7 result:
+
+- Track `status` becomes `ready` after successful extraction and processing.
+- `processing_job_status` is `succeeded`.
+- `original_file_path` points to the extracted audio under the `originals`
+  directory, not the temporary video.
+- `playback_file_path` points to a generated MP3 playback file.
+- The temporary video is deleted on success.
+- Stream endpoint works for the extracted audio.
+
+Upload a video with no audio stream (create with `-an` flag):
+
+```powershell
+ffmpeg -y -f lavfi -i "testsrc=size=160x120:duration=1" -an test-no-audio.mp4
+
+$noAudioUpload = curl.exe `
+  -s `
+  -X POST `
+  -H "Authorization: Bearer $token" `
+  -F "file=@test-no-audio.mp4;type=video/mp4" `
+  "http://127.0.0.1:8000/api/tracks/upload-video" | ConvertFrom-Json
+
+$noAudioTrackId = $noAudioUpload.id
+.\.venv\Scripts\python.exe -m app.worker --track-id $noAudioTrackId
+```
+
+Expected failure result:
+
+- Track `status` becomes `failed`.
+- `processing_error_message` is a UI-safe message such as
+  "Video audio extraction failed.".
+- No temporary paths or stack traces are exposed.
+
+### Mixed Audio/Video Import Directory
+
+V2.9 extends the import scan and confirm flow to classify and handle both audio
+and video source files. Scan candidates are classified as `media_kind: "audio"`
+or `media_kind: "video"`. Video candidates are copied into temporary video
+storage and processed by the worker like video uploads.
+
+Scan a throwaway directory with mixed files:
+
+```powershell
+$mixedRoot = Join-Path $env:TEMP "easy-music-mixed-import"
+New-Item -ItemType Directory -Force -Path $mixedRoot | Out-Null
+ffmpeg -y -f lavfi -i "sine=frequency=440:duration=1" (Join-Path $mixedRoot "import-audio.wav")
+ffmpeg -y -f lavfi -i "testsrc=size=160x120:duration=1" -f lavfi -i "sine=frequency=440:duration=1" -shortest (Join-Path $mixedRoot "import-video.mp4")
+Set-Content -Path (Join-Path $mixedRoot "notes.txt") -Value "not media"
+
+$env:IMPORT_ALLOWED_ROOTS = $mixedRoot
+# Restart API after changing env
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/imports/scan" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    root_id = $config.roots[0].id
+  } | ConvertTo-Json)
+```
+
+Expected scan result:
+
+- `import-audio.wav` appears in `candidates` with `media_kind: "audio"`.
+- `import-video.mp4` appears in `candidates` with `media_kind: "video"`.
+- `notes.txt` appears in `skipped` with reason `unsupported_extension`.
+
+Confirm both audio and video candidates:
+
+```powershell
+$mixedConfirm = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/imports" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    root_id = $config.roots[0].id
+    files = @(
+      @{ relative_path = "import-audio.wav" }
+      @{ relative_path = "import-video.mp4" }
+    )
+  } | ConvertTo-Json -Depth 4)
+
+$mixedConfirm.results
+```
+
+Expected confirm result:
+
+- Audio result has `status: imported` with a normal track and processing job.
+- Video result has `status: imported` with a `video_extraction` job.
+- Both source files remain unchanged under `$mixedRoot`.
+
+Run the worker to process both:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.worker --loop --poll-interval 5
+# Or process pending jobs individually
+```
+
+Expected end-to-end result:
+
+- The audio import becomes a normal `ready` track.
+- The video import extracts audio and becomes a normal `ready` track.
+- Source files are preserved and unchanged.
 
 ## Review Duplicate Candidates
 

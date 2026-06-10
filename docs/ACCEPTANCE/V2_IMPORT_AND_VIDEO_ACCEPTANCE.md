@@ -951,7 +951,69 @@ Acceptance status:
 - V2 Automatic import tools are unchanged by this task (still await manual
   import smoke).
 
-## Android Impact
+### 2026-06-10 - Task V2.10 Documentation And Smoke-Test Updates
+
+Implemented:
+
+- Updated `docs/DEVELOPMENT.md`:
+  - Import section now describes mixed audio/video import support.
+  - Worker section now documents video extraction behavior (FFmpeg with
+    `-vn`, extracted audio in originals, temp lifecycle).
+- Updated `docs/API_MANUAL_TESTING.md`:
+  - Added worker video extraction smoke steps (success and no-audio failure).
+  - Added mixed audio/video import directory smoke flow.
+  - Added expected results for scan, confirm, worker processing, and source
+    preservation.
+- Reviewed docs and env examples for prohibited content:
+  - No references to deleting source files, URL downloads, Bilibili
+    downloading, arbitrary filesystem browsing, or committed local paths.
+  - Confirmed import roots are documented as disabled by default.
+  - Confirmed temp video directory and size limits are documented.
+
+Final implementation verification from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+docker compose -f docker-compose.prod.yml --env-file .env.production.example config --quiet
+```
+
+Results:
+
+- Full backend test suite: 302 passed, 2 skipped (symlink-escape on Windows).
+- Production Compose config validation: passed.
+
+From `web/`:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+Manual checks:
+
+- No live API manual smoke was run in this implementation pass.
+- No browser import/video upload smoke was run in this implementation pass.
+- No Android impact check was run because no Track response fields changed.
+- FFmpeg/ffprobe were not available in the current shell environment; tests
+  use monkeypatched FFmpeg helpers. Real media smoke requires FFmpeg.
+
+Acceptance status:
+
+- All automated gates (1–8) have passing automated coverage locally.
+- V2 Automatic import tools: not accepted — manual audio import smoke,
+  mixed import smoke, and production-aware smoke still required.
+- V2 user-provided video-to-audio processing: not accepted — manual video
+  upload smoke, worker extraction smoke, and production-aware smoke still
+  required.
+- Acceptance record contains real dated automated verification results;
+  manual smoke results should be appended when actually run.
+
+
 
 No Android UI is required for the first version of these V2 features. Android
 should continue to consume normal ready tracks through existing library,
