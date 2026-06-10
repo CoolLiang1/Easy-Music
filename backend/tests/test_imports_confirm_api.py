@@ -82,6 +82,10 @@ def auth_headers(user: User) -> dict[str, str]:
     return {"Authorization": f"Bearer {create_access_token(user.id)}"}
 
 
+def mp4_bytes(payload: bytes = b"video") -> bytes:
+    return b"\x00\x00\x00\x18ftypmp42" + payload
+
+
 def test_confirm_import_requires_authentication(client: TestClient) -> None:
     response = client.post(
         "/api/imports",
@@ -117,6 +121,7 @@ def test_confirm_import_copies_audio_and_creates_track_and_job(
     result = body["results"][0]
     assert result["relative_path"] == "Song.MP3"
     assert result["status"] == "imported"
+    assert result["media_kind"] == "audio"
     assert result["error"] is None
     assert result["duplicate_warnings"] == []
     assert result["track"]["title"] == "Song"
@@ -137,6 +142,51 @@ def test_confirm_import_copies_audio_and_creates_track_and_job(
     job = db_session.query(ProcessingJob).one()
     assert job.track_id == track.id
     assert job.status == "pending"
+    assert job.job_type == "audio_processing"
+
+
+def test_confirm_import_accepts_mixed_audio_and_video_with_media_kind(
+    client: TestClient,
+    db_session: Session,
+    import_root: Path,
+    media_root: Path,
+) -> None:
+    user = create_user(db_session)
+    audio = import_root / "Song.MP3"
+    video = import_root / "Clip.MP4"
+    audio.write_bytes(b"audio bytes")
+    video.write_bytes(mp4_bytes(b"video bytes"))
+
+    response = client.post(
+        "/api/imports",
+        json={
+            "root_id": "root-1",
+            "files": [
+                {"relative_path": "Song.MP3"},
+                {"relative_path": "Clip.MP4"},
+            ],
+        },
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["imported_count"] == 2
+    results = {result["relative_path"]: result for result in body["results"]}
+    assert results["Song.MP3"]["status"] == "imported"
+    assert results["Song.MP3"]["media_kind"] == "audio"
+    assert results["Clip.MP4"]["status"] == "imported"
+    assert results["Clip.MP4"]["media_kind"] == "video"
+
+    assert audio.read_bytes() == b"audio bytes"
+    assert video.read_bytes() == mp4_bytes(b"video bytes")
+
+    jobs = sorted(db_session.query(ProcessingJob).all(), key=lambda job: job.id)
+    assert [job.job_type for job in jobs] == ["audio_processing", "video_extraction"]
+    video_job = jobs[1]
+    assert video_job.source_path is not None
+    assert video_job.source_path.startswith("temp-videos/user-")
+    assert (media_root / video_job.source_path).read_bytes() == mp4_bytes(b"video bytes")
 
 
 def test_confirm_import_disabled_returns_configured_off_response(

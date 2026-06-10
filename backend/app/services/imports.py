@@ -345,6 +345,7 @@ class ImportRootPolicy:
                 relative_path=relative_source_path,
                 basename=basename,
                 status="imported",
+                media_kind="audio",
                 track=build_track_response(db, track),
                 duplicate_warnings=duplicate_warnings,
             )
@@ -366,15 +367,15 @@ class ImportRootPolicy:
             relative_source_path = source.relative_to(root.path).as_posix()
             basename = source.name
             if not source.exists():
-                return self._import_result(relative_source_path, basename, "failed", "Source file does not exist.")
+                return self._import_result(relative_source_path, basename, "failed", "Source file does not exist.", "video")
             if not source.is_file():
-                return self._import_result(relative_source_path, basename, "failed", "Source path is not a file.")
+                return self._import_result(relative_source_path, basename, "failed", "Source path is not a file.", "video")
             extension = source.suffix.lower()
             if extension not in ALLOWED_VIDEO_IMPORT_EXTENSIONS:
-                return self._import_result(relative_source_path, basename, "skipped", "Unsupported video file extension.")
+                return self._import_result(relative_source_path, basename, "skipped", "Unsupported video file extension.", "video")
             size_bytes = source.stat().st_size
             if size_bytes > self._scan_limits().max_file_size_bytes:
-                return self._import_result(relative_source_path, basename, "skipped", "Source file exceeds import size limit.")
+                return self._import_result(relative_source_path, basename, "skipped", "Source file exceeds import size limit.", "video")
 
             # Validate video container signature from file header.
             upload_format = extension.removeprefix(".")
@@ -382,7 +383,7 @@ class ImportRootPolicy:
                 from app.services.video_uploads import validate_saved_video_signature
                 validate_saved_video_signature(source, upload_format)
             except Exception:
-                return self._import_result(relative_source_path, basename, "skipped", "Video file failed signature validation.")
+                return self._import_result(relative_source_path, basename, "skipped", "Video file failed signature validation.", "video")
 
             track = Track(
                 user_id=user.id,
@@ -417,6 +418,7 @@ class ImportRootPolicy:
                 relative_path=relative_source_path,
                 basename=basename,
                 status="imported",
+                media_kind="video",
                 track=build_track_response(db, track),
             )
         except (ImportPathSafetyError, OSError) as exc:
@@ -424,11 +426,18 @@ class ImportRootPolicy:
             return self._import_result(relative_path, basename, "failed", str(exc))
 
     @staticmethod
-    def _import_result(relative_path: str, basename: str, status: str, error: str) -> ImportConfirmResult:
+    def _import_result(
+        relative_path: str,
+        basename: str,
+        status: str,
+        error: str,
+        media_kind: str | None = None,
+    ) -> ImportConfirmResult:
         return ImportConfirmResult(
             relative_path=relative_path.replace("\\", "/"),
             basename=basename,
             status=status,
+            media_kind=media_kind or _infer_media_kind(basename, None),
             error=error,
         )
 

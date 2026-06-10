@@ -175,6 +175,31 @@ def test_scan_returns_supported_audio_candidates_and_skipped_files(
     assert db_session.query(ProcessingJob).count() == 0
 
 
+def test_scan_returns_supported_video_candidates(
+    client: TestClient,
+    db_session: Session,
+    import_root: Path,
+) -> None:
+    user = create_user(db_session)
+    (import_root / "clip.mp4").write_bytes(b"video")
+    (import_root / "movie.WEBM").write_bytes(b"video")
+
+    response = client.post(
+        "/api/imports/scan",
+        json={"root_id": "root-1"},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    candidates = {item["relative_path"]: item for item in response.json()["candidates"]}
+    assert candidates["clip.mp4"]["media_kind"] == "video"
+    assert candidates["clip.mp4"]["extension"] == "mp4"
+    assert candidates["movie.WEBM"]["media_kind"] == "video"
+    assert candidates["movie.WEBM"]["extension"] == "webm"
+    assert db_session.query(Track).count() == 0
+    assert db_session.query(ProcessingJob).count() == 0
+
+
 def test_scan_can_target_nested_allowed_directory(
     client: TestClient,
     db_session: Session,

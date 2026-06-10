@@ -85,11 +85,6 @@ export function ImportPage() {
 
   const [mediaKindFilter, setMediaKindFilter] = useState<"all" | "audio" | "video">("all");
 
-  const scanCandidatePaths = useMemo(
-    () => scanResult?.candidates.map((candidate) => candidate.relative_path) ?? [],
-    [scanResult],
-  );
-
   const filteredCandidates = useMemo(() => {
     if (!scanResult) return [];
     if (mediaKindFilter === "all") return scanResult.candidates;
@@ -187,7 +182,13 @@ export function ImportPage() {
   };
 
   const selectAllCandidates = () => {
-    setSelectedPaths(new Set(scanCandidatePaths));
+    setSelectedPaths((current) => {
+      const next = new Set(current);
+      for (const candidate of filteredCandidates) {
+        next.add(candidate.relative_path);
+      }
+      return next;
+    });
     setActionError(null);
   };
 
@@ -538,7 +539,10 @@ function ConfirmResultPanel({ result }: { result: ImportConfirmResponse }) {
           <li className="item-card" key={`${item.relative_path}-${item.status}`}>
             <div className="item-heading">
               <strong>{item.basename}</strong>
-              <ImportStatusBadge status={item.status} />
+              <div className="toolbar compact-toolbar">
+                {item.media_kind ? <MediaKindBadge mediaKind={item.media_kind} /> : null}
+                <ImportStatusBadge status={item.status} />
+              </div>
             </div>
             <p className={item.status === "failed" ? "status-message error" : "status-message"}>
               {item.error ?? item.relative_path}
@@ -600,7 +604,10 @@ function LatestBatchPanel({
               <li className="item-card" key={item.id}>
                 <div className="item-heading">
                   <strong>{item.basename}</strong>
-                  <ImportStatusBadge status={item.status} />
+                  <div className="toolbar compact-toolbar">
+                    {item.media_kind ? <MediaKindBadge mediaKind={item.media_kind} /> : null}
+                    <ImportStatusBadge status={item.status} />
+                  </div>
                 </div>
                 <p className={item.status === "failed" ? "status-message error" : "status-message"}>
                   {item.error ?? item.relative_path}
@@ -669,6 +676,14 @@ function ImportStatusBadge({ status }: { status: string }) {
   return (
     <span className={`status-badge import-status-${normalizeCssToken(normalizedStatus)}`}>
       {formatImportStatus(normalizedStatus)}
+    </span>
+  );
+}
+
+function MediaKindBadge({ mediaKind }: { mediaKind: string }) {
+  return (
+    <span className={`status-badge import-kind-${normalizeCssToken(mediaKind)}`}>
+      {formatMediaKind(mediaKind)}
     </span>
   );
 }

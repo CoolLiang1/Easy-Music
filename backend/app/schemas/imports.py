@@ -80,6 +80,7 @@ class ImportConfirmResult(BaseModel):
     relative_path: str
     basename: str
     status: str
+    media_kind: str | None = None
     track: TrackResponse | None = None
     error: str | None = None
     duplicate_warnings: list[ImportDuplicateWarning] = Field(default_factory=list)

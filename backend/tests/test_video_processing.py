@@ -271,6 +271,40 @@ class TestVideoExtractionFailures:
         db_session.refresh(track)
         assert track.status == "failed"
 
+    def test_source_path_outside_temp_video_storage_is_rejected_without_deletion(
+        self,
+        db_session: Session,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        user = create_user(db_session)
+        storage = MediaStorage(Settings(media_root=str(tmp_path)))
+
+        source_rel = "originals/user-1/track-1/source.mp4"
+        non_temp_video = storage.stored_media_path(source_rel)
+        non_temp_video.parent.mkdir(parents=True)
+        non_temp_video.write_bytes(b"must-not-delete")
+
+        track, job = create_video_track_and_job(db_session, user, source_path=source_rel)
+
+        def fail_extract(*args: object, **kwargs: object) -> None:
+            raise AssertionError("non-temp source path should be rejected before extraction")
+
+        monkeypatch.setattr(
+            "app.worker.jobs.extract_audio_from_video",
+            fail_extract,
+        )
+
+        processed_job = process_next_job(db_session, storage)
+
+        assert processed_job is not None
+        assert processed_job.status == "failed"
+        assert "temporary video storage" in (processed_job.error_message or "")
+        assert non_temp_video.read_bytes() == b"must-not-delete"
+
+        db_session.refresh(track)
+        assert track.status == "failed"
+
     def test_track_not_found(
         self,
         db_session: Session,

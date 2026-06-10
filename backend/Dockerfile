@@ -24,7 +24,7 @@ COPY app ./app
 
 # Create media directories with non-root ownership so named volumes
 # (dev compose) and bind mounts (prod compose) both work correctly.
-RUN mkdir -p /app/media/originals /app/media/playback /app/media/covers \
+RUN mkdir -p /app/media/originals /app/media/playback /app/media/covers /app/media/temp-videos \
     && chown -R appuser:appgroup /app/media
 
 USER appuser

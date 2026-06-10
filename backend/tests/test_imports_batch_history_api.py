@@ -33,6 +33,10 @@ def auth_headers(user: User) -> dict[str, str]:
     return {"Authorization": f"Bearer {create_access_token(user.id)}"}
 
 
+def mp4_bytes(payload: bytes = b"video") -> bytes:
+    return b"\x00\x00\x00\x18ftypmp42" + payload
+
+
 @pytest.fixture
 def db_session() -> Generator[Session]:
     engine = create_engine(
@@ -119,6 +123,7 @@ def test_confirm_import_creates_batch_history_with_safe_fields(
     assert str(import_root) not in item["relative_path"]
     assert item["basename"] == "song.mp3"
     assert item["status"] == "imported"
+    assert item["media_kind"] == "audio"
     assert item["error"] is None
     assert item["track_id"] == item["track"]["id"]
     assert item["track"]["status"] == "processing"
@@ -128,6 +133,32 @@ def test_confirm_import_creates_batch_history_with_safe_fields(
     assert db_session.query(ImportBatch).count() == 1
     assert db_session.query(ImportItem).count() == 1
     assert db_session.query(ProcessingJob).count() == 1
+
+
+def test_batch_history_records_video_import_media_kind(
+    client: TestClient,
+    db_session: Session,
+    import_root: Path,
+) -> None:
+    (import_root / "clip.mp4").write_bytes(mp4_bytes())
+    user = create_user(db_session)
+
+    response = client.post(
+        "/api/imports",
+        json={"root_id": "root-1", "files": [{"relative_path": "clip.mp4"}]},
+        headers=auth_headers(user),
+    )
+    assert response.status_code == 200
+    batch_id = response.json()["batch_id"]
+    assert response.json()["results"][0]["media_kind"] == "video"
+
+    batch_response = client.get(f"/api/imports/batches/{batch_id}", headers=auth_headers(user))
+
+    assert batch_response.status_code == 200
+    item = batch_response.json()["items"][0]
+    assert item["relative_path"] == "clip.mp4"
+    assert item["media_kind"] == "video"
+    assert item["track"]["processing_job_status"] == "pending"
 
 
 def test_latest_batch_is_scoped_to_current_user(

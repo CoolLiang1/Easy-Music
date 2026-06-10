@@ -67,6 +67,7 @@ export type ImportConfirmResult = {
   relative_path: string;
   basename: string;
   status: "imported" | "skipped" | "failed" | string;
+  media_kind: "audio" | "video" | string | null;
   track: Track | null;
   error: string | null;
   duplicate_warnings: ImportDuplicateWarning[];

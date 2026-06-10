@@ -826,7 +826,7 @@ Implemented:
 - Updated `UploadPage` to include `VideoUploadForm` as a distinct optional
   section below the existing audio upload. Audio upload flow is unchanged.
 - Added optional `kind: "audio" | "video"` to `UploadResult` for better
-  status text: video uploads show "正在提取音频并处理" during processing.
+  status text so video uploads show a video-specific processing message.
 - Video results reuse the existing result list, status polling via
   `getTrack()`, and error display. Duplicate checking is deferred to
   post-processing (like normal uploads).
@@ -974,12 +974,14 @@ Final implementation verification from `backend/`:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m alembic heads
 docker compose -f docker-compose.prod.yml --env-file .env.production.example config --quiet
 ```
 
 Results:
 
 - Full backend test suite: 302 passed, 2 skipped (symlink-escape on Windows).
+- Alembic heads: `20260610_0008 (head)`.
 - Production Compose config validation: passed.
 
 From `web/`:
@@ -1004,14 +1006,123 @@ Manual checks:
 
 Acceptance status:
 
-- All automated gates (1–8) have passing automated coverage locally.
-- V2 Automatic import tools: not accepted — manual audio import smoke,
+- All automated gates (1-8) have passing automated coverage locally.
+- V2 Automatic import tools: not accepted - manual audio import smoke,
   mixed import smoke, and production-aware smoke still required.
-- V2 user-provided video-to-audio processing: not accepted — manual video
+- V2 user-provided video-to-audio processing: not accepted - manual video
   upload smoke, worker extraction smoke, and production-aware smoke still
   required.
 - Acceptance record contains real dated automated verification results;
   manual smoke results should be appended when actually run.
+
+### 2026-06-10 - Final V2 Automated Acceptance Review
+
+Purpose:
+
+- Re-run the V2 import and video automated acceptance checks after the final
+  V2.7-V2.10 review fixes, including path safety, mixed import response
+  fields, Web selection behavior, and video upload validation.
+- Verify the local Docker database migration state after applying the V2
+  Alembic migrations.
+- Record only checks actually completed in this environment.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m alembic heads
+```
+
+Results:
+
+- Full backend test suite: 306 passed, 2 skipped. The skipped checks were
+  symlink-escape coverage because Windows symlink creation was unavailable in
+  this environment.
+- Alembic heads: `20260610_0008 (head)`.
+
+Automated checks run from `web/`:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+Deployment and Docker checks run from the repository root:
+
+```powershell
+docker compose -f docker-compose.prod.yml --env-file .env.production.example config --quiet
+docker compose ps
+docker compose exec -T api alembic current
+docker compose exec -T api sh -lc "command -v ffmpeg && ffmpeg -version | head -n 1 && command -v ffprobe && ffprobe -version | head -n 1"
+```
+
+Results:
+
+- Production Compose config validation with `.env.production.example`: passed.
+- Local Docker services checked: `postgres`, `api`, and `worker-loop` were
+  running.
+- Local Docker database migration state: `20260610_0008 (head)`.
+- FFmpeg and ffprobe were available inside the API container.
+
+Runtime configuration observed in local Docker:
+
+- `IMPORT_ALLOWED_ROOTS` was empty, so import tools were disabled by safe
+  default in the currently running Docker environment.
+- `MEDIA_ROOT` was `/app/media`.
+- `TEMP_VIDEOS_DIR` was `temp-videos`.
+- `MAX_VIDEO_UPLOAD_MB` was `1024`.
+
+Manual checks:
+
+- Browser audio import smoke was not run because the current Docker environment
+  has no configured import root.
+- Browser mixed audio/video import smoke was not run because the current Docker
+  environment has no configured import root.
+- Browser video upload smoke with a real media file was not run in this
+  acceptance pass.
+- No Android build was run because V2 import/video changes do not change
+  existing Track response fields consumed by Android; import-specific response
+  fields are Web/backend only.
+
+Final acceptance status:
+
+- V2 automated acceptance: accepted.
+- V2 local Docker migration/config readiness: accepted.
+- V2 full manual product acceptance: accepted after the browser smoke record
+  below.
+- No evidence was found in this final pass that source files are deleted,
+  moved, renamed, or modified by import flows.
+- No evidence was found in this final pass that original videos are retained as
+  library media files or exposed through stream/download endpoints.
+
+### 2026-06-10 - Final Browser Smoke Acceptance
+
+Operator-reported manual checks:
+
+- Configured a temporary Docker import root at `/app/imports/smoke`, backed by
+  a local throwaway test directory mounted into the API and worker containers.
+- Ran the Web audio import smoke from the Import page.
+- Ran the Web video upload smoke from the Upload page.
+- Ran the Web mixed audio/video import smoke from the Import page.
+
+Results:
+
+- Manual audio import smoke: passed.
+- Manual video upload and worker extraction smoke: passed.
+- Manual mixed audio/video import smoke: passed.
+- Source files in the configured import directory were preserved.
+- Imported and uploaded media reached normal Library playback behavior.
+
+Acceptance status:
+
+- V2 Automatic import tools: accepted.
+- V2 user-provided video-to-audio processing: accepted.
+- V2 Import and Video Processing: accepted for local V2 closure.
 
 
 
@@ -1023,20 +1134,22 @@ JVM tests or build before acceptance.
 
 ## Acceptance Checklist
 
-- Import path safety tests pass.
-- Audio scan API tests pass.
-- Confirmed audio import tests pass.
-- Worker regression tests pass.
-- Web import UI typecheck/build pass.
-- Manual audio import smoke passes.
-- Video upload API tests pass.
-- Video processing worker tests pass.
-- Web video upload typecheck/build pass.
-- Manual video upload smoke passes.
-- Mixed audio/video import tests pass.
-- Manual mixed import smoke passes.
-- Documentation updates are complete.
-- Ubuntu deployment notes are reviewed.
-- Source files are never deleted, moved, renamed, or modified.
-- Original videos are not retained as library media files.
-- Duplicate handling remains advisory.
+- [x] Import path safety tests pass.
+- [x] Audio scan API tests pass.
+- [x] Confirmed audio import tests pass.
+- [x] Worker regression tests pass.
+- [x] Web import UI typecheck/build pass.
+- [x] Manual audio import smoke passes.
+- [x] Video upload API tests pass.
+- [x] Video processing worker tests pass.
+- [x] Web video upload typecheck/build pass.
+- [x] Manual video upload smoke passes.
+- [x] Mixed audio/video import tests pass.
+- [x] Manual mixed import smoke passes.
+- [x] Documentation updates are complete.
+- [x] Ubuntu deployment notes are reviewed.
+- [x] Source files are never deleted, moved, renamed, or modified by the
+  covered automated paths.
+- [x] Original videos are not retained as library media files by the covered
+  automated paths.
+- [x] Duplicate handling remains advisory.

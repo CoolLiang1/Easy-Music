@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.media.ffmpeg import FFmpegError, extract_audio_from_video
-from app.media.paths import UnsafeMediaPathError, sanitize_filename
+from app.media.paths import UnsafeMediaPathError, resolve_media_path, sanitize_filename
 from app.media.storage import MediaStorage
 from app.models.processing_job import ProcessingJob
 from app.models.track import Track
@@ -68,6 +68,9 @@ def _process_video_extraction_job(
     except UnsafeMediaPathError:
         _fail_track(db, track_id)
         raise VideoExtractionError("Video source path is invalid.")
+    if not _is_temporary_video_path(temp_video_path, storage):
+        _fail_track(db, track_id)
+        raise VideoExtractionError("Video source path is not temporary video storage.")
 
     if not temp_video_path.is_file():
         _fail_track(db, track_id)
@@ -132,6 +135,17 @@ def _extracted_audio_filename(track_title: str) -> str:
     safe = sanitize_filename(track_title, fallback="extracted_audio")
     stem = Path(safe).stem or "extracted_audio"
     return f"{stem}.mp3"
+
+
+def _is_temporary_video_path(path: Path, storage: MediaStorage) -> bool:
+    try:
+        temp_root = resolve_media_path(
+            storage.settings.media_root,
+            storage.settings.temp_videos_dir,
+        )
+    except UnsafeMediaPathError:
+        return False
+    return path.resolve(strict=False).is_relative_to(temp_root)
 
 
 def _fail_track(db: Session, track_id: int) -> None:

@@ -2,13 +2,6 @@ import { type ChangeEvent, type FormEvent, useId, useState } from "react";
 import { env } from "../config/env";
 
 const acceptedVideoExtensions = [".mp4", ".mkv", ".mov", ".webm"];
-const acceptedVideoMimeTypes = [
-  "video/mp4",
-  "video/x-matroska",
-  "video/matroska",
-  "video/quicktime",
-  "video/webm",
-];
 
 type VideoUploadFormProps = {
   disabled?: boolean;
@@ -97,9 +90,7 @@ function getVideoValidationError(files: File[]) {
 
 function isSupportedVideoFile(file: File) {
   const lowerName = file.name.toLowerCase();
-  const hasSupportedExtension = acceptedVideoExtensions.some((extension) =>
+  return acceptedVideoExtensions.some((extension) =>
     lowerName.endsWith(extension),
   );
-
-  return hasSupportedExtension || acceptedVideoMimeTypes.includes(file.type);
 }
