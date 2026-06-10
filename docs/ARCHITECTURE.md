@@ -448,6 +448,7 @@ does not let AI select tracks.
 
 - `GET /api/imports/configuration`
 - `POST /api/imports/scan`
+- `POST /api/imports`
 
 ### Playback And Feedback
 

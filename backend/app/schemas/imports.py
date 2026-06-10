@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from app.schemas.track import TrackResponse
 
 
 class ImportRootInfo(BaseModel):
@@ -54,3 +56,38 @@ class ImportScanResponse(BaseModel):
     candidates: list[ImportScanCandidate]
     skipped: list[ImportScanSkippedItem]
     limits: ImportScanLimits
+
+
+class ImportConfirmFileSelection(BaseModel):
+    relative_path: str
+
+
+class ImportConfirmRequest(BaseModel):
+    root_id: str
+    files: list[ImportConfirmFileSelection]
+
+
+class ImportDuplicateWarning(BaseModel):
+    match_type: str
+    reason: str
+    candidate_track_ids: list[int]
+
+
+class ImportConfirmResult(BaseModel):
+    relative_path: str
+    basename: str
+    status: str
+    track: TrackResponse | None = None
+    error: str | None = None
+    duplicate_warnings: list[ImportDuplicateWarning] = Field(default_factory=list)
+
+
+class ImportConfirmResponse(BaseModel):
+    enabled: bool
+    message: str
+    root: ImportRootInfo | None = None
+    requested_count: int
+    imported_count: int
+    skipped_count: int
+    failed_count: int
+    results: list[ImportConfirmResult]

@@ -546,10 +546,11 @@ Run all Phase 1 backend tests from `backend/`:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Run the focused V2 import-root safety and scan-preview checks from `backend/`:
+Run the focused V2 import-root safety, scan-preview, and confirmed-import
+checks from `backend/`:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py tests\test_imports_confirm_api.py
 ```
 
 The test suite covers:

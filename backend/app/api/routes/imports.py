@@ -1,14 +1,24 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
+from app.db.session import get_db
+from app.media.storage import MediaStorage, get_media_storage
 from app.models.user import User
-from app.schemas.imports import ImportConfigurationResponse, ImportScanRequest, ImportScanResponse
+from app.schemas.imports import (
+    ImportConfirmRequest,
+    ImportConfirmResponse,
+    ImportConfigurationResponse,
+    ImportScanRequest,
+    ImportScanResponse,
+)
 from app.services.imports import (
     ImportConfigurationError,
     ImportPathSafetyError,
     ImportRootPolicy,
+    ImportConfirmError,
     ImportScanError,
     get_import_root_policy,
 )
@@ -42,3 +52,25 @@ def scan_import_directory(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ImportScanError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("", response_model=ImportConfirmResponse)
+def confirm_audio_import(
+    request: ImportConfirmRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
+    policy: Annotated[ImportRootPolicy, Depends(get_import_root_policy)],
+) -> ImportConfirmResponse:
+    try:
+        return policy.confirm_audio_import(
+            db=db,
+            user=current_user,
+            root_id=request.root_id,
+            relative_paths=[selection.relative_path for selection in request.files],
+            storage=storage,
+        )
+    except (ImportConfigurationError, ImportPathSafetyError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ImportConfirmError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

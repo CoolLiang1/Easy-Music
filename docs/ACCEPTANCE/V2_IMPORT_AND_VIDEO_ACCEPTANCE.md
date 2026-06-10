@@ -487,6 +487,62 @@ Acceptance status:
   Web UI, worker closure, and manual smoke checks are not implemented yet.
 - V2 user-provided video-to-audio processing is still not accepted.
 
+### 2026-06-10 - Task V2.3 Backend Confirmed Audio Import
+
+Implemented:
+
+- Added authenticated `POST /api/imports` confirmed audio import endpoint.
+- Request imports only explicitly selected relative paths under one configured
+  import root and re-validates every path against the import safety policy.
+- First-version import strategy is copy-and-keep-source:
+  - source files are never deleted;
+  - source files are never moved;
+  - selected supported audio files are copied into controlled original media
+    storage through the existing `MediaStorage` layout;
+  - copied files become normal track originals for the existing worker.
+- Each successful file creates a normal `Track` with `processing` status and a
+  normal pending processing job.
+- Results are per-file and include `imported`, `skipped`, or `failed`.
+- Exact original-file duplicate warnings are advisory and do not block import.
+- Partial success is allowed; one failed file does not roll back prior
+  successful imported files.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py tests\test_imports_confirm_api.py
+.\.venv\Scripts\python.exe -m pytest tests\test_media_storage.py tests\test_uploads_api.py tests\test_processing_service.py tests\test_worker_jobs.py
+.\.venv\Scripts\python.exe -m pytest
+docker compose -f docker-compose.prod.yml --env-file .env.production.example config --quiet
+```
+
+Results:
+
+- `tests\test_imports_config.py tests\test_imports_path_safety.py
+  tests\test_imports_scan_api.py tests\test_imports_confirm_api.py`: 30
+  passed, 2 skipped. The skipped checks were symlink-escape coverage because
+  Windows symlink creation was unavailable in this environment.
+- `tests\test_media_storage.py tests\test_uploads_api.py
+  tests\test_processing_service.py tests\test_worker_jobs.py`: 18 passed.
+- Full backend test suite: 275 passed, 2 skipped.
+- Production Compose config validation with `.env.production.example`: passed.
+
+Manual checks:
+
+- No live API manual confirmed-import smoke was run in this implementation
+  pass.
+- No Web import UI exists yet, so no browser import smoke was run.
+- No Android impact check was run because this task adds new import-only API
+  responses and does not change Track response shapes used by Android.
+
+Acceptance status:
+
+- Gate 3 automated confirmed audio import coverage is partially verified
+  locally.
+- V2 Automatic import tools are still not accepted because Web UI, worker
+  end-to-end manual smoke, and production-aware smoke checks are not complete.
+- V2 user-provided video-to-audio processing is still not accepted.
+
 ## Android Impact
 
 No Android UI is required for the first version of these V2 features. Android

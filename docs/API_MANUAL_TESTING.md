@@ -213,6 +213,57 @@ Expected result:
 - No tracks, processing jobs, media files, or source import files are created,
   deleted, moved, or renamed.
 
+## Confirm Selected Audio Import
+
+V2.3 adds explicit confirmed audio import. It copies only selected source files
+from a configured import root into controlled Easy Music original media storage,
+keeps source files unchanged, and creates normal `processing` tracks with
+normal pending processing jobs.
+
+Using the `$config` and `$importRoot` from the scan section above, confirm one
+supported audio file:
+
+```powershell
+$confirm = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/imports" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    root_id = $config.roots[0].id
+    files = @(
+      @{
+        relative_path = "scan-tone.wav"
+      }
+    )
+  } | ConvertTo-Json -Depth 4)
+
+$confirm.results
+$trackId = $confirm.results[0].track.id
+```
+
+Expected result:
+
+- The selected file result has `status: imported`.
+- The nested `track` payload is the normal safe track response.
+- The created track has `status: processing`.
+- `processing_job_status` is `pending`.
+- `original_file_path` is under Easy Music controlled media storage.
+- The source file still exists under `$importRoot` and has not been moved,
+  renamed, deleted, or modified.
+- Unsupported or oversized selected files return per-file `skipped` results.
+- Missing files or copy failures return per-file `failed` results without
+  rolling back prior successful imports.
+- Exact duplicate warnings, when present, are advisory and do not block import.
+
+The source file remains in the import directory:
+
+```powershell
+Test-Path (Join-Path $importRoot "scan-tone.wav")
+```
+
+Then run the worker as usual to process the imported track.
+
 ## Run The Worker
 
 From `backend/`, process one pending job:

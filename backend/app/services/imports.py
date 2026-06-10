@@ -1,8 +1,16 @@
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
 
+from sqlalchemy import select
 from app.core.config import Settings, get_settings
+from app.media.storage import MediaStorage
+from app.models.track import Track
+from app.models.user import User
 from app.schemas.imports import (
+    ImportConfirmResponse,
+    ImportConfirmResult,
+    ImportDuplicateWarning,
     ImportConfigurationResponse,
     ImportRootInfo,
     ImportScanCandidate,
@@ -10,6 +18,9 @@ from app.schemas.imports import (
     ImportScanResponse,
     ImportScanSkippedItem,
 )
+from app.services.duplicate_signals import build_normalized_metadata_key, collect_file_duplicate_signal
+from app.services.jobs import create_processing_job
+from app.services.tracks import build_track_response
 from app.services.uploads import ALLOWED_UPLOAD_TYPES
 
 
@@ -22,6 +33,10 @@ class ImportPathSafetyError(ValueError):
 
 
 class ImportScanError(ValueError):
+    pass
+
+
+class ImportConfirmError(ValueError):
     pass
 
 
@@ -107,6 +122,48 @@ class ImportRootPolicy:
             limits=limits,
         )
 
+    def confirm_audio_import(
+        self,
+        db,
+        user: User,
+        root_id: str,
+        relative_paths: list[str],
+        storage: MediaStorage,
+    ) -> ImportConfirmResponse:
+        if not self.settings.import_allowed_roots:
+            return ImportConfirmResponse(
+                enabled=False,
+                message=_DISABLED_MESSAGE,
+                requested_count=len(relative_paths),
+                imported_count=0,
+                skipped_count=0,
+                failed_count=0,
+                results=[],
+            )
+
+        roots = {root.id: root for root in self.configured_roots()}
+        root = roots.get(root_id)
+        if root is None:
+            raise ImportPathSafetyError("Requested import root is not configured.")
+
+        results: list[ImportConfirmResult] = []
+        for relative_path in relative_paths:
+            results.append(self._confirm_one_audio_import(db, user, root, relative_path, storage))
+
+        imported_count = sum(1 for result in results if result.status == "imported")
+        skipped_count = sum(1 for result in results if result.status == "skipped")
+        failed_count = sum(1 for result in results if result.status == "failed")
+        return ImportConfirmResponse(
+            enabled=True,
+            message="Import completed.",
+            root=ImportRootInfo(id=root.id, label=root.label),
+            requested_count=len(relative_paths),
+            imported_count=imported_count,
+            skipped_count=skipped_count,
+            failed_count=failed_count,
+            results=results,
+        )
+
     def configured_roots(self) -> list[ConfiguredImportRoot]:
         roots: list[ConfiguredImportRoot] = []
         for index, configured_path in enumerate(self.settings.import_allowed_roots, start=1):
@@ -138,6 +195,116 @@ class ImportRootPolicy:
             path=candidate,
             relative_path=candidate.relative_to(root.path).as_posix() or ".",
         )
+
+    def _confirm_one_audio_import(
+        self,
+        db,
+        user: User,
+        root: ConfiguredImportRoot,
+        relative_path: str,
+        storage: MediaStorage,
+    ) -> ImportConfirmResult:
+        basename = Path(relative_path.replace("\\", "/")).name or "."
+        try:
+            source = self._resolve_under_root(root.path, relative_path)
+            relative_source_path = source.relative_to(root.path).as_posix()
+            basename = source.name
+            if not source.exists():
+                return self._import_result(relative_source_path, basename, "failed", "Source file does not exist.")
+            if not source.is_file():
+                return self._import_result(relative_source_path, basename, "failed", "Source path is not a file.")
+            extension = source.suffix.lower()
+            if extension not in ALLOWED_UPLOAD_TYPES:
+                return self._import_result(relative_source_path, basename, "skipped", "Unsupported audio file extension.")
+            size_bytes = source.stat().st_size
+            if size_bytes > self._scan_limits().max_file_size_bytes:
+                return self._import_result(relative_source_path, basename, "skipped", "Source file exceeds import size limit.")
+
+            source_signal = collect_file_duplicate_signal(source)
+            duplicate_warnings = self._duplicate_warnings_for_signal(db, user, source_signal.sha256 if source_signal else None)
+
+            track = Track(
+                user_id=user.id,
+                title=source.stem or "Untitled Import",
+                content_type="song",
+                status="uploading",
+                format=extension.removeprefix("."),
+            )
+            db.add(track)
+            db.flush()
+
+            destination = storage.original_upload_path(user.id, track.id, source.name)
+            try:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, destination)
+            except Exception as exc:
+                db.rollback()
+                if destination.exists():
+                    destination.unlink()
+                return self._import_result(relative_source_path, basename, "failed", f"Copy failed: {exc}")
+
+            copied_signal = collect_file_duplicate_signal(destination)
+            if copied_signal is not None:
+                track.original_file_size_bytes = copied_signal.size_bytes
+                track.original_file_sha256 = copied_signal.sha256
+            else:
+                track.original_file_size_bytes = size_bytes
+                track.original_file_sha256 = source_signal.sha256 if source_signal else None
+
+            track.original_file_path = storage.relative_media_path(destination)
+            track.normalized_metadata_key = build_normalized_metadata_key(
+                title=track.title,
+                artist=track.artist,
+                album=track.album,
+                duration_seconds=track.duration_seconds,
+            )
+            track.status = "processing"
+            create_processing_job(db, track)
+            db.commit()
+            db.refresh(track)
+            return ImportConfirmResult(
+                relative_path=relative_source_path,
+                basename=basename,
+                status="imported",
+                track=build_track_response(db, track),
+                duplicate_warnings=duplicate_warnings,
+            )
+        except (ImportPathSafetyError, OSError) as exc:
+            db.rollback()
+            return self._import_result(relative_path, basename, "failed", str(exc))
+
+    @staticmethod
+    def _import_result(relative_path: str, basename: str, status: str, error: str) -> ImportConfirmResult:
+        return ImportConfirmResult(
+            relative_path=relative_path.replace("\\", "/"),
+            basename=basename,
+            status=status,
+            error=error,
+        )
+
+    @staticmethod
+    def _duplicate_warnings_for_signal(db, user: User, sha256: str | None) -> list[ImportDuplicateWarning]:
+        if not sha256:
+            return []
+        candidate_track_ids = list(
+            db.scalars(
+                select(Track.id)
+                .where(
+                    Track.user_id == user.id,
+                    Track.original_file_sha256 == sha256,
+                )
+                .order_by(Track.id),
+            ),
+        )
+        if not candidate_track_ids:
+            return []
+        return [
+            ImportDuplicateWarning(
+                match_type="exact_file",
+                reason="Selected file matches an existing track original file SHA-256.",
+                candidate_track_ids=candidate_track_ids,
+            ),
+        ]
 
     def _scan_directory(
         self,
