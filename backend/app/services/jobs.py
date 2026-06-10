@@ -44,12 +44,18 @@ def create_processing_job(
     return job
 
 
-def claim_next_pending_job(db: Session) -> ProcessingJob | None:
+def claim_next_pending_job(
+    db: Session,
+    *,
+    allowed_types: set[str] | None = None,
+) -> ProcessingJob | None:
+    if allowed_types is None:
+        allowed_types = {AUDIO_PROCESSING_JOB_TYPE, VIDEO_EXTRACTION_JOB_TYPE}
     job = db.scalar(
         select(ProcessingJob)
         .where(
             ProcessingJob.status == "pending",
-            ProcessingJob.job_type == AUDIO_PROCESSING_JOB_TYPE,
+            ProcessingJob.job_type.in_(allowed_types),
         )
         .order_by(ProcessingJob.created_at.asc(), ProcessingJob.id.asc())
         .with_for_update(skip_locked=True)

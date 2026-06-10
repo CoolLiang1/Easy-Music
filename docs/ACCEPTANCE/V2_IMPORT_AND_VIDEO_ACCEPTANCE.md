@@ -734,6 +734,78 @@ Acceptance status:
 - V2 Automatic import tools are unchanged by this task and still await manual
   import smoke before acceptance.
 
+### 2026-06-10 - Task V2.7 Worker Video-To-Audio Extraction
+
+Implemented:
+
+- Modified `claim_next_pending_job` to accept an optional `allowed_types`
+  parameter, defaulting to both `audio_processing` and `video_extraction` job
+  types. FIFO ordering by `created_at` then `id` is preserved.
+- Added `extract_audio_from_video` helper in `backend/app/media/ffmpeg.py`.
+  Uses `-vn` argument array (never shell string) to drop video streams and
+  extract audio via `libmp3lame` at a configurable bitrate defaulting to 192k.
+- Added `_process_video_extraction_job` in `backend/app/worker/jobs.py`:
+  - Resolves `job.source_path` through `MediaStorage.stored_media_path` with
+    path-safety enforcement.
+  - Rejects missing `source_path`, missing temp file, and missing track with
+    UI-safe error messages.
+  - Extracts audio from the temporary video into a controlled original path
+    via `storage.original_upload_path`.
+  - Sets `track.original_file_path` to the extracted audio.
+  - Deletes the exact temp video file on success; keeps it on failure for
+    retry/debug.
+  - Calls `process_track()` for metadata extraction, playback MP3 generation,
+    duplicate signals, and ready/failed state.
+  - Handles reruns safely: if the track already has a usable extracted
+    original, extraction is skipped.
+- Added `VideoExtractionError` with UI-safe messages: "Video audio extraction
+  failed.", "Temporary video file is missing.", etc.
+- No absolute paths, temp paths, or stack traces are exposed in job error
+  messages.
+- No recursive directory deletion. Temp video lifecycle operates only on the
+  exact resolved file.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_video_processing.py tests\test_worker_jobs.py
+.\.venv\Scripts\python.exe -m pytest tests\test_video_uploads_api.py tests\test_uploads_api.py tests\test_processing_service.py
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Results:
+
+- `tests\test_video_processing.py tests\test_worker_jobs.py`: 17 passed.
+  Covers successful extraction, audio processing regression, FFmpeg failure,
+  missing source/temp/track, temp lifecycle (delete on success, keep on
+  failure, no recursive deletion), rerun/idempotency (skip when original
+  exists, re-extract when missing), and UI-safe error messages.
+- `tests\test_video_uploads_api.py tests\test_uploads_api.py
+  tests\test_processing_service.py`: 17 passed. All existing upload and
+  processing regression tests pass unchanged.
+- Full backend test suite: 302 passed, 2 skipped. The skipped checks were
+  symlink-escape coverage because Windows symlink creation was unavailable
+  in this environment.
+
+Manual checks:
+
+- FFmpeg/ffprobe were not available in the current shell environment; tests
+  use monkeypatched FFmpeg helpers.
+- No live API worker video extraction smoke was run in this implementation
+  pass.
+- No Web video upload smoke was run because V2.8 is not implemented yet.
+- No Android impact check was run because this task adds worker-only
+  functionality and does not change existing Track response fields used by
+  Android.
+
+Acceptance status:
+
+- Gate 6 automated worker video extraction coverage is verified locally.
+- V2 user-provided video-to-audio processing is still not accepted because
+  Web video upload UI (V2.8), mixed import support (V2.9), and manual smoke
+  checks are not complete.
+- V2 Automatic import tools are unchanged by this task.
+
 ## Android Impact
 
 No Android UI is required for the first version of these V2 features. Android

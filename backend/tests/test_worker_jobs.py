@@ -131,7 +131,7 @@ def test_process_next_job_returns_none_when_no_pending_jobs(db_session: Session)
     assert worker_jobs.process_next_job(db_session, MediaStorage()) is None
 
 
-def test_process_next_job_ignores_video_extraction_jobs(
+def test_process_next_job_claims_and_processes_video_extraction_jobs(
     db_session: Session,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -154,18 +154,23 @@ def test_process_next_job_ignores_video_extraction_jobs(
     db_session.add(job)
     db_session.commit()
 
-    def process_track_stub(*args, **kwargs) -> Track:
-        raise AssertionError("video extraction jobs should wait for V2.7 worker support")
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
+    processed_by_video: list[int] = []
 
-    monkeypatch.setattr(worker_jobs, "process_track", process_track_stub)
+    def video_handler_stub(db: Session, job: ProcessingJob, storage: MediaStorage) -> None:
+        processed_by_video.append(job.id)
+        t = db.get(Track, job.track_id)
+        assert t is not None
+        t.status = "ready"
+        db.commit()
 
-    processed_job = worker_jobs.process_next_job(
-        db_session,
-        MediaStorage(Settings(media_root=str(tmp_path))),
-    )
+    monkeypatch.setattr(worker_jobs, "_process_video_extraction_job", video_handler_stub)
 
-    assert processed_job is None
-    db_session.refresh(job)
+    processed_job = worker_jobs.process_next_job(db_session, storage)
+
+    assert processed_job is not None
+    assert processed_job.id == job.id
+    assert processed_job.status == "succeeded"
+    assert processed_by_video == [job.id]
     db_session.refresh(track)
-    assert job.status == "pending"
-    assert track.status == "processing"
+    assert track.status == "ready"
