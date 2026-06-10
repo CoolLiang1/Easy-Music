@@ -618,6 +618,57 @@ Acceptance status:
   end-to-end manual smoke, and production-aware smoke checks are not complete.
 - V2 user-provided video-to-audio processing is still not accepted.
 
+### 2026-06-10 - Task V2.5 Web Import Scan And Confirmation UI
+
+Implemented:
+
+- Added Web import API wrapper and TypeScript response/request types for:
+  configuration, scan preview, confirmed import, latest batch, and specific
+  batch status.
+- Added `/imports` Web management page and sidebar navigation entry.
+- Web shows configured import roots by backend-provided safe labels and allows
+  only an optional relative subdirectory input.
+- Web scan flow shows supported audio candidates with relative path, basename,
+  extension, size, and support status. Unsupported/skipped scan items are shown
+  separately with safe reasons.
+- Web requires explicit file selection before confirming import. It does not
+  auto-import scanned candidates and does not expose delete, move, rename, or
+  cleanup actions.
+- Web confirmation results show imported, skipped, and failed per-file states,
+  duplicate warnings as advisory messages, and links to created Track Detail
+  pages.
+- Web latest-batch panel refreshes imported item track payloads so existing
+  track processing status remains the source of truth for transcoding state.
+
+Automated checks run from `web/`:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+Manual checks:
+
+- No browser import smoke against a live backend was run in this implementation
+  pass.
+- No worker end-to-end import-to-ready smoke was run in this implementation
+  pass.
+- No Android impact check was run because this task adds Web-only UI and does
+  not change backend Track response shapes used by Android.
+
+Acceptance status:
+
+- Gate 4 automated Web compile/build coverage is verified locally.
+- V2 Automatic import tools are still not accepted because browser import smoke,
+  worker end-to-end manual smoke, and production-aware smoke checks are not
+  complete.
+- V2 user-provided video-to-audio processing is still not accepted.
+
 ## Android Impact
 
 No Android UI is required for the first version of these V2 features. Android

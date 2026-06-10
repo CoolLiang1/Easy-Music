@@ -405,6 +405,12 @@ Vite prints the local browser URL, usually `http://localhost:5173/`. The Web
 console calls the backend API after login, so run PostgreSQL, migrations, the
 API, and an initial local user before doing a full browser smoke test.
 
+The V2 audio import page is available at `/imports` after login. It reads the
+configured import roots from the backend, scans one configured root and optional
+relative subdirectory, lets the user explicitly select supported audio
+candidates, confirms import, and refreshes the latest import batch status using
+the existing track processing status.
+
 Run the Web type check from `web/`:
 
 ```powershell

@@ -13,6 +13,7 @@ const navGroups = [
     items: [
       { label: "曲库", path: "/library" },
       { label: "上传", path: "/upload" },
+      { label: "导入", path: "/imports" },
       { label: "标签", path: "/tags" },
     ],
   },
