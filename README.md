@@ -23,6 +23,7 @@ deployment step, not a completed repository verification step.
 - [Git Workflow](docs/GIT_WORKFLOW.md)
 - [Phase 7 Acceptance](docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md)
 - [V1.1 Duplicate Detection Acceptance](docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md)
+- [V1.1 Workflow Enhancements Acceptance](docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md)
 
 ## Implemented Areas
 
@@ -62,6 +63,9 @@ Current documented progress:
 - Phase 7: accepted by local static and automated verification. Production
   deployment artifacts exist, while the first real-server HTTPS smoke test is
   deferred to the operator's deployment.
+- V1.1: duplicate detection is accepted. Workflow enhancements through Android
+  launcher shortcuts are implemented with automated checks recorded; manual
+  acceptance is partially recorded in the V1.1 workflow acceptance note.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.

@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-02:
+Status as of 2026-06-10:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -42,6 +42,11 @@ Status as of 2026-06-02:
   production Docker Compose, Caddy HTTPS config, production env template, host
   storage layout, database backup script, structured logging, health checks,
   and deployment documentation.
+- V1.1: Duplicate Detection is accepted. Better upload progress, batch tag
+  editing, library organization reports, cover editing, advanced recommendation
+  explanations, recently revived tracks, and Android launcher shortcuts are
+  implemented. Automated checks are recorded, with manual acceptance partially
+  recorded in `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
