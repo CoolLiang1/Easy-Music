@@ -264,6 +264,45 @@ Test-Path (Join-Path $importRoot "scan-tone.wav")
 
 Then run the worker as usual to process the imported track.
 
+## Review Import Batch Status
+
+V2.4 records a small safe history record for confirmed imports. Track
+processing state is still read from the normal track payload; the import batch
+only explains which source selections were imported, skipped, or failed.
+
+Fetch the latest import batch for the current user:
+
+```powershell
+$latestImportBatch = Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/imports/batches/latest" `
+  -Headers $headers
+
+$latestImportBatch
+```
+
+Fetch a specific batch from the confirm response:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/imports/batches/$($confirm.batch_id)" `
+  -Headers $headers
+```
+
+Expected result:
+
+- Batch responses are scoped to the authenticated user.
+- The response includes safe root id/label, batch status, requested/imported/
+  skipped/failed counts, and item timestamps.
+- Item responses include safe relative source paths and basenames, never
+  unrestricted absolute import source paths.
+- Imported items include `track_id` and the normal safe track response so the
+  Web can show current processing status.
+- Failed or skipped items include UI-safe error messages.
+- A missing token returns `401 Unauthorized`.
+- A batch belonging to another user returns `404 Not Found`.
+
 ## Run The Worker
 
 From `backend/`, process one pending job:

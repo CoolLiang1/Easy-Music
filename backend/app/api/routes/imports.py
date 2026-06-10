@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.media.storage import MediaStorage, get_media_storage
 from app.models.user import User
 from app.schemas.imports import (
+    ImportBatchResponse,
     ImportConfirmRequest,
     ImportConfirmResponse,
     ImportConfigurationResponse,
@@ -52,6 +53,34 @@ def scan_import_directory(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ImportScanError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/batches/latest", response_model=ImportBatchResponse | None)
+def get_latest_import_batch(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    policy: Annotated[ImportRootPolicy, Depends(get_import_root_policy)],
+) -> ImportBatchResponse | None:
+    try:
+        return policy.latest_import_batch(db, current_user)
+    except (ImportConfigurationError, ImportPathSafetyError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/batches/{batch_id}", response_model=ImportBatchResponse)
+def get_import_batch(
+    batch_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    policy: Annotated[ImportRootPolicy, Depends(get_import_root_policy)],
+) -> ImportBatchResponse:
+    try:
+        batch = policy.get_import_batch(db, current_user, batch_id)
+    except (ImportConfigurationError, ImportPathSafetyError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if batch is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Import batch not found.")
+    return batch
 
 
 @router.post("", response_model=ImportConfirmResponse)

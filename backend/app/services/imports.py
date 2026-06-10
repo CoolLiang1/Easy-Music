@@ -5,9 +5,12 @@ import shutil
 from sqlalchemy import select
 from app.core.config import Settings, get_settings
 from app.media.storage import MediaStorage
+from app.models.import_batch import ImportBatch, ImportItem
 from app.models.track import Track
 from app.models.user import User
 from app.schemas.imports import (
+    ImportBatchItemResponse,
+    ImportBatchResponse,
     ImportConfirmResponse,
     ImportConfirmResult,
     ImportDuplicateWarning,
@@ -134,6 +137,7 @@ class ImportRootPolicy:
             return ImportConfirmResponse(
                 enabled=False,
                 message=_DISABLED_MESSAGE,
+                batch_id=None,
                 requested_count=len(relative_paths),
                 imported_count=0,
                 skipped_count=0,
@@ -146,23 +150,66 @@ class ImportRootPolicy:
         if root is None:
             raise ImportPathSafetyError("Requested import root is not configured.")
 
+        batch = ImportBatch(
+            user_id=user.id,
+            root_id=root.id,
+            status="importing",
+            message="Import is running.",
+            requested_count=len(relative_paths),
+        )
+        db.add(batch)
+        db.commit()
+        db.refresh(batch)
+
         results: list[ImportConfirmResult] = []
         for relative_path in relative_paths:
-            results.append(self._confirm_one_audio_import(db, user, root, relative_path, storage))
+            result = self._confirm_one_audio_import(db, user, root, relative_path, storage)
+            results.append(result)
+            self._record_import_item(db, batch, user, root, result)
 
         imported_count = sum(1 for result in results if result.status == "imported")
         skipped_count = sum(1 for result in results if result.status == "skipped")
         failed_count = sum(1 for result in results if result.status == "failed")
+        batch.imported_count = imported_count
+        batch.skipped_count = skipped_count
+        batch.failed_count = failed_count
+        batch.status = self._batch_status(imported_count, skipped_count, failed_count)
+        batch.message = "Import completed."
+        db.commit()
+        db.refresh(batch)
+
         return ImportConfirmResponse(
             enabled=True,
             message="Import completed.",
             root=ImportRootInfo(id=root.id, label=root.label),
+            batch_id=batch.id,
             requested_count=len(relative_paths),
             imported_count=imported_count,
             skipped_count=skipped_count,
             failed_count=failed_count,
             results=results,
         )
+
+    def latest_import_batch(self, db, user: User) -> ImportBatchResponse | None:
+        batch = db.scalar(
+            select(ImportBatch)
+            .where(ImportBatch.user_id == user.id)
+            .order_by(ImportBatch.created_at.desc(), ImportBatch.id.desc()),
+        )
+        if batch is None:
+            return None
+        return self._build_batch_response(db, user, batch)
+
+    def get_import_batch(self, db, user: User, batch_id: int) -> ImportBatchResponse | None:
+        batch = db.scalar(
+            select(ImportBatch).where(
+                ImportBatch.id == batch_id,
+                ImportBatch.user_id == user.id,
+            ),
+        )
+        if batch is None:
+            return None
+        return self._build_batch_response(db, user, batch)
 
     def configured_roots(self) -> list[ConfiguredImportRoot]:
         roots: list[ConfiguredImportRoot] = []
@@ -280,6 +327,97 @@ class ImportRootPolicy:
             basename=basename,
             status=status,
             error=error,
+        )
+
+    @staticmethod
+    def _record_import_item(
+        db,
+        batch: ImportBatch,
+        user: User,
+        root: ConfiguredImportRoot,
+        result: ImportConfirmResult,
+    ) -> None:
+        db.add(
+            ImportItem(
+                batch_id=batch.id,
+                user_id=user.id,
+                root_id=root.id,
+                relative_source_path=result.relative_path.replace("\\", "/"),
+                display_name=result.basename,
+                status=result.status,
+                track_id=result.track.id if result.track else None,
+                error_message=result.error,
+            ),
+        )
+        db.commit()
+
+    @staticmethod
+    def _batch_status(imported_count: int, skipped_count: int, failed_count: int) -> str:
+        if failed_count > 0:
+            return "failed"
+        if imported_count > 0:
+            return "imported"
+        if skipped_count > 0:
+            return "skipped"
+        return "skipped"
+
+    def _build_batch_response(self, db, user: User, batch: ImportBatch) -> ImportBatchResponse:
+        root_label = batch.root_id
+        for root in self.configured_roots():
+            if root.id == batch.root_id:
+                root_label = root.label
+                break
+
+        items = list(
+            db.scalars(
+                select(ImportItem)
+                .where(
+                    ImportItem.batch_id == batch.id,
+                    ImportItem.user_id == user.id,
+                )
+                .order_by(ImportItem.created_at, ImportItem.id),
+            ),
+        )
+        track_ids = [item.track_id for item in items if item.track_id is not None]
+        tracks_by_id = {
+            track.id: track
+            for track in db.scalars(
+                select(Track).where(
+                    Track.user_id == user.id,
+                    Track.id.in_(track_ids),
+                ),
+            )
+        } if track_ids else {}
+
+        return ImportBatchResponse(
+            id=batch.id,
+            root=ImportRootInfo(id=batch.root_id, label=root_label),
+            status=batch.status,
+            message=batch.message,
+            requested_count=batch.requested_count,
+            imported_count=batch.imported_count,
+            skipped_count=batch.skipped_count,
+            failed_count=batch.failed_count,
+            items=[
+                ImportBatchItemResponse(
+                    id=item.id,
+                    relative_path=item.relative_source_path,
+                    basename=item.display_name,
+                    status=item.status,
+                    track_id=item.track_id,
+                    track=(
+                        build_track_response(db, tracks_by_id[item.track_id])
+                        if item.track_id is not None and item.track_id in tracks_by_id
+                        else None
+                    ),
+                    error=item.error_message,
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                )
+                for item in items
+            ],
+            created_at=batch.created_at,
+            updated_at=batch.updated_at,
         )
 
     @staticmethod

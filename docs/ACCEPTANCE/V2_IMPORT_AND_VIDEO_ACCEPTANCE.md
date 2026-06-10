@@ -118,6 +118,34 @@ Expected result:
   duplicate warning, unsupported file, oversized file, path safety, and worker
   regression tests pass.
 
+### Gate 3.5: Import Status And Batch History
+
+Required behavior:
+
+- Confirmed imports create safe batch history for the authenticated user.
+- Batch items record configured root id, relative source path or safe display
+  name, per-file status, resulting track id when created, UI-safe error
+  message, and timestamps.
+- API can return the latest import batch and a specific batch for the current
+  user.
+- Ownership isolation prevents one user from reading another user's import
+  batch.
+- Track processing status remains the source of truth for transcoding results.
+
+Recommended automated check from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_batch_history_api.py
+```
+
+Expected result:
+
+- Safe response fields, latest/specific batch reads, ownership isolation,
+  partial failure state, and imported item links to created tracks pass.
+
+Required Web checks still belong to Gate 4 and must not be marked complete
+until the Web import UI exists and has been tested.
+
 ### Gate 4: Web Import UI
 
 Required behavior:
@@ -538,6 +566,53 @@ Manual checks:
 Acceptance status:
 
 - Gate 3 automated confirmed audio import coverage is partially verified
+  locally.
+- V2 Automatic import tools are still not accepted because Web UI, worker
+  end-to-end manual smoke, and production-aware smoke checks are not complete.
+- V2 user-provided video-to-audio processing is still not accepted.
+
+### 2026-06-10 - Task V2.4 Import Status And Import Batch History
+
+Implemented:
+
+- Added durable `ImportBatch` and `ImportItem` backend tables for confirmed
+  audio import status history.
+- Confirmed import now creates one batch per request and one item per selected
+  file, recording only safe fields: current user id, configured root id,
+  relative source path, display filename, status, created track id when present,
+  UI-safe error message, and timestamps.
+- Added `batch_id` to confirmed import responses so Web can refresh the batch
+  after import.
+- Added authenticated read-only `GET /api/imports/batches/latest` and
+  `GET /api/imports/batches/{batch_id}` endpoints.
+- Batch history responses are current-user scoped and use the existing safe
+  track response for imported items. Track processing status remains the source
+  of truth for worker transcoding state.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_batch_history_api.py
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py tests\test_imports_confirm_api.py tests\test_imports_batch_history_api.py
+```
+
+Results:
+
+- `tests\test_imports_batch_history_api.py`: 4 passed.
+- Focused V2 import suite: 34 passed, 2 skipped. The skipped checks were
+  symlink-escape coverage because Windows symlink creation was unavailable in
+  this environment.
+
+Manual checks:
+
+- No live API manual import batch smoke was run in this implementation pass.
+- No Web import UI exists yet, so no browser import status smoke was run.
+- No Android impact check was run because this task adds import-only API
+  responses and does not change Track response shapes used by Android.
+
+Acceptance status:
+
+- Gate 3.5 automated import batch history coverage is partially verified
   locally.
 - V2 Automatic import tools are still not accepted because Web UI, worker
   end-to-end manual smoke, and production-aware smoke checks are not complete.

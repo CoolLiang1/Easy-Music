@@ -65,8 +65,9 @@ The backend keeps these modules separated at a high level:
 - Tracks: library metadata, playback file references, status, and track updates.
 - Tags: tag taxonomy, tag groups, and track-tag assignment.
 - Uploads: audio upload validation, original file persistence, and upload lifecycle state.
-- Imports: optional administrator-configured local import roots and path safety
-  checks for future read-only scan and explicit import flows.
+- Imports: optional administrator-configured local import roots, path safety
+  checks, read-only scan preview, explicit confirmed import, and small batch
+  history for Web status display.
 - Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
 - Playback events: online/offline playback event ingestion and duplicate-safe sync.
 - Feedback events: recommendation feedback ingestion and cooldown/avoidance inputs.
@@ -305,6 +306,34 @@ Possible feedback types:
 - `score`
 - `reason`
 
+### 8.9 ImportBatch
+
+- `id`
+- `user_id`
+- `root_id`
+- `status`
+- `message`
+- `requested_count`
+- `imported_count`
+- `skipped_count`
+- `failed_count`
+- `created_at`
+- `updated_at`
+
+### 8.10 ImportItem
+
+- `id`
+- `batch_id`
+- `user_id`
+- `root_id`
+- `relative_source_path`
+- `display_name`
+- `status`
+- `track_id`
+- `error_message`
+- `created_at`
+- `updated_at`
+
 ## 9. Media Processing
 
 ### 9.1 Upload
@@ -361,17 +390,29 @@ Requested paths are relative to one configured root, resolved before use, and
 rejected if they escape the root or target broad locations such as a drive root,
 OS root, user home directory, repository root, or `MEDIA_ROOT`.
 
-The first import API surface is read-only:
+The import API surface is intentionally small:
 
 - `GET /api/imports/configuration` returns enabled state and safe root labels.
 - `POST /api/imports/scan` scans one configured root/subdirectory for supported
   audio candidates and skipped files.
+- `POST /api/imports` imports only explicitly selected audio files by copying
+  them into controlled original media storage, creating normal tracks and normal
+  pending processing jobs.
+- `GET /api/imports/batches/latest` and `GET /api/imports/batches/{batch_id}`
+  return the current user's safe import batch history for Web status display.
 
 Scan preview responses include safe relative paths, basenames, extensions,
 sizes, support status, skipped reasons, and applied scan limits. They do not
 expose unrestricted absolute paths, run FFmpeg/ffprobe, create tracks, create
 processing jobs, hash files, copy files, delete files, move files, or modify
 source directories.
+
+Confirmed import responses and batch history store only safe source display
+data: configured root id, relative source path, basename, per-file status,
+resulting track id, UI-safe error message, and timestamps. They do not expose
+absolute import source paths. Imported item track details are built from the
+existing safe track response, and track processing status remains the source of
+truth for transcoding results.
 
 ## 10. Recommendation System
 
@@ -449,6 +490,8 @@ does not let AI select tracks.
 - `GET /api/imports/configuration`
 - `POST /api/imports/scan`
 - `POST /api/imports`
+- `GET /api/imports/batches/latest`
+- `GET /api/imports/batches/{batch_id}`
 
 ### Playback And Feedback
 

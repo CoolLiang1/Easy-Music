@@ -68,9 +68,10 @@ $env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@
 $env:MEDIA_ROOT = ".\media"
 ```
 
-V2 import tools are disabled by default. To test import-root safety and the
-read-only audio scan preview, configure throwaway directories outside the
-repository and outside `MEDIA_ROOT`; semicolons are safest for Windows paths:
+V2 import tools are disabled by default. To test import-root safety, the
+read-only audio scan preview, confirmed audio import, and import batch history,
+configure throwaway directories outside the repository and outside
+`MEDIA_ROOT`; semicolons are safest for Windows paths:
 
 ```powershell
 $env:IMPORT_ALLOWED_ROOTS = "D:\EasyMusicImport;E:\AnotherImport"
@@ -80,9 +81,11 @@ $env:IMPORT_SCAN_MAX_FILE_MB = "200"
 ```
 
 Do not point import roots at `C:\`, `/`, your home directory, this repository,
-or the Easy Music media storage directory. V2.2 scan preview is read-only: it
-does not create tracks, processing jobs, hashes, copies, moves, or deletes.
-Confirmed import API flows arrive in later V2 tasks.
+or the Easy Music media storage directory. Scan preview is read-only: it does
+not create tracks, processing jobs, hashes, copies, moves, or deletes.
+Confirmed import copies explicitly selected audio files into controlled Easy
+Music media storage, keeps the source files unchanged, creates normal
+processing tracks and jobs, and records safe import batch history for the Web.
 
 Apply migrations from `backend/`:
 
@@ -546,11 +549,11 @@ Run all Phase 1 backend tests from `backend/`:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Run the focused V2 import-root safety, scan-preview, and confirmed-import
-checks from `backend/`:
+Run the focused V2 import-root safety, scan-preview, confirmed-import, and
+batch-history checks from `backend/`:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py tests\test_imports_confirm_api.py
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py tests\test_imports_confirm_api.py tests\test_imports_batch_history_api.py
 ```
 
 The test suite covers:

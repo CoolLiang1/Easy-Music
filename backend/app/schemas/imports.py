@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from app.schemas.track import TrackResponse
@@ -86,8 +88,35 @@ class ImportConfirmResponse(BaseModel):
     enabled: bool
     message: str
     root: ImportRootInfo | None = None
+    batch_id: int | None = None
     requested_count: int
     imported_count: int
     skipped_count: int
     failed_count: int
     results: list[ImportConfirmResult]
+
+
+class ImportBatchItemResponse(BaseModel):
+    id: int
+    relative_path: str
+    basename: str
+    status: str
+    track_id: int | None = None
+    track: TrackResponse | None = None
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ImportBatchResponse(BaseModel):
+    id: int
+    root: ImportRootInfo
+    status: str
+    message: str | None = None
+    requested_count: int
+    imported_count: int
+    skipped_count: int
+    failed_count: int
+    items: list[ImportBatchItemResponse]
+    created_at: datetime
+    updated_at: datetime
