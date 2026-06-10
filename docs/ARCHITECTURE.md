@@ -65,6 +65,8 @@ The backend keeps these modules separated at a high level:
 - Tracks: library metadata, playback file references, status, and track updates.
 - Tags: tag taxonomy, tag groups, and track-tag assignment.
 - Uploads: audio upload validation, original file persistence, and upload lifecycle state.
+- Imports: optional administrator-configured local import roots and path safety
+  checks for future read-only scan and explicit import flows.
 - Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
 - Playback events: online/offline playback event ingestion and duplicate-safe sync.
 - Feedback events: recommendation feedback ingestion and cooldown/avoidance inputs.
@@ -351,6 +353,26 @@ media contents.
 Duplicate detection remains advisory. Signal storage must not block uploads and
 must not delete, merge, overwrite, or hide tracks automatically.
 
+### 9.5 Import Root Safety
+
+V2 import tools are disabled when `IMPORT_ALLOWED_ROOTS` is empty. When enabled,
+the backend treats configured roots as an allowlist of server-side directories.
+Requested paths are relative to one configured root, resolved before use, and
+rejected if they escape the root or target broad locations such as a drive root,
+OS root, user home directory, repository root, or `MEDIA_ROOT`.
+
+The first import API surface is read-only:
+
+- `GET /api/imports/configuration` returns enabled state and safe root labels.
+- `POST /api/imports/scan` scans one configured root/subdirectory for supported
+  audio candidates and skipped files.
+
+Scan preview responses include safe relative paths, basenames, extensions,
+sizes, support status, skipped reasons, and applied scan limits. They do not
+expose unrestricted absolute paths, run FFmpeg/ffprobe, create tracks, create
+processing jobs, hash files, copy files, delete files, move files, or modify
+source directories.
+
 ## 10. Recommendation System
 
 Version 1 uses hybrid recommendation:
@@ -421,6 +443,11 @@ does not let AI select tracks.
 - `POST /api/tags`
 - `PATCH /api/tags/{id}`
 - `DELETE /api/tags/{id}`
+
+### Imports
+
+- `GET /api/imports/configuration`
+- `POST /api/imports/scan`
 
 ### Playback And Feedback
 

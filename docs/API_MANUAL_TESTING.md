@@ -116,6 +116,103 @@ Expected result:
 - `playback_file_path` is `null`.
 - A pending processing job exists in the database.
 
+## Import Root Configuration And Read-Only Scan
+
+V2 import scan preview is authenticated and read-only. It lists supported audio
+candidates and skipped files from configured import roots, but does not create
+tracks, processing jobs, hashes, copies, moves, or deletes.
+
+Keep import tools disabled unless you are testing import-root policy:
+
+```powershell
+$env:IMPORT_ALLOWED_ROOTS = ""
+```
+
+For local policy and scan checks, use throwaway directories outside the
+repository and outside `MEDIA_ROOT`:
+
+```powershell
+$importRoot = Join-Path $env:TEMP "easy-music-import-smoke"
+New-Item -ItemType Directory -Force -Path $importRoot | Out-Null
+Set-Content -Path (Join-Path $importRoot "notes.txt") -Value "not audio"
+ffmpeg -y -f lavfi -i "sine=frequency=440:duration=1" (Join-Path $importRoot "scan-tone.wav")
+
+$env:IMPORT_ALLOWED_ROOTS = $importRoot
+$env:IMPORT_SCAN_MAX_FILES = "1000"
+$env:IMPORT_SCAN_MAX_DEPTH = "5"
+$env:IMPORT_SCAN_MAX_FILE_MB = "200"
+```
+
+Restart the API after changing environment variables, then list configured
+roots:
+
+```powershell
+$config = Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/imports/configuration" `
+  -Headers $headers
+
+$config
+```
+
+Scan the first configured root:
+
+```powershell
+$scan = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/imports/scan" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    root_id = $config.roots[0].id
+    relative_subdir = $null
+  } | ConvertTo-Json)
+
+$scan.candidates
+$scan.skipped
+```
+
+Verify traversal rejection:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/imports/scan" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    root_id = $config.roots[0].id
+    relative_subdir = "..\outside"
+  } | ConvertTo-Json)
+```
+
+Expected result:
+
+- Configuration returns safe root ids and labels, not absolute import paths.
+- Scan returns `scan-tone.wav` in `candidates` with a safe relative path.
+- `notes.txt` appears in `skipped` with reason `unsupported_extension`.
+- Traversal returns `400 Bad Request`.
+- Missing auth returns `401 Unauthorized`.
+- Missing directories return a clear `404 Not Found`.
+- No tracks, processing jobs, media files, or source import files are created,
+  deleted, moved, or renamed.
+
+Automated verification from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py
+```
+
+Expected result:
+
+- Empty roots produce a configured-off service response.
+- Allowed roots and nested relative directories resolve safely.
+- Auth, disabled configuration, allowed scan, unsupported format, scan limits,
+  missing directory, traversal rejection, permission errors, no mutation, and
+  symlink escape checks where supported pass.
+- No tracks, processing jobs, media files, or source import files are created,
+  deleted, moved, or renamed.
+
 ## Run The Worker
 
 From `backend/`, process one pending job:

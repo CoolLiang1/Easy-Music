@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     covers_dir: str = Field(default="covers", validation_alias="COVERS_DIR")
     max_upload_mb: int = Field(default=200, validation_alias="MAX_UPLOAD_MB")
     max_cover_mb: int = Field(default=10, validation_alias="MAX_COVER_MB")
+    import_allowed_roots: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        validation_alias="IMPORT_ALLOWED_ROOTS",
+    )
+    import_scan_max_files: int = Field(default=1000, validation_alias="IMPORT_SCAN_MAX_FILES")
+    import_scan_max_depth: int = Field(default=5, validation_alias="IMPORT_SCAN_MAX_DEPTH")
+    import_scan_max_file_mb: int = Field(default=200, validation_alias="IMPORT_SCAN_MAX_FILE_MB")
     ffmpeg_path: str = Field(default="ffmpeg", validation_alias="FFMPEG_PATH")
     ffprobe_path: str = Field(default="ffprobe", validation_alias="FFPROBE_PATH")
     cors_origins: Annotated[list[str], NoDecode] = Field(
@@ -52,6 +59,14 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("import_allowed_roots", mode="before")
+    @classmethod
+    def parse_import_allowed_roots(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            separator = ";" if ";" in value else ","
+            return [root.strip() for root in value.split(separator) if root.strip()]
         return value
 
     @field_validator("originals_dir", "playback_dir", "covers_dir")

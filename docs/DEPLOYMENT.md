@@ -128,6 +128,13 @@ AI_PROVIDER=openai-compatible
 AI_API_KEY=
 AI_MODEL=
 AI_BASE_URL=https://api.openai.com/v1
+
+# Disabled by default. If import tools are enabled later, use container-visible
+# paths that are explicitly mounted read-only into api and worker containers.
+IMPORT_ALLOWED_ROOTS=
+IMPORT_SCAN_MAX_FILES=1000
+IMPORT_SCAN_MAX_DEPTH=5
+IMPORT_SCAN_MAX_FILE_MB=200
 ```
 
 Rules:
@@ -137,6 +144,12 @@ Rules:
 - `DATABASE_URL` must use the same password as `POSTGRES_PASSWORD`.
 - Use `AI_ENABLED=false` for the first deployment unless AI credentials are
   ready.
+- Leave `IMPORT_ALLOWED_ROOTS` empty unless you have created dedicated import
+  directories and mounted them into the containers. Do not point it at `/`,
+  `/home`, the repository checkout, or `/app/media`.
+- Keep scan limits conservative for the first deployment. The scan endpoint is
+  read-only and reports supported audio candidates plus skipped files; confirmed
+  import remains a later V2 flow.
 
 Check for unfinished placeholders before continuing:
 
@@ -171,6 +184,16 @@ Expected ownership:
 
 - Media and backup directories: UID/GID `1100:1100`.
 - PostgreSQL data directory: UID/GID `70:70`.
+
+Optional import directories are not created by `deploy/setup-host.sh` and are
+not enabled by default. If a later V2 import task is enabled in production,
+create dedicated host directories such as `/srv/easy-music/imports/library-a`,
+mount them read-only into both `api` and `worker`, and set
+`IMPORT_ALLOWED_ROOTS` to the matching container paths such as
+`/app/imports/library-a`. Keep those directories separate from
+`/srv/easy-music/media`, the repository checkout, and user home roots.
+Use `IMPORT_SCAN_MAX_FILES`, `IMPORT_SCAN_MAX_DEPTH`, and
+`IMPORT_SCAN_MAX_FILE_MB` to keep read-only preview scans bounded.
 
 ## Step 4 - Build the Web App
 

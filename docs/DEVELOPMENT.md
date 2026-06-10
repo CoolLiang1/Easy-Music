@@ -68,6 +68,22 @@ $env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@
 $env:MEDIA_ROOT = ".\media"
 ```
 
+V2 import tools are disabled by default. To test import-root safety and the
+read-only audio scan preview, configure throwaway directories outside the
+repository and outside `MEDIA_ROOT`; semicolons are safest for Windows paths:
+
+```powershell
+$env:IMPORT_ALLOWED_ROOTS = "D:\EasyMusicImport;E:\AnotherImport"
+$env:IMPORT_SCAN_MAX_FILES = "1000"
+$env:IMPORT_SCAN_MAX_DEPTH = "5"
+$env:IMPORT_SCAN_MAX_FILE_MB = "200"
+```
+
+Do not point import roots at `C:\`, `/`, your home directory, this repository,
+or the Easy Music media storage directory. V2.2 scan preview is read-only: it
+does not create tracks, processing jobs, hashes, copies, moves, or deletes.
+Confirmed import API flows arrive in later V2 tasks.
+
 Apply migrations from `backend/`:
 
 ```powershell
@@ -528,6 +544,12 @@ Run all Phase 1 backend tests from `backend/`:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
+```
+
+Run the focused V2 import-root safety and scan-preview checks from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py
 ```
 
 The test suite covers:

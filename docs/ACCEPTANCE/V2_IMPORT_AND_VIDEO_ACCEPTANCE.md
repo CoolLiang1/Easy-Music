@@ -387,6 +387,106 @@ Status as of 2026-06-10:
 
 Append real dated verification results here as implementation tasks complete.
 
+### 2026-06-10 - Task V2.1 Import Directory Configuration And Safety Policy
+
+Implemented:
+
+- Added `IMPORT_ALLOWED_ROOTS` backend configuration, empty by default.
+- Added import-root configuration and path-safety service code.
+- Added safe configuration response shape that reports disabled imports without
+  exposing absolute import paths.
+- Added path validation for configured roots and requested relative subpaths,
+  including traversal, absolute requested paths, broad roots, repository root,
+  home root, `MEDIA_ROOT`, and symlink escape checks where the platform permits
+  symlink creation.
+- Updated environment templates and operational documentation for Windows
+  PowerShell and Ubuntu/container path expectations.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py
+.\.venv\Scripts\python.exe -m pytest tests\test_media_storage.py tests\test_uploads_api.py
+.\.venv\Scripts\python.exe -m pytest
+docker compose -f docker-compose.prod.yml --env-file .env.production.example config --quiet
+```
+
+Results:
+
+- `tests\test_imports_config.py tests\test_imports_path_safety.py`: 10 passed,
+  1 skipped. The skipped check was symlink-escape coverage because Windows
+  symlink creation was unavailable in this environment.
+- `tests\test_media_storage.py tests\test_uploads_api.py`: 11 passed.
+- Full backend test suite: 255 passed, 1 skipped.
+- Production Compose config validation with `.env.production.example`: passed.
+
+Manual checks:
+
+- No V2 import scan or confirmed import API exists yet, so no API scan/import
+  manual smoke was run.
+- No Web import UI exists yet, so no browser import smoke was run.
+- No Android impact check was run because this task adds no API response used
+  by Android and no track response shape changes.
+
+Acceptance status:
+
+- Gate 1 automated import path safety coverage is partially verified locally.
+- V2 Automatic import tools are still not accepted because scan, confirmed
+  import, Web UI, and manual smoke checks are not implemented yet.
+- V2 user-provided video-to-audio processing is still not accepted.
+
+### 2026-06-10 - Task V2.2 Backend Audio Import Scan Preview
+
+Implemented:
+
+- Added authenticated `GET /api/imports/configuration` for safe enabled state
+  and configured root labels.
+- Added authenticated `POST /api/imports/scan` for read-only audio scan preview
+  under one configured root and optional relative subdirectory.
+- Reused the existing upload audio extension allowlist: MP3, FLAC, M4A, WAV,
+  and OGG.
+- Added conservative/configurable scan limits:
+  `IMPORT_SCAN_MAX_FILES`, `IMPORT_SCAN_MAX_DEPTH`, and
+  `IMPORT_SCAN_MAX_FILE_MB`.
+- Scan responses include safe relative paths, basenames, extensions, sizes,
+  support status, skipped reasons, and applied limits. They do not expose
+  unrestricted absolute paths.
+- Scan does not create tracks, processing jobs, hashes, media copies, deletes,
+  moves, or source-file modifications.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py
+.\.venv\Scripts\python.exe -m pytest tests\test_media_storage.py tests\test_uploads_api.py
+.\.venv\Scripts\python.exe -m pytest
+docker compose -f docker-compose.prod.yml --env-file .env.production.example config --quiet
+```
+
+Results:
+
+- `tests\test_imports_config.py tests\test_imports_path_safety.py
+  tests\test_imports_scan_api.py`: 22 passed, 2 skipped. The skipped checks
+  were symlink-escape coverage because Windows symlink creation was unavailable
+  in this environment.
+- `tests\test_media_storage.py tests\test_uploads_api.py`: 11 passed.
+- Full backend test suite: 267 passed, 2 skipped.
+- Production Compose config validation with `.env.production.example`: passed.
+
+Manual checks:
+
+- No live API manual scan smoke was run in this implementation pass.
+- No Web import UI exists yet, so no browser import smoke was run.
+- No Android impact check was run because this task adds new import-only API
+  responses and does not change Track response shapes used by Android.
+
+Acceptance status:
+
+- Gate 2 automated audio scan preview coverage is partially verified locally.
+- V2 Automatic import tools are still not accepted because confirmed import,
+  Web UI, worker closure, and manual smoke checks are not implemented yet.
+- V2 user-provided video-to-audio processing is still not accepted.
+
 ## Android Impact
 
 No Android UI is required for the first version of these V2 features. Android

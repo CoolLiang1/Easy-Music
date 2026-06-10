@@ -26,6 +26,10 @@ contain placeholders only, not production-ready secrets.
 | `COVERS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for uploaded and extracted cover images. |
 | `MAX_UPLOAD_MB` | Yes | Yes | Maximum accepted upload size in megabytes. Deployment should choose a value that fits storage and reverse proxy limits. |
 | `MAX_COVER_MB` | Yes | Yes | Maximum accepted cover-image upload size in megabytes. |
+| `IMPORT_ALLOWED_ROOTS` | No | No | Optional semicolon- or comma-separated allowlist of server-side import roots. Empty disables import tools. Use explicit directories outside the repository, outside user home roots, and outside `MEDIA_ROOT`; never commit private machine-specific paths. |
+| `IMPORT_SCAN_MAX_FILES` | No | No | Maximum supported audio candidates returned by one import scan. Defaults to `1000`. |
+| `IMPORT_SCAN_MAX_DEPTH` | No | No | Maximum recursive directory depth for import scan preview. Defaults to `5`. |
+| `IMPORT_SCAN_MAX_FILE_MB` | No | No | Maximum per-file size included as a supported import scan candidate. Defaults to `200`; larger files are returned as skipped. |
 | `FFMPEG_PATH` | Yes | Yes | Executable name or configured path for `ffmpeg`. Development can use `ffmpeg` when it is available on `PATH`. |
 | `FFPROBE_PATH` | Yes | Yes | Executable name or configured path for `ffprobe`. Development can use `ffprobe` when it is available on `PATH`. |
 | `CORS_ORIGINS` | Yes | Yes | Comma-separated list of allowed browser origins. Development should list local Web origins explicitly; deployment should list only deployed domains. |
@@ -49,6 +53,25 @@ contain placeholders only, not production-ready secrets.
 
 The example intentionally avoids real credentials, tokens, private host paths, and production domains. Before any real deployment, replace passwords and secrets through the deployment environment rather than by editing committed files.
 
+`IMPORT_ALLOWED_ROOTS` is empty by default. For local V2 import testing, point it
+at one or more throwaway directories outside the repository and outside
+`MEDIA_ROOT`. Use semicolons for Windows paths, for example:
+
+```powershell
+$env:IMPORT_ALLOWED_ROOTS = "D:\EasyMusicImport;E:\AnotherImport"
+```
+
+Ubuntu-style container paths are also accepted when those directories are
+explicitly mounted into the backend container, for example:
+
+```bash
+IMPORT_ALLOWED_ROOTS=/app/imports/library-a;/app/imports/library-b
+```
+
+The scan endpoint is read-only and controlled by `IMPORT_SCAN_MAX_FILES`,
+`IMPORT_SCAN_MAX_DEPTH`, and `IMPORT_SCAN_MAX_FILE_MB`. These limits do not
+create tracks or copy files; they only constrain preview responses.
+
 ## Deployment Expectations
 
 Deployment configuration should provide the same variable names through
@@ -58,6 +81,8 @@ Deployment values must:
 
 - Use strong unique values for `POSTGRES_PASSWORD` and `APP_SECRET_KEY`.
 - Use storage paths that point to the mounted persistent media location.
+- Leave `IMPORT_ALLOWED_ROOTS` empty unless import directories have been
+  explicitly created and mounted read-only into the API container.
 - Restrict `CORS_ORIGINS` to trusted deployed origins.
 - Set `CADDY_DOMAIN` to the public domain that points to the server.
 - Keep all real credentials and host-specific private paths outside version control.
