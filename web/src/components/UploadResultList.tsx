@@ -8,6 +8,7 @@ export type UploadResult = {
   id: string;
   duplicateCheck?: DuplicateCheckState;
   fileName: string;
+  kind?: "audio" | "video";
   message?: string;
   state: "uploading" | "success" | "error";
   statusMessage?: string;
@@ -203,7 +204,12 @@ function getResultMessage(result: UploadResult) {
     return "上传完成。";
   }
 
+  const isVideo = result.kind === "video";
+
   if (result.track.status === "processing") {
+    if (isVideo) {
+      return `视频音轨 #${result.track.id} 已上传，正在提取音频并处理。`;
+    }
     return `音轨 #${result.track.id} 已上传，后台正在处理。`;
   }
 

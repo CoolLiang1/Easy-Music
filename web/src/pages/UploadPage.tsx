@@ -1,13 +1,14 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 
 import { listDuplicateCandidates } from "../api/duplicates";
-import { getTrack, uploadTrack } from "../api/tracks";
+import { getTrack, uploadTrack, uploadVideoTrack } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import { UploadForm } from "../components/UploadForm";
 import {
   UploadResultList,
   type UploadResult,
 } from "../components/UploadResultList";
+import { VideoUploadForm } from "../components/VideoUploadForm";
 import { navigateTo } from "../routes/router";
 
 export function UploadPage() {
@@ -21,6 +22,7 @@ export function UploadPage() {
         files.map((file, index) => ({
           id: buildUploadResultId(file, index),
           fileName: file.name,
+          kind: "audio" as const,
           message: "请重新登录后再上传文件。",
           state: "error",
         })),
@@ -38,6 +40,7 @@ export function UploadPage() {
         {
           id: resultId,
           fileName: file.name,
+          kind: "audio" as const,
           state: "uploading",
           uploadProgress: { percent: 0 },
         },
@@ -68,6 +71,59 @@ export function UploadPage() {
     setIsUploading(false);
   };
 
+  const handleVideoUpload = async (files: File[]) => {
+    if (!accessToken) {
+      setResults((currentResults) => [
+        ...currentResults,
+        ...files.map((file, index) => ({
+          id: buildVideoResultId(file, index),
+          fileName: file.name,
+          kind: "video" as const,
+          message: "请重新登录后再上传文件。",
+          state: "error" as const,
+        })),
+      ]);
+      return;
+    }
+
+    setIsUploading(true);
+
+    for (const [index, file] of files.entries()) {
+      const resultId = buildVideoResultId(file, index);
+      setResults((currentResults) => [
+        ...currentResults,
+        {
+          id: resultId,
+          fileName: file.name,
+          kind: "video" as const,
+          state: "uploading" as const,
+          uploadProgress: { percent: 0 },
+        },
+      ]);
+
+      try {
+        const track = await uploadVideoTrack(accessToken, file, (progress) => {
+          updateUploadResult(setResults, resultId, {
+            uploadProgress: { percent: progress.percent },
+          });
+        });
+        updateUploadResult(setResults, resultId, {
+          state: "success",
+          track,
+          uploadProgress: { percent: 100 },
+        });
+        void pollTrackStatus(accessToken, track.id, resultId, setResults);
+      } catch (error) {
+        updateUploadResult(setResults, resultId, {
+          message: getErrorMessage(error),
+          state: "error",
+        });
+      }
+    }
+
+    setIsUploading(false);
+  };
+
   const hasSuccessfulUpload = results.some((result) => result.state === "success");
 
   return (
@@ -85,6 +141,7 @@ export function UploadPage() {
         ) : null}
       </div>
       <UploadForm disabled={isUploading} onUpload={handleUpload} />
+      <VideoUploadForm disabled={isUploading} onUpload={handleVideoUpload} />
       {isUploading ? (
         <div className="empty-state" aria-live="polite">
           正在上传选中文件...
@@ -196,7 +253,11 @@ function updateUploadResult(
 }
 
 function buildUploadResultId(file: File, index: number) {
-  return `${Date.now()}-${index}-${file.name}`;
+  return `${Date.now()}-audio-${index}-${file.name}`;
+}
+
+function buildVideoResultId(file: File, index: number) {
+  return `${Date.now()}-video-${index}-${file.name}`;
 }
 
 function delay(milliseconds: number) {

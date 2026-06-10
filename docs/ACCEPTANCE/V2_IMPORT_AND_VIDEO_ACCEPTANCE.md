@@ -806,6 +806,70 @@ Acceptance status:
   checks are not complete.
 - V2 Automatic import tools are unchanged by this task.
 
+### 2026-06-10 - Task V2.8 Web Video Upload Flow
+
+Implemented:
+
+- Added `uploadVideoTrack()` API wrapper in `web/src/api/tracks.ts` that
+  mirrors the existing `uploadTrack()` XMLHttpRequest progress behavior and
+  POSTs to `/api/tracks/upload-video`.
+- Extracted shared `uploadWithProgress()` helper to reduce duplication.
+- Added `maxVideoUploadMb` to `web/src/config/env.ts` (defaults to 1024,
+  configurable via `VITE_MAX_VIDEO_UPLOAD_MB`).
+- Added `VideoUploadForm` component with:
+  - Supported video file extensions: MP4, MKV, MOV, WEBM.
+  - Supported video MIME types: `video/mp4`, `video/x-matroska`,
+    `video/matroska`, `video/quicktime`, `video/webm`.
+  - Extension-based browser hint as primary (browser MIME reporting varies).
+  - Size limit text using configured `maxVideoUploadMb` value.
+  - Client-side validation rejecting unsupported files.
+- Updated `UploadPage` to include `VideoUploadForm` as a distinct optional
+  section below the existing audio upload. Audio upload flow is unchanged.
+- Added optional `kind: "audio" | "video"` to `UploadResult` for better
+  status text: video uploads show "正在提取音频并处理" during processing.
+- Video results reuse the existing result list, status polling via
+  `getTrack()`, and error display. Duplicate checking is deferred to
+  post-processing (like normal uploads).
+- No FFmpeg in browser, no URL input, no downloader, no backend changes.
+
+Automated checks run from `web/`:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+Backend regression from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_video_uploads_api.py
+```
+
+Results:
+
+- 8 passed. Existing video upload API tests pass unchanged.
+
+Manual checks:
+
+- No browser video upload smoke was run in this implementation pass.
+- No worker end-to-end video extraction smoke was run because V2.7 worker
+  extraction exists but manual smoke was not performed.
+- No Android impact check was run because this task adds Web-only UI and
+  does not change backend Track response shapes used by Android.
+
+Acceptance status:
+
+- Gate 7 automated Web compile/build coverage is verified locally.
+- V2 user-provided video-to-audio processing is still not accepted because
+  mixed import support (V2.9), manual smoke, and documentation updates are
+  not complete.
+- V2 Automatic import tools are unchanged by this task.
+
 ## Android Impact
 
 No Android UI is required for the first version of these V2 features. Android

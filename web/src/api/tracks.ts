@@ -78,9 +78,42 @@ export function uploadTrack(
   const formData = new FormData();
   formData.append("file", file);
 
-  return new Promise<Track>((resolve, reject) => {
+  return uploadWithProgress<Track>(
+    `${env.apiBaseUrl}/api/tracks/upload`,
+    accessToken,
+    formData,
+    file.size,
+    onProgress,
+  );
+}
+
+export function uploadVideoTrack(
+  accessToken: string,
+  file: File,
+  onProgress?: (progress: UploadProgress) => void,
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return uploadWithProgress<Track>(
+    `${env.apiBaseUrl}/api/tracks/upload-video`,
+    accessToken,
+    formData,
+    file.size,
+    onProgress,
+  );
+}
+
+function uploadWithProgress<T>(
+  url: string,
+  accessToken: string,
+  formData: FormData,
+  fileSize: number,
+  onProgress?: (progress: UploadProgress) => void,
+) {
+  return new Promise<T>((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open("POST", `${env.apiBaseUrl}/api/tracks/upload`);
+    request.open("POST", url);
     request.setRequestHeader("Authorization", `Bearer ${accessToken}`);
     request.responseType = "json";
 
@@ -89,7 +122,7 @@ export function uploadTrack(
         return;
       }
 
-      const total = event.lengthComputable ? event.total : file.size || null;
+      const total = event.lengthComputable ? event.total : fileSize || null;
       const percent =
         total && total > 0 ? Math.min(100, Math.round((event.loaded / total) * 100)) : null;
 
@@ -118,11 +151,11 @@ export function uploadTrack(
       }
 
       onProgress?.({
-        loaded: file.size,
+        loaded: fileSize,
         percent: 100,
-        total: file.size,
+        total: fileSize,
       });
-      resolve(payload as Track);
+      resolve(payload as T);
     };
 
     request.send(formData);
