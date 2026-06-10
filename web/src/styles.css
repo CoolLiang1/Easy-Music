@@ -498,25 +498,289 @@ h3 {
 }
 
 .audio-player {
-  display: grid;
-  gap: 10px;
   margin-top: 24px;
   max-width: 640px;
 }
 
 .audio-player.compact {
-  min-width: 180px;
-  max-width: 240px;
+  min-width: 240px;
+  max-width: 320px;
   margin-top: 0;
 }
 
-.audio-player audio {
-  width: 100%;
+/* ---- custom control bar ---- */
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
 }
 
-.audio-player.compact audio {
-  width: 220px;
-  max-width: 100%;
+.audio-player.compact .audio-controls {
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+/* native audio — hidden, driven by custom controls */
+.audio-controls audio {
+  display: none;
+}
+
+/* ---- buttons ---- */
+.audio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.audio-btn:hover {
+  background: var(--teal-dark);
+}
+
+.audio-player.compact .audio-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 0.75rem;
+}
+
+.audio-volume-btn {
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.audio-volume-btn:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.audio-player.compact .audio-volume-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 0.85rem;
+}
+
+/* ---- time labels ---- */
+.audio-time {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 34px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.audio-player.compact .audio-time {
+  font-size: 0.7rem;
+  min-width: 28px;
+}
+
+.audio-duration {
+  text-align: center;
+}
+
+/* ---- seek bar ---- */
+.audio-seek-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  transition: height 0.1s;
+}
+
+.audio-seek-bar:hover {
+  height: 10px;
+}
+
+.audio-player.compact .audio-seek-bar {
+  height: 4px;
+}
+
+.audio-player.compact .audio-seek-bar:hover {
+  height: 6px;
+}
+
+/* WebKit seek bar track & thumb */
+.audio-seek-bar::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.audio-seek-bar:hover::-webkit-slider-runnable-track {
+  height: 10px;
+}
+
+.audio-player.compact .audio-seek-bar::-webkit-slider-runnable-track {
+  height: 4px;
+}
+
+.audio-player.compact .audio-seek-bar:hover::-webkit-slider-runnable-track {
+  height: 6px;
+}
+
+.audio-seek-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--teal);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 20%);
+  cursor: pointer;
+  margin-top: -4px;
+  transition: transform 0.1s;
+}
+
+.audio-seek-bar:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+  margin-top: -2px;
+}
+
+.audio-player.compact .audio-seek-bar::-webkit-slider-thumb {
+  width: 10px;
+  height: 10px;
+  margin-top: -3px;
+}
+
+.audio-player.compact .audio-seek-bar:hover::-webkit-slider-thumb {
+  margin-top: -2px;
+}
+
+/* Firefox seek bar track & thumb */
+.audio-seek-bar::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  border: none;
+}
+
+.audio-seek-bar:hover::-moz-range-track {
+  height: 10px;
+}
+
+.audio-seek-bar::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--teal);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 20%);
+  cursor: pointer;
+}
+
+/* ---- volume control (Bilibili-style vertical popup) ---- */
+.audio-volume-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Portal-mounted popup — positioning handled inline via getBoundingClientRect.
+   z-index must be high enough to escape table-wrap stacking context. */
+.audio-volume-popup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(15 23 42 / 12%);
+  z-index: 9999;
+}
+
+/* ---- volume slider wrapper (rotates a normal horizontal slider) ---- */
+.audio-volume-slider-wrap {
+  width: 28px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Normal horizontal slider, rotated -90° to appear vertical.
+   No writing-mode / slider-vertical hacks — transform is reliable everywhere. */
+.audio-volume-slider {
+  width: 80px;
+  height: 6px;
+  transform: rotate(-90deg);
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+}
+
+.audio-volume-slider::-webkit-slider-runnable-track {
+  width: 80px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.audio-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--teal);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 20%);
+  cursor: pointer;
+}
+
+.audio-volume-slider::-moz-range-track {
+  width: 80px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  border: none;
+}
+
+.audio-volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--teal);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 20%);
+  cursor: pointer;
+}
+
+.audio-volume-value {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .hint-text {

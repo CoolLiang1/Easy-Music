@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { createPortal } from "react-dom";
 
 import { getTrackStreamBlob } from "../api/tracks";
 import type { Track } from "../types/track";
@@ -57,6 +58,9 @@ export function WebAudioPlayer({
   const [muted, setMuted] = useState(false);
   const [seeking, setSeeking] = useState(false);
   const [showVolumePopup, setShowVolumePopup] = useState(false);
+  const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const volumeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
   const isReadyTrack = track.status.toLowerCase() === "ready";
 
   // --- track-id change: release blob, reset state, stop audio ---
@@ -96,6 +100,34 @@ export function WebAudioPlayer({
       // Browser autoplay rules can still require the native control click.
     });
   }, [playerState, shouldStartPlayback]);
+
+  // --- keep volume popup pinned to the button during scroll ---
+  useEffect(() => {
+    if (!showVolumePopup) return;
+
+    let rafId: number | null = null;
+
+    const onScroll = () => {
+      if (rafId !== null) return; // already queued
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const btn = volumeBtnRef.current;
+        if (btn) {
+          const rect = btn.getBoundingClientRect();
+          setPopupPos({
+            top: rect.top - 8,
+            left: rect.left + rect.width / 2,
+          });
+        }
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [showVolumePopup]);
 
   // --- wire audio element events ---
   const handlePlay = useCallback(() => {
@@ -293,10 +325,30 @@ export function WebAudioPlayer({
           {/* volume control — Bilibili-style vertical popup */}
           <div
             className="audio-volume-wrap"
-            onMouseEnter={() => setShowVolumePopup(true)}
-            onMouseLeave={() => setShowVolumePopup(false)}
+            onMouseEnter={() => {
+              if (volumeHideTimerRef.current) {
+                clearTimeout(volumeHideTimerRef.current);
+                volumeHideTimerRef.current = null;
+              }
+              // Calculate position from the button's screen position
+              const btn = volumeBtnRef.current;
+              if (btn) {
+                const rect = btn.getBoundingClientRect();
+                setPopupPos({
+                  top: rect.top - 8,        // 8px gap above the button
+                  left: rect.left + rect.width / 2,
+                });
+              }
+              setShowVolumePopup(true);
+            }}
+            onMouseLeave={() => {
+              volumeHideTimerRef.current = setTimeout(() => {
+                setShowVolumePopup(false);
+              }, 150);
+            }}
           >
             <button
+              ref={volumeBtnRef}
               className="audio-btn audio-volume-btn"
               onClick={toggleMute}
               type="button"
@@ -305,19 +357,45 @@ export function WebAudioPlayer({
               {volumeIcon}
             </button>
 
-            <div className={`audio-volume-popup${showVolumePopup ? " visible" : ""}`}>
-              <input
-                className="audio-volume-slider"
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={muted ? 0 : volume}
-                onChange={handleVolumeChange}
-                aria-label="音量"
-              />
-              <span className="audio-volume-value">{Math.round((muted ? 0 : volume) * 100)}</span>
-            </div>
+            {showVolumePopup &&
+              createPortal(
+                <div
+                  className="audio-volume-popup visible"
+                  style={{
+                    position: "fixed",
+                    top: `${popupPos.top}px`,
+                    left: `${popupPos.left}px`,
+                    transform: "translate(-50%, -100%)",
+                    margin: 0,
+                  }}
+                  onMouseEnter={() => {
+                    if (volumeHideTimerRef.current) {
+                      clearTimeout(volumeHideTimerRef.current);
+                      volumeHideTimerRef.current = null;
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    volumeHideTimerRef.current = setTimeout(() => {
+                      setShowVolumePopup(false);
+                    }, 150);
+                  }}
+                >
+                  <div className="audio-volume-slider-wrap">
+                    <input
+                      className="audio-volume-slider"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={muted ? 0 : volume}
+                      onChange={handleVolumeChange}
+                      aria-label="音量"
+                    />
+                  </div>
+                  <span className="audio-volume-value">{Math.round((muted ? 0 : volume) * 100)}</span>
+                </div>,
+                document.body,
+              )}
           </div>
         </div>
       ) : null}
