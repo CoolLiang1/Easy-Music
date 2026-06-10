@@ -23,6 +23,7 @@ export type ImportScanCandidate = {
   extension: string;
   size_bytes: number;
   status: "supported" | string;
+  media_kind: "audio" | "video" | string;
 };
 
 export type ImportScanSkippedItem = {
@@ -91,6 +92,7 @@ export type ImportBatchItemResponse = {
   track_id: number | null;
   track: Track | null;
   error: string | null;
+  media_kind: string | null;
   created_at: string;
   updated_at: string;
 };

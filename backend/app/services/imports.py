@@ -22,9 +22,13 @@ from app.schemas.imports import (
     ImportScanSkippedItem,
 )
 from app.services.duplicate_signals import build_normalized_metadata_key, collect_file_duplicate_signal
-from app.services.jobs import create_processing_job
+from app.services.jobs import VIDEO_EXTRACTION_JOB_TYPE, create_processing_job
 from app.services.tracks import build_track_response
 from app.services.uploads import ALLOWED_UPLOAD_TYPES
+
+ALLOWED_AUDIO_IMPORT_EXTENSIONS = {".mp3", ".flac", ".m4a", ".wav", ".ogg"}
+ALLOWED_VIDEO_IMPORT_EXTENSIONS = {".mp4", ".mkv", ".mov", ".webm"}
+ALL_SUPPORTED_IMPORT_EXTENSIONS = ALLOWED_AUDIO_IMPORT_EXTENSIONS | ALLOWED_VIDEO_IMPORT_EXTENSIONS
 
 
 class ImportConfigurationError(ValueError):
@@ -163,7 +167,7 @@ class ImportRootPolicy:
 
         results: list[ImportConfirmResult] = []
         for relative_path in relative_paths:
-            result = self._confirm_one_audio_import(db, user, root, relative_path, storage)
+            result = self._confirm_one_import(db, user, root, relative_path, storage)
             results.append(result)
             self._record_import_item(db, batch, user, root, result)
 
@@ -243,6 +247,34 @@ class ImportRootPolicy:
             relative_path=candidate.relative_to(root.path).as_posix() or ".",
         )
 
+    def _confirm_one_import(
+        self,
+        db,
+        user: User,
+        root: ConfiguredImportRoot,
+        relative_path: str,
+        storage: MediaStorage,
+    ) -> ImportConfirmResult:
+        """Classify the selected file by extension and route to the correct handler."""
+        basename = Path(relative_path.replace("\\", "/")).name or "."
+        try:
+            source = self._resolve_under_root(root.path, relative_path)
+            relative_source_path = source.relative_to(root.path).as_posix()
+            basename = source.name
+            if not source.exists():
+                return self._import_result(relative_source_path, basename, "failed", "Source file does not exist.")
+            if not source.is_file():
+                return self._import_result(relative_source_path, basename, "failed", "Source path is not a file.")
+            extension = source.suffix.lower()
+            if extension in ALLOWED_AUDIO_IMPORT_EXTENSIONS:
+                return self._confirm_one_audio_import(db, user, root, relative_path, storage)
+            if extension in ALLOWED_VIDEO_IMPORT_EXTENSIONS:
+                return self._confirm_one_video_import(db, user, root, relative_path, storage)
+            return self._import_result(relative_source_path, basename, "skipped", "Unsupported file extension.")
+        except (ImportPathSafetyError, OSError) as exc:
+            db.rollback()
+            return self._import_result(relative_path, basename, "failed", str(exc))
+
     def _confirm_one_audio_import(
         self,
         db,
@@ -261,7 +293,7 @@ class ImportRootPolicy:
             if not source.is_file():
                 return self._import_result(relative_source_path, basename, "failed", "Source path is not a file.")
             extension = source.suffix.lower()
-            if extension not in ALLOWED_UPLOAD_TYPES:
+            if extension not in ALLOWED_AUDIO_IMPORT_EXTENSIONS:
                 return self._import_result(relative_source_path, basename, "skipped", "Unsupported audio file extension.")
             size_bytes = source.stat().st_size
             if size_bytes > self._scan_limits().max_file_size_bytes:
@@ -315,6 +347,77 @@ class ImportRootPolicy:
                 status="imported",
                 track=build_track_response(db, track),
                 duplicate_warnings=duplicate_warnings,
+            )
+        except (ImportPathSafetyError, OSError) as exc:
+            db.rollback()
+            return self._import_result(relative_path, basename, "failed", str(exc))
+
+    def _confirm_one_video_import(
+        self,
+        db,
+        user: User,
+        root: ConfiguredImportRoot,
+        relative_path: str,
+        storage: MediaStorage,
+    ) -> ImportConfirmResult:
+        basename = Path(relative_path.replace("\\", "/")).name or "."
+        try:
+            source = self._resolve_under_root(root.path, relative_path)
+            relative_source_path = source.relative_to(root.path).as_posix()
+            basename = source.name
+            if not source.exists():
+                return self._import_result(relative_source_path, basename, "failed", "Source file does not exist.")
+            if not source.is_file():
+                return self._import_result(relative_source_path, basename, "failed", "Source path is not a file.")
+            extension = source.suffix.lower()
+            if extension not in ALLOWED_VIDEO_IMPORT_EXTENSIONS:
+                return self._import_result(relative_source_path, basename, "skipped", "Unsupported video file extension.")
+            size_bytes = source.stat().st_size
+            if size_bytes > self._scan_limits().max_file_size_bytes:
+                return self._import_result(relative_source_path, basename, "skipped", "Source file exceeds import size limit.")
+
+            # Validate video container signature from file header.
+            upload_format = extension.removeprefix(".")
+            try:
+                from app.services.video_uploads import validate_saved_video_signature
+                validate_saved_video_signature(source, upload_format)
+            except Exception:
+                return self._import_result(relative_source_path, basename, "skipped", "Video file failed signature validation.")
+
+            track = Track(
+                user_id=user.id,
+                title=source.stem or "Untitled Import",
+                content_type="song",
+                status="uploading",
+                format=upload_format,
+            )
+            db.add(track)
+            db.flush()
+
+            destination = storage.temporary_video_path(user.id, track.id, source.name)
+            try:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, destination)
+            except Exception as exc:
+                db.rollback()
+                if destination.exists():
+                    destination.unlink()
+                return self._import_result(relative_source_path, basename, "failed", f"Copy failed: {exc}")
+
+            track.status = "processing"
+            create_processing_job(
+                db,
+                track,
+                job_type=VIDEO_EXTRACTION_JOB_TYPE,
+                source_path=storage.relative_media_path(destination),
+            )
+            db.commit()
+            db.refresh(track)
+            return ImportConfirmResult(
+                relative_path=relative_source_path,
+                basename=basename,
+                status="imported",
+                track=build_track_response(db, track),
             )
         except (ImportPathSafetyError, OSError) as exc:
             db.rollback()
@@ -411,6 +514,7 @@ class ImportRootPolicy:
                         else None
                     ),
                     error=item.error_message,
+                    media_kind=_infer_media_kind(item.display_name, tracks_by_id.get(item.track_id)),
                     created_at=item.created_at,
                     updated_at=item.updated_at,
                 )
@@ -516,9 +620,14 @@ class ImportRootPolicy:
     ) -> None:
         extension = path.suffix.lower()
         stat = path.stat()
-        if extension not in ALLOWED_UPLOAD_TYPES:
+        if extension in ALLOWED_AUDIO_IMPORT_EXTENSIONS:
+            media_kind = "audio"
+        elif extension in ALLOWED_VIDEO_IMPORT_EXTENSIONS:
+            media_kind = "video"
+        else:
             skipped.append(self._skipped_item(path, root, "unsupported_extension", stat.st_size))
             return
+
         if stat.st_size > limits.max_file_size_bytes:
             skipped.append(self._skipped_item(path, root, "file_too_large", stat.st_size))
             return
@@ -530,6 +639,7 @@ class ImportRootPolicy:
                 basename=path.name,
                 extension=extension.removeprefix("."),
                 size_bytes=stat.st_size,
+                media_kind=media_kind,
             ),
         )
 
@@ -602,6 +712,22 @@ class ImportRootPolicy:
     @staticmethod
     def _safe_root_label(root: Path, index: int) -> str:
         return root.name or f"Import root {index}"
+
+
+def _infer_media_kind(display_name: str, track: Track | None) -> str | None:
+    """Infer media_kind from the display_name extension or track format."""
+    suffix = Path(display_name).suffix.lower()
+    if suffix in ALLOWED_AUDIO_IMPORT_EXTENSIONS:
+        return "audio"
+    if suffix in ALLOWED_VIDEO_IMPORT_EXTENSIONS:
+        return "video"
+    if track and track.format:
+        fmt = f".{track.format.lower()}"
+        if fmt in ALLOWED_AUDIO_IMPORT_EXTENSIONS:
+            return "audio"
+        if fmt in ALLOWED_VIDEO_IMPORT_EXTENSIONS:
+            return "video"
+    return None
 
 
 def get_import_root_policy() -> ImportRootPolicy:

@@ -870,6 +870,87 @@ Acceptance status:
   not complete.
 - V2 Automatic import tools are unchanged by this task.
 
+### 2026-06-10 - Task V2.9 Import Scan Support For Video Files
+
+Implemented:
+
+- Added `media_kind` field to `ImportScanCandidate` (values: `"audio"`,
+  `"video"`) and `ImportBatchItemResponse` (computed from file extension
+  or track format).
+- Extended backend scan with `ALLOWED_AUDIO_IMPORT_EXTENSIONS` (MP3, FLAC,
+  M4A, WAV, OGG) and `ALLOWED_VIDEO_IMPORT_EXTENSIONS` (MP4, MKV, MOV,
+  WEBM). Unsupported extensions remain skipped with reason.
+- Updated `_scan_file` to classify candidates by `media_kind`.
+- Updated confirmed import to dispatch based on file extension:
+  - Audio files: existing copy-to-originals and `audio_processing` job
+    behavior (unchanged).
+  - Video files: copy source into controlled temp-video storage, create
+    a normal `Track` with `processing` status and `video_extraction` job.
+    Source file remains unchanged.
+- Added `validate_saved_video_signature` call for imported video files
+  for basic container header validation.
+- Video import creates temp-video copy via `storage.temporary_video_path`
+  and `shutil.copyfile`. Source files are never deleted, moved, renamed,
+  or modified.
+- Added `_infer_media_kind` for batch item responses, computed from
+  display_name extension or track format.
+- Scan limits apply to both audio and video candidates.
+- No migration required: `media_kind` is computed or present in responses
+  without a durable schema change.
+- Updated Web import page:
+  - Shows media kind as "Audio" or "Video" in candidate table.
+  - Added All / Audio / Video filter buttons.
+  - Scan heading updated to "Import audio & video".
+  - Filtered candidate list preserves selection across filter changes.
+  - Selection and confirmation flow works for mixed audio/video imports.
+- Existing audio-only import behavior is unchanged.
+
+Automated checks run from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_scan_api.py tests\test_imports_confirm_api.py tests\test_imports_batch_history_api.py
+.\.venv\Scripts\python.exe -m pytest tests\test_video_processing.py tests\test_worker_jobs.py
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Results:
+
+- `tests\test_imports_scan_api.py tests\test_imports_confirm_api.py
+  tests\test_imports_batch_history_api.py`: 24 passed, 1 skipped. The
+  skipped check was symlink-escape coverage because Windows symlink
+  creation was unavailable in this environment.
+- `tests\test_video_processing.py tests\test_worker_jobs.py`: 17 passed.
+- Full backend test suite: 302 passed, 2 skipped.
+
+From `web/`:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+
+Manual checks:
+
+- No browser import smoke against a live backend was run in this
+  implementation pass.
+- No worker end-to-end mixed import smoke was run in this implementation
+  pass.
+- No Android impact check was run because this task adds new fields only
+  to import-related responses.
+
+Acceptance status:
+
+- Gate 8 automated mixed import coverage is verified locally.
+- V2 user-provided video-to-audio processing is still not accepted because
+  manual smoke and documentation updates (V2.10) are not complete.
+- V2 Automatic import tools are unchanged by this task (still await manual
+  import smoke).
+
 ## Android Impact
 
 No Android UI is required for the first version of these V2 features. Android

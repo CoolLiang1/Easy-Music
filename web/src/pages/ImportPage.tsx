@@ -83,10 +83,18 @@ export function ImportPage() {
     return pageState.configuration.roots.find((root) => root.id === selectedRootId) ?? null;
   }, [pageState, selectedRootId]);
 
+  const [mediaKindFilter, setMediaKindFilter] = useState<"all" | "audio" | "video">("all");
+
   const scanCandidatePaths = useMemo(
     () => scanResult?.candidates.map((candidate) => candidate.relative_path) ?? [],
     [scanResult],
   );
+
+  const filteredCandidates = useMemo(() => {
+    if (!scanResult) return [];
+    if (mediaKindFilter === "all") return scanResult.candidates;
+    return scanResult.candidates.filter((c) => c.media_kind === mediaKindFilter);
+  }, [scanResult, mediaKindFilter]);
 
   const handleScan = async () => {
     if (!accessToken || !selectedRootId) {
@@ -121,7 +129,7 @@ export function ImportPage() {
 
     const paths = [...selectedPaths];
     if (paths.length === 0) {
-      setActionError("Select at least one scanned audio file.");
+      setActionError("Select at least one scanned file.");
       return;
     }
 
@@ -193,10 +201,11 @@ export function ImportPage() {
       <div className="page-header-row">
         <div>
           <p className="eyebrow">Import</p>
-          <h1 id="import-title">Import audio</h1>
+          <h1 id="import-title">Import audio & video</h1>
           <p className="page-copy">
-            Scan a configured server-side import root, select audio files, then
-            import them into the normal Easy Music processing flow.
+            Scan a configured server-side import root, select audio or video
+            files, then import them into the normal Easy Music processing flow.
+            Video files will have their audio extracted automatically.
           </p>
         </div>
         {scanResult ? (
@@ -239,9 +248,12 @@ export function ImportPage() {
 
           {scanResult ? (
             <ScanResultPanel
+              filteredCandidates={filteredCandidates}
               isConfirming={isConfirming}
+              mediaKindFilter={mediaKindFilter}
               onClearSelection={clearSelection}
               onConfirm={() => void handleConfirm()}
+              onMediaKindFilterChange={setMediaKindFilter}
               onSelectAll={selectAllCandidates}
               onTogglePath={toggleSelectedPath}
               result={scanResult}
@@ -331,23 +343,31 @@ function ImportScanPanel({
 }
 
 function ScanResultPanel({
+  filteredCandidates,
   isConfirming,
+  mediaKindFilter,
   onClearSelection,
   onConfirm,
+  onMediaKindFilterChange,
   onSelectAll,
   onTogglePath,
   result,
   selectedPaths,
 }: {
+  filteredCandidates: ImportScanCandidate[];
   isConfirming: boolean;
+  mediaKindFilter: "all" | "audio" | "video";
   onClearSelection: () => void;
   onConfirm: () => void;
+  onMediaKindFilterChange: (kind: "all" | "audio" | "video") => void;
   onSelectAll: () => void;
   onTogglePath: (relativePath: string) => void;
   result: ImportScanResponse;
   selectedPaths: Set<string>;
 }) {
   const selectedCount = selectedPaths.size;
+  const audioCount = result.candidates.filter((c) => c.media_kind === "audio").length;
+  const videoCount = result.candidates.filter((c) => c.media_kind === "video").length;
 
   return (
     <div className="panel">
@@ -363,10 +383,34 @@ function ScanResultPanel({
       </div>
 
       {result.candidates.length === 0 ? (
-        <div className="empty-state">No supported audio files were found.</div>
+        <div className="empty-state">No supported audio or video files were found.</div>
       ) : (
         <>
-          <div className="toolbar">
+          <div className="toolbar" style={{ flexWrap: "wrap", gap: "8px" }}>
+            <span style={{ fontSize: "0.9rem", color: "#526174" }}>
+              {audioCount} audio / {videoCount} video
+            </span>
+            <button
+              className={`button ${mediaKindFilter === "all" ? "primary" : "secondary"}`}
+              onClick={() => onMediaKindFilterChange("all")}
+              type="button"
+            >
+              All
+            </button>
+            <button
+              className={`button ${mediaKindFilter === "audio" ? "primary" : "secondary"}`}
+              onClick={() => onMediaKindFilterChange("audio")}
+              type="button"
+            >
+              Audio
+            </button>
+            <button
+              className={`button ${mediaKindFilter === "video" ? "primary" : "secondary"}`}
+              onClick={() => onMediaKindFilterChange("video")}
+              type="button"
+            >
+              Video
+            </button>
             <button className="button secondary" onClick={onSelectAll} type="button">
               Select candidates
             </button>
@@ -383,7 +427,7 @@ function ScanResultPanel({
             </button>
           </div>
           <CandidateTable
-            candidates={result.candidates}
+            candidates={filteredCandidates}
             onTogglePath={onTogglePath}
             selectedPaths={selectedPaths}
           />
@@ -416,6 +460,7 @@ function CandidateTable({
             <th scope="col">Select</th>
             <th scope="col">File</th>
             <th scope="col">Path</th>
+            <th scope="col">Kind</th>
             <th scope="col">Type</th>
             <th scope="col">Size</th>
             <th scope="col">Status</th>
@@ -434,6 +479,7 @@ function CandidateTable({
               </td>
               <td className="track-title-cell">{candidate.basename}</td>
               <td>{candidate.relative_path}</td>
+              <td>{formatMediaKind(candidate.media_kind)}</td>
               <td>{candidate.extension.toUpperCase()}</td>
               <td>{formatBytes(candidate.size_bytes)}</td>
               <td>
@@ -727,6 +773,12 @@ function normalizeCssToken(value: string) {
 
 function delay(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function formatMediaKind(kind: string) {
+  if (kind === "audio") return "Audio";
+  if (kind === "video") return "Video";
+  return kind;
 }
 
 function getErrorMessage(error: unknown) {

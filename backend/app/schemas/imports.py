@@ -39,6 +39,7 @@ class ImportScanCandidate(BaseModel):
     extension: str
     size_bytes: int
     status: str = "supported"
+    media_kind: str = "audio"
 
 
 class ImportScanSkippedItem(BaseModel):
@@ -104,6 +105,7 @@ class ImportBatchItemResponse(BaseModel):
     track_id: int | None = None
     track: TrackResponse | None = None
     error: str | None = None
+    media_kind: str | None = None
     created_at: datetime
     updated_at: datetime
 

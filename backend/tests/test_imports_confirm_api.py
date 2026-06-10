@@ -219,7 +219,7 @@ def test_confirm_import_reports_unsupported_and_oversized_files_without_copying(
     assert body["skipped_count"] == 2
     results = {result["relative_path"]: result for result in body["results"]}
     assert results["notes.txt"]["status"] == "skipped"
-    assert results["notes.txt"]["error"] == "Unsupported audio file extension."
+    assert results["notes.txt"]["error"] == "Unsupported file extension."
     assert results["large.wav"]["status"] == "skipped"
     assert results["large.wav"]["error"] == "Source file exceeds import size limit."
     assert unsupported.exists()

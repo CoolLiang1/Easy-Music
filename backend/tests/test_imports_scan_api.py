@@ -133,6 +133,7 @@ def test_scan_returns_supported_audio_candidates_and_skipped_files(
             "extension": "m4a",
             "size_bytes": 3,
             "status": "supported",
+            "media_kind": "audio",
         },
         "song.mp3": {
             "relative_path": "song.mp3",
@@ -140,6 +141,7 @@ def test_scan_returns_supported_audio_candidates_and_skipped_files(
             "extension": "mp3",
             "size_bytes": 3,
             "status": "supported",
+            "media_kind": "audio",
         },
         "voice.FLAC": {
             "relative_path": "voice.FLAC",
@@ -147,6 +149,7 @@ def test_scan_returns_supported_audio_candidates_and_skipped_files(
             "extension": "flac",
             "size_bytes": 4,
             "status": "supported",
+            "media_kind": "audio",
         },
         "zed.ogg": {
             "relative_path": "zed.ogg",
@@ -154,6 +157,7 @@ def test_scan_returns_supported_audio_candidates_and_skipped_files(
             "extension": "ogg",
             "size_bytes": 3,
             "status": "supported",
+            "media_kind": "audio",
         },
     }
     assert body["skipped"] == [
