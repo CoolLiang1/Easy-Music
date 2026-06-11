@@ -1,13 +1,15 @@
 import { type ChangeEvent, type FormEvent, useId, useState } from "react";
 
-const acceptedAudioExtensions = [".mp3", ".flac", ".m4a", ".wav", ".ogg"];
+const acceptedAudioExtensions = [".mp3", ".flac", ".m4a", ".wav", ".ogg", ".aac"];
 const acceptedAudioMimeTypes = [
+  "audio/aac",
   "audio/flac",
   "audio/m4a",
   "audio/mp4",
   "audio/mpeg",
   "audio/ogg",
   "audio/wav",
+  "audio/x-aac",
   "audio/x-m4a",
   "audio/x-wav",
 ];
@@ -56,7 +58,7 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
           />
         </label>
         <p className="recommendation-muted">
-          支持格式：MP3、FLAC、M4A、WAV、OGG。
+          支持格式：MP3、FLAC、M4A、WAV、OGG、AAC。
         </p>
         {selectedFiles.length > 0 ? (
           <p className="status-message">

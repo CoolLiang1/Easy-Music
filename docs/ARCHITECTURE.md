@@ -361,6 +361,7 @@ Supported upload formats:
 - M4A
 - WAV
 - OGG
+- AAC
 
 Supported user-provided video upload formats:
 

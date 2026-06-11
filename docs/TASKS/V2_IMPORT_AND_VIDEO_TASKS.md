@@ -147,6 +147,7 @@ preview list before importing anything.
   - M4A
   - WAV
   - OGG
+  - AAC
 - Unsupported files are ignored or returned in a separate skipped list with a
   safe reason.
 - Response includes safe display fields only, such as relative path, basename,

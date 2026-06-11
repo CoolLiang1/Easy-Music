@@ -75,7 +75,7 @@ Required behavior:
 - Authenticated scan endpoint returns supported audio candidates from an
   allowed import directory.
 - Supported formats match existing audio upload support: MP3, FLAC, M4A, WAV,
-  and OGG.
+  OGG, and AAC.
 - Unsupported files are skipped or reported with safe reasons.
 - Empty directories, missing paths, permission errors, scan limits, and
   unauthorized access are handled.

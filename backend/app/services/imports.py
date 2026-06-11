@@ -26,7 +26,7 @@ from app.services.jobs import VIDEO_EXTRACTION_JOB_TYPE, create_processing_job
 from app.services.tracks import build_track_response
 from app.services.uploads import ALLOWED_UPLOAD_TYPES
 
-ALLOWED_AUDIO_IMPORT_EXTENSIONS = {".mp3", ".flac", ".m4a", ".wav", ".ogg"}
+ALLOWED_AUDIO_IMPORT_EXTENSIONS = {".mp3", ".flac", ".m4a", ".wav", ".ogg", ".aac"}
 ALLOWED_VIDEO_IMPORT_EXTENSIONS = {".mp4", ".mkv", ".mov", ".webm"}
 ALL_SUPPORTED_IMPORT_EXTENSIONS = ALLOWED_AUDIO_IMPORT_EXTENSIONS | ALLOWED_VIDEO_IMPORT_EXTENSIONS
 

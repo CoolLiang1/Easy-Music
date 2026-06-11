@@ -15,6 +15,7 @@ from app.services.jobs import create_processing_job
 
 
 ALLOWED_UPLOAD_TYPES = {
+    ".aac": {"audio/aac", "audio/x-aac", "audio/vnd.dlna.adts"},
     ".flac": {"audio/flac", "audio/x-flac"},
     ".m4a": {"audio/mp4", "audio/m4a", "audio/x-m4a"},
     ".mp3": {"audio/mpeg", "audio/mp3"},
