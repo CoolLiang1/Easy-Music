@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-10:
+Status as of 2026-06-11:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -47,6 +47,11 @@ Status as of 2026-06-10:
   explanations, recently revived tracks, and Android launcher shortcuts are
   implemented. Automated checks are recorded, with manual acceptance partially
   recorded in `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`.
+- V2 import/video slice: Accepted for local closure. Automatic import tools
+  and optional user-provided video-to-audio processing are implemented through
+  safe configured import roots, scan/confirm flows, import batch history,
+  Web import UI, Web video upload, worker video extraction, mixed
+  audio/video imports, and documented automated plus browser smoke acceptance.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
@@ -232,15 +237,16 @@ Deliverables:
 
 ## V2 Ideas
 
+- Completed local V2 slice:
+  - Automatic import tools.
+  - Optional user-provided video-to-audio processing.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection
 - Language detection
 - Energy and mood analysis
 - Embedding-based recommendation
-- Automatic import tools
 - Optional Bilibili metadata import
-- Optional user-provided video-to-audio processing
 - Multi-user support
 - Windows desktop client if browser usage is not enough
 

@@ -4,9 +4,10 @@ Easy Music is a self-hosted personal cloud music system for scenario-based
 listening.
 
 The repository has completed the planned MVP implementation through Phase 7
-Deployment Hardening. It now contains a FastAPI backend, PostgreSQL migrations,
-media processing worker, React/Vite Web management console, Kotlin/Jetpack
-Compose Android listening client, and Docker Compose deployment artifacts.
+Deployment Hardening and has locally accepted the first V2 import/video
+workflow slice. It now contains a FastAPI backend, PostgreSQL migrations, media
+processing worker, React/Vite Web management console, Kotlin/Jetpack Compose
+Android listening client, and Docker Compose deployment artifacts.
 
 Phase 7 acceptance is documented locally. A real production smoke test on an
 Ubuntu host with a real domain and HTTPS certificate is still an operator-side
@@ -24,6 +25,7 @@ deployment step, not a completed repository verification step.
 - [Phase 7 Acceptance](docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md)
 - [V1.1 Duplicate Detection Acceptance](docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md)
 - [V1.1 Workflow Enhancements Acceptance](docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md)
+- [V2 Import And Video Acceptance](docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md)
 
 ## Implemented Areas
 
@@ -33,7 +35,8 @@ deployment step, not a completed repository verification step.
   media processing.
 - Web: React/Vite management console with login, upload flow, library, track
   editor, tag editor, Web playback, recommendation test panel, and AI
-  assistant/tag suggestion UI.
+  assistant/tag suggestion UI, plus import-directory review and optional
+  user-provided video-to-audio upload.
 - Android: Kotlin/Jetpack Compose client with login, library, track detail,
   Media3 playback service, background/notification controls, manual offline
   cache, cached playback, playback-event sync, and structured/natural-language
@@ -66,6 +69,9 @@ Current documented progress:
 - V1.1: duplicate detection is accepted. Workflow enhancements through Android
   launcher shortcuts are implemented with automated checks recorded; manual
   acceptance is partially recorded in the V1.1 workflow acceptance note.
+- V2 import/video slice: accepted for local closure. Automatic import tools
+  and optional user-provided video-to-audio processing are implemented with
+  automated checks and browser smoke recorded.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.

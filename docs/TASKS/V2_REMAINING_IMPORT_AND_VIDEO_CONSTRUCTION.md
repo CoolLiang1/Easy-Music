@@ -4,6 +4,12 @@ This document converts the remaining V2 import and video tasks into executable
 work orders for coding agents. Tasks V2.1 through V2.6 are already implemented
 locally as of 2026-06-10 and must not be reimplemented here.
 
+Status update, 2026-06-11: V2.7 through V2.10 are now recorded as implemented
+and locally accepted in `docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md`.
+This file is retained as a historical construction order and agent handoff
+record. Use the acceptance document, `docs/ROADMAP.md`, and current code as the
+source of truth for present project status.
+
 Use this document together with:
 
 - `AGENTS.md`
