@@ -19,15 +19,29 @@ enum class PlaybackSource {
     OfflineCache,
 }
 
+enum class PlaybackQueueMode {
+    Sequence,
+    Shuffle,
+    Reverse,
+}
+
 data class PlayerUiState(
     val track: TrackResponse? = null,
     val status: PlaybackStatus = PlaybackStatus.Idle,
     val playbackSource: PlaybackSource = PlaybackSource.OnlineStream,
+    val queueMode: PlaybackQueueMode? = null,
+    val queueIndex: Int = 0,
+    val queueSize: Int = 0,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val durationMs: Long = 0L,
     val positionMs: Long = 0L,
     val errorMessage: String? = null,
+)
+
+data class PlaybackQueueItem(
+    val track: TrackResponse,
+    val playbackSource: PlaybackSource,
 )
 
 object PlaybackStateStore {

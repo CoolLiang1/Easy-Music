@@ -592,6 +592,12 @@ h3 {
   background: var(--teal-dark);
 }
 
+.audio-btn:disabled {
+  background: var(--surface-muted);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
 .audio-player.compact .audio-btn {
   width: 26px;
   height: 26px;
@@ -633,6 +639,31 @@ h3 {
 
 .audio-duration {
   text-align: center;
+}
+
+.queue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.queue-meta strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-current-track {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 820;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---- seek bar ---- */
@@ -1076,6 +1107,25 @@ h3 {
   gap: 12px;
   align-items: end;
   margin-top: 18px;
+}
+
+.playlist-playback-panel {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px;
+}
+
+.playlist-playback-panel .audio-player {
+  margin-top: 14px;
+  max-width: none;
+}
+
+.playlist-playback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .playlist-track-table-wrap {

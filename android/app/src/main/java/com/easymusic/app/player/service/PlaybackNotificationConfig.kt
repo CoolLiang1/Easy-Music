@@ -23,14 +23,24 @@ object PlaybackNotificationConfig {
 
     fun mediaButtonPreferences(): List<CommandButton> {
         return listOf(
+            CommandButton.Builder(CommandButton.ICON_PREVIOUS)
+                .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .setDisplayName("Previous")
+                .setSlots(CommandButton.SLOT_BACK)
+                .build(),
             CommandButton.Builder(CommandButton.ICON_PLAY)
                 .setPlayerCommand(Player.COMMAND_PLAY_PAUSE)
-                .setDisplayName("播放/暂停")
+                .setDisplayName("Play/Pause")
                 .setSlots(CommandButton.SLOT_CENTRAL)
+                .build(),
+            CommandButton.Builder(CommandButton.ICON_NEXT)
+                .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                .setDisplayName("Next")
+                .setSlots(CommandButton.SLOT_FORWARD)
                 .build(),
             CommandButton.Builder(CommandButton.ICON_STOP)
                 .setPlayerCommand(Player.COMMAND_STOP)
-                .setDisplayName("停止")
+                .setDisplayName("Stop")
                 .setSlots(CommandButton.SLOT_BACK)
                 .build(),
         )

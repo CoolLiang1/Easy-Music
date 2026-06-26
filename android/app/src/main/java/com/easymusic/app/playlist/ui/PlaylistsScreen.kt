@@ -31,6 +31,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -38,6 +40,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.auth.data.AuthTokenStore
+import com.easymusic.app.core.config.AppConfig
+import com.easymusic.app.core.network.ApiClient
+import com.easymusic.app.library.data.TrackApi
+import com.easymusic.app.player.domain.PlaybackQueueMode
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerController
@@ -49,6 +56,7 @@ import com.easymusic.app.playlist.data.PlaylistTrackResponse
 import com.easymusic.app.ui.theme.BannerTone
 import com.easymusic.app.ui.theme.SectionHeader
 import com.easymusic.app.ui.theme.StatusBanner
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlaylistsScreen(
@@ -62,6 +70,9 @@ fun PlaylistsScreen(
 ) {
     val context = LocalContext.current
     val playerController = androidx.compose.runtime.remember(context) { PlayerController(context) }
+    val tokenStore = remember(context) { AuthTokenStore(context) }
+    val trackApi = remember { TrackApi(ApiClient(AppConfig.default())) }
+    val coroutineScope = rememberCoroutineScope()
     val playbackState by PlaybackStateStore.state.collectAsState()
 
     Column(
@@ -79,6 +90,24 @@ fun PlaylistsScreen(
                     errorMessage = uiState.errorMessage,
                     onBack = onClosePlaylist,
                     onRefresh = onRefresh,
+                    onPlayPlaylist = { mode ->
+                        coroutineScope.launch {
+                            val bearerToken = tokenStore.readToken()
+                            if (bearerToken == null) {
+                                playerController.fail(
+                                    track = null,
+                                    message = "请重新登录后再播放歌单。",
+                                )
+                            } else {
+                                playerController.playQueue(
+                                    tracks = playlist.queueTracks(mode),
+                                    bearerToken = bearerToken,
+                                    streamUrlForTrack = trackApi::streamUrl,
+                                    mode = mode,
+                                )
+                            }
+                        }
+                    },
                     onTrackSelected = onTrackSelected,
                 )
             } ?: PlaylistsOverview(
@@ -275,6 +304,7 @@ private fun PlaylistDetail(
     errorMessage: String?,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
+    onPlayPlaylist: (PlaybackQueueMode) -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
 ) {
     SectionHeader(
@@ -307,6 +337,13 @@ private fun PlaylistDetail(
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    PlaylistPlaybackActions(
+        enabled = playlist.tracks.isNotEmpty() && isNetworkAvailable,
+        onPlayPlaylist = onPlayPlaylist,
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
     when {
         errorMessage != null -> StatusBanner(
             text = errorMessage,
@@ -334,6 +371,42 @@ private fun PlaylistDetail(
                     onClick = { onTrackSelected(item.track) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistPlaybackActions(
+    enabled: Boolean,
+    onPlayPlaylist: (PlaybackQueueMode) -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Button(
+            enabled = enabled,
+            onClick = { onPlayPlaylist(PlaybackQueueMode.Sequence) },
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = null,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("顺序播放")
+        }
+        OutlinedButton(
+            enabled = enabled,
+            onClick = { onPlayPlaylist(PlaybackQueueMode.Shuffle) },
+        ) {
+            Text("随机播放")
+        }
+        OutlinedButton(
+            enabled = enabled,
+            onClick = { onPlayPlaylist(PlaybackQueueMode.Reverse) },
+        ) {
+            Text("倒序播放")
         }
     }
 }
@@ -506,6 +579,19 @@ private fun TrackResponse.subtitle(): String =
         .filter { value -> value.isNotBlank() }
         .joinToString(separator = " - ")
         .ifBlank { "未知艺人或专辑" }
+
+private fun PlaylistResponse.queueTracks(mode: PlaybackQueueMode): List<TrackResponse> {
+    val orderedTracks = tracks
+        .sortedBy { item -> item.position }
+        .map { item -> item.track }
+        .filter { track -> track.isReady }
+
+    return when (mode) {
+        PlaybackQueueMode.Sequence -> orderedTracks
+        PlaybackQueueMode.Shuffle -> orderedTracks.shuffled()
+        PlaybackQueueMode.Reverse -> orderedTracks.asReversed()
+    }
+}
 
 private fun PlaybackStatus.currentTrackChipLabel(): String =
     when (this) {

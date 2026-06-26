@@ -131,6 +131,10 @@ Recommended mounted paths:
 - AI assistant
 - Android cache sync
 
+Playback queue state is client-local. The backend persists playlists and their
+ordered tracks, but it does not persist current playback queues or synchronize
+queue state across devices.
+
 ## 6. Android App
 
 ### 6.1 Technology
@@ -148,6 +152,7 @@ Recommended mounted paths:
 - Recommendation home
 - Cloud playback
 - Playlist browsing and playback handoff
+- Playlist queue playback in sequence, shuffled-once, and reverse order
 - Background playback
 - Notification and lock screen controls
 - Headset control integration
@@ -184,6 +189,8 @@ Android should store:
 - AI tag confirmation
 - Recommendation testing
 - Web playback
+- Client-side playback queue for playlist sequence, shuffled-once, and reverse
+  playback
 - Playback history
 
 ## 8. Data Model Draft

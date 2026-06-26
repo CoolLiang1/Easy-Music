@@ -11,6 +11,9 @@ import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import com.easymusic.app.player.domain.PlaybackStateStore
+import com.easymusic.app.player.domain.PlaybackQueueItem
+import com.easymusic.app.player.domain.PlaybackQueueMode
+import com.easymusic.app.player.domain.PlaybackSource
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlaybackEventRecorder
 import com.easymusic.app.player.domain.PlayerUiState
@@ -19,6 +22,8 @@ object MediaSessionConnector {
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
     private var playbackEventRecorder: PlaybackEventRecorder? = null
+    private var playbackQueue: List<PlaybackQueueItem> = emptyList()
+    private var playbackQueueMode: PlaybackQueueMode? = null
 
     fun player(context: Context): ExoPlayer {
         return ensureSession(context).player as ExoPlayer
@@ -32,11 +37,25 @@ object MediaSessionConnector {
         playbackEventRecorder = recorder
     }
 
+    fun setPlaybackQueue(
+        items: List<PlaybackQueueItem>,
+        mode: PlaybackQueueMode?,
+    ) {
+        playbackQueue = items
+        playbackQueueMode = mode
+    }
+
+    fun clearPlaybackQueue() {
+        playbackQueue = emptyList()
+        playbackQueueMode = null
+    }
+
     fun release() {
         mediaSession?.release()
         mediaSession = null
         player?.release()
         player = null
+        clearPlaybackQueue()
         PlaybackStateStore.update(PlayerUiState())
     }
 
@@ -81,6 +100,45 @@ object MediaSessionConnector {
                                     playbackEventRecorder?.recordStopBeforeComplete(
                                         positionMs = exoPlayer.currentPosition,
                                         durationMs = exoPlayer.duration.takeIf { it > 0L },
+                                    )
+                                }
+                            }
+                            publishState(exoPlayer)
+                        }
+
+                        override fun onMediaItemTransition(
+                            mediaItem: androidx.media3.common.MediaItem?,
+                            reason: Int,
+                        ) {
+                            val queueItem = mediaItem?.mediaId
+                                ?.toIntOrNull()
+                                ?.let { trackId ->
+                                    playbackQueue.firstOrNull { item -> item.track.id == trackId }
+                                }
+                            if (queueItem != null) {
+                                val queueIndex = playbackQueue.indexOfFirst {
+                                    it.track.id == queueItem.track.id
+                                }
+                                val current = PlaybackStateStore.state.value
+                                if (current.track?.id != queueItem.track.id) {
+                                    playbackEventRecorder?.startTrack(
+                                        trackId = queueItem.track.id,
+                                        playbackSource = queueItem.playbackSource,
+                                        durationMs = queueItem.track.durationSeconds?.times(1000L),
+                                    )
+                                }
+                                PlaybackStateStore.update {
+                                    it.copy(
+                                        track = queueItem.track,
+                                        playbackSource = queueItem.playbackSource,
+                                        queueMode = playbackQueueMode,
+                                        queueIndex = queueIndex.coerceAtLeast(0),
+                                        queueSize = playbackQueue.size,
+                                        positionMs = 0L,
+                                        durationMs = queueItem.track.durationSeconds
+                                            ?.times(1000L)
+                                            ?: 0L,
+                                        errorMessage = null,
                                     )
                                 }
                             }
@@ -144,6 +202,12 @@ fun publishState(
 
     PlaybackStateStore.update {
         it.copy(
+            queueIndex = currentQueueIndex(player, it.queueIndex),
+            queueSize = if (PlaybackStateStore.state.value.queueSize > 0) {
+                player.mediaItemCount
+            } else {
+                it.queueSize
+            },
             status = status,
             isPlaying = player.isPlaying,
             isBuffering = player.playbackState == Player.STATE_BUFFERING,
@@ -152,6 +216,13 @@ fun publishState(
             errorMessage = errorMessage,
         )
     }
+}
+
+private fun currentQueueIndex(
+    player: Player,
+    fallback: Int,
+): Int {
+    return player.currentMediaItemIndex.takeIf { it >= 0 } ?: fallback
 }
 
 private fun PlaybackException.toPlaybackMessage(): String {

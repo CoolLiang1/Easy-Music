@@ -9,6 +9,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
 import com.easymusic.app.cache.data.EasyMusicDatabase
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.data.AuthenticatedDataSourceFactory
@@ -53,6 +54,7 @@ class PlayerController(
             .createMediaSource(mediaItem)
         val player = MediaSessionConnector.player(appContext)
         MediaSessionConnector.setPlaybackEventRecorder(eventRecorder)
+        MediaSessionConnector.clearPlaybackQueue()
         player.setMediaSource(mediaSource)
         startPlayback(
             player = player,
@@ -78,11 +80,55 @@ class PlayerController(
 
         val player = MediaSessionConnector.player(appContext)
         MediaSessionConnector.setPlaybackEventRecorder(eventRecorder)
+        MediaSessionConnector.clearPlaybackQueue()
         player.setMediaItem(track.toMediaItem(Uri.fromFile(audioFile).toString()))
         startPlayback(
             player = player,
             track = track,
             playbackSource = PlaybackSource.OfflineCache,
+        )
+    }
+
+    fun playQueue(
+        tracks: List<TrackResponse>,
+        bearerToken: String,
+        streamUrlForTrack: (Int) -> String,
+        mode: PlaybackQueueMode,
+    ) {
+        val playableTracks = tracks.filter { it.isReady }
+        if (playableTracks.isEmpty()) {
+            PlaybackStateStore.update(
+                PlayerUiState(
+                    status = PlaybackStatus.Error,
+                    queueMode = mode,
+                    queueSize = 0,
+                    errorMessage = "歌单里没有已就绪的可播放音轨。",
+                ),
+            )
+            return
+        }
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory.create(bearerToken))
+        val mediaSources = playableTracks.map { track ->
+            mediaSourceFactory.createMediaSource(track.toMediaItem(streamUrlForTrack(track.id)))
+        }
+        val player = MediaSessionConnector.player(appContext)
+        MediaSessionConnector.setPlaybackEventRecorder(eventRecorder)
+        MediaSessionConnector.setPlaybackQueue(
+            items = playableTracks.map { track ->
+                PlaybackQueueItem(
+                    track = track,
+                    playbackSource = PlaybackSource.OnlineStream,
+                )
+            },
+            mode = mode,
+        )
+        player.setMediaSources(mediaSources)
+        startPlaybackQueue(
+            player = player,
+            mediaSources = mediaSources,
+            tracks = playableTracks,
+            mode = mode,
         )
     }
 
@@ -104,6 +150,34 @@ class PlayerController(
                 track = track,
                 status = PlaybackStatus.Buffering,
                 playbackSource = playbackSource,
+                isBuffering = true,
+            ),
+        )
+        player.prepare()
+        player.play()
+        ensureServiceRunning()
+    }
+
+    private fun startPlaybackQueue(
+        player: Player,
+        mediaSources: List<MediaSource>,
+        tracks: List<TrackResponse>,
+        mode: PlaybackQueueMode,
+    ) {
+        val firstTrack = tracks.first()
+        eventRecorder.startTrack(
+            trackId = firstTrack.id,
+            playbackSource = PlaybackSource.OnlineStream,
+            durationMs = firstTrack.durationSeconds?.times(1000L),
+        )
+        PlaybackStateStore.update(
+            PlayerUiState(
+                track = firstTrack,
+                status = PlaybackStatus.Buffering,
+                playbackSource = PlaybackSource.OnlineStream,
+                queueMode = mode,
+                queueIndex = 0,
+                queueSize = mediaSources.size,
                 isBuffering = true,
             ),
         )
@@ -196,6 +270,7 @@ class PlayerController(
 
     private fun TrackResponse.toMediaItem(uri: String): MediaItem =
         MediaItem.Builder()
+            .setMediaId(id.toString())
             .setUri(uri)
             .setMediaMetadata(
                 MediaMetadata.Builder()

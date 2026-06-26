@@ -14,8 +14,8 @@ a structured Recommendation V1 test panel, and an AI Assistant panel. The
 Android app supports authenticated library/detail flows, Media3 playback,
 Phase 4 manual offline cache behavior, a structured Recommendation Home, and
 natural-language AI recommendation input. V2.1 adds ordinary owner-scoped
-playlist management on the backend and Web, plus Android playlist browsing
-that hands selected playlist tracks to the existing Now Playing flow.
+playlist management on the backend and Web, plus Web and Android playlist
+playback queues for sequence, shuffled-once, and reverse playback.
 
 Production deployment is covered separately.  For the full step-by-step
 guide see `docs/DEPLOYMENT.md`.  For production environment variables
@@ -458,8 +458,9 @@ therefore uses `127.0.0.1:8081` for local Web development.
 
 The V2.1 playlist page is available at `/playlists` after login. It can create,
 rename, delete, and open ordinary user playlists, add owned tracks, remove
-tracks, and save order changes. It does not create smart playlists or change
-recommendation ranking.
+tracks, save order changes, and start a local Web playback queue in sequence,
+one-time shuffled, or reverse order. It does not create smart playlists,
+persist queue state on the backend, or change recommendation ranking.
 
 The V2 import page is available at `/imports` after login. It reads the
 configured import roots from the backend, scans one configured root and optional
@@ -682,9 +683,11 @@ hosts, usernames, passwords, or bearer tokens into source files.
 
 V2.1 Android playlists are available from the bottom navigation after login.
 The Android client reads `GET /api/playlists` and `GET /api/playlists/{id}`,
-opens a selected playlist, and hands selected tracks to the existing Now
-Playing flow. It does not edit playlists on Android and does not alter Media3,
-cache selection, or recommendation ranking.
+opens a selected playlist, and can start Media3 playback queues in sequence,
+one-time shuffled, or reverse order. Media3 owns next/previous navigation after
+the queue is built, so notification, lock-screen, and headset controls continue
+to target the current queue. It does not edit playlists on Android, persist
+queue state on the backend, or change recommendation ranking.
 
 - Android emulator to host backend: use `http://10.0.2.2:8000`.
 - Connected device or emulator with port reverse: run

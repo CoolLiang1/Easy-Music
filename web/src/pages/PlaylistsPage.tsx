@@ -12,7 +12,12 @@ import {
 } from "../api/playlists";
 import { listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
-import { WebAudioPlayer } from "../components/WebAudioPlayer";
+import {
+  WebAudioPlayer,
+  WebPlaybackQueuePlayer,
+  type PlaybackQueueMode,
+  type PlaybackQueueSession,
+} from "../components/WebAudioPlayer";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import {
   formatDateTime,
@@ -41,6 +46,7 @@ export function PlaylistsPage() {
   const [createName, setCreateName] = useState("");
   const [renameName, setRenameName] = useState("");
   const [addTrackId, setAddTrackId] = useState("");
+  const [queueSession, setQueueSession] = useState<PlaybackQueueSession | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -287,6 +293,29 @@ export function PlaylistsPage() {
     }
   };
 
+  const handlePlayPlaylist = (mode: PlaybackQueueMode) => {
+    if (!selectedPlaylist) {
+      setErrorMessage("请先选择一个歌单。");
+      return;
+    }
+
+    const orderedTracks = selectedPlaylist.tracks.map((item) => item.track);
+    const playableTracks = orderedTracks.filter((track) => track.status.toLowerCase() === "ready");
+    if (playableTracks.length === 0) {
+      setErrorMessage("这个歌单里没有已就绪的可播放音轨。");
+      return;
+    }
+
+    setErrorMessage(null);
+    setStatusMessage(null);
+    setQueueSession({
+      id: Date.now(),
+      mode,
+      playlistName: selectedPlaylist.name,
+      tracks: buildQueueTracks(playableTracks, mode),
+    });
+  };
+
   const applySelectedPlaylist = (playlist: Playlist) => {
     setPageState((current) => {
       if (current.name !== "ready") {
@@ -417,6 +446,41 @@ export function PlaylistsPage() {
                   >
                     删除歌单
                   </button>
+                </div>
+
+                <div className="playlist-playback-panel">
+                  <div className="playlist-playback-actions">
+                    <button
+                      className="button primary"
+                      disabled={isMutating || selectedPlaylist.tracks.length === 0}
+                      onClick={() => handlePlayPlaylist("sequence")}
+                      type="button"
+                    >
+                      顺序播放
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={isMutating || selectedPlaylist.tracks.length === 0}
+                      onClick={() => handlePlayPlaylist("shuffle")}
+                      type="button"
+                    >
+                      随机播放
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={isMutating || selectedPlaylist.tracks.length === 0}
+                      onClick={() => handlePlayPlaylist("reverse")}
+                      type="button"
+                    >
+                      倒序播放
+                    </button>
+                  </div>
+                  {queueSession ? (
+                    <WebPlaybackQueuePlayer
+                      accessToken={accessToken}
+                      session={queueSession}
+                    />
+                  ) : null}
                 </div>
 
                 <form className="playlist-inline-form" onSubmit={handleRename}>
@@ -588,6 +652,23 @@ function toSummary(playlist: Playlist): PlaylistSummary {
     created_at: playlist.created_at,
     updated_at: playlist.updated_at,
   };
+}
+
+function buildQueueTracks(tracks: Track[], mode: PlaybackQueueMode): Track[] {
+  if (mode === "reverse") {
+    return [...tracks].reverse();
+  }
+
+  if (mode === "shuffle") {
+    const shuffled = [...tracks];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
+  }
+
+  return tracks;
 }
 
 function getErrorMessage(error: unknown) {
