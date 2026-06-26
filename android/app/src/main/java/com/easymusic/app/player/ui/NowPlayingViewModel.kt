@@ -68,6 +68,24 @@ class NowPlayingViewModel(
         playerController.seekTo(positionMs)
     }
 
+    fun removeQueueItem(queueItemId: String) {
+        playerController.removeQueueItem(queueItemId)
+    }
+
+    fun clearQueue() {
+        playerController.clearQueue()
+    }
+
+    fun moveUpcomingItem(
+        queueItemId: String,
+        targetUpcomingIndex: Int,
+    ) {
+        playerController.moveUpcomingItem(
+            queueItemId = queueItemId,
+            targetUpcomingIndex = targetUpcomingIndex,
+        )
+    }
+
     fun dispose() {
         positionJob?.cancel()
     }

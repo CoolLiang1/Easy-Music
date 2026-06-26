@@ -272,6 +272,22 @@ class PlayerController(
         publishState(player)
     }
 
+    fun moveUpcomingItem(
+        queueItemId: String,
+        targetUpcomingIndex: Int,
+    ) {
+        val player = MediaSessionConnector.player(appContext)
+        val move = MediaSessionConnector.moveUpcomingItem(
+            queueItemId = queueItemId,
+            targetUpcomingIndex = targetUpcomingIndex,
+        )
+        if (move != null) {
+            val (fromIndex, toIndex) = move
+            player.moveMediaItem(fromIndex, toIndex)
+        }
+        publishState(player)
+    }
+
     fun clearQueue() {
         val player = MediaSessionConnector.player(appContext)
         eventRecorder.recordStopBeforeComplete(

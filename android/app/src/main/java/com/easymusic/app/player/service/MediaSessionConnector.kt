@@ -107,6 +107,34 @@ object MediaSessionConnector {
         return removedIndex
     }
 
+    fun moveUpcomingItem(
+        queueItemId: String,
+        targetUpcomingIndex: Int,
+    ): Pair<Int, Int>? {
+        val currentIndex = currentQueueIndex()
+        val fromIndex = playbackQueue.indexOfFirst { item ->
+            item.queueItemId == queueItemId
+        }
+        if (currentIndex < 0 || fromIndex <= currentIndex) {
+            return null
+        }
+
+        val upcomingStartIndex = currentIndex + 1
+        val upcomingSize = playbackQueue.size - upcomingStartIndex
+        val toIndex = (upcomingStartIndex + targetUpcomingIndex)
+            .coerceIn(upcomingStartIndex, playbackQueue.lastIndex)
+        if (fromIndex == toIndex || upcomingSize <= 1) {
+            return null
+        }
+
+        playbackQueue = playbackQueue.toMutableList().also { queue ->
+            val item = queue.removeAt(fromIndex)
+            queue.add(toIndex, item)
+        }
+        publishQueueState()
+        return fromIndex to toIndex
+    }
+
     fun release() {
         mediaSession?.release()
         mediaSession = null

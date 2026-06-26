@@ -79,6 +79,31 @@ class PlaybackQueueStateTest {
         assertEquals(listOf("queue-c"), state.upcoming.map { it.queueItemId })
     }
 
+    @Test
+    fun movingUpcomingItemDoesNotMoveCurrent() {
+        val first = queueItem("queue-a", track(id = 1))
+        val second = queueItem("queue-b", track(id = 2))
+        val third = queueItem("queue-c", track(id = 2))
+
+        MediaSessionConnector.setPlaybackQueue(
+            items = listOf(first, second, third),
+            mode = PlaybackQueueMode.Sequence,
+            source = PlaybackQueueSource(PlaybackQueueSourceType.Playlist, playlistId = 7),
+            baseCycleItems = listOf(first, second, third),
+        )
+
+        val move = MediaSessionConnector.moveUpcomingItem(
+            queueItemId = "queue-c",
+            targetUpcomingIndex = 0,
+        )
+
+        val state = PlaybackStateStore.state.value
+        assertEquals(2 to 1, move)
+        assertEquals("queue-a", state.currentQueueItem?.queueItemId)
+        assertEquals(listOf("queue-c", "queue-b"), state.upcoming.map { it.queueItemId })
+        assertEquals(listOf(2, 2), state.upcoming.map { it.track.id })
+    }
+
     private fun queueItem(
         queueItemId: String,
         track: TrackResponse,
