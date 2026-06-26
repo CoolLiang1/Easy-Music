@@ -382,7 +382,7 @@ h3 {
 
 .track-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1160px;
   border-collapse: collapse;
 }
 
@@ -427,6 +427,44 @@ h3 {
 
 .track-title-cell {
   max-width: 280px;
+}
+
+.track-playlist-add {
+  display: grid;
+  width: min(100%, 300px);
+  gap: 6px;
+}
+
+.track-playlist-add-controls {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.track-playlist-add select {
+  min-height: 34px;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 6px 8px;
+}
+
+.track-playlist-add-message {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 780;
+  line-height: 1.35;
+}
+
+.track-playlist-add-message.success {
+  color: var(--green);
+}
+
+.track-playlist-add-message.error {
+  color: var(--red);
 }
 
 .muted {

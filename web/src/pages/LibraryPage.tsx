@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { addPlaylistTrack, listPlaylists } from "../api/playlists";
 import { listTags } from "../api/tags";
 import { batchUpdateTrackTags, listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
@@ -10,12 +11,13 @@ import {
 } from "../components/BatchTagEditor";
 import { TrackTable } from "../components/TrackTable";
 import { RouteLink } from "../routes/RouteLink";
+import type { PlaylistSummary } from "../types/playlist";
 import type { Tag } from "../types/tag";
 import type { Track } from "../types/track";
 
 type LibraryState =
   | { name: "loading" }
-  | { name: "ready"; tags: Tag[]; tracks: Track[] }
+  | { name: "ready"; playlists: PlaylistSummary[]; tags: Tag[]; tracks: Track[] }
   | { name: "error"; message: string };
 
 export function LibraryPage() {
@@ -45,11 +47,12 @@ export function LibraryPage() {
     }
 
     try {
-      const [tracks, tags] = await Promise.all([
+      const [tracks, tags, playlists] = await Promise.all([
         listTracks(accessToken),
         listTags(accessToken),
+        listPlaylists(accessToken),
       ]);
-      setLibraryState({ name: "ready", tags, tracks });
+      setLibraryState({ name: "ready", playlists, tags, tracks });
       setSelectedTrackIds((current) => {
         const availableTrackIds = new Set(tracks.map((track) => track.id));
         return new Set([...current].filter((trackId) => availableTrackIds.has(trackId)));
@@ -152,6 +155,37 @@ export function LibraryPage() {
     }
   };
 
+  const addTrackToPlaylist = async (track: Track, playlistId: number) => {
+    if (!accessToken) {
+      throw new Error("请重新登录后再添加到歌单。");
+    }
+
+    const playlist = await addPlaylistTrack(accessToken, playlistId, {
+      track_id: track.id,
+    });
+
+    setLibraryState((current) => {
+      if (current.name !== "ready") {
+        return current;
+      }
+
+      return {
+        ...current,
+        playlists: current.playlists.map((item) =>
+          item.id === playlist.id
+            ? {
+                ...item,
+                track_count: playlist.track_count,
+                updated_at: playlist.updated_at,
+              }
+            : item,
+        ),
+      };
+    });
+
+    return `已将「${track.title || "未命名音轨"}」加入「${playlist.name}」。`;
+  };
+
   return (
     <section className="page-panel" aria-labelledby="library-title">
       <div className="page-header-row">
@@ -214,7 +248,9 @@ export function LibraryPage() {
           />
           <TrackTable
             accessToken={accessToken}
+            onAddTrackToPlaylist={addTrackToPlaylist}
             onToggleTrackSelection={toggleTrackSelection}
+            playlistOptions={libraryState.playlists}
             selectedTrackIds={selectedTrackIds}
             tracks={libraryState.tracks}
           />
