@@ -26,21 +26,22 @@ deployment step, not a completed repository verification step.
 - [V1.1 Duplicate Detection Acceptance](docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md)
 - [V1.1 Workflow Enhancements Acceptance](docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md)
 - [V2 Import And Video Acceptance](docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md)
+- [V2.1 Playlist Management Acceptance](docs/ACCEPTANCE/V2_1_PLAYLISTS_ACCEPTANCE.md)
 
 ## Implemented Areas
 
 - Backend: FastAPI API, auth, tracks, tags, uploads, media streaming,
-  playback events, feedback events, recommendation endpoints, AI assistant
-  endpoints, health checks, structured logging, Alembic migrations, and worker
-  media processing.
+  playlists, playback events, feedback events, recommendation endpoints, AI
+  assistant endpoints, health checks, structured logging, Alembic migrations,
+  and worker media processing.
 - Web: React/Vite management console with login, upload flow, library, track
-  editor, tag editor, Web playback, recommendation test panel, and AI
-  assistant/tag suggestion UI, plus import-directory review and optional
-  user-provided video-to-audio upload.
+  editor, tag editor, playlist management, Web playback, recommendation test
+  panel, and AI assistant/tag suggestion UI, plus import-directory review and
+  optional user-provided video-to-audio upload.
 - Android: Kotlin/Jetpack Compose client with login, library, track detail,
-  Media3 playback service, background/notification controls, manual offline
-  cache, cached playback, playback-event sync, and structured/natural-language
-  recommendation flows.
+  playlist browsing, Media3 playback service, background/notification controls,
+  manual offline cache, cached playback, playback-event sync, and
+  structured/natural-language recommendation flows.
 - Deployment: development Docker Compose, production Docker Compose, Caddy
   HTTPS reverse proxy configuration, production environment template, host
   setup script, database backup script, and deployment guide.
@@ -72,6 +73,8 @@ Current documented progress:
 - V2 import/video slice: accepted for local closure. Automatic import tools
   and optional user-provided video-to-audio processing are implemented with
   automated checks and browser smoke recorded.
+- V2.1 playlist management: implemented as ordinary owner-scoped user
+  playlists across backend, Web management, and Android browse/play flows.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.

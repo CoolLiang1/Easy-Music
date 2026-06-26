@@ -5,6 +5,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { LibraryReportsPage } from "./pages/LibraryReportsPage";
 import { ImportPage } from "./pages/ImportPage";
+import { PlaylistsPage } from "./pages/PlaylistsPage";
 import { RecommendationPage } from "./pages/RecommendationPage";
 import { TagsPage } from "./pages/TagsPage";
 import { TrackDetailPage } from "./pages/TrackDetailPage";
@@ -47,6 +48,7 @@ export default function App() {
     >
       <AppLayout onSignOut={() => setPlaceholderAuth(false)}>
         {route.name === "library" ? <LibraryPage /> : null}
+        {route.name === "playlists" ? <PlaylistsPage /> : null}
         {route.name === "duplicates" ? <DuplicateReviewPage /> : null}
         {route.name === "imports" ? <ImportPage /> : null}
         {route.name === "reports" ? <LibraryReportsPage /> : null}

@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-11:
+Status as of 2026-06-26:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -52,6 +52,10 @@ Status as of 2026-06-11:
   safe configured import roots, scan/confirm flows, import batch history,
   Web import UI, Web video upload, worker video extraction, mixed
   audio/video imports, and documented automated plus browser smoke acceptance.
+- V2.1 playlist management: Implemented. Ordinary owner-scoped user playlists
+  now have backend CRUD/add/remove/reorder APIs, Web management UI, and Android
+  browse/play flows. Smart playlists, sharing, collaboration, auto-generation,
+  and recommendation algorithm changes remain out of scope.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
@@ -240,6 +244,7 @@ Deliverables:
 - Completed local V2 slice:
   - Automatic import tools.
   - Optional user-provided video-to-audio processing.
+- V2.1 user-built playlist management.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection

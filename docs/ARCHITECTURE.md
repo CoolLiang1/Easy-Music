@@ -63,6 +63,8 @@ The backend keeps these modules separated at a high level:
 - Auth: authentication, token/session handling, password hashing, and access control.
 - Users: user records, ownership boundaries, and single-user-to-future-multi-user compatibility.
 - Tracks: library metadata, playback file references, status, and track updates.
+- Playlists: owner-scoped manually curated playlists and ordered playlist-track
+  membership for future recommendation signals.
 - Tags: tag taxonomy, tag groups, and track-tag assignment.
 - Uploads: audio upload validation, original file persistence, and upload lifecycle state.
 - Video uploads: user-provided video validation, temporary media storage, and
@@ -145,6 +147,7 @@ Recommended mounted paths:
 - Login
 - Recommendation home
 - Cloud playback
+- Playlist browsing and playback handoff
 - Background playback
 - Notification and lock screen controls
 - Headset control integration
@@ -175,6 +178,7 @@ Android should store:
 - Login
 - Audio upload
 - Library management
+- Playlist management
 - Track editing
 - Tag management
 - AI tag confirmation
@@ -350,6 +354,30 @@ Possible feedback types:
 - `created_at`
 - `updated_at`
 
+### 8.12 Playlist
+
+- `id`
+- `user_id`
+- `name`
+- `created_at`
+- `updated_at`
+
+Playlists are ordinary user-created private lists. Version 2.1 does not include
+smart playlists, public sharing, collaboration, or automatic playlist
+generation.
+
+### 8.13 PlaylistTrack
+
+- `playlist_id`
+- `track_id`
+- `position`
+- `created_at`
+
+`playlist_tracks` is scoped through its parent playlist owner and only accepts
+tracks owned by the same user. The service also exposes a narrow read-only
+playlist signal method for future recommendation work, but Recommendation V1
+ranking does not consume playlist signals yet.
+
 ## 9. Media Processing
 
 ### 9.1 Upload
@@ -517,6 +545,17 @@ does not let AI select tracks.
 - `GET /api/tracks/duplicates`
 - `GET /api/tracks/{id}/stream`
 - `GET /api/tracks/{id}/download-cache`
+
+### Playlists
+
+- `GET /api/playlists`
+- `POST /api/playlists`
+- `GET /api/playlists/{id}`
+- `PATCH /api/playlists/{id}`
+- `DELETE /api/playlists/{id}`
+- `POST /api/playlists/{id}/tracks`
+- `DELETE /api/playlists/{id}/tracks/{track_id}`
+- `PUT /api/playlists/{id}/tracks/order`
 
 ### Tags
 

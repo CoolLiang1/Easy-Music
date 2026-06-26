@@ -598,6 +598,88 @@ Expected result:
 - The endpoint preserves existing tag ownership and track ownership checks.
 - No track, media file, tag, or duplicate candidate is deleted or merged.
 
+## Manage Playlists
+
+V2.1 adds ordinary owner-scoped playlists. Playlists are manual private lists:
+no smart playlists, public sharing, collaboration, automatic generation, or
+recommendation ranking changes are included.
+
+Create a playlist:
+
+```powershell
+$playlist = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playlists" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"name":"Night coding"}'
+
+$playlist
+```
+
+Rename it:
+
+```powershell
+Invoke-RestMethod `
+  -Method Patch `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"name":"Late-night focus"}'
+```
+
+Add owned tracks. Repeating the same request is idempotent and should still
+return one playlist item for that track:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)/tracks" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ track_id = $trackId } | ConvertTo-Json)
+```
+
+Reorder tracks by sending exactly the current playlist track ids:
+
+```powershell
+Invoke-RestMethod `
+  -Method Put `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)/tracks/order" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ track_ids = @($secondTrackId, $trackId) } | ConvertTo-Json)
+```
+
+Remove a track:
+
+```powershell
+Invoke-RestMethod `
+  -Method Delete `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)/tracks/$trackId" `
+  -Headers $headers
+```
+
+Delete the playlist:
+
+```powershell
+Invoke-RestMethod `
+  -Method Delete `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)" `
+  -Headers $headers
+```
+
+Expected result:
+
+- List/detail/update/delete are current-user scoped.
+- Adding another user's track returns `404 Not Found`.
+- Accessing another user's playlist returns `404 Not Found`.
+- Reorder rejects duplicate ids or ids that are not exactly the current
+  playlist membership.
+- Deleting a track removes its playlist-track relationships and leaves the
+  playlist itself intact.
+- Missing auth returns `401 Unauthorized`.
+
 ## Review Library Organization Reports
 
 V1.1 adds a read-only organization report endpoint for Web Library cleanup

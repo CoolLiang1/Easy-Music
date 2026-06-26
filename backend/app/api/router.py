@@ -9,6 +9,7 @@ from app.api.routes import (
     imports,
     library_reports,
     playback_events,
+    playlists,
     recommendations,
     tags,
     tracks,
@@ -24,6 +25,7 @@ api_router.include_router(feedback_events.router, prefix="/api")
 api_router.include_router(imports.router, prefix="/api")
 api_router.include_router(library_reports.router, prefix="/api")
 api_router.include_router(playback_events.router, prefix="/api")
+api_router.include_router(playlists.router, prefix="/api")
 api_router.include_router(recommendations.router, prefix="/api")
 api_router.include_router(tags.router, prefix="/api")
 api_router.include_router(uploads.router, prefix="/api")

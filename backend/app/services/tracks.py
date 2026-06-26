@@ -9,6 +9,7 @@ from app.media.paths import UnsafeMediaPathError
 from app.media.storage import MediaStorage
 from app.models.feedback_event import FeedbackEvent
 from app.models.playback_event import PlaybackEvent
+from app.models.playlist import PlaylistTrack
 from app.models.processing_job import ProcessingJob
 from app.models.tag import Tag
 from app.models.track import Track
@@ -272,6 +273,7 @@ def delete_track(db: Session, track: Track, storage: MediaStorage | None = None)
     try:
         db.execute(delete(FeedbackEvent).where(FeedbackEvent.track_id == track_id))
         db.execute(delete(PlaybackEvent).where(PlaybackEvent.track_id == track_id))
+        db.execute(delete(PlaylistTrack).where(PlaylistTrack.track_id == track_id))
         db.execute(delete(ProcessingJob).where(ProcessingJob.track_id == track_id))
         db.execute(delete(TrackTag).where(TrackTag.track_id == track_id))
         db.delete(track)

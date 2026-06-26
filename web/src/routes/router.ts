@@ -7,6 +7,7 @@ export type AppRoute =
   | { name: "imports" }
   | { name: "reports" }
   | { name: "library" }
+  | { name: "playlists" }
   | { name: "upload" }
   | { name: "tags" }
   | { name: "recommendations" }
@@ -31,6 +32,10 @@ export function getRoute(path: string): AppRoute {
 
   if (normalizedPath === "/upload") {
     return { name: "upload" };
+  }
+
+  if (normalizedPath === "/playlists") {
+    return { name: "playlists" };
   }
 
   if (normalizedPath === "/imports") {

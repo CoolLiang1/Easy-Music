@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.auth.domain.AuthSession
 import com.easymusic.app.library.LibraryRoutes
+import com.easymusic.app.playlist.PlaylistRoutes
 import com.easymusic.app.ShortcutRoutes
 import com.easymusic.app.ui.theme.BannerTone
 import com.easymusic.app.ui.theme.StatusBanner
@@ -37,6 +39,7 @@ fun AppScaffold(
     isLoggingOut: Boolean = false,
     currentRoute: String? = null,
     onNavigateToLibrary: (() -> Unit)? = null,
+    onNavigateToPlaylists: (() -> Unit)? = null,
     onNavigateToCachedTracks: (() -> Unit)? = null,
     onNavigateToRecommendations: (() -> Unit)? = null,
     isNetworkAvailable: Boolean = true,
@@ -97,6 +100,7 @@ fun AppScaffold(
         bottomBar = {
             if (
                 onNavigateToLibrary != null ||
+                onNavigateToPlaylists != null ||
                 onNavigateToCachedTracks != null ||
                 onNavigateToRecommendations != null
             ) {
@@ -112,6 +116,19 @@ fun AppScaffold(
                                 )
                             },
                             label = { Text("曲库") },
+                        )
+                    }
+                    onNavigateToPlaylists?.let {
+                        NavigationBarItem(
+                            selected = currentRoute == PlaylistRoutes.PLAYLISTS,
+                            onClick = it,
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                    contentDescription = null,
+                                )
+                            },
+                            label = { Text("歌单") },
                         )
                     }
                     onNavigateToCachedTracks?.let {
