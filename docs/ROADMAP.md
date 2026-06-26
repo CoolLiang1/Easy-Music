@@ -54,8 +54,14 @@ Status as of 2026-06-26:
   audio/video imports, and documented automated plus browser smoke acceptance.
 - V2.1 playlist management: Implemented. Ordinary owner-scoped user playlists
   now have backend CRUD/add/remove/reorder APIs, Web management UI, and Android
-  browse/play flows. Smart playlists, sharing, collaboration, auto-generation,
-  and recommendation algorithm changes remain out of scope.
+  browse/play flows. Web and Android also support client-side playback queues
+  for playlist sequence, one-time shuffled, and reverse playback. Smart
+  playlists, sharing, collaboration, auto-generation, cross-device queue sync,
+  server-side persistent queues, and recommendation algorithm changes remain
+  out of scope.
+- V2.2 playback queue design: Planned. The intended first-class local Queue
+  model is documented in `docs/SPECS/PLAYBACK_QUEUE.md`, with phased
+  implementation tasks in `docs/TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md`.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
@@ -244,7 +250,8 @@ Deliverables:
 - Completed local V2 slice:
   - Automatic import tools.
   - Optional user-provided video-to-audio processing.
-- V2.1 user-built playlist management.
+- V2.1 user-built playlist management and client-side playlist playback queue.
+- V2.2 first-class local playback queue module.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection

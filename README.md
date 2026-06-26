@@ -22,11 +22,14 @@ deployment step, not a completed repository verification step.
 - [Environment](docs/ENVIRONMENT.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
+- [Playback Queue Design](docs/SPECS/PLAYBACK_QUEUE.md)
+- [V2.2 Playback Queue Tasks](docs/TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md)
 - [Phase 7 Acceptance](docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md)
 - [V1.1 Duplicate Detection Acceptance](docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md)
 - [V1.1 Workflow Enhancements Acceptance](docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md)
 - [V2 Import And Video Acceptance](docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md)
 - [V2.1 Playlist Management Acceptance](docs/ACCEPTANCE/V2_1_PLAYLISTS_ACCEPTANCE.md)
+- [V2.1 Playback Queue Acceptance](docs/ACCEPTANCE/V2_1_PLAYBACK_QUEUE_ACCEPTANCE.md)
 
 ## Implemented Areas
 
@@ -35,11 +38,11 @@ deployment step, not a completed repository verification step.
   assistant endpoints, health checks, structured logging, Alembic migrations,
   and worker media processing.
 - Web: React/Vite management console with login, upload flow, library, track
-  editor, tag editor, playlist management, Web playback, recommendation test
+  editor, tag editor, playlist management, queued Web playback, recommendation test
   panel, and AI assistant/tag suggestion UI, plus import-directory review and
   optional user-provided video-to-audio upload.
 - Android: Kotlin/Jetpack Compose client with login, library, track detail,
-  playlist browsing, Media3 playback service, background/notification controls,
+  playlist browsing, Media3 queue playback service, background/notification controls,
   manual offline cache, cached playback, playback-event sync, and
   structured/natural-language recommendation flows.
 - Deployment: development Docker Compose, production Docker Compose, Caddy
@@ -75,6 +78,8 @@ Current documented progress:
   automated checks and browser smoke recorded.
 - V2.1 playlist management: implemented as ordinary owner-scoped user
   playlists across backend, Web management, and Android browse/play flows.
+  Client-side playback queues now let Web and Android play a playlist in
+  sequence, shuffled once per round, or reverse order.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.
