@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listTags } from "../api/tags";
 import { deleteTrack, getTrack, updateTrack, updateTrackCover } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
+import { PlaybackQueueActions } from "../components/PlaybackQueueActions";
 import { TrackCoverEditor } from "../components/TrackCoverEditor";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
@@ -285,6 +286,7 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
               {getStatusSummary(detailState.track.status)}
             </p>
             <WebAudioPlayer accessToken={accessToken} track={detailState.track} />
+            <PlaybackQueueActions track={detailState.track} />
           </section>
           <TrackMetadataForm
             disabled={isSaving}

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
+import { PlaybackQueueProvider } from "../player/PlaybackQueueProvider";
 import { navigateTo } from "./router";
 
 type ProtectedRouteProps = {
@@ -45,5 +46,5 @@ function ProtectedRouteContent({ children }: { children: ReactNode }) {
     return null;
   }
 
-  return children;
+  return <PlaybackQueueProvider>{children}</PlaybackQueueProvider>;
 }

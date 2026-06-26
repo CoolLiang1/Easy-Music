@@ -8,6 +8,7 @@ import {
 import { RouteLink } from "../routes/RouteLink";
 import type { PlaylistSummary } from "../types/playlist";
 import type { Track } from "../types/track";
+import { PlaybackQueueActions } from "./PlaybackQueueActions";
 import { TrackStatusBadge } from "./TrackStatusBadge";
 import { WebAudioPlayer } from "./WebAudioPlayer";
 
@@ -48,6 +49,7 @@ export function TrackTable({
               "更新",
               canAddToPlaylist ? "歌单" : null,
               "播放",
+              "队列",
             ]
               .filter(Boolean)
               .map((heading) => (
@@ -99,6 +101,9 @@ export function TrackTable({
               ) : null}
               <td>
                 <WebAudioPlayer accessToken={accessToken} compact track={track} />
+              </td>
+              <td>
+                <PlaybackQueueActions compact track={track} />
               </td>
             </tr>
           ))}

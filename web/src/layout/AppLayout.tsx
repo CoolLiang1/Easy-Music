@@ -1,5 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
+import { useAuth } from "../auth/AuthProvider";
+import { PlaybackQueueDrawer } from "../components/PlaybackQueueDrawer";
+import { WebPlaybackQueuePlayer } from "../components/WebAudioPlayer";
+import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
 import { RouteLink } from "../routes/RouteLink";
 
 type AppLayoutProps = {
@@ -35,6 +39,9 @@ const navGroups = [
 ];
 
 export function AppLayout({ children, onSignOut }: AppLayoutProps) {
+  const { accessToken } = useAuth();
+  const { state: queueState } = usePlaybackQueue();
+  const [isQueueDrawerOpen, setIsQueueDrawerOpen] = useState(false);
   const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
 
   return (
@@ -73,7 +80,27 @@ export function AppLayout({ children, onSignOut }: AppLayoutProps) {
         </div>
       </aside>
 
-      <main className="content-shell">{children}</main>
+      <main className="content-shell">
+        {children}
+        {queueState.current ? (
+          <div className="global-player-bar" aria-label="当前播放">
+            <div className="global-player-row">
+              <WebPlaybackQueuePlayer accessToken={accessToken} />
+              <button
+                className="button secondary"
+                onClick={() => setIsQueueDrawerOpen(true)}
+                type="button"
+              >
+                队列
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </main>
+      <PlaybackQueueDrawer
+        isOpen={isQueueDrawerOpen}
+        onClose={() => setIsQueueDrawerOpen(false)}
+      />
     </div>
   );
 }

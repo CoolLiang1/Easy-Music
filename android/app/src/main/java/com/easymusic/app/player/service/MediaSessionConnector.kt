@@ -13,6 +13,8 @@ import androidx.media3.session.MediaSession
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackQueueItem
 import com.easymusic.app.player.domain.PlaybackQueueMode
+import com.easymusic.app.player.domain.PlaybackQueueSource
+import com.easymusic.app.player.domain.PlaybackQueueSourceType
 import com.easymusic.app.player.domain.PlaybackSource
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlaybackEventRecorder
@@ -23,7 +25,11 @@ object MediaSessionConnector {
     private var mediaSession: MediaSession? = null
     private var playbackEventRecorder: PlaybackEventRecorder? = null
     private var playbackQueue: List<PlaybackQueueItem> = emptyList()
+    private var playbackHistory: List<PlaybackQueueItem> = emptyList()
     private var playbackQueueMode: PlaybackQueueMode? = null
+    private var playbackQueueSource: PlaybackQueueSource? = null
+    private var baseCycleItems: List<PlaybackQueueItem> = emptyList()
+    private var currentQueueItemId: String? = null
 
     fun player(context: Context): ExoPlayer {
         return ensureSession(context).player as ExoPlayer
@@ -40,14 +46,65 @@ object MediaSessionConnector {
     fun setPlaybackQueue(
         items: List<PlaybackQueueItem>,
         mode: PlaybackQueueMode?,
+        source: PlaybackQueueSource?,
+        baseCycleItems: List<PlaybackQueueItem>,
     ) {
         playbackQueue = items
+        playbackHistory = emptyList()
         playbackQueueMode = mode
+        playbackQueueSource = source
+        this.baseCycleItems = baseCycleItems
+        currentQueueItemId = items.firstOrNull()?.queueItemId
+        publishQueueState()
     }
 
     fun clearPlaybackQueue() {
         playbackQueue = emptyList()
+        playbackHistory = emptyList()
         playbackQueueMode = null
+        playbackQueueSource = null
+        baseCycleItems = emptyList()
+        currentQueueItemId = null
+    }
+
+    fun insertNext(item: PlaybackQueueItem) {
+        val currentIndex = currentQueueIndex()
+        val insertIndex = if (currentIndex >= 0) currentIndex + 1 else 0
+        playbackQueue = playbackQueue.toMutableList().also { queue ->
+            queue.add(insertIndex.coerceIn(0, queue.size), item)
+        }
+        if (playbackQueueSource == null) {
+            playbackQueueSource = PlaybackQueueSource(PlaybackQueueSourceType.Manual)
+        }
+        publishQueueState()
+    }
+
+    fun addToQueue(item: PlaybackQueueItem) {
+        playbackQueue = playbackQueue + item
+        if (playbackQueueSource == null) {
+            playbackQueueSource = PlaybackQueueSource(PlaybackQueueSourceType.Manual)
+        }
+        if (currentQueueItemId == null) {
+            currentQueueItemId = item.queueItemId
+        }
+        publishQueueState()
+    }
+
+    fun removeQueueItem(queueItemId: String): Int? {
+        val removedIndex = playbackQueue.indexOfFirst { item ->
+            item.queueItemId == queueItemId
+        }
+        if (removedIndex < 0) return null
+
+        val removedCurrent = currentQueueItemId == queueItemId
+        playbackQueue = playbackQueue.filterNot { item -> item.queueItemId == queueItemId }
+        playbackHistory = playbackHistory.filterNot { item -> item.queueItemId == queueItemId }
+        if (removedCurrent) {
+            currentQueueItemId = playbackQueue.getOrNull(removedIndex)?.queueItemId
+                ?: playbackQueue.getOrNull(removedIndex - 1)?.queueItemId
+        }
+        publishQueueState()
+        return removedIndex
     }
 
     fun release() {
@@ -111,16 +168,34 @@ object MediaSessionConnector {
                             reason: Int,
                         ) {
                             val queueItem = mediaItem?.mediaId
-                                ?.toIntOrNull()
-                                ?.let { trackId ->
-                                    playbackQueue.firstOrNull { item -> item.track.id == trackId }
+                                ?.let { queueItemId ->
+                                    playbackQueue.firstOrNull {
+                                        item -> item.queueItemId == queueItemId
+                                    }
                                 }
                             if (queueItem != null) {
+                                val previousCurrent = currentQueueItem()
+                                if (
+                                    previousCurrent != null &&
+                                    previousCurrent.queueItemId != queueItem.queueItemId &&
+                                    playbackHistory.none {
+                                        item -> item.queueItemId == previousCurrent.queueItemId
+                                    }
+                                ) {
+                                    val previousIndex = playbackQueue.indexOf(previousCurrent)
+                                    val nextIndex = playbackQueue.indexOf(queueItem)
+                                    if (nextIndex > previousIndex) {
+                                        playbackHistory = playbackHistory + previousCurrent
+                                    } else {
+                                        playbackHistory = playbackHistory.dropLast(1)
+                                    }
+                                }
+                                currentQueueItemId = queueItem.queueItemId
                                 val queueIndex = playbackQueue.indexOfFirst {
-                                    it.track.id == queueItem.track.id
+                                    it.queueItemId == queueItem.queueItemId
                                 }
                                 val current = PlaybackStateStore.state.value
-                                if (current.track?.id != queueItem.track.id) {
+                                if (current.currentQueueItem?.queueItemId != queueItem.queueItemId) {
                                     playbackEventRecorder?.startTrack(
                                         trackId = queueItem.track.id,
                                         playbackSource = queueItem.playbackSource,
@@ -131,9 +206,14 @@ object MediaSessionConnector {
                                     it.copy(
                                         track = queueItem.track,
                                         playbackSource = queueItem.playbackSource,
+                                        queueSource = playbackQueueSource,
                                         queueMode = playbackQueueMode,
                                         queueIndex = queueIndex.coerceAtLeast(0),
                                         queueSize = playbackQueue.size,
+                                        history = playbackHistory,
+                                        currentQueueItem = queueItem,
+                                        upcoming = upcomingAfter(queueItem.queueItemId),
+                                        baseCycleItems = baseCycleItems,
                                         positionMs = 0L,
                                         durationMs = queueItem.track.durationSeconds
                                             ?.times(1000L)
@@ -174,6 +254,42 @@ object MediaSessionConnector {
             .also { session ->
                 mediaSession = session
             }
+    }
+
+    private fun publishQueueState() {
+        val current = currentQueueItem()
+        PlaybackStateStore.update {
+            it.copy(
+                track = current?.track ?: it.track,
+                playbackSource = current?.playbackSource ?: it.playbackSource,
+                queueSource = playbackQueueSource,
+                queueMode = playbackQueueMode,
+                queueIndex = currentQueueIndex().coerceAtLeast(0),
+                queueSize = playbackQueue.size,
+                history = playbackHistory,
+                currentQueueItem = current,
+                upcoming = current?.queueItemId?.let(::upcomingAfter) ?: playbackQueue,
+                baseCycleItems = baseCycleItems,
+            )
+        }
+    }
+
+    private fun currentQueueItem(): PlaybackQueueItem? =
+        currentQueueItemId?.let { queueItemId ->
+            playbackQueue.firstOrNull { item -> item.queueItemId == queueItemId }
+        }
+
+    private fun currentQueueIndex(): Int =
+        currentQueueItemId?.let { queueItemId ->
+            playbackQueue.indexOfFirst { item -> item.queueItemId == queueItemId }
+        } ?: -1
+
+    private fun upcomingAfter(queueItemId: String): List<PlaybackQueueItem> {
+        val currentIndex = playbackQueue.indexOfFirst { item ->
+            item.queueItemId == queueItemId
+        }
+        if (currentIndex < 0) return emptyList()
+        return playbackQueue.drop(currentIndex + 1)
     }
 
     private fun playbackAudioAttributes(): AudioAttributes {

@@ -14,10 +14,9 @@ import { listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import {
   WebAudioPlayer,
-  WebPlaybackQueuePlayer,
   type PlaybackQueueMode,
-  type PlaybackQueueSession,
 } from "../components/WebAudioPlayer";
+import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import {
   formatDateTime,
@@ -40,13 +39,13 @@ type PlaylistsState =
 
 export function PlaylistsPage() {
   const { accessToken } = useAuth();
+  const { replaceFromPlaylist, state: queueState } = usePlaybackQueue();
   const [pageState, setPageState] = useState<PlaylistsState>({ name: "loading" });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [createName, setCreateName] = useState("");
   const [renameName, setRenameName] = useState("");
   const [addTrackId, setAddTrackId] = useState("");
-  const [queueSession, setQueueSession] = useState<PlaybackQueueSession | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -300,19 +299,33 @@ export function PlaylistsPage() {
     }
 
     const orderedTracks = selectedPlaylist.tracks.map((item) => item.track);
-    const playableTracks = orderedTracks.filter((track) => track.status.toLowerCase() === "ready");
+    const playableTracks = orderedTracks.filter((track) => isReadyTrack(track));
+    const skippedCount = orderedTracks.length - playableTracks.length;
     if (playableTracks.length === 0) {
       setErrorMessage("这个歌单里没有已就绪的可播放音轨。");
       return;
     }
 
+    if (hasActiveQueue(queueState)) {
+      const shouldReplace = window.confirm(
+        "当前已有播放队列。要用这个歌单替换当前队列吗？",
+      );
+      if (!shouldReplace) {
+        return;
+      }
+    }
+
     setErrorMessage(null);
-    setStatusMessage(null);
-    setQueueSession({
-      id: Date.now(),
-      mode,
+    setStatusMessage(
+      skippedCount > 0
+        ? `已创建播放队列，跳过 ${skippedCount} 首未就绪音轨。`
+        : "已创建播放队列。",
+    );
+    replaceFromPlaylist({
+      generationMode: mode,
+      playlistId: selectedPlaylist.id,
       playlistName: selectedPlaylist.name,
-      tracks: buildQueueTracks(playableTracks, mode),
+      tracks: playableTracks,
     });
   };
 
@@ -461,7 +474,7 @@ export function PlaylistsPage() {
                     <button
                       className="button secondary"
                       disabled={isMutating || selectedPlaylist.tracks.length === 0}
-                      onClick={() => handlePlayPlaylist("shuffle")}
+                      onClick={() => handlePlayPlaylist("shuffleOnce")}
                       type="button"
                     >
                       随机播放
@@ -475,12 +488,6 @@ export function PlaylistsPage() {
                       倒序播放
                     </button>
                   </div>
-                  {queueSession ? (
-                    <WebPlaybackQueuePlayer
-                      accessToken={accessToken}
-                      session={queueSession}
-                    />
-                  ) : null}
                 </div>
 
                 <form className="playlist-inline-form" onSubmit={handleRename}>
@@ -654,21 +661,14 @@ function toSummary(playlist: Playlist): PlaylistSummary {
   };
 }
 
-function buildQueueTracks(tracks: Track[], mode: PlaybackQueueMode): Track[] {
-  if (mode === "reverse") {
-    return [...tracks].reverse();
-  }
+function hasActiveQueue(queueState: ReturnType<typeof usePlaybackQueue>["state"]) {
+  return Boolean(
+    queueState.current || queueState.history.length > 0 || queueState.upcoming.length > 0,
+  );
+}
 
-  if (mode === "shuffle") {
-    const shuffled = [...tracks];
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(Math.random() * (index + 1));
-      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
-    }
-    return shuffled;
-  }
-
-  return tracks;
+function isReadyTrack(track: Track): boolean {
+  return track.status.toLowerCase() === "ready";
 }
 
 function getErrorMessage(error: unknown) {

@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type MutableRefObject,
@@ -9,6 +8,10 @@ import {
 import { createPortal } from "react-dom";
 
 import { getTrackStreamBlob } from "../api/tracks";
+import {
+  usePlaybackQueue,
+  type PlaybackQueueGenerationMode,
+} from "../player/PlaybackQueueProvider";
 import type { Track } from "../types/track";
 
 let activeAudioElement: HTMLAudioElement | null = null;
@@ -32,14 +35,7 @@ function clearActiveAudio(element: HTMLAudioElement) {
   }
 }
 
-export type PlaybackQueueMode = "sequence" | "shuffle" | "reverse";
-
-export type PlaybackQueueSession = {
-  id: number;
-  mode: PlaybackQueueMode;
-  playlistName?: string;
-  tracks: Track[];
-};
+export type PlaybackQueueMode = PlaybackQueueGenerationMode;
 
 type WebAudioPlayerProps = {
   accessToken: string | null;
@@ -51,7 +47,6 @@ type WebPlaybackQueuePlayerProps = {
   accessToken: string | null;
   autoStart?: boolean;
   compact?: boolean;
-  session: PlaybackQueueSession;
 };
 
 type PlayerState =
@@ -65,22 +60,17 @@ export function WebAudioPlayer({
   compact = false,
   track,
 }: WebAudioPlayerProps) {
-  const session = useMemo<PlaybackQueueSession>(
-    () => ({
-      id: track.id,
-      mode: "sequence",
-      tracks: [track],
-    }),
-    [track],
-  );
+  const { immediatePlay } = usePlaybackQueue();
 
   return (
-    <WebPlaybackQueuePlayer
-      accessToken={accessToken}
-      autoStart={false}
-      compact={compact}
-      session={session}
-    />
+    <button
+      className={compact ? "button secondary small" : "button secondary"}
+      disabled={!isReadyTrack(track)}
+      onClick={() => immediatePlay(track)}
+      type="button"
+    >
+      {isReadyTrack(track) ? "播放" : "不可播放"}
+    </button>
   );
 }
 
@@ -88,17 +78,16 @@ export function WebPlaybackQueuePlayer({
   accessToken,
   autoStart = true,
   compact = false,
-  session,
 }: WebPlaybackQueuePlayerProps) {
+  const { next, previous, state } = usePlaybackQueue();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const seekBarRef = useRef<HTMLInputElement | null>(null);
-  const requestedTrackIdRef = useRef<number | null>(null);
+  const requestedQueueItemIdRef = useRef<string | null>(null);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const [playerState, setPlayerState] = useState<PlayerState>({ name: "idle" });
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -108,14 +97,14 @@ export function WebPlaybackQueuePlayer({
   const [showVolumePopup, setShowVolumePopup] = useState(false);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
 
-  const playableTracks = useMemo(
-    () => session.tracks.filter((track) => isReadyTrack(track)),
-    [session.tracks],
-  );
-  const currentTrack = playableTracks[currentIndex] ?? null;
-  const hasPrevious = currentIndex > 0;
-  const hasNext = currentIndex < playableTracks.length - 1;
-  const isQueue = playableTracks.length > 1 || Boolean(session.playlistName);
+  const currentItem = state.current;
+  const currentTrack = currentItem?.track ?? null;
+  const hasPrevious = state.history.length > 0;
+  const hasNext = state.upcoming.length > 0;
+  const isQueue =
+    state.history.length > 0 ||
+    state.upcoming.length > 0 ||
+    state.source?.type === "playlist";
 
   const resetAudio = useCallback(() => {
     if (audioRef.current) {
@@ -124,16 +113,20 @@ export function WebPlaybackQueuePlayer({
       audioRef.current.removeAttribute("src");
     }
     releaseObjectUrl(objectUrlRef);
-    requestedTrackIdRef.current = null;
+    requestedQueueItemIdRef.current = null;
     setPlayerState({ name: "idle" });
     setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
   }, []);
 
-  const loadTrackAt = useCallback(
-    async (index: number, autoPlay = true) => {
-      const track = playableTracks[index];
+  const loadCurrentTrack = useCallback(
+    async (autoPlay = true) => {
+      if (!currentItem) {
+        resetAudio();
+        return;
+      }
+
       if (!accessToken) {
         setPlayerState({
           name: "error",
@@ -142,24 +135,16 @@ export function WebPlaybackQueuePlayer({
         return;
       }
 
-      if (!track) {
-        setPlayerState({
-          name: "error",
-          message: "这个队列里没有可播放的音轨。",
-        });
-        return;
-      }
-
       releaseObjectUrl(objectUrlRef);
-      requestedTrackIdRef.current = track.id;
+      requestedQueueItemIdRef.current = currentItem.queueItemId;
       setPlayerState({ name: "loading" });
       setPlaying(false);
       setCurrentTime(0);
       setDuration(0);
 
       try {
-        const blob = await getTrackStreamBlob(accessToken, track.id);
-        if (requestedTrackIdRef.current !== track.id) {
+        const blob = await getTrackStreamBlob(accessToken, currentItem.track.id);
+        if (requestedQueueItemIdRef.current !== currentItem.queueItemId) {
           return;
         }
         const objectUrl = URL.createObjectURL(blob);
@@ -175,42 +160,36 @@ export function WebPlaybackQueuePlayer({
           }, 0);
         }
       } catch (error: unknown) {
-        if (index < playableTracks.length - 1) {
-          setCurrentIndex(index + 1);
+        if (hasNext) {
           setPlayerState({
             name: "error",
-            message: `无法播放「${track.title || "未命名音轨"}」，正在跳到下一首。`,
+            message: `无法播放「${currentItem.track.title || "未命名音轨"}」，正在跳到下一首。`,
           });
           window.setTimeout(() => {
-            void loadTrackAt(index + 1, true);
+            next();
           }, 400);
           return;
         }
+
         setPlayerState({
           name: "error",
           message: getErrorMessage(error),
         });
       }
     },
-    [accessToken, playableTracks],
+    [accessToken, currentItem, hasNext, next, resetAudio],
   );
 
   useEffect(() => {
     resetAudio();
-    setCurrentIndex(0);
-    if (autoStart && playableTracks.length > 0) {
-      void loadTrackAt(0, true);
-    } else if (session.tracks.length > 0 && playableTracks.length === 0) {
-      setPlayerState({
-        name: "error",
-        message: "这个队列里没有已就绪的可播放音轨。",
-      });
+    if (currentItem && autoStart) {
+      void loadCurrentTrack(true);
     }
 
     return () => {
       resetAudio();
     };
-  }, [session.id]);
+  }, [currentItem?.queueItemId]);
 
   useEffect(() => {
     if (!showVolumePopup) return;
@@ -240,17 +219,13 @@ export function WebPlaybackQueuePlayer({
 
   const playPrevious = useCallback(() => {
     if (!hasPrevious) return;
-    const nextIndex = currentIndex - 1;
-    setCurrentIndex(nextIndex);
-    void loadTrackAt(nextIndex, true);
-  }, [currentIndex, hasPrevious, loadTrackAt]);
+    previous();
+  }, [hasPrevious, previous]);
 
   const playNext = useCallback(() => {
     if (!hasNext) return;
-    const nextIndex = currentIndex + 1;
-    setCurrentIndex(nextIndex);
-    void loadTrackAt(nextIndex, true);
-  }, [currentIndex, hasNext, loadTrackAt]);
+    next();
+  }, [hasNext, next]);
 
   const handlePlay = useCallback(() => {
     if (audioRef.current) {
@@ -293,7 +268,7 @@ export function WebPlaybackQueuePlayer({
   const togglePlay = useCallback(() => {
     const el = audioRef.current;
     if (!el) {
-      void loadTrackAt(currentIndex, true);
+      void loadCurrentTrack(true);
       return;
     }
 
@@ -303,7 +278,7 @@ export function WebPlaybackQueuePlayer({
     } else {
       el.pause();
     }
-  }, [currentIndex, loadTrackAt]);
+  }, [loadCurrentTrack]);
 
   const handleSeekStart = useCallback(() => {
     setSeeking(true);
@@ -352,11 +327,12 @@ export function WebPlaybackQueuePlayer({
     <div className={compact ? "audio-player compact" : "audio-player"}>
       {isQueue ? (
         <div className="queue-meta">
-          <span>{session.playlistName ?? "播放队列"}</span>
+          <span>{queueSourceLabel(state.source)}</span>
           <strong>
-            {playableTracks.length === 0 ? 0 : currentIndex + 1} / {playableTracks.length}
+            {state.history.length + (currentTrack ? 1 : 0)} /{" "}
+            {state.history.length + (currentTrack ? 1 : 0) + state.upcoming.length}
           </strong>
-          <span>{queueModeLabel(session.mode)}</span>
+          <span>{queueModeLabel(state.generationMode)}</span>
         </div>
       ) : null}
 
@@ -369,11 +345,11 @@ export function WebPlaybackQueuePlayer({
       {playerState.name !== "ready" ? (
         <button
           className={compact ? "button secondary small" : "button secondary"}
-          disabled={playerState.name === "loading" || playableTracks.length === 0}
-          onClick={() => void loadTrackAt(currentIndex, true)}
+          disabled={playerState.name === "loading" || !currentTrack}
+          onClick={() => void loadCurrentTrack(true)}
           type="button"
         >
-          {getButtonLabel(playerState, playableTracks.length > 0)}
+          {getButtonLabel(playerState, Boolean(currentTrack))}
         </button>
       ) : null}
 
@@ -571,8 +547,17 @@ function formatTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-function queueModeLabel(mode: PlaybackQueueMode): string {
-  if (mode === "shuffle") return "随机";
+function queueModeLabel(mode: PlaybackQueueGenerationMode): string {
+  if (mode === "shuffleOnce") return "随机";
   if (mode === "reverse") return "倒序";
   return "顺序";
+}
+
+function queueSourceLabel(
+  source: ReturnType<typeof usePlaybackQueue>["state"]["source"],
+): string {
+  if (source?.type === "playlist") return source.playlistName;
+  if (source?.type === "singleTrack") return "单曲播放";
+  if (source?.type === "recommendation") return "推荐播放";
+  return "播放队列";
 }

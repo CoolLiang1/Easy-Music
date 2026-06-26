@@ -104,6 +104,8 @@ fun PlaylistsScreen(
                                     bearerToken = bearerToken,
                                     streamUrlForTrack = trackApi::streamUrl,
                                     mode = mode,
+                                    playlistId = playlist.id,
+                                    playlistName = playlist.name,
                                 )
                             }
                         }
