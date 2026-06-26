@@ -1534,7 +1534,7 @@ $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
 npm run dev
 ```
 
-Open the Vite URL in a browser, usually `http://127.0.0.1:3000/`, then verify:
+Open the Vite URL in a browser, usually `http://127.0.0.1:8081/`, then verify:
 
 1. Log in with the local initial user.
 2. Open `Library` and confirm the track list loads, including empty, processing,

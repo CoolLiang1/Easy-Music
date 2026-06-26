@@ -98,7 +98,7 @@ def test_me_returns_current_user(client: TestClient, db_session: Session) -> Non
 
 
 def test_login_allows_web_cors_preflight(monkeypatch: pytest.MonkeyPatch) -> None:
-    web_origin = "http://127.0.0.1:3000"
+    web_origin = "http://127.0.0.1:8081"
     monkeypatch.setenv(
         "CORS_ORIGINS",
         f"{web_origin},http://localhost:5173",

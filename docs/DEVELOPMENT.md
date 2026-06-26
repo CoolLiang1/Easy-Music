@@ -416,13 +416,13 @@ Run the Web development server from `web/`:
 npm run dev
 ```
 
-Vite prints the local browser URL, usually `http://127.0.0.1:3000/`. The Web
+Vite prints the local browser URL, usually `http://127.0.0.1:8081/`. The Web
 console calls the backend API after login, so run PostgreSQL, migrations, the
 API, and an initial local user before doing a full browser smoke test.
 
-On Windows, Vite's default `5173` can fall inside an excluded TCP port range
-reserved by the OS or Hyper-V/WSL. The checked-in Vite config therefore uses
-`127.0.0.1:3000` for local Web development.
+On Windows, common Vite/dev ports such as `5173` or `3000` can fall inside TCP
+port ranges reserved by the OS or Hyper-V/WSL. The checked-in Vite config
+therefore uses `127.0.0.1:8081` for local Web development.
 
 The V2 import page is available at `/imports` after login. It reads the
 configured import roots from the backend, scans one configured root and optional
@@ -484,7 +484,7 @@ backend:
    npm run dev
    ```
 
-5. Open the Vite URL, usually `http://127.0.0.1:3000/`, and log in with the
+5. Open the Vite URL, usually `http://127.0.0.1:8081/`, and log in with the
    local user.
 6. Visit `Upload`, upload an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
    page shows per-file browser upload progress, then creates a track with an
