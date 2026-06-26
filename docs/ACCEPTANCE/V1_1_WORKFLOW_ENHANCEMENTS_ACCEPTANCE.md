@@ -125,15 +125,22 @@ Manual checks with recorded operator verification:
   - Signed-in shortcut launch opens the expected screen.
   - Now Playing shortcut does not auto-start playback.
 
-Manual checks not yet explicitly recorded in an acceptance note:
-
-- V1.1.7 browser smoke for upload progress and processing status refresh.
-- V1.1.8 browser smoke for Library multi-select batch tag add/remove.
-- V1.1.9 browser smoke for Library Reports sections and Track Detail links.
-- V1.1.12 browser smoke for the Recently Revived section and Track Detail links.
-
-These unrecorded manual checks should be performed and appended here before
-marking the full V1.1 workflow enhancement set as manually accepted.
+- V1.1.7 Better Upload Progress, 2026-06-26:
+  - Browser upload progress display: passed.
+  - Backend processing status refresh after upload: passed.
+  - Ready/failed state visibility from the Web flow: passed.
+- V1.1.8 Batch Tag Editing, 2026-06-26:
+  - Library multi-select batch tag add: passed.
+  - Library multi-select batch tag remove: passed.
+  - Unselected tracks remain unchanged: passed.
+- V1.1.9 Library Organization Reports, 2026-06-26:
+  - Reports page sections load in the Web UI: passed.
+  - Report rows link to the expected Track Detail pages: passed.
+  - Reports remain read-only: passed.
+- V1.1.12 Recently Revived Tracks, 2026-06-26:
+  - Recently Revived section loads in the Recommendations view: passed.
+  - Revived rows link to the expected Track Detail pages: passed.
+  - Empty and populated states remain usable: passed.
 
 ## Current Status
 
@@ -144,9 +151,10 @@ Status as of 2026-06-10:
   passed during their implementation sessions.
 - Manual acceptance is complete for Cover Editing, Advanced Recommendation
   Explanations, and Android Home Screen Shortcuts.
-- Manual acceptance remains to be explicitly recorded for Better Upload
-  Progress, Batch Tag Editing, Library Organization Reports, and Recently
-  Revived Tracks.
+- Manual acceptance is recorded for Better Upload Progress, Batch Tag Editing,
+  Library Organization Reports, Cover Editing, Advanced Recommendation
+  Explanations, Recently Revived Tracks, and Android Home Screen Shortcuts.
+- V1.1 workflow enhancements are manually accepted.
 
 ## Android Impact
 

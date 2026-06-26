@@ -67,8 +67,8 @@ Current documented progress:
   deployment artifacts exist, while the first real-server HTTPS smoke test is
   deferred to the operator's deployment.
 - V1.1: duplicate detection is accepted. Workflow enhancements through Android
-  launcher shortcuts are implemented with automated checks recorded; manual
-  acceptance is partially recorded in the V1.1 workflow acceptance note.
+  launcher shortcuts are implemented with automated checks and manual
+  acceptance recorded.
 - V2 import/video slice: accepted for local closure. Automatic import tools
   and optional user-provided video-to-audio processing are implemented with
   automated checks and browser smoke recorded.

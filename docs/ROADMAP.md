@@ -45,8 +45,8 @@ Status as of 2026-06-11:
 - V1.1: Duplicate Detection is accepted. Better upload progress, batch tag
   editing, library organization reports, cover editing, advanced recommendation
   explanations, recently revived tracks, and Android launcher shortcuts are
-  implemented. Automated checks are recorded, with manual acceptance partially
-  recorded in `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`.
+  implemented. Automated checks and manual acceptance are recorded in
+  `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`.
 - V2 import/video slice: Accepted for local closure. Automatic import tools
   and optional user-provided video-to-audio processing are implemented through
   safe configured import roots, scan/confirm flows, import batch history,
