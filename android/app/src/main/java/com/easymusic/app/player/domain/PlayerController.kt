@@ -247,9 +247,13 @@ class PlayerController(
 
     fun next() {
         val player = MediaSessionConnector.player(appContext)
-        if (player.hasNextMediaItem()) {
+        val movedToNext = if (player.hasNextMediaItem()) {
             player.seekToNextMediaItem()
+            true
         } else {
+            MediaSessionConnector.startPlaylistRepeatRound(player)
+        }
+        if (!movedToNext) {
             player.stop()
         }
         publishState(player)

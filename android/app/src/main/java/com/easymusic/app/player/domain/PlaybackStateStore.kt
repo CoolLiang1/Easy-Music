@@ -81,6 +81,13 @@ fun PlayerUiState.toPlaybackUiSummary(): PlaybackUiSummary =
         errorMessage = errorMessage,
     )
 
+fun PlayerUiState.canSkipToPrevious(): Boolean =
+    history.isNotEmpty()
+
+fun PlayerUiState.canSkipToNext(): Boolean =
+    currentQueueItem != null &&
+        (upcoming.isNotEmpty() || repeatPlaylist && baseCycleItems.isNotEmpty())
+
 object PlaybackStateStore {
     private val mutableState = MutableStateFlow(PlayerUiState())
 

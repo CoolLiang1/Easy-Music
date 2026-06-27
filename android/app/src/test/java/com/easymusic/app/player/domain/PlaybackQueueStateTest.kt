@@ -4,7 +4,9 @@ import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.service.MediaSessionConnector
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaybackQueueStateTest {
@@ -120,6 +122,36 @@ class PlaybackQueueStateTest {
         val tick = current.copy(positionMs = 1_500L)
 
         assertEquals(current.toPlaybackUiSummary(), tick.toPlaybackUiSummary())
+    }
+
+    @Test
+    fun skipAvailabilityFollowsQueueHistoryAndRepeatState() {
+        val current = queueItem("queue-a", track(id = 1))
+        val previous = queueItem("queue-history", track(id = 2))
+        val next = queueItem("queue-b", track(id = 3))
+
+        assertFalse(PlayerUiState(currentQueueItem = current).canSkipToPrevious())
+        assertFalse(PlayerUiState(currentQueueItem = current).canSkipToNext())
+
+        assertTrue(
+            PlayerUiState(
+                currentQueueItem = current,
+                history = listOf(previous),
+            ).canSkipToPrevious(),
+        )
+        assertTrue(
+            PlayerUiState(
+                currentQueueItem = current,
+                upcoming = listOf(next),
+            ).canSkipToNext(),
+        )
+        assertTrue(
+            PlayerUiState(
+                currentQueueItem = current,
+                baseCycleItems = listOf(current),
+                repeatPlaylist = true,
+            ).canSkipToNext(),
+        )
     }
 
     private fun queueItem(

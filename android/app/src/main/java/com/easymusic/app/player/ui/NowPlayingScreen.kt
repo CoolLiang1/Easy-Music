@@ -23,11 +23,14 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -57,6 +60,8 @@ import com.easymusic.app.player.domain.PlaybackQueueSourceType
 import com.easymusic.app.player.domain.PlaybackSource
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.canSkipToNext
+import com.easymusic.app.player.domain.canSkipToPrevious
 import com.easymusic.app.ui.theme.BannerTone
 import com.easymusic.app.ui.theme.SectionHeader
 import com.easymusic.app.ui.theme.StatusBanner
@@ -68,6 +73,8 @@ fun NowPlayingScreen(
     onBackToLibrary: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onRemoveQueueItem: (String) -> Unit,
     onClearQueue: () -> Unit,
@@ -168,32 +175,15 @@ fun NowPlayingScreen(
             onSeekTo = onSeekTo,
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                enabled = track.isReady &&
-                    !uiState.isPlaying &&
-                    (isNetworkAvailable || uiState.playbackSource == PlaybackSource.OfflineCache),
-                onClick = onPlay,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (uiState.status == PlaybackStatus.Ended) "重新播放" else "播放")
-            }
-            OutlinedButton(
-                enabled = uiState.isPlaying,
-                onClick = onPause,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Pause,
-                    contentDescription = null,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("暂停")
-            }
-        }
+        PlaybackControls(
+            uiState = uiState,
+            canPlayCurrentTrack = track.isReady &&
+                (isNetworkAvailable || uiState.playbackSource == PlaybackSource.OfflineCache),
+            onPlay = onPlay,
+            onPause = onPause,
+            onPrevious = onPrevious,
+            onNext = onNext,
+        )
 
         QueueManagementSection(
             uiState = uiState,
@@ -250,12 +240,73 @@ fun NowPlayingRouteContent(
         onBackToLibrary = onBackToLibrary,
         onPlay = { viewModel.play(isNetworkAvailable) },
         onPause = viewModel::pause,
+        onPrevious = viewModel::previous,
+        onNext = viewModel::next,
         onSeekTo = viewModel::seekTo,
         onRemoveQueueItem = viewModel::removeQueueItem,
         onClearQueue = viewModel::clearQueue,
         onMoveUpcomingItem = viewModel::moveUpcomingItem,
         onSetRepeatPlaylist = viewModel::setRepeatPlaylist,
     )
+}
+
+@Composable
+private fun PlaybackControls(
+    uiState: PlayerUiState,
+    canPlayCurrentTrack: Boolean,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilledTonalIconButton(
+            enabled = uiState.canSkipToPrevious(),
+            onClick = onPrevious,
+        ) {
+            Icon(
+                imageVector = Icons.Default.SkipPrevious,
+                contentDescription = "上一首",
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        if (uiState.isPlaying) {
+            OutlinedButton(onClick = onPause) {
+                Icon(
+                    imageVector = Icons.Default.Pause,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("暂停")
+            }
+        } else {
+            Button(
+                enabled = canPlayCurrentTrack,
+                onClick = onPlay,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (uiState.status == PlaybackStatus.Ended) "重新播放" else "播放")
+            }
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        FilledTonalIconButton(
+            enabled = uiState.canSkipToNext(),
+            onClick = onNext,
+        ) {
+            Icon(
+                imageVector = Icons.Default.SkipNext,
+                contentDescription = "下一首",
+            )
+        }
+    }
 }
 
 @Composable

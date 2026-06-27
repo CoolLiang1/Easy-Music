@@ -64,6 +64,14 @@ class NowPlayingViewModel(
         playerController.pause()
     }
 
+    fun next() {
+        playerController.next()
+    }
+
+    fun previous() {
+        playerController.previous()
+    }
+
     fun seekTo(positionMs: Long) {
         playerController.seekTo(positionMs)
     }

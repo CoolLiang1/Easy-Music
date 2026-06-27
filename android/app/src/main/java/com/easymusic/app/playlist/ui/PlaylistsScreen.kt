@@ -533,6 +533,8 @@ private fun PlaylistMiniPlayer(
         onOpenNowPlaying = onOpenNowPlaying,
         onPlay = playerController::resume,
         onPause = playerController::pause,
+        onPrevious = playerController::previous,
+        onNext = playerController::next,
         onTick = playerController::updatePosition,
     )
 }

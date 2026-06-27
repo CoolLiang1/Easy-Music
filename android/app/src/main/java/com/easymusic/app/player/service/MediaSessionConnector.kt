@@ -419,7 +419,7 @@ object MediaSessionConnector {
         }
 
     @OptIn(UnstableApi::class)
-    private fun startPlaylistRepeatRound(exoPlayer: ExoPlayer): Boolean {
+    fun startPlaylistRepeatRound(exoPlayer: ExoPlayer): Boolean {
         if (
             !repeatPlaylist ||
             playbackQueueSource?.type != PlaybackQueueSourceType.Playlist ||

@@ -11,8 +11,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -27,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.canSkipToNext
+import com.easymusic.app.player.domain.canSkipToPrevious
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -36,6 +41,8 @@ fun MiniPlayer(
     onOpenNowPlaying: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
     onTick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -82,6 +89,15 @@ fun MiniPlayer(
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
+                IconButton(
+                    enabled = uiState.canSkipToPrevious(),
+                    onClick = onPrevious,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "上一首",
+                    )
+                }
                 if (uiState.isPlaying) {
                     OutlinedButton(onClick = onPause) {
                         Icon(
@@ -103,6 +119,15 @@ fun MiniPlayer(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("播放")
                     }
+                }
+                IconButton(
+                    enabled = uiState.canSkipToNext(),
+                    onClick = onNext,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "下一首",
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 OutlinedButton(onClick = onOpenNowPlaying) {
