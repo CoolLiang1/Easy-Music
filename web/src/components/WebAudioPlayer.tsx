@@ -11,10 +11,13 @@ import { getTrackStreamBlob } from "../api/tracks";
 import {
   usePlaybackQueue,
   type PlaybackQueueGenerationMode,
+  type PlaybackQueueState,
 } from "../player/PlaybackQueueProvider";
 import type { Track } from "../types/track";
 
 let activeAudioElement: HTMLAudioElement | null = null;
+const GLOBAL_VOLUME_STORAGE_KEY = "easy-music.webPlayer.volume";
+const GLOBAL_MUTED_STORAGE_KEY = "easy-music.webPlayer.muted";
 
 function pauseActiveAudio() {
   if (activeAudioElement) {
@@ -84,6 +87,8 @@ export function WebPlaybackQueuePlayer({
   const objectUrlRef = useRef<string | null>(null);
   const seekBarRef = useRef<HTMLInputElement | null>(null);
   const requestedQueueItemIdRef = useRef<string | null>(null);
+  const playbackRequestedRef = useRef(false);
+  const suppressPauseEventRef = useRef(false);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -91,8 +96,8 @@ export function WebPlaybackQueuePlayer({
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(readStoredVolume);
+  const [muted, setMuted] = useState(readStoredMuted);
   const [seeking, setSeeking] = useState(false);
   const [showVolumePopup, setShowVolumePopup] = useState(false);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
@@ -100,7 +105,7 @@ export function WebPlaybackQueuePlayer({
   const currentItem = state.current;
   const currentTrack = currentItem?.track ?? null;
   const hasPrevious = state.history.length > 0;
-  const hasNext = state.upcoming.length > 0;
+  const hasNext = canAdvanceToNext(state);
   const isQueue =
     state.history.length > 0 ||
     state.upcoming.length > 0 ||
@@ -109,7 +114,9 @@ export function WebPlaybackQueuePlayer({
   const resetAudio = useCallback(() => {
     if (audioRef.current) {
       clearActiveAudio(audioRef.current);
+      suppressPauseEventRef.current = true;
       audioRef.current.pause();
+      suppressPauseEventRef.current = false;
       audioRef.current.removeAttribute("src");
     }
     releaseObjectUrl(objectUrlRef);
@@ -121,7 +128,7 @@ export function WebPlaybackQueuePlayer({
   }, []);
 
   const loadCurrentTrack = useCallback(
-    async (autoPlay = true) => {
+    async () => {
       if (!currentItem) {
         resetAudio();
         return;
@@ -150,15 +157,6 @@ export function WebPlaybackQueuePlayer({
         const objectUrl = URL.createObjectURL(blob);
         objectUrlRef.current = objectUrl;
         setPlayerState({ name: "ready", objectUrl });
-
-        if (autoPlay) {
-          window.setTimeout(() => {
-            const el = audioRef.current;
-            if (!el) return;
-            setActiveAudio(el);
-            void el.play();
-          }, 0);
-        }
       } catch (error: unknown) {
         if (hasNext) {
           setPlayerState({
@@ -181,15 +179,44 @@ export function WebPlaybackQueuePlayer({
   );
 
   useEffect(() => {
-    resetAudio();
     if (currentItem && autoStart) {
-      void loadCurrentTrack(true);
+      playbackRequestedRef.current = true;
+      void loadCurrentTrack();
+    } else {
+      resetAudio();
     }
 
     return () => {
       resetAudio();
     };
   }, [currentItem?.queueItemId]);
+
+  const readyObjectUrl =
+    playerState.name === "ready" ? playerState.objectUrl : null;
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !readyObjectUrl) return;
+
+    el.volume = volume;
+    el.muted = muted || volume === 0;
+  }, [muted, readyObjectUrl, volume]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !readyObjectUrl || !playbackRequestedRef.current) return;
+
+    setActiveAudio(el);
+    el.play().catch(() => {
+      playbackRequestedRef.current = false;
+      clearActiveAudio(el);
+      setPlaying(false);
+      setPlayerState({
+        name: "error",
+        message: "浏览器阻止了自动播放，请再点一次播放。",
+      });
+    });
+  }, [readyObjectUrl]);
 
   useEffect(() => {
     if (!showVolumePopup) return;
@@ -219,15 +246,18 @@ export function WebPlaybackQueuePlayer({
 
   const playPrevious = useCallback(() => {
     if (!hasPrevious) return;
+    playbackRequestedRef.current = true;
     previous();
   }, [hasPrevious, previous]);
 
   const playNext = useCallback(() => {
     if (!hasNext) return;
+    playbackRequestedRef.current = true;
     next();
   }, [hasNext, next]);
 
   const handlePlay = useCallback(() => {
+    playbackRequestedRef.current = true;
     if (audioRef.current) {
       setActiveAudio(audioRef.current);
     }
@@ -235,6 +265,10 @@ export function WebPlaybackQueuePlayer({
   }, []);
 
   const handlePause = useCallback(() => {
+    if (suppressPauseEventRef.current) {
+      return;
+    }
+    playbackRequestedRef.current = false;
     if (audioRef.current) {
       clearActiveAudio(audioRef.current);
     }
@@ -248,7 +282,10 @@ export function WebPlaybackQueuePlayer({
     setPlaying(false);
     setCurrentTime(0);
     if (hasNext) {
+      playbackRequestedRef.current = true;
       playNext();
+    } else {
+      playbackRequestedRef.current = false;
     }
   }, [hasNext, playNext]);
 
@@ -260,22 +297,25 @@ export function WebPlaybackQueuePlayer({
   const handleLoadedMetadata = useCallback(() => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration || 0);
-      setVolume(audioRef.current.volume);
-      setMuted(audioRef.current.muted);
+      audioRef.current.volume = volume;
+      audioRef.current.muted = muted || volume === 0;
     }
-  }, []);
+  }, [muted, volume]);
 
   const togglePlay = useCallback(() => {
     const el = audioRef.current;
     if (!el) {
-      void loadCurrentTrack(true);
+      playbackRequestedRef.current = true;
+      void loadCurrentTrack();
       return;
     }
 
     if (el.paused) {
+      playbackRequestedRef.current = true;
       setActiveAudio(el);
       void el.play();
     } else {
+      playbackRequestedRef.current = false;
       el.pause();
     }
   }, [loadCurrentTrack]);
@@ -298,28 +338,34 @@ export function WebPlaybackQueuePlayer({
   }, []);
 
   const handleVolumeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
+    const value = clampVolume(Number(event.target.value));
     setVolume(value);
+    storeVolume(value);
     if (audioRef.current) {
       audioRef.current.volume = value;
       audioRef.current.muted = value === 0;
     }
     setMuted(value === 0);
+    storeMuted(value === 0);
   }, []);
 
   const toggleMute = useCallback(() => {
-    const el = audioRef.current;
-    if (!el) return;
-
     if (muted || volume === 0) {
       const nextVolume = volume === 0 ? 1 : volume;
-      el.volume = nextVolume;
-      el.muted = false;
       setVolume(nextVolume);
       setMuted(false);
+      storeVolume(nextVolume);
+      storeMuted(false);
+      if (audioRef.current) {
+        audioRef.current.volume = nextVolume;
+        audioRef.current.muted = false;
+      }
     } else {
-      el.muted = true;
       setMuted(true);
+      storeMuted(true);
+      if (audioRef.current) {
+        audioRef.current.muted = true;
+      }
     }
   }, [muted, volume]);
 
@@ -346,7 +392,10 @@ export function WebPlaybackQueuePlayer({
         <button
           className={compact ? "button secondary small" : "button secondary"}
           disabled={playerState.name === "loading" || !currentTrack}
-          onClick={() => void loadCurrentTrack(true)}
+          onClick={() => {
+            playbackRequestedRef.current = true;
+            void loadCurrentTrack();
+          }}
           type="button"
         >
           {getButtonLabel(playerState, Boolean(currentTrack))}
@@ -373,7 +422,7 @@ export function WebPlaybackQueuePlayer({
             onClick={playPrevious}
             type="button"
           >
-            上
+            <span aria-hidden="true" className="audio-icon audio-icon-previous" />
           </button>
           <button
             aria-label={playing ? "暂停" : "播放"}
@@ -381,7 +430,10 @@ export function WebPlaybackQueuePlayer({
             onClick={togglePlay}
             type="button"
           >
-            {playing ? "暂停" : "播放"}
+            <span
+              aria-hidden="true"
+              className={playing ? "audio-icon audio-icon-pause" : "audio-icon audio-icon-play"}
+            />
           </button>
           <button
             aria-label="下一首"
@@ -390,7 +442,7 @@ export function WebPlaybackQueuePlayer({
             onClick={playNext}
             type="button"
           >
-            下
+            <span aria-hidden="true" className="audio-icon audio-icon-next" />
           </button>
 
           <span className="audio-time">{formatTime(currentTime)}</span>
@@ -443,7 +495,14 @@ export function WebPlaybackQueuePlayer({
               onClick={toggleMute}
               type="button"
             >
-              {muted || volume === 0 ? "静" : "音"}
+              <span
+                aria-hidden="true"
+                className={
+                  muted || volume === 0
+                    ? "audio-icon audio-icon-volume muted"
+                    : "audio-icon audio-icon-volume"
+                }
+              />
             </button>
 
             {showVolumePopup
@@ -530,6 +589,57 @@ function getErrorMessage(error: unknown) {
 
 function isReadyTrack(track: Track): boolean {
   return track.status.toLowerCase() === "ready";
+}
+
+function canAdvanceToNext(state: PlaybackQueueState): boolean {
+  return (
+    state.upcoming.length > 0 ||
+    (state.repeatPlaylist &&
+      state.source?.type === "playlist" &&
+      state.baseCycleItems.length > 0)
+  );
+}
+
+function readStoredVolume(): number {
+  if (typeof window === "undefined") return 1;
+
+  try {
+    const rawValue = window.localStorage.getItem(GLOBAL_VOLUME_STORAGE_KEY);
+    const parsedValue = rawValue === null ? Number.NaN : Number(rawValue);
+    return Number.isFinite(parsedValue) ? clampVolume(parsedValue) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function readStoredMuted(): boolean {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return window.localStorage.getItem(GLOBAL_MUTED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function storeVolume(volume: number) {
+  try {
+    window.localStorage.setItem(GLOBAL_VOLUME_STORAGE_KEY, String(clampVolume(volume)));
+  } catch {
+    // Playback should continue even when persistent browser storage is unavailable.
+  }
+}
+
+function storeMuted(muted: boolean) {
+  try {
+    window.localStorage.setItem(GLOBAL_MUTED_STORAGE_KEY, String(muted));
+  } catch {
+    // Playback should continue even when persistent browser storage is unavailable.
+  }
+}
+
+function clampVolume(volume: number): number {
+  return Math.min(1, Math.max(0, volume));
 }
 
 function releaseObjectUrl(objectUrlRef: MutableRefObject<string | null>) {
