@@ -49,6 +49,44 @@ organization model; Queue is not a backend API resource.
 
 ## Verification Record
 
+### 2026-06-28 - Web Playback Controls Regression Fix
+
+Implemented:
+
+- Replaced the Web player's visible Chinese text controls for previous,
+  play/pause, next, and volume with compact symbolic controls while keeping
+  accessible `aria-label` text.
+- Fixed Web playback intent so starting a single track or playlist queue loads
+  and starts playback without requiring a second manual Play click.
+- Fixed Web queue advancement so automatic transition from one playlist track
+  to the next keeps playback running.
+- Fixed Web playlist repeat tail behavior in the player controls so Next is
+  available when a playlist repeat round can be generated.
+- Changed the Web volume control from per-audio-element state to global browser
+  state stored in `localStorage`; the chosen volume and mute state now carry
+  across track changes and player reloads.
+
+Automated checks:
+
+```powershell
+cd web
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- Web TypeScript check: passed.
+- Web production build: passed.
+
+Manual browser smoke:
+
+- Full browser smoke was not rerun for this documentation update.
+- Targeted behaviors to verify manually: symbolic player buttons are visible,
+  single-track and playlist playback start after one user action, playlist
+  track transitions continue playing automatically, and volume persists across
+  the next track.
+
 ### 2026-06-27 - V2.2 Queue Acceptance Pass
 
 Implemented:
