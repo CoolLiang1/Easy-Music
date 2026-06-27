@@ -30,6 +30,7 @@ deployment step, not a completed repository verification step.
 - [V2 Import And Video Acceptance](docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md)
 - [V2.1 Playlist Management Acceptance](docs/ACCEPTANCE/V2_1_PLAYLISTS_ACCEPTANCE.md)
 - [V2.1 Playback Queue Acceptance](docs/ACCEPTANCE/V2_1_PLAYBACK_QUEUE_ACCEPTANCE.md)
+- [V2.2 Playback Queue Acceptance](docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md)
 
 ## Implemented Areas
 
@@ -80,6 +81,10 @@ Current documented progress:
   playlists across backend, Web management, and Android browse/play flows.
   Client-side playback queues now let Web and Android play a playlist in
   sequence, shuffled once per round, or reverse order.
+- V2.2 playback queue: implemented as first-class local temporary queue state
+  on Web and Android, including queue editing UI, upcoming reorder,
+  playlist-only repeat, and same-client source playlist sync. Automated checks
+  plus Web and Android manual smoke are recorded as accepted.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.

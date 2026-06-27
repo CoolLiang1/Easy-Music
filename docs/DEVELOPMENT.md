@@ -462,6 +462,18 @@ tracks, save order changes, and start a local Web playback queue in sequence,
 one-time shuffled, or reverse order. It does not create smart playlists,
 persist queue state on the backend, or change recommendation ranking.
 
+V2.2 promotes Queue to first-class local temporary client state. Web exposes a
+global queue drawer for current/upcoming management, previous/next, remove,
+clear, upcoming drag reorder, and playlist-only repeat. Android exposes the
+same local queue model through Media3 state and the Now Playing queue
+management surface. Queue remains process/page-local; there is no backend queue
+API and no cross-device queue sync.
+
+V2.2 acceptance is recorded in
+`docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`. Web automated checks and
+browser smoke are recorded as passed. Android automated checks and
+emulator/device smoke are recorded as passed.
+
 The V2 import page is available at `/imports` after login. It reads the
 configured import roots from the backend, scans one configured root and optional
 relative subdirectory, lets the user explicitly select supported audio

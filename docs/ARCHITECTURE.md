@@ -152,7 +152,9 @@ queue state across devices.
 - Recommendation home
 - Cloud playback
 - Playlist browsing and playback handoff
-- Playlist queue playback in sequence, shuffled-once, and reverse order
+- Local playback queue management with history/current/upcoming, playlist
+  sequence/shuffle/reverse generation, upcoming reorder, and playlist-only
+  repeat
 - Background playback
 - Notification and lock screen controls
 - Headset control integration
@@ -189,8 +191,9 @@ Android should store:
 - AI tag confirmation
 - Recommendation testing
 - Web playback
-- Client-side playback queue for playlist sequence, shuffled-once, and reverse
-  playback
+- Client-side playback queue with history/current/upcoming, queue editing,
+  playlist sequence/shuffle/reverse generation, upcoming reorder, and
+  playlist-only repeat
 - Playback history
 
 ## 8. Data Model Draft

@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-26:
+Status as of 2026-06-27:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -59,9 +59,11 @@ Status as of 2026-06-26:
   playlists, sharing, collaboration, auto-generation, cross-device queue sync,
   server-side persistent queues, and recommendation algorithm changes remain
   out of scope.
-- V2.2 playback queue design: Planned. The intended first-class local Queue
-  model is documented in `docs/SPECS/PLAYBACK_QUEUE.md`, with phased
-  implementation tasks in `docs/TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md`.
+- V2.2 playback queue: Implemented for local temporary client queues. Web and
+  Android now expose first-class queue state, queue management, upcoming
+  reorder, playlist-only repeat, and same-client source playlist sync.
+  Automated checks plus Web and Android manual smoke are recorded as accepted
+  in `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
