@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -71,6 +72,7 @@ fun NowPlayingScreen(
     onRemoveQueueItem: (String) -> Unit,
     onClearQueue: () -> Unit,
     onMoveUpcomingItem: (String, Int) -> Unit,
+    onSetRepeatPlaylist: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val track = uiState.track
@@ -198,6 +200,7 @@ fun NowPlayingScreen(
             onClearQueueRequest = { showClearQueueConfirm = true },
             onMoveUpcomingItem = onMoveUpcomingItem,
             onRemoveQueueItem = onRemoveQueueItem,
+            onSetRepeatPlaylist = onSetRepeatPlaylist,
         )
     }
 
@@ -251,6 +254,7 @@ fun NowPlayingRouteContent(
         onRemoveQueueItem = viewModel::removeQueueItem,
         onClearQueue = viewModel::clearQueue,
         onMoveUpcomingItem = viewModel::moveUpcomingItem,
+        onSetRepeatPlaylist = viewModel::setRepeatPlaylist,
     )
 }
 
@@ -260,6 +264,7 @@ private fun QueueManagementSection(
     onClearQueueRequest: () -> Unit,
     onMoveUpcomingItem: (String, Int) -> Unit,
     onRemoveQueueItem: (String) -> Unit,
+    onSetRepeatPlaylist: (Boolean) -> Unit,
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -299,6 +304,35 @@ private fun QueueManagementSection(
             }
 
             QueueMetadata(uiState = uiState)
+            if (uiState.queueSource?.type == PlaybackQueueSourceType.Playlist) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "歌单循环",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = if (uiState.baseCycleItems.isEmpty()) {
+                                "当前歌单没有可播放的基础音轨，无法开启循环。"
+                            } else {
+                                "只重复歌单原始可播放音轨，手动插入项不会进入下一轮。"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = uiState.repeatPlaylist,
+                        enabled = uiState.baseCycleItems.isNotEmpty(),
+                        onCheckedChange = onSetRepeatPlaylist,
+                    )
+                }
+            }
 
             Text(
                 text = "正在播放",

@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
@@ -74,6 +75,20 @@ fun PlaylistsScreen(
     val trackApi = remember { TrackApi(ApiClient(AppConfig.default())) }
     val coroutineScope = rememberCoroutineScope()
     val playbackState by PlaybackStateStore.state.collectAsState()
+
+    LaunchedEffect(uiState.selectedPlaylist, playbackState.queueSource?.playlistId) {
+        val playlist = uiState.selectedPlaylist
+        if (
+            playlist != null &&
+            playbackState.queueSource?.playlistId == playlist.id
+        ) {
+            playerController.syncPlaylistSourceTracks(
+                playlistId = playlist.id,
+                playlistName = playlist.name,
+                tracks = playlist.tracks.map { item -> item.track },
+            )
+        }
+    }
 
     Column(
         modifier = modifier

@@ -9,7 +9,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.session.MediaSession
+import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackQueueItem
 import com.easymusic.app.player.domain.PlaybackQueueMode
@@ -19,6 +21,7 @@ import com.easymusic.app.player.domain.PlaybackSource
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlaybackEventRecorder
 import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.newPlaybackQueueItemId
 
 object MediaSessionConnector {
     private var player: ExoPlayer? = null
@@ -30,6 +33,8 @@ object MediaSessionConnector {
     private var playbackQueueSource: PlaybackQueueSource? = null
     private var baseCycleItems: List<PlaybackQueueItem> = emptyList()
     private var currentQueueItemId: String? = null
+    private var repeatPlaylist: Boolean = false
+    private var repeatMediaSourceFactory: ((List<PlaybackQueueItem>) -> List<MediaSource>)? = null
 
     fun player(context: Context): ExoPlayer {
         return ensureSession(context).player as ExoPlayer
@@ -48,6 +53,7 @@ object MediaSessionConnector {
         mode: PlaybackQueueMode?,
         source: PlaybackQueueSource?,
         baseCycleItems: List<PlaybackQueueItem>,
+        repeatMediaSourceFactory: ((List<PlaybackQueueItem>) -> List<MediaSource>)? = null,
     ) {
         playbackQueue = items
         playbackHistory = emptyList()
@@ -55,6 +61,9 @@ object MediaSessionConnector {
         playbackQueueSource = source
         this.baseCycleItems = baseCycleItems
         currentQueueItemId = items.firstOrNull()?.queueItemId
+        this.repeatMediaSourceFactory = repeatMediaSourceFactory
+        repeatPlaylist = false
+        player?.repeatMode = Player.REPEAT_MODE_OFF
         publishQueueState()
     }
 
@@ -65,6 +74,66 @@ object MediaSessionConnector {
         playbackQueueSource = null
         baseCycleItems = emptyList()
         currentQueueItemId = null
+        repeatPlaylist = false
+        repeatMediaSourceFactory = null
+        player?.repeatMode = Player.REPEAT_MODE_OFF
+    }
+
+    fun setRepeatPlaylist(enabled: Boolean) {
+        repeatPlaylist = enabled &&
+            playbackQueueSource?.type == PlaybackQueueSourceType.Playlist &&
+            baseCycleItems.isNotEmpty()
+        player?.repeatMode = Player.REPEAT_MODE_OFF
+        publishQueueState()
+    }
+
+    fun syncPlaylistSourceTracks(
+        playlistId: Int,
+        playlistName: String,
+        tracks: List<TrackResponse>,
+    ): List<Int> {
+        val source = playbackQueueSource
+        if (
+            source?.type != PlaybackQueueSourceType.Playlist ||
+            source.playlistId != playlistId
+        ) {
+            return emptyList()
+        }
+
+        val playableTracks = tracks.filter { it.isReady }
+        val nextSource = source.copy(playlistName = playlistName)
+        val playableTrackIds = playableTracks.map { it.id }.toSet()
+        val removedIndices = playbackQueue.mapIndexedNotNull { index, item ->
+            if (
+                index > currentQueueIndex() &&
+                item.cycleItem &&
+                item.track.id !in playableTrackIds
+            ) {
+                index
+            } else {
+                null
+            }
+        }
+
+        playbackQueueSource = nextSource
+        baseCycleItems = orderCycleItems(
+            items = playableTracks.map { track ->
+                PlaybackQueueItem(
+                    queueItemId = newPlaybackQueueItemId(),
+                    track = track,
+                    playbackSource = PlaybackSource.OnlineStream,
+                    cycleItem = true,
+                )
+            },
+            mode = playbackQueueMode,
+        )
+        playbackQueue = playbackQueue.filterIndexed { index, _ ->
+            index !in removedIndices
+        }
+        repeatPlaylist = repeatPlaylist && baseCycleItems.isNotEmpty()
+        player?.repeatMode = Player.REPEAT_MODE_OFF
+        publishQueueState()
+        return removedIndices
     }
 
     fun insertNext(item: PlaybackQueueItem) {
@@ -179,6 +248,9 @@ object MediaSessionConnector {
                                         positionMs = exoPlayer.currentPosition,
                                         durationMs = exoPlayer.duration.takeIf { it > 0L },
                                     )
+                                    if (startPlaylistRepeatRound(exoPlayer)) {
+                                        return
+                                    }
                                 }
 
                                 Player.STATE_IDLE -> {
@@ -242,6 +314,7 @@ object MediaSessionConnector {
                                         currentQueueItem = queueItem,
                                         upcoming = upcomingAfter(queueItem.queueItemId),
                                         baseCycleItems = baseCycleItems,
+                                        repeatPlaylist = repeatPlaylist,
                                         positionMs = 0L,
                                         durationMs = queueItem.track.durationSeconds
                                             ?.times(1000L)
@@ -298,6 +371,7 @@ object MediaSessionConnector {
                 currentQueueItem = current,
                 upcoming = current?.queueItemId?.let(::upcomingAfter) ?: playbackQueue,
                 baseCycleItems = baseCycleItems,
+                repeatPlaylist = repeatPlaylist,
             )
         }
     }
@@ -318,6 +392,61 @@ object MediaSessionConnector {
         }
         if (currentIndex < 0) return emptyList()
         return playbackQueue.drop(currentIndex + 1)
+    }
+
+    private fun orderCycleItems(
+        items: List<PlaybackQueueItem>,
+        mode: PlaybackQueueMode?,
+        previousTrackId: Int? = null,
+    ): List<PlaybackQueueItem> =
+        when (mode) {
+            PlaybackQueueMode.Reverse -> items.asReversed()
+            PlaybackQueueMode.Shuffle -> {
+                val shuffled = items.shuffled().toMutableList()
+                if (shuffled.size > 1 && shuffled.firstOrNull()?.track?.id == previousTrackId) {
+                    val swapIndex = shuffled.indexOfFirst { item ->
+                        item.track.id != previousTrackId
+                    }
+                    if (swapIndex > 0) {
+                        val first = shuffled[0]
+                        shuffled[0] = shuffled[swapIndex]
+                        shuffled[swapIndex] = first
+                    }
+                }
+                shuffled
+            }
+            else -> items
+        }
+
+    @OptIn(UnstableApi::class)
+    private fun startPlaylistRepeatRound(exoPlayer: ExoPlayer): Boolean {
+        if (
+            !repeatPlaylist ||
+            playbackQueueSource?.type != PlaybackQueueSourceType.Playlist ||
+            baseCycleItems.isEmpty()
+        ) {
+            return false
+        }
+
+        val previousTrackId = currentQueueItem()?.track?.id
+        val nextItems = orderCycleItems(
+            items = baseCycleItems,
+            mode = playbackQueueMode,
+            previousTrackId = previousTrackId,
+        ).map { item ->
+            item.copy(queueItemId = newPlaybackQueueItemId())
+        }
+        val mediaSources = repeatMediaSourceFactory?.invoke(nextItems) ?: return false
+        if (mediaSources.size != nextItems.size) return false
+
+        val firstNewIndex = playbackQueue.size
+        playbackQueue = playbackQueue + nextItems
+        exoPlayer.addMediaSources(mediaSources)
+        exoPlayer.seekTo(firstNewIndex, 0L)
+        exoPlayer.prepare()
+        exoPlayer.play()
+        publishQueueState()
+        return true
     }
 
     private fun playbackAudioAttributes(): AudioAttributes {

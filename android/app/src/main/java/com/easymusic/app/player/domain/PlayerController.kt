@@ -167,6 +167,16 @@ class PlayerController(
             mode = mode,
             source = queueSource,
             baseCycleItems = queueItems,
+            repeatMediaSourceFactory = { repeatItems ->
+                repeatItems.map { item ->
+                    mediaSourceFactory.createMediaSource(
+                        item.track.toMediaItem(
+                            mediaId = item.queueItemId,
+                            uri = streamUrlForTrack(item.track.id),
+                        ),
+                    )
+                }
+            },
         )
         player.setMediaSources(mediaSources)
         startPlaybackQueue(
@@ -284,6 +294,29 @@ class PlayerController(
         if (move != null) {
             val (fromIndex, toIndex) = move
             player.moveMediaItem(fromIndex, toIndex)
+        }
+        publishState(player)
+    }
+
+    fun setRepeatPlaylist(enabled: Boolean) {
+        MediaSessionConnector.setRepeatPlaylist(enabled)
+    }
+
+    fun syncPlaylistSourceTracks(
+        playlistId: Int,
+        playlistName: String,
+        tracks: List<TrackResponse>,
+    ) {
+        val player = MediaSessionConnector.player(appContext)
+        val removedIndices = MediaSessionConnector.syncPlaylistSourceTracks(
+            playlistId = playlistId,
+            playlistName = playlistName,
+            tracks = tracks,
+        )
+        removedIndices.sortedDescending().forEach { index ->
+            if (index < player.mediaItemCount) {
+                player.removeMediaItem(index)
+            }
         }
         publishState(player)
     }

@@ -388,6 +388,17 @@ on Web and Android.
 - Do not implement multi-playlist loop.
 - Do not implement single-track repeat.
 
+### Implementation Notes
+
+- Implemented Web playlist-only repeat in the local queue provider, including
+  sequence/reverse round regeneration, shuffle round reshuffle, manual-item
+  exclusion, and same-client playlist source sync from Web playlist mutations.
+- Implemented Android playlist repeat controls and same-client selected
+  playlist refresh sync for the Media3 queue state, including generated
+  repeat-round MediaSources for playlist queue continuation.
+- Verified with Web `npm run typecheck`, Web `npm run build`, Android
+  `.\gradlew.bat test`, and Android `.\gradlew.bat build`.
+
 ## Task V2.2.7: Queue Acceptance And Manual Smoke
 
 ### Goal

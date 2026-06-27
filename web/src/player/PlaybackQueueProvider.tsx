@@ -48,6 +48,12 @@ type ReplaceFromPlaylistInput = {
   tracks: Track[];
 };
 
+type SyncPlaylistSourceTracksInput = {
+  playlistId: number;
+  playlistName: string;
+  tracks: Track[];
+};
+
 type QueueAction =
   | { type: "immediatePlay"; track: Track }
   | { type: "replaceFromPlaylist"; input: ReplaceFromPlaylistInput }
@@ -58,7 +64,8 @@ type QueueAction =
   | { type: "removeQueueItem"; queueItemId: string }
   | { type: "clearQueue" }
   | { type: "reorderUpcoming"; queueItemIds: string[] }
-  | { type: "setRepeatPlaylist"; repeatPlaylist: boolean };
+  | { type: "setRepeatPlaylist"; repeatPlaylist: boolean }
+  | { type: "syncPlaylistSourceTracks"; input: SyncPlaylistSourceTracksInput };
 
 type PlaybackQueueContextValue = {
   state: PlaybackQueueState;
@@ -72,6 +79,7 @@ type PlaybackQueueContextValue = {
   replaceFromPlaylist: (input: ReplaceFromPlaylistInput) => void;
   reorderUpcoming: (queueItemIds: string[]) => void;
   setRepeatPlaylist: (repeatPlaylist: boolean) => void;
+  syncPlaylistSourceTracks: (input: SyncPlaylistSourceTracksInput) => void;
 };
 
 const initialQueueState: PlaybackQueueState = {
@@ -130,6 +138,13 @@ export function PlaybackQueueProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "setRepeatPlaylist", repeatPlaylist });
   }, []);
 
+  const syncPlaylistSourceTracks = useCallback(
+    (input: SyncPlaylistSourceTracksInput) => {
+      dispatch({ type: "syncPlaylistSourceTracks", input });
+    },
+    [],
+  );
+
   const value = useMemo<PlaybackQueueContextValue>(
     () => ({
       state,
@@ -143,6 +158,7 @@ export function PlaybackQueueProvider({ children }: { children: ReactNode }) {
       replaceFromPlaylist,
       reorderUpcoming,
       setRepeatPlaylist,
+      syncPlaylistSourceTracks,
     }),
     [
       addToQueue,
@@ -155,6 +171,7 @@ export function PlaybackQueueProvider({ children }: { children: ReactNode }) {
       replaceFromPlaylist,
       reorderUpcoming,
       setRepeatPlaylist,
+      syncPlaylistSourceTracks,
       state,
     ],
   );
@@ -285,22 +302,38 @@ function playbackQueueReducer(
     case "next": {
       if (!state.current && state.upcoming.length === 0) return state;
 
-      const [nextCurrent = null, ...nextUpcoming] = state.upcoming;
+      const candidateUpcoming =
+        state.upcoming.length > 0
+          ? state.upcoming
+          : createNextRepeatRound(state, state.current?.track.id);
+      const [nextCurrent = null, ...nextUpcoming] = candidateUpcoming;
       return {
         ...state,
         history: state.current ? [...state.history, state.current] : state.history,
         current: nextCurrent,
         upcoming: nextUpcoming,
+        repeatPlaylist:
+          state.repeatPlaylist &&
+          state.source?.type === "playlist" &&
+          state.baseCycleItems.length > 0,
       };
     }
 
     case "removeQueueItem": {
       if (state.current?.queueItemId === action.queueItemId) {
-        const [nextCurrent = null, ...nextUpcoming] = state.upcoming;
+        const candidateUpcoming =
+          state.upcoming.length > 0
+            ? state.upcoming
+            : createNextRepeatRound(state, state.current.track.id);
+        const [nextCurrent = null, ...nextUpcoming] = candidateUpcoming;
         return {
           ...state,
           current: nextCurrent,
           upcoming: nextUpcoming,
+          repeatPlaylist:
+            state.repeatPlaylist &&
+            state.source?.type === "playlist" &&
+            state.baseCycleItems.length > 0,
         };
       }
 
@@ -325,8 +358,46 @@ function playbackQueueReducer(
       return {
         ...state,
         repeatPlaylist:
-          state.source?.type === "playlist" ? action.repeatPlaylist : false,
+          state.source?.type === "playlist" && state.baseCycleItems.length > 0
+            ? action.repeatPlaylist
+            : false,
       };
+
+    case "syncPlaylistSourceTracks": {
+      if (
+        state.source?.type !== "playlist" ||
+        state.source.playlistId !== action.input.playlistId
+      ) {
+        return state;
+      }
+
+      const source = {
+        type: "playlist" as const,
+        playlistId: action.input.playlistId,
+        playlistName: action.input.playlistName,
+      };
+      const playableTracks = action.input.tracks.filter(isReadyTrack);
+      const baseCycleItems = orderTracks(
+        playableTracks,
+        state.generationMode,
+      ).map((track) =>
+        createQueueItem(track, {
+          cycleItem: true,
+          origin: source,
+        }),
+      );
+      const playableTrackIds = new Set(playableTracks.map((track) => track.id));
+
+      return {
+        ...state,
+        source,
+        repeatPlaylist: state.repeatPlaylist && baseCycleItems.length > 0,
+        baseCycleItems,
+        upcoming: state.upcoming.filter(
+          (item) => !isSourcePlaylistCycleItem(item) || playableTrackIds.has(item.track.id),
+        ),
+      };
+    }
   }
 }
 
@@ -354,6 +425,50 @@ function cloneQueueItem(item: PlaybackQueueItem): PlaybackQueueItem {
     ...item,
     queueItemId: createQueueItemId(),
   };
+}
+
+function createNextRepeatRound(
+  state: PlaybackQueueState,
+  previousTrackId?: number,
+): PlaybackQueueItem[] {
+  if (
+    !state.repeatPlaylist ||
+    state.source?.type !== "playlist" ||
+    state.baseCycleItems.length === 0
+  ) {
+    return [];
+  }
+
+  const orderedItems = orderBaseCycleItems(
+    state.baseCycleItems,
+    state.generationMode,
+    previousTrackId,
+  );
+
+  return orderedItems.map(cloneQueueItem);
+}
+
+function orderBaseCycleItems(
+  items: PlaybackQueueItem[],
+  generationMode: PlaybackQueueGenerationMode,
+  previousTrackId?: number,
+): PlaybackQueueItem[] {
+  if (generationMode === "reverse") {
+    return [...items].reverse();
+  }
+
+  if (generationMode === "shuffleOnce") {
+    const shuffled = shuffleItems(items);
+    if (shuffled.length > 1 && shuffled[0]?.track.id === previousTrackId) {
+      const swapIndex = shuffled.findIndex((item) => item.track.id !== previousTrackId);
+      if (swapIndex > 0) {
+        [shuffled[0], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[0]];
+      }
+    }
+    return shuffled;
+  }
+
+  return items;
 }
 
 function createQueueId() {
@@ -384,6 +499,15 @@ function orderTracks(
   return tracks;
 }
 
+function shuffleItems<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
 function reorderByQueueItemIds(
   items: PlaybackQueueItem[],
   queueItemIds: string[],
@@ -400,4 +524,8 @@ function reorderByQueueItemIds(
 
 function isReadyTrack(track: Track): boolean {
   return track.status.toLowerCase() === "ready";
+}
+
+function isSourcePlaylistCycleItem(item: PlaybackQueueItem): boolean {
+  return item.cycleItem && item.origin?.type === "playlist";
 }

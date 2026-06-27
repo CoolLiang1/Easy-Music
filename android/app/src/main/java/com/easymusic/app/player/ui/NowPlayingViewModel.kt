@@ -86,6 +86,10 @@ class NowPlayingViewModel(
         )
     }
 
+    fun setRepeatPlaylist(enabled: Boolean) {
+        playerController.setRepeatPlaylist(enabled)
+    }
+
     fun dispose() {
         positionJob?.cancel()
     }

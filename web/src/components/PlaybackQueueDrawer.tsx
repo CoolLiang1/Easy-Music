@@ -19,6 +19,7 @@ export function PlaybackQueueDrawer({
     clearQueue,
     removeQueueItem,
     reorderUpcoming,
+    setRepeatPlaylist,
     state: queueState,
   } = usePlaybackQueue();
   const [draggedQueueItemId, setDraggedQueueItemId] = useState<string | null>(null);
@@ -93,6 +94,25 @@ export function PlaybackQueueDrawer({
             value={queueState.repeatPlaylist ? "已开启" : "未开启"}
           />
         </div>
+
+        {queueState.source?.type === "playlist" ? (
+          <div className="queue-repeat-control">
+            <label>
+              <input
+                checked={queueState.repeatPlaylist}
+                disabled={queueState.baseCycleItems.length === 0}
+                onChange={(event) => setRepeatPlaylist(event.target.checked)}
+                type="checkbox"
+              />
+              歌单循环
+            </label>
+            <p>
+              {queueState.baseCycleItems.length === 0
+                ? "当前歌单没有可播放的基础音轨，无法开启循环。"
+                : "循环只会重复歌单原始可播放音轨，手动插入的音轨不会进入下一轮。"}
+            </p>
+          </div>
+        ) : null}
 
         <section className="queue-section" aria-labelledby="queue-current-title">
           <div className="queue-section-heading">

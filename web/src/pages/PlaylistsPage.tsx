@@ -39,7 +39,11 @@ type PlaylistsState =
 
 export function PlaylistsPage() {
   const { accessToken } = useAuth();
-  const { replaceFromPlaylist, state: queueState } = usePlaybackQueue();
+  const {
+    replaceFromPlaylist,
+    state: queueState,
+    syncPlaylistSourceTracks,
+  } = usePlaybackQueue();
   const [pageState, setPageState] = useState<PlaylistsState>({ name: "loading" });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -87,6 +91,13 @@ export function PlaylistsPage() {
         selectedPlaylist,
         tracks,
       });
+      if (selectedPlaylist) {
+        syncPlaylistSourceTracks({
+          playlistId: selectedPlaylist.id,
+          playlistName: selectedPlaylist.name,
+          tracks: selectedPlaylist.tracks.map((item) => item.track),
+        });
+      }
       setRenameName(selectedPlaylist?.name ?? "");
       setAddTrackId("");
     } catch (error: unknown) {
@@ -342,6 +353,11 @@ export function PlaylistsPage() {
       };
     });
     setRenameName(playlist.name);
+    syncPlaylistSourceTracks({
+      playlistId: playlist.id,
+      playlistName: playlist.name,
+      tracks: playlist.tracks.map((item) => item.track),
+    });
   };
 
   return (
