@@ -474,6 +474,11 @@ V2.2 acceptance is recorded in
 browser smoke are recorded as passed. Android automated checks and
 emulator/device smoke are recorded as passed.
 
+Android playback performance debugging notes are recorded in
+`docs/DEBUGGING/ANDROID_PLAYBACK_QUEUE_PERFORMANCE.md`. Start there if playback
+or playlist queue startup causes sustained app-wide jank, high main-thread CPU,
+or repeated media notification updates.
+
 The V2 import page is available at `/imports` after login. It reads the
 configured import roots from the backend, scans one configured root and optional
 relative subdirectory, lets the user explicitly select supported audio

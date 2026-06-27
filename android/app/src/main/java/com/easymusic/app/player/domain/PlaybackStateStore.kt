@@ -66,6 +66,21 @@ data class PlayerUiState(
     val errorMessage: String? = null,
 )
 
+data class PlaybackUiSummary(
+    val currentTrackId: Int? = null,
+    val status: PlaybackStatus = PlaybackStatus.Idle,
+    val queueSourcePlaylistId: Int? = null,
+    val errorMessage: String? = null,
+)
+
+fun PlayerUiState.toPlaybackUiSummary(): PlaybackUiSummary =
+    PlaybackUiSummary(
+        currentTrackId = track?.id,
+        status = status,
+        queueSourcePlaylistId = queueSource?.playlistId,
+        errorMessage = errorMessage,
+    )
+
 object PlaybackStateStore {
     private val mutableState = MutableStateFlow(PlayerUiState())
 

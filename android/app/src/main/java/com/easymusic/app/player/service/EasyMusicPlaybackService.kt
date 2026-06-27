@@ -15,17 +15,6 @@ class EasyMusicPlaybackService : MediaSessionService() {
         playbackSession()
     }
 
-    override fun onStartCommand(
-        intent: Intent?,
-        flags: Int,
-        startId: Int,
-    ): Int {
-        val session = playbackSession()
-        val result = super.onStartCommand(intent, flags, startId)
-        onUpdateNotification(session, true)
-        return result
-    }
-
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession {
         return playbackSession()
     }

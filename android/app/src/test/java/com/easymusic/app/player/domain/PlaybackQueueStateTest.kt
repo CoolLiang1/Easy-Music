@@ -104,6 +104,24 @@ class PlaybackQueueStateTest {
         assertEquals(listOf(2, 2), state.upcoming.map { it.track.id })
     }
 
+    @Test
+    fun playbackUiSummaryIgnoresHighFrequencyPositionFields() {
+        val current = PlayerUiState(
+            track = track(id = 7),
+            status = PlaybackStatus.Playing,
+            queueSource = PlaybackQueueSource(
+                type = PlaybackQueueSourceType.Playlist,
+                playlistId = 11,
+            ),
+            positionMs = 1_000L,
+            durationMs = 180_000L,
+        )
+
+        val tick = current.copy(positionMs = 1_500L)
+
+        assertEquals(current.toPlaybackUiSummary(), tick.toPlaybackUiSummary())
+    }
+
     private fun queueItem(
         queueItemId: String,
         track: TrackResponse,

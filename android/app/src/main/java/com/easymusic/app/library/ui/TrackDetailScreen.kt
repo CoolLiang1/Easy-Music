@@ -49,9 +49,12 @@ import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
-import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.PlaybackUiSummary
 import com.easymusic.app.player.domain.PlayerController
+import com.easymusic.app.player.domain.toPlaybackUiSummary
 import com.easymusic.app.ui.theme.SectionHeader
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 @Composable
 fun TrackDetailRoute(
@@ -76,12 +79,16 @@ fun TrackDetailRoute(
             initialNetworkAvailable = isNetworkAvailable,
         )
     }
-    val playbackState by PlaybackStateStore.state.collectAsState()
+    val playbackSummary by remember {
+        PlaybackStateStore.state
+            .map { state -> state.toPlaybackUiSummary() }
+            .distinctUntilChanged()
+    }.collectAsState(initial = PlaybackUiSummary())
 
     TrackDetailScreen(
         modifier = modifier,
         uiState = viewModel.uiState,
-        playbackState = playbackState,
+        playbackSummary = playbackSummary,
         onBackToLibrary = onBackToLibrary,
         onRefresh = { viewModel.refresh(isNetworkAvailable) },
         onOpenNowPlaying = onOpenNowPlaying,
@@ -94,7 +101,7 @@ fun TrackDetailRoute(
 @Composable
 fun TrackDetailScreen(
     uiState: TrackDetailUiState,
-    playbackState: PlayerUiState,
+    playbackSummary: PlaybackUiSummary,
     onBackToLibrary: () -> Unit,
     onRefresh: () -> Unit,
     onOpenNowPlaying: (TrackResponse) -> Unit,
@@ -136,7 +143,7 @@ fun TrackDetailScreen(
 
             uiState.track != null -> DetailContent(
                 track = uiState.track,
-                playbackState = playbackState,
+                playbackSummary = playbackSummary,
                 cacheState = uiState.cacheState,
                 isNetworkAvailable = isNetworkAvailable,
                 onOpenNowPlaying = onOpenNowPlaying,
@@ -203,14 +210,14 @@ private fun DetailError(
 @Composable
 private fun DetailContent(
     track: TrackResponse,
-    playbackState: PlayerUiState,
+    playbackSummary: PlaybackUiSummary,
     cacheState: TrackCacheUiState,
     isNetworkAvailable: Boolean,
     onOpenNowPlaying: (TrackResponse) -> Unit,
     onCacheTrack: () -> Unit,
     onDeleteCachedTrack: () -> Unit,
 ) {
-    val isCurrentTrack = playbackState.track?.id == track.id
+    val isCurrentTrack = playbackSummary.currentTrackId == track.id
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     if (showDeleteConfirmation) {
@@ -277,7 +284,7 @@ private fun DetailContent(
                 )
                 Text(
                     text = if (isCurrentTrack) {
-                        playbackState.detailPlaybackLabel()
+                        playbackSummary.detailPlaybackLabel()
                     } else if (track.isReady) {
                         "已可在线播放。"
                     } else {
@@ -298,7 +305,7 @@ private fun DetailContent(
                     if (isCurrentTrack) {
                         AssistChip(
                             onClick = {},
-                            label = { Text(playbackState.status.detailChipLabel()) },
+                            label = { Text(playbackSummary.status.detailChipLabel()) },
                             enabled = true,
                         )
                     }
@@ -473,7 +480,7 @@ private fun Long.formatBytes(): String =
         else -> "$this B"
     }
 
-private fun PlayerUiState.detailPlaybackLabel(): String =
+private fun PlaybackUiSummary.detailPlaybackLabel(): String =
     when (status) {
         PlaybackStatus.Buffering -> "这个音轨正在缓冲。"
         PlaybackStatus.Playing -> "这个音轨正在播放。"

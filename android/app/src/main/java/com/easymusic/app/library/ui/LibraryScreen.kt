@@ -40,12 +40,15 @@ import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
+import com.easymusic.app.player.domain.PlaybackUiSummary
 import com.easymusic.app.player.domain.PlayerController
-import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.toPlaybackUiSummary
 import com.easymusic.app.player.ui.MiniPlayer
 import com.easymusic.app.ui.theme.BannerTone
 import com.easymusic.app.ui.theme.SectionHeader
 import com.easymusic.app.ui.theme.StatusBanner
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 @Composable
 fun LibraryScreen(
@@ -58,7 +61,11 @@ fun LibraryScreen(
     var selectedTrackId by remember { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
     val playerController = remember(context) { PlayerController(context) }
-    val playbackState by PlaybackStateStore.state.collectAsState()
+    val playbackSummary by remember {
+        PlaybackStateStore.state
+            .map { state -> state.toPlaybackUiSummary() }
+            .distinctUntilChanged()
+    }.collectAsState(initial = PlaybackUiSummary())
 
     selectedTrackId?.let { trackId ->
         Column(modifier = modifier.fillMaxSize()) {
@@ -70,10 +77,9 @@ fun LibraryScreen(
                 modifier = Modifier.weight(1f),
             )
             LibraryMiniPlayer(
-                uiState = playbackState,
                 playerController = playerController,
                 onOpenNowPlaying = {
-                    playbackState.track?.let(onTrackSelected)
+                    PlaybackStateStore.state.value.track?.let(onTrackSelected)
                 },
             )
         }
@@ -105,7 +111,7 @@ fun LibraryScreen(
                 else -> TrackList(
                     tracks = uiState.tracks,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
-                    playbackState = playbackState,
+                    playbackSummary = playbackSummary,
                     errorMessage = uiState.errorMessage,
                     onRefresh = onRefresh,
                     onTrackSelected = { track -> selectedTrackId = track.id },
@@ -116,10 +122,9 @@ fun LibraryScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         LibraryMiniPlayer(
-            uiState = playbackState,
             playerController = playerController,
             onOpenNowPlaying = {
-                playbackState.track?.let(onTrackSelected)
+                PlaybackStateStore.state.value.track?.let(onTrackSelected)
             },
         )
     }
@@ -228,7 +233,7 @@ private fun LibraryError(
 private fun TrackList(
     tracks: List<TrackResponse>,
     cacheStatesByTrackId: Map<Int, LibraryCacheUiState>,
-    playbackState: PlayerUiState,
+    playbackSummary: PlaybackUiSummary,
     errorMessage: String?,
     onRefresh: () -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
@@ -254,7 +259,7 @@ private fun TrackList(
             TrackRow(
                 track = track,
                 cacheState = cacheStatesByTrackId[track.id] ?: LibraryCacheUiState(),
-                playbackState = playbackState,
+                playbackSummary = playbackSummary,
                 onClick = { onTrackSelected(track) },
             )
         }
@@ -281,10 +286,10 @@ private fun InlineError(
 private fun TrackRow(
     track: TrackResponse,
     cacheState: LibraryCacheUiState,
-    playbackState: PlayerUiState,
+    playbackSummary: PlaybackUiSummary,
     onClick: () -> Unit,
 ) {
-    val isCurrentTrack = playbackState.track?.id == track.id
+    val isCurrentTrack = playbackSummary.currentTrackId == track.id
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -318,7 +323,7 @@ private fun TrackRow(
                 if (isCurrentTrack) {
                     AssistChip(
                         onClick = {},
-                        label = { Text(playbackState.status.currentTrackChipLabel()) },
+                        label = { Text(playbackSummary.status.currentTrackChipLabel()) },
                         enabled = true,
                     )
                 }
@@ -339,7 +344,7 @@ private fun TrackRow(
                 Text(
                     text = track.rowPlaybackLabel(
                         isCurrentTrack = isCurrentTrack,
-                        status = playbackState.status,
+                        status = playbackSummary.status,
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isCurrentTrack || track.isReady) {
@@ -375,10 +380,11 @@ private fun CacheStatusChip(cacheState: LibraryCacheUiState) {
 
 @Composable
 private fun LibraryMiniPlayer(
-    uiState: PlayerUiState,
     playerController: PlayerController,
     onOpenNowPlaying: () -> Unit,
 ) {
+    val uiState by PlaybackStateStore.state.collectAsState()
+
     MiniPlayer(
         uiState = uiState,
         onOpenNowPlaying = onOpenNowPlaying,

@@ -48,8 +48,9 @@ import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.player.domain.PlaybackQueueMode
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
+import com.easymusic.app.player.domain.PlaybackUiSummary
 import com.easymusic.app.player.domain.PlayerController
-import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.toPlaybackUiSummary
 import com.easymusic.app.player.ui.MiniPlayer
 import com.easymusic.app.playlist.data.PlaylistResponse
 import com.easymusic.app.playlist.data.PlaylistSummaryResponse
@@ -57,6 +58,8 @@ import com.easymusic.app.playlist.data.PlaylistTrackResponse
 import com.easymusic.app.ui.theme.BannerTone
 import com.easymusic.app.ui.theme.SectionHeader
 import com.easymusic.app.ui.theme.StatusBanner
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @Composable
@@ -74,13 +77,17 @@ fun PlaylistsScreen(
     val tokenStore = remember(context) { AuthTokenStore(context) }
     val trackApi = remember { TrackApi(ApiClient(AppConfig.default())) }
     val coroutineScope = rememberCoroutineScope()
-    val playbackState by PlaybackStateStore.state.collectAsState()
+    val playbackSummary by remember {
+        PlaybackStateStore.state
+            .map { state -> state.toPlaybackUiSummary() }
+            .distinctUntilChanged()
+    }.collectAsState(initial = PlaybackUiSummary())
 
-    LaunchedEffect(uiState.selectedPlaylist, playbackState.queueSource?.playlistId) {
+    LaunchedEffect(uiState.selectedPlaylist, playbackSummary.queueSourcePlaylistId) {
         val playlist = uiState.selectedPlaylist
         if (
             playlist != null &&
-            playbackState.queueSource?.playlistId == playlist.id
+            playbackSummary.queueSourcePlaylistId == playlist.id
         ) {
             playerController.syncPlaylistSourceTracks(
                 playlistId = playlist.id,
@@ -99,7 +106,7 @@ fun PlaylistsScreen(
             uiState.selectedPlaylist?.let { playlist ->
                 PlaylistDetail(
                     playlist = playlist,
-                    playbackState = playbackState,
+                    playbackSummary = playbackSummary,
                     isRefreshing = uiState.isRefreshing,
                     isNetworkAvailable = isNetworkAvailable,
                     errorMessage = uiState.errorMessage,
@@ -137,14 +144,11 @@ fun PlaylistsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        MiniPlayer(
-            uiState = playbackState,
+        PlaylistMiniPlayer(
+            playerController = playerController,
             onOpenNowPlaying = {
-                playbackState.track?.let(onTrackSelected)
+                PlaybackStateStore.state.value.track?.let(onTrackSelected)
             },
-            onPlay = playerController::resume,
-            onPause = playerController::pause,
-            onTick = playerController::updatePosition,
         )
     }
 }
@@ -315,7 +319,7 @@ private fun PlaylistCard(
 @Composable
 private fun PlaylistDetail(
     playlist: PlaylistResponse,
-    playbackState: PlayerUiState,
+    playbackSummary: PlaybackUiSummary,
     isRefreshing: Boolean,
     isNetworkAvailable: Boolean,
     errorMessage: String?,
@@ -384,7 +388,7 @@ private fun PlaylistDetail(
             ) { item ->
                 PlaylistTrackCard(
                     item = item,
-                    playbackState = playbackState,
+                    playbackSummary = playbackSummary,
                     onClick = { onTrackSelected(item.track) },
                 )
             }
@@ -431,11 +435,11 @@ private fun PlaylistPlaybackActions(
 @Composable
 private fun PlaylistTrackCard(
     item: PlaylistTrackResponse,
-    playbackState: PlayerUiState,
+    playbackSummary: PlaybackUiSummary,
     onClick: () -> Unit,
 ) {
     val track = item.track
-    val isCurrentTrack = playbackState.track?.id == track.id
+    val isCurrentTrack = playbackSummary.currentTrackId == track.id
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -502,7 +506,7 @@ private fun PlaylistTrackCard(
                 if (isCurrentTrack) {
                     AssistChip(
                         onClick = {},
-                        label = { Text(playbackState.status.currentTrackChipLabel()) },
+                        label = { Text(playbackSummary.status.currentTrackChipLabel()) },
                         enabled = true,
                     )
                 }
@@ -515,6 +519,22 @@ private fun PlaylistTrackCard(
             )
         }
     }
+}
+
+@Composable
+private fun PlaylistMiniPlayer(
+    playerController: PlayerController,
+    onOpenNowPlaying: () -> Unit,
+) {
+    val uiState by PlaybackStateStore.state.collectAsState()
+
+    MiniPlayer(
+        uiState = uiState,
+        onOpenNowPlaying = onOpenNowPlaying,
+        onPlay = playerController::resume,
+        onPause = playerController::pause,
+        onTick = playerController::updatePosition,
+    )
 }
 
 @Composable
