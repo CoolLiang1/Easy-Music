@@ -13,7 +13,7 @@ class RecommendationModelsTest {
     fun serializesOptionalCooldownModeAndRawText() {
         val json = JSONObject(
             RecommendationRequest(
-                scenarioTagIds = listOf(1),
+                sceneTagIds = listOf(1),
                 rawText = "focus coding",
                 cooldownMode = RecommendationCooldownMode.Strict,
             ).toJson(),
@@ -21,7 +21,7 @@ class RecommendationModelsTest {
 
         assertEquals("focus coding", json.getString("raw_text"))
         assertEquals("strict", json.getString("cooldown_mode"))
-        assertEquals(1, json.getJSONArray("scenario_tag_ids").getInt(0))
+        assertEquals(1, json.getJSONArray("scene_tag_ids").getInt(0))
     }
 
     @Test
@@ -32,10 +32,10 @@ class RecommendationModelsTest {
         assertEquals(3, response.results.size)
         assertEquals(listOf(1, 2, 3), response.results.map { it.rank })
         assertEquals(12.5, response.results[0].score, 0.0)
-        assertEquals("Matched scenario and type tags.", response.results[0].reason)
+        assertEquals("Matched scene and type tags.", response.results[0].reason)
         assertEquals(
             "focus",
-            response.results[0].explanation?.matchedTags?.get("scenario")?.single()?.name,
+            response.results[0].explanation?.matchedTags?.get("scene")?.single()?.name,
         )
         assertEquals(
             "playlist context boost: Work Flow",
@@ -49,7 +49,7 @@ class RecommendationModelsTest {
         assertEquals("Morning Focus", response.results[0].track.title)
         assertEquals("The Testers", response.results[0].track.artist)
         assertEquals("focus", response.results[0].track.tags.single().name)
-        assertEquals("scenario", response.results[0].track.tags.single().group)
+        assertEquals("scene", response.results[0].track.tags.single().group)
         assertTrue(response.results.all { it.track.isReady })
     }
 
@@ -78,14 +78,14 @@ class RecommendationModelsTest {
             {
               "rank": 1,
               "score": 12.5,
-              "reason": "Matched scenario and type tags.",
+              "reason": "Matched scene and type tags.",
               "explanation": {
                 "matched_tags": {
-                  "scenario": [
+                  "scene": [
                     {
                       "id": 1,
                       "name": "focus",
-                      "group": "scenario"
+                      "group": "scene"
                     }
                   ]
                 },
@@ -114,7 +114,7 @@ class RecommendationModelsTest {
             {
               "rank": 2,
               "score": 9.0,
-              "reason": "Matched scenario tag.",
+              "reason": "Matched scene tag.",
               "track": ${trackJson(102, "Quiet Work", null)}
             },
             {
@@ -156,7 +156,7 @@ class RecommendationModelsTest {
             {
               "id": 1,
               "name": "focus",
-              "group": "scenario",
+              "group": "scene",
               "created_at": "2026-05-29T07:00:00Z"
             }
           ]

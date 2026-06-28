@@ -101,7 +101,7 @@ def create_track(
 
 
 def create_tag(db_session: Session, user: User) -> Tag:
-    tag = Tag(user_id=user.id, name="Focus", group="scenario")
+    tag = Tag(user_id=user.id, name="Focus", group="scene")
     db_session.add(tag)
     db_session.commit()
     db_session.refresh(tag)

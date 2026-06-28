@@ -2,10 +2,9 @@ import type { FeedbackType } from "../types/feedback";
 import type { TagGroup } from "../types/tag";
 
 export const tagGroupLabels: Record<TagGroup, string> = {
-  scenario: "场景",
-  state: "状态",
+  scene: "场景",
   type: "类型",
-  attribute: "属性",
+  feature: "特点",
 };
 
 export const feedbackLabels: Partial<Record<FeedbackType, string>> = {

@@ -146,11 +146,11 @@ def test_create_recommendations_rejects_unowned_tag(
 ) -> None:
     owner = create_user(db_session)
     other_user = create_user(db_session, username="other")
-    hidden_tag = create_tag(db_session, other_user, "scenario", "Hidden")
+    hidden_tag = create_tag(db_session, other_user, "scene", "Hidden")
 
     response = client.post(
         "/api/recommendations",
-        json={"scenario_tag_ids": [hidden_tag.id]},
+        json={"scene_tag_ids": [hidden_tag.id]},
         headers=auth_headers(owner),
     )
 
@@ -163,16 +163,31 @@ def test_create_recommendations_rejects_wrong_tag_group(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    attribute = create_tag(db_session, user, "attribute", "Piano")
+    feature = create_tag(db_session, user, "feature", "Calm")
 
     response = client.post(
         "/api/recommendations",
-        json={"scenario_tag_ids": [attribute.id]},
+        json={"scene_tag_ids": [feature.id]},
         headers=auth_headers(user),
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Recommendation tag group must be scenario."
+    assert response.json()["detail"] == "Recommendation tag group must be scene."
+
+
+def test_create_recommendations_rejects_attribute_fields(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+
+    response = client.post(
+        "/api/recommendations",
+        json={"attribute_tag_ids": [1]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 422
 
 
 def test_create_recommendations_returns_empty_results_when_no_ready_candidates(
@@ -199,29 +214,25 @@ def test_create_recommendations_returns_three_ordered_results(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    calm = create_tag(db_session, user, "state", "Calm")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
     instrumental = create_tag(db_session, user, "type", "Instrumental")
-    piano = create_tag(db_session, user, "attribute", "Piano")
-    excluded = create_tag(db_session, user, "attribute", "Noisy")
 
     best = create_track(db_session, user, "Best", liked=True)
     second = create_track(db_session, user, "Second")
     third = create_track(db_session, user, "Third")
     fourth = create_track(db_session, user, "Fourth")
-    assign_tags(db_session, best, focus, calm, instrumental, piano)
+    assign_tags(db_session, best, focus, calm, instrumental)
     assign_tags(db_session, second, focus, instrumental)
     assign_tags(db_session, third, focus)
-    assign_tags(db_session, fourth, focus, excluded)
+    assign_tags(db_session, fourth, focus)
 
     response = client.post(
         "/api/recommendations",
         json={
-            "scenario_tag_ids": [focus.id],
-            "state_tag_ids": [calm.id],
+            "scene_tag_ids": [focus.id],
+            "feature_tag_ids": [calm.id],
             "type_tag_ids": [instrumental.id],
-            "attribute_tag_ids": [piano.id],
-            "exclude_attribute_tag_ids": [excluded.id],
             "limit": 3,
             "client": "web",
         },
@@ -246,23 +257,23 @@ def test_create_recommendations_includes_deterministic_reason_fields(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     track = create_track(db_session, user, "Reasoned", liked=True)
     assign_tags(db_session, track, focus)
 
     response = client.post(
         "/api/recommendations",
-        json={"scenario_tag_ids": [focus.id]},
+        json={"scene_tag_ids": [focus.id]},
         headers=auth_headers(user),
     )
 
     assert response.status_code == 200
     result = response.json()["results"][0]
-    assert result["reason"] == "matched scenario tags: Focus; liked track boost."
-    assert result["explanation"]["matched_tags"]["scenario"][0] == {
+    assert result["reason"] == "matched scene tags: Focus; liked track boost."
+    assert result["explanation"]["matched_tags"]["scene"][0] == {
         "id": focus.id,
         "name": "Focus",
-        "group": "scenario",
+        "group": "scene",
     }
     assert result["explanation"]["boosts"] == [
         {"label": "liked track boost", "score_delta": 1.0},
@@ -279,7 +290,7 @@ def test_create_recommendations_defaults_cooldown_to_soft_penalty(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     available = create_track(db_session, user, "Available")
     cooldown = create_track(
         db_session,
@@ -292,7 +303,7 @@ def test_create_recommendations_defaults_cooldown_to_soft_penalty(
 
     response = client.post(
         "/api/recommendations",
-        json={"scenario_tag_ids": [focus.id]},
+        json={"scene_tag_ids": [focus.id]},
         headers=auth_headers(user),
     )
 
@@ -311,7 +322,7 @@ def test_create_recommendations_includes_playlist_boost_reason(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     track = create_track(db_session, user, "Playlisted")
     assign_tags(db_session, track, focus)
     playlist = create_playlist(
@@ -324,7 +335,7 @@ def test_create_recommendations_includes_playlist_boost_reason(
 
     response = client.post(
         "/api/recommendations",
-        json={"scenario_tag_ids": [focus.id]},
+        json={"scene_tag_ids": [focus.id]},
         headers=auth_headers(user),
     )
 
@@ -343,7 +354,7 @@ def test_create_recommendations_reports_exclusions_considered(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     available = create_track(db_session, user, "Available")
     cooldown = create_track(
         db_session,
@@ -368,7 +379,7 @@ def test_create_recommendations_reports_exclusions_considered(
 
     response = client.post(
         "/api/recommendations",
-        json={"scenario_tag_ids": [focus.id], "cooldown_mode": "strict"},
+        json={"scene_tag_ids": [focus.id], "cooldown_mode": "strict"},
         headers=auth_headers(user),
     )
 

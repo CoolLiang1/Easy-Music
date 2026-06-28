@@ -250,10 +250,13 @@ Possible statuses:
 
 Possible groups:
 
-- scenario
-- state
+- scene
 - type
-- attribute
+- feature
+
+V2.4 simplified the tag taxonomy to these three groups. Existing `scenario`
+tags migrate to `scene`, existing `state` tags migrate to `feature`, and
+`attribute` tags plus their track-tag links are removed by migration.
 
 ### 8.4 TrackTag
 
@@ -293,8 +296,8 @@ Possible event types:
 - `id`
 - `user_id`
 - `track_id`
-- `scenario_context`
-- `state_context`
+- `scene_tag_ids`
+- `feature_tag_ids`
 - `type_context`
 - `feedback_type`
 - `occurred_at`
@@ -510,10 +513,9 @@ Version 1 uses hybrid recommendation:
 
 ### 10.2 Rule Ranking Inputs
 
-- Scenario tag match
-- State tag match
+- Scene tag match
 - Type tag match
-- Attribute filters
+- Feature tag match
 - Like status
 - Recent playback
 - Cooldown mode (`off`, `soft`, or `strict`)

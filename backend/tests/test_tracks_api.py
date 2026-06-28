@@ -89,7 +89,7 @@ def create_tag(
     db_session: Session,
     user: User,
     name: str = "Focus",
-    group: str = "scenario",
+    group: str = "scene",
 ) -> Tag:
     tag = Tag(user_id=user.id, name=name, group=group)
     db_session.add(tag)
@@ -267,8 +267,8 @@ def test_batch_removes_tags_from_selected_tracks(
     user = create_user(db_session)
     first = create_track(db_session, user, title="First")
     second = create_track(db_session, user, title="Second")
-    keep = create_tag(db_session, user, name="Keep", group="state")
-    remove = create_tag(db_session, user, name="Remove", group="attribute")
+    keep = create_tag(db_session, user, name="Keep", group="feature")
+    remove = create_tag(db_session, user, name="Remove", group="type")
     for track in (first, second):
         db_session.add(TrackTag(track_id=track.id, tag_id=keep.id))
         db_session.add(TrackTag(track_id=track.id, tag_id=remove.id))
@@ -441,10 +441,9 @@ def test_delete_track_removes_related_rows_and_media_files(
             track_id=track.id,
             client_event_id="feedback-delete-test",
             feedback_type="like",
-            scenario_tag_ids=[],
-            state_tag_ids=[],
+            scene_tag_ids=[],
+            feature_tag_ids=[],
             type_tag_ids=[],
-            attribute_tag_ids=[],
             occurred_at=datetime.now(timezone.utc),
             client="web",
         ),

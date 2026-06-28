@@ -5,22 +5,18 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class RecommendationRequest(
-    val scenarioTagIds: List<Int> = emptyList(),
-    val stateTagIds: List<Int> = emptyList(),
+    val sceneTagIds: List<Int> = emptyList(),
     val typeTagIds: List<Int> = emptyList(),
-    val attributeTagIds: List<Int> = emptyList(),
-    val excludeAttributeTagIds: List<Int> = emptyList(),
+    val featureTagIds: List<Int> = emptyList(),
     val rawText: String? = null,
     val cooldownMode: RecommendationCooldownMode? = null,
     val limit: Int = DEFAULT_LIMIT,
     val client: String = CLIENT_ANDROID,
 ) {
     fun toJson(): String = JSONObject()
-        .put("scenario_tag_ids", scenarioTagIds.toJsonArray())
-        .put("state_tag_ids", stateTagIds.toJsonArray())
+        .put("scene_tag_ids", sceneTagIds.toJsonArray())
         .put("type_tag_ids", typeTagIds.toJsonArray())
-        .put("attribute_tag_ids", attributeTagIds.toJsonArray())
-        .put("exclude_attribute_tag_ids", excludeAttributeTagIds.toJsonArray())
+        .put("feature_tag_ids", featureTagIds.toJsonArray())
         .apply {
             rawText?.let { put("raw_text", it) }
             cooldownMode?.let { put("cooldown_mode", it.value) }

@@ -16,10 +16,9 @@ data class FeedbackEventRequest(
     val clientEventId: String? = null,
     val trackId: Int,
     val feedbackType: FeedbackType,
-    val scenarioTagIds: List<Int>? = null,
-    val stateTagIds: List<Int>? = null,
+    val sceneTagIds: List<Int>? = null,
     val typeTagIds: List<Int>? = null,
-    val attributeTagIds: List<Int>? = null,
+    val featureTagIds: List<Int>? = null,
     val occurredAt: String,
     val client: String = RecommendationRequest.CLIENT_ANDROID,
 ) {
@@ -31,10 +30,9 @@ data class FeedbackEventRequest(
             .put("client", client)
 
         clientEventId?.let { json.put("client_event_id", it) }
-        scenarioTagIds?.let { json.put("scenario_tag_ids", it.toJsonArray()) }
-        stateTagIds?.let { json.put("state_tag_ids", it.toJsonArray()) }
+        sceneTagIds?.let { json.put("scene_tag_ids", it.toJsonArray()) }
         typeTagIds?.let { json.put("type_tag_ids", it.toJsonArray()) }
-        attributeTagIds?.let { json.put("attribute_tag_ids", it.toJsonArray()) }
+        featureTagIds?.let { json.put("feature_tag_ids", it.toJsonArray()) }
 
         return json
     }

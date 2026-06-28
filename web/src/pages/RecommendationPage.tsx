@@ -52,10 +52,9 @@ type FeedbackState = {
 } | null;
 
 const initialSelections: SelectionState = {
-  scenario: [],
-  state: [],
+  scene: [],
   type: [],
-  attribute: [],
+  feature: [],
 };
 
 const cooldownModeOptions: Array<{
@@ -88,9 +87,6 @@ export function RecommendationPage() {
   const [tagsState, setTagsState] = useState<TagsState>({ name: "loading" });
   const [selectedTagIds, setSelectedTagIds] =
     useState<SelectionState>(initialSelections);
-  const [excludedAttributeTagIds, setExcludedAttributeTagIds] = useState<
-    number[]
-  >([]);
   const [cooldownMode, setCooldownMode] = useState<RecommendationCooldownMode>(
     () => readStoredCooldownMode(),
   );
@@ -166,10 +162,9 @@ export function RecommendationPage() {
 
   const groupedTags = useMemo(() => {
     const groups: Record<TagGroup, Tag[]> = {
-      scenario: [],
-      state: [],
+      scene: [],
       type: [],
-      attribute: [],
+      feature: [],
     };
 
     if (tagsState.name !== "ready") {
@@ -185,16 +180,14 @@ export function RecommendationPage() {
 
   const currentRequest = useMemo<RecommendationRequest>(
     () => ({
-      scenario_tag_ids: selectedTagIds.scenario,
-      state_tag_ids: selectedTagIds.state,
+      scene_tag_ids: selectedTagIds.scene,
       type_tag_ids: selectedTagIds.type,
-      attribute_tag_ids: selectedTagIds.attribute,
-      exclude_attribute_tag_ids: excludedAttributeTagIds,
+      feature_tag_ids: selectedTagIds.feature,
       cooldown_mode: cooldownMode,
       limit: 3,
       client: "web",
     }),
-    [cooldownMode, excludedAttributeTagIds, selectedTagIds],
+    [cooldownMode, selectedTagIds],
   );
 
   const handleRequestRecommendations = async () => {
@@ -251,10 +244,9 @@ export function RecommendationPage() {
             client_event_id: createClientEventId(),
             feedback_type: feedbackType,
             occurred_at: new Date().toISOString(),
-            scenario_tag_ids: currentRequest.scenario_tag_ids,
-            state_tag_ids: currentRequest.state_tag_ids,
+            scene_tag_ids: currentRequest.scene_tag_ids,
             type_tag_ids: currentRequest.type_tag_ids,
-            attribute_tag_ids: currentRequest.attribute_tag_ids,
+            feature_tag_ids: currentRequest.feature_tag_ids,
             track_id: result.track.id,
           },
         ],
@@ -298,7 +290,7 @@ export function RecommendationPage() {
           <p className="eyebrow">推荐</p>
           <h1 id="recommendation-title">结构化推荐</h1>
           <p className="page-copy">
-            使用明确的场景、状态、类型、期望属性和排除属性标签测试规则推荐。
+            使用明确的场景、类型和特点标签测试规则推荐。
           </p>
         </div>
         {recommendationState.name === "ready" ? (
@@ -322,7 +314,6 @@ export function RecommendationPage() {
           disabled={recommendationState.name === "loading"}
           onClick={() => {
             setSelectedTagIds(initialSelections);
-            setExcludedAttributeTagIds([]);
             setFeedbackState(null);
             setRecommendationState({ name: "idle" });
           }}
@@ -346,7 +337,7 @@ export function RecommendationPage() {
 
       {tagsState.name === "ready" && !hasAnyTags ? (
         <div className="empty-state">
-          还没有可用的场景、状态、类型或属性标签。请先创建标签，再测试结构化推荐。
+          还没有可用的场景、类型或特点标签。请先创建标签，再测试结构化推荐。
         </div>
       ) : null}
 
@@ -362,31 +353,11 @@ export function RecommendationPage() {
                     ...current,
                     [group]: toggleId(current[group], tagId),
                   }));
-
-                  if (group === "attribute") {
-                    setExcludedAttributeTagIds((current) =>
-                      current.filter((id) => id !== tagId),
-                    );
-                  }
                 }}
                 selectedIds={selectedTagIds[group]}
                 tags={groupedTags[group]}
               />
             ))}
-
-            <TagPicker
-              group="attribute"
-              isExcludedPicker
-              onToggle={(tagId) => {
-                setExcludedAttributeTagIds((current) => toggleId(current, tagId));
-                setSelectedTagIds((current) => ({
-                  ...current,
-                  attribute: current.attribute.filter((id) => id !== tagId),
-                }));
-              }}
-              selectedIds={excludedAttributeTagIds}
-              tags={groupedTags.attribute}
-            />
           </div>
 
           <div className="recommendation-toolbar">
@@ -451,7 +422,7 @@ export function RecommendationPage() {
       recommendationState.response.results.length === 0 ? (
         <div className="empty-state">
           没有返回推荐。可能还没有可播放音轨，或所有可播放音轨都被冷却、
-          反馈、排除属性等规则过滤了。
+          反馈等规则过滤了。
         </div>
       ) : null}
 
@@ -597,7 +568,6 @@ function RevivedTrackCard({ candidate }: { candidate: RevivedTrackCandidate }) {
 
 type TagPickerProps = {
   group: TagGroup;
-  isExcludedPicker?: boolean;
   onToggle: (tagId: number) => void;
   selectedIds: number[];
   tags: Tag[];
@@ -605,14 +575,11 @@ type TagPickerProps = {
 
 function TagPicker({
   group,
-  isExcludedPicker = false,
   onToggle,
   selectedIds,
   tags,
 }: TagPickerProps) {
-  const title = isExcludedPicker
-    ? "排除属性"
-    : tagGroupLabels[group];
+  const title = tagGroupLabels[group];
 
   return (
     <section className="recommendation-card" aria-labelledby={`picker-${title}`}>

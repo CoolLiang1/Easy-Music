@@ -25,14 +25,12 @@ from app.services.tracks import build_track_response
 DEFAULT_RECOMMENDATION_LIMIT = 3
 MAX_RECOMMENDATION_LIMIT = 3
 TAG_MATCH_WEIGHTS = {
-    "scenario": 3.0,
-    "state": 2.0,
+    "scene": 3.0,
     "type": 2.0,
-    "attribute": 1.0,
+    "feature": 2.0,
 }
 LIKED_BOOST = 1.0
 ACTIVE_COOLDOWN_SOFT_PENALTY = 5.0
-EXCLUDED_ATTRIBUTE_PENALTY = 4.0
 RECENT_PLAYBACK_WINDOWS = (
     (timedelta(days=1), 4.0),
     (timedelta(days=7), 2.0),
@@ -48,11 +46,9 @@ PLAYLIST_CONTEXT_BOOST = 1.5
 PLAYLIST_CONTEXT_BOOST_CAP = 3.0
 PLAYLIST_REASON_NAME_LIMIT = 3
 TAG_REQUEST_FIELDS = {
-    "scenario_tag_ids": "scenario",
-    "state_tag_ids": "state",
+    "scene_tag_ids": "scene",
     "type_tag_ids": "type",
-    "attribute_tag_ids": "attribute",
-    "exclude_attribute_tag_ids": "attribute",
+    "feature_tag_ids": "feature",
 }
 TERM_STOPWORDS = {
     "a",
@@ -179,12 +175,6 @@ def recommend_tracks_with_context(
             playlist_signals.get(track.id, []),
             playlist_match_terms,
         )
-        _score_excluded_attributes(
-            scored,
-            request.exclude_attribute_tag_ids,
-            track_tags.get(track.id, set()),
-            tags_by_id,
-        )
         _score_recent_playback(scored, latest_playback.get(track.id), ranking_time)
         _score_feedback_penalties(scored, feedback_for_track, requested_tag_ids, ranking_time)
         scored_tracks.append(scored)
@@ -287,10 +277,9 @@ def _score_tag_matches(
     tags_by_id: dict[int, Tag],
 ) -> None:
     request_groups = {
-        "scenario": request.scenario_tag_ids,
-        "state": request.state_tag_ids,
+        "scene": request.scene_tag_ids,
         "type": request.type_tag_ids,
-        "attribute": request.attribute_tag_ids,
+        "feature": request.feature_tag_ids,
     }
     for group, requested_ids in request_groups.items():
         matching_ids = [
@@ -390,38 +379,6 @@ def _score_playlist_signals(
     )
 
 
-def _score_excluded_attributes(
-    scored: _ScoredTrack,
-    excluded_attribute_tag_ids: list[int],
-    track_tag_ids: set[int],
-    tags_by_id: dict[int, Tag],
-) -> None:
-    matching_ids = [
-        tag_id
-        for tag_id in _unique_ids(excluded_attribute_tag_ids)
-        if tag_id in track_tag_ids
-        and tag_id in tags_by_id
-        and tags_by_id[tag_id].group == "attribute"
-    ]
-    if not matching_ids:
-        return
-
-    scored.score -= EXCLUDED_ATTRIBUTE_PENALTY * len(matching_ids)
-    tag_names = ", ".join(tags_by_id[tag_id].name for tag_id in matching_ids)
-    scored.penalties.append(
-        RecommendationExplanationPart(
-            label=f"excluded attribute penalty: {tag_names}",
-            score_delta=-(EXCLUDED_ATTRIBUTE_PENALTY * len(matching_ids)),
-        ),
-    )
-    scored.avoidance_reasons.append(
-        RecommendationExplanationPart(
-            label=f"matched excluded attributes: {tag_names}",
-            score_delta=-(EXCLUDED_ATTRIBUTE_PENALTY * len(matching_ids)),
-        ),
-    )
-
-
 def _score_recent_playback(
     scored: _ScoredTrack,
     playback_event: PlaybackEvent | None,
@@ -514,10 +471,9 @@ def _has_not_today_feedback(feedback_events: list[FeedbackEvent], now: datetime)
 def _requested_tag_ids(request: RecommendationRequest) -> set[int]:
     tag_ids: set[int] = set()
     for ids in (
-        request.scenario_tag_ids,
-        request.state_tag_ids,
+        request.scene_tag_ids,
         request.type_tag_ids,
-        request.attribute_tag_ids,
+        request.feature_tag_ids,
     ):
         tag_ids.update(_unique_ids(ids))
     return tag_ids
@@ -589,10 +545,9 @@ def _format_playlist_names(
 def _feedback_context_ids(event: FeedbackEvent) -> set[int]:
     tag_ids: set[int] = set()
     for ids in (
-        event.scenario_tag_ids,
-        event.state_tag_ids,
+        event.scene_tag_ids,
         event.type_tag_ids,
-        event.attribute_tag_ids,
+        event.feature_tag_ids,
     ):
         tag_ids.update(_unique_ids(ids))
     return tag_ids
@@ -600,7 +555,7 @@ def _feedback_context_ids(event: FeedbackEvent) -> set[int]:
 
 def _build_reason(scored: _ScoredTrack) -> str:
     parts: list[str] = []
-    for group in ("scenario", "state", "type", "attribute"):
+    for group in ("scene", "type", "feature"):
         tags = scored.matched.get(group)
         if tags:
             parts.append(f"matched {group} tags: {', '.join(tag.name for tag in tags)}")

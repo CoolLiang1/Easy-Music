@@ -158,19 +158,16 @@ class _FakeClient:
 
 def _intent_json(
     *,
-    scenario: list[int] | None = None,
-    state: list[int] | None = None,
+    scene: list[int] | None = None,
+    feature: list[int] | None = None,
     type_: list[int] | None = None,
-    attribute: list[int] | None = None,
     explanation: str | None = None,
 ) -> str:
     return json.dumps(
         {
-            "scenario_tag_ids": scenario or [],
-            "state_tag_ids": state or [],
+            "scene_tag_ids": scene or [],
+            "feature_tag_ids": feature or [],
             "type_tag_ids": type_ or [],
-            "attribute_tag_ids": attribute or [],
-            "exclude_attribute_tag_ids": [],
             "unmatched_terms": [],
             "explanation": explanation,
         }
@@ -264,8 +261,8 @@ def test_ai_recommend_delegates_ranking_to_phase_5(
 ) -> None:
     """Happy path: AI parses intent, Phase 5 ranks tracks, results returned."""
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    calm = create_tag(db_session, user, "state", "Calm")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
 
     # Create three tracks tagged with Focus
     best = create_track(db_session, user, "Best", liked=True)
@@ -277,7 +274,7 @@ def test_ai_recommend_delegates_ranking_to_phase_5(
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
-        _intent_json(scenario=[focus.id], state=[calm.id])
+        _intent_json(scene=[focus.id], feature=[calm.id])
     )
 
     response = client.post(
@@ -291,9 +288,9 @@ def test_ai_recommend_delegates_ranking_to_phase_5(
 
     # Parsed intent
     assert body["parsed_intent"]["provider_status"] == "ok"
-    assert body["parsed_intent"]["structured_request"]["scenario_tag_ids"] == [focus.id]
-    assert body["parsed_intent"]["structured_request"]["state_tag_ids"] == [calm.id]
-    assert body["parsed_intent"]["matched_tags"]["scenario"][0]["name"] == "Focus"
+    assert body["parsed_intent"]["structured_request"]["scene_tag_ids"] == [focus.id]
+    assert body["parsed_intent"]["structured_request"]["feature_tag_ids"] == [calm.id]
+    assert body["parsed_intent"]["matched_tags"]["scene"][0]["name"] == "Focus"
 
     # Results from Phase 5 ranking
     assert body["request_id"]
@@ -315,13 +312,13 @@ def test_ai_recommend_includes_deterministic_reason_from_phase_5(
 ) -> None:
     """Phase 5 deterministic reason text must be present and not replaced by AI."""
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     track = create_track(db_session, user, "Reasoned", liked=True)
     assign_tags(db_session, track, focus)
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
-        _intent_json(scenario=[focus.id], explanation="AI thinks focus is best.")
+        _intent_json(scene=[focus.id], explanation="AI thinks focus is best.")
     )
 
     response = client.post(
@@ -336,7 +333,7 @@ def test_ai_recommend_includes_deterministic_reason_from_phase_5(
     assert body["parsed_intent"]["explanation"] == "AI thinks focus is best."
     # But the result reason comes from Phase 5
     result_reason = body["results"][0]["reason"]
-    assert "matched scenario tags: Focus" in result_reason
+    assert "matched scene tags: Focus" in result_reason
     assert "liked track boost" in result_reason
 
 
@@ -344,13 +341,13 @@ def test_ai_recommend_returns_empty_when_no_candidates(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    """No ready tracks match — Phase 5 returns empty results."""
+    """No ready tracks match - Phase 5 returns empty results."""
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     # No tracks at all
 
     fake = _install_provider(client.app)
-    fake.result = AiCompletionResult.ok(_intent_json(scenario=[focus.id]))
+    fake.result = AiCompletionResult.ok(_intent_json(scene=[focus.id]))
 
     response = client.post(
         "/api/ai/recommend",
@@ -375,7 +372,7 @@ def test_ai_recommend_applies_default_soft_cooldown_penalty(
 ) -> None:
     """A track with future cooldown_until stays eligible but is penalized."""
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
 
     future = datetime.now(timezone.utc) + timedelta(days=7)
     cooled = create_track(db_session, user, "Cooled Down", cooldown_until=future)
@@ -385,7 +382,7 @@ def test_ai_recommend_applies_default_soft_cooldown_penalty(
     assign_tags(db_session, normal, focus)
 
     fake = _install_provider(client.app)
-    fake.result = AiCompletionResult.ok(_intent_json(scenario=[focus.id]))
+    fake.result = AiCompletionResult.ok(_intent_json(scene=[focus.id]))
 
     response = client.post(
         "/api/ai/recommend",
@@ -411,7 +408,7 @@ def test_ai_recommend_excludes_not_today_track(
 ) -> None:
     """A track with a not_today feedback today must not appear in AI results."""
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
 
     not_today_track = create_track(db_session, user, "Not Today Track")
     assign_tags(db_session, not_today_track, focus)
@@ -432,7 +429,7 @@ def test_ai_recommend_excludes_not_today_track(
     db_session.commit()
 
     fake = _install_provider(client.app)
-    fake.result = AiCompletionResult.ok(_intent_json(scenario=[focus.id]))
+    fake.result = AiCompletionResult.ok(_intent_json(scene=[focus.id]))
 
     response = client.post(
         "/api/ai/recommend",
@@ -487,13 +484,13 @@ def test_ai_recommend_passes_limit_and_client(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     for i in range(5):
         t = create_track(db_session, user, f"Track {i}")
         assign_tags(db_session, t, focus)
 
     fake = _install_provider(client.app)
-    fake.result = AiCompletionResult.ok(_intent_json(scenario=[focus.id]))
+    fake.result = AiCompletionResult.ok(_intent_json(scene=[focus.id]))
 
     response = client.post(
         "/api/ai/recommend",
@@ -514,14 +511,14 @@ def test_ai_recommend_allows_optional_ai_explanation_in_parsed_intent(
 ) -> None:
     """AI helper explanation may appear in parsed_intent, not in per-result reason."""
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     track = create_track(db_session, user, "Explained")
     assign_tags(db_session, track, focus)
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
         _intent_json(
-            scenario=[focus.id],
+            scene=[focus.id],
             explanation="Focus is ideal for deep work sessions.",
         )
     )
@@ -537,7 +534,7 @@ def test_ai_recommend_allows_optional_ai_explanation_in_parsed_intent(
     # AI explanation in parsed_intent
     assert "deep work" in body["parsed_intent"]["explanation"].lower()
     # Result reason is Phase 5 deterministic text, not the AI explanation
-    assert "matched scenario tags: Focus" in body["results"][0]["reason"]
+    assert "matched scene tags: Focus" in body["results"][0]["reason"]
 
 
 def test_ai_recommend_handles_empty_text_rejection(

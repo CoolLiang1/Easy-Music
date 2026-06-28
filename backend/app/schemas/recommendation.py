@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.track import TrackResponse
 
@@ -9,11 +9,11 @@ CooldownMode = Literal["off", "soft", "strict"]
 
 
 class RecommendationRequest(BaseModel):
-    scenario_tag_ids: list[int] = Field(default_factory=list)
-    state_tag_ids: list[int] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    scene_tag_ids: list[int] = Field(default_factory=list)
     type_tag_ids: list[int] = Field(default_factory=list)
-    attribute_tag_ids: list[int] = Field(default_factory=list)
-    exclude_attribute_tag_ids: list[int] = Field(default_factory=list)
+    feature_tag_ids: list[int] = Field(default_factory=list)
     raw_text: str | None = Field(default=None, max_length=1000)
     cooldown_mode: CooldownMode = "soft"
     limit: int = Field(default=3, ge=1, le=10)

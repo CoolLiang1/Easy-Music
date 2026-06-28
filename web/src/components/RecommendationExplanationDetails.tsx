@@ -5,10 +5,9 @@ type RecommendationExplanationDetailsProps = {
 };
 
 const groupLabels: Record<string, string> = {
-  scenario: "场景匹配",
-  state: "状态匹配",
+  scene: "场景匹配",
   type: "类型匹配",
-  attribute: "属性匹配",
+  feature: "特点匹配",
 };
 
 export function RecommendationExplanationDetails({
@@ -129,7 +128,7 @@ function formatPart(part: { label: string; score_delta: number | null }) {
 
 function formatReasonSegment(segment: string) {
   const label = stripTrailingPeriod(segment);
-  const tagMatch = label.match(/^matched (scenario|state|type|attribute) tags?: (.+)$/);
+  const tagMatch = label.match(/^matched (scene|type|feature) tags?: (.+)$/);
   if (tagMatch) {
     return `${groupLabels[tagMatch[1]] ?? formatLabel(tagMatch[1])}：${tagMatch[2]}`;
   }
@@ -147,18 +146,6 @@ function formatExplanationLabel(label: string) {
   const playlistContext = normalized.match(/^playlist context boost: (.+)$/);
   if (playlistContext) {
     return `歌单名称/描述匹配：${playlistContext[1]}`;
-  }
-
-  const excludedAttribute = normalized.match(/^excluded attribute penalty: (.+)$/);
-  if (excludedAttribute) {
-    return `命中排除属性：${excludedAttribute[1]}`;
-  }
-
-  const matchedExcludedAttribute = normalized.match(
-    /^matched excluded attributes: (.+)$/,
-  );
-  if (matchedExcludedAttribute) {
-    return `规避属性命中：${matchedExcludedAttribute[1]}`;
   }
 
   const labels: Record<string, string> = {

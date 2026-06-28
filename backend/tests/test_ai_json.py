@@ -32,8 +32,8 @@ class _SimpleModel(BaseModel):
 
 
 class _TagModel(BaseModel):
-    scenario_tag_ids: list[int] = Field(default_factory=list)
-    state_tag_ids: list[int] = Field(default_factory=list)
+    scene_tag_ids: list[int] = Field(default_factory=list)
+    feature_tag_ids: list[int] = Field(default_factory=list)
     explanation: str | None = None
 
 
@@ -271,17 +271,17 @@ def test_parse_json_returns_error_for_malformed_json() -> None:
 
 def test_parse_json_validates_list_field_types() -> None:
     instance, error = parse_json_response(
-        '{"scenario_tag_ids": [1, 2, 3], "explanation": "ok"}',
+        '{"scene_tag_ids": [1, 2, 3], "explanation": "ok"}',
         _TagModel,
     )
     assert error is None
     assert instance is not None
-    assert instance.scenario_tag_ids == [1, 2, 3]
+    assert instance.scene_tag_ids == [1, 2, 3]
 
 
 def test_parse_json_rejects_wrong_list_item_type() -> None:
     instance, error = parse_json_response(
-        '{"scenario_tag_ids": ["not-an-int"], "explanation": "ok"}',
+        '{"scene_tag_ids": ["not-an-int"], "explanation": "ok"}',
         _TagModel,
     )
     assert instance is None

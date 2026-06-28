@@ -36,7 +36,7 @@ type SuggestState =
 // constants
 // ---------------------------------------------------------------------------
 
-const GROUP_ORDER: TagGroup[] = ["scenario", "state", "type", "attribute"];
+const GROUP_ORDER: TagGroup[] = ["scene", "type", "feature"];
 
 // ---------------------------------------------------------------------------
 // component

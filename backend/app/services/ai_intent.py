@@ -91,11 +91,9 @@ def parse_listening_intent(
 
     # 6. Build a RecommendationRequest for tag validation (reuses Phase 5 logic)
     structured_req = RecommendationRequest(
-        scenario_tag_ids=ai_output.scenario_tag_ids,
-        state_tag_ids=ai_output.state_tag_ids,
+        scene_tag_ids=ai_output.scene_tag_ids,
         type_tag_ids=ai_output.type_tag_ids,
-        attribute_tag_ids=ai_output.attribute_tag_ids,
-        exclude_attribute_tag_ids=ai_output.exclude_attribute_tag_ids,
+        feature_tag_ids=ai_output.feature_tag_ids,
         raw_text=text,
         limit=3,
         client=client,
@@ -187,10 +185,9 @@ def recommend_via_ai(
 # ---------------------------------------------------------------------------
 
 _TAG_GROUP_LABELS: dict[str, str] = {
-    "scenario": "scenario",
-    "state": "state",
+    "scene": "scene",
     "type": "type",
-    "attribute": "attribute",
+    "feature": "feature",
 }
 
 
@@ -223,10 +220,9 @@ def _build_matched_tags(
     """Build a dict of tag group → matched tag items for the response."""
     result: dict[str, list[MatchedTagItem]] = {}
     field_groups: list[tuple[str, str]] = [
-        ("scenario_tag_ids", "scenario"),
-        ("state_tag_ids", "state"),
+        ("scene_tag_ids", "scene"),
         ("type_tag_ids", "type"),
-        ("attribute_tag_ids", "attribute"),
+        ("feature_tag_ids", "feature"),
     ]
     for field_name, group in field_groups:
         tag_ids = _unique_ids(getattr(request, field_name))

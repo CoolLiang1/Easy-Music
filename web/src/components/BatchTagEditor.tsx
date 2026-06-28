@@ -18,7 +18,7 @@ export type BatchTagOperation = {
   tagIds: number[];
 };
 
-const tagGroups: TagGroup[] = ["scenario", "state", "type", "attribute"];
+const tagGroups: TagGroup[] = ["scene", "type", "feature"];
 
 export function BatchTagEditor({
   disabled = false,

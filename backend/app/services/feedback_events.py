@@ -17,10 +17,9 @@ from app.schemas.feedback_event import (
 
 
 TAG_CONTEXT_FIELDS = {
-    "scenario_tag_ids": "scenario",
-    "state_tag_ids": "state",
+    "scene_tag_ids": "scene",
     "type_tag_ids": "type",
-    "attribute_tag_ids": "attribute",
+    "feature_tag_ids": "feature",
 }
 TIRED_COOLDOWN_DAYS = 14
 
@@ -98,10 +97,9 @@ def sync_feedback_events(
                 track_id=event.track_id,
                 client_event_id=event.client_event_id,
                 feedback_type=event.feedback_type,
-                scenario_tag_ids=_unique_ids(event.scenario_tag_ids),
-                state_tag_ids=_unique_ids(event.state_tag_ids),
+                scene_tag_ids=_unique_ids(event.scene_tag_ids),
                 type_tag_ids=_unique_ids(event.type_tag_ids),
-                attribute_tag_ids=_unique_ids(event.attribute_tag_ids),
+                feature_tag_ids=_unique_ids(event.feature_tag_ids),
                 occurred_at=event.occurred_at,
                 client=event.client,
             ),

@@ -10,10 +10,9 @@ export type FeedbackEventPayload = {
   client_event_id?: string | null;
   track_id: number;
   feedback_type: FeedbackType;
-  scenario_tag_ids?: number[] | null;
-  state_tag_ids?: number[] | null;
+  scene_tag_ids?: number[] | null;
   type_tag_ids?: number[] | null;
-  attribute_tag_ids?: number[] | null;
+  feature_tag_ids?: number[] | null;
   occurred_at: string;
   client: string;
 };

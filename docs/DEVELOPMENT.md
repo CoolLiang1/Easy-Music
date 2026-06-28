@@ -197,10 +197,9 @@ Invoke-RestMethod `
         client_event_id = $feedbackEventId
         track_id = $trackId
         feedback_type = "not_today"
-        scenario_tag_ids = @()
-        state_tag_ids = @()
+        scene_tag_ids = @()
+        feature_tag_ids = @()
         type_tag_ids = @()
-        attribute_tag_ids = @()
         occurred_at = (Get-Date).ToUniversalTime().ToString("o")
         client = "android"
       }
@@ -224,11 +223,9 @@ Invoke-RestMethod `
   -Headers $headers `
   -ContentType "application/json" `
   -Body (@{
-    scenario_tag_ids = @($scenarioTagId)
-    state_tag_ids = @($stateTagId)
+    scene_tag_ids = @($sceneTagId)
+    feature_tag_ids = @($featureTagId)
     type_tag_ids = @($typeTagId)
-    attribute_tag_ids = @($attributeTagId)
-    exclude_attribute_tag_ids = @()
     raw_text = "night coding focus"
     cooldown_mode = "soft"
     limit = 3
@@ -587,8 +584,8 @@ backend:
 12. Visit `Recommendations` and confirm the read-only Recently Revived section
     loads quiet ready tracks, links to Track Detail, and does not auto-play,
     auto-cache, or modify feedback.
-13. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
-    `state`, `type`, `attribute`), rename it, change its group, and delete one
+13. Visit `Tags`, create a tag in one of the supported groups (`scene`,
+    `type`, `feature`), rename it, change its group, and delete one
     explicit tag.
 14. For a ready track, use the playback control from the library row or track
     detail page and confirm audio loads through the authenticated stream
@@ -889,7 +886,7 @@ architecture and Phase 4 cached playback source selection:
    ```
 
 5. In the Web console, create or reuse tags in the supported groups:
-   `scenario`, `state`, `type`, and `attribute`.
+   `scene`, `type`, and `feature`.
 6. Assign those tags to at least three ready tracks.
 7. Use the feedback and recommendation API smoke tests in
    `docs/API_MANUAL_TESTING.md` to verify `POST /api/feedback-events` and
@@ -941,8 +938,8 @@ playback, and Phase 4 cached playback source selection:
 3. Create or reuse the initial local user. If the database already has a user,
    keep using that account instead of creating another one.
 4. Upload and process enough audio files until at least three tracks are
-   `ready`, then assign structured tags in the `scenario`, `state`, `type`,
-   and `attribute` groups.
+   `ready`, then assign structured tags in the `scene`, `type`, and `feature`
+   groups.
 5. Configure development-only AI provider values if testing provider-ok
    behavior. Never commit a real key, production secret, or bearer token.
 6. Use the AI endpoint smoke tests in `docs/API_MANUAL_TESTING.md` to verify

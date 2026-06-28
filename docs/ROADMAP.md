@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-27:
+Status as of 2026-06-28:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -70,6 +70,10 @@ Status as of 2026-06-27:
   `like` and `dislike` feedback affect ranking, and owner-scoped playlist
   membership plus playlist name/description relevance are recommendation
   scoring signals.
+- V2.4 tag taxonomy simplification: Implemented. Supported tag groups are now
+  `scene`, `type`, and `feature`; old `scenario` maps to `scene`, old `state`
+  maps to `feature`, and old `attribute` tags plus track-tag links are removed
+  during migration.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
@@ -190,7 +194,7 @@ Status: Accepted.
 Goals:
 
 - Recommend from structured context
-- Support scenario, state, and type tags
+- Support scene, type, and feature tags
 - Penalize recent plays
 - Respect cooldown and not-today feedback
 - Return one primary result and two alternatives

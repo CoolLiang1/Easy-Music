@@ -945,10 +945,9 @@ Invoke-RestMethod `
         client_event_id = $feedbackEventId
         track_id = $trackId
         feedback_type = "not_today"
-        scenario_tag_ids = @()
-        state_tag_ids = @()
+        scene_tag_ids = @()
+        feature_tag_ids = @()
         type_tag_ids = @()
-        attribute_tag_ids = @()
         occurred_at = (Get-Date).ToUniversalTime().ToString("o")
         client = "android"
       }
@@ -959,7 +958,7 @@ Invoke-RestMethod `
 Supported `feedback_type` values are `like`, `dislike`, `tired`, `not_today`,
 `not_suitable_for_context`, and `skip_recommendation`. Context tag arrays are
 optional, but when present the tags must belong to the authenticated user and
-match their structured groups: `scenario`, `state`, `type`, and `attribute`.
+match their structured groups: `scene`, `type`, and `feature`.
 
 Expected result:
 
@@ -1015,11 +1014,9 @@ Invoke-RestMethod `
   -Headers $headers `
   -ContentType "application/json" `
   -Body (@{
-    scenario_tag_ids = @($scenarioTagId)
-    state_tag_ids = @($stateTagId)
+    scene_tag_ids = @($sceneTagId)
+    feature_tag_ids = @($featureTagId)
     type_tag_ids = @($typeTagId)
-    attribute_tag_ids = @($attributeTagId)
-    exclude_attribute_tag_ids = @()
     raw_text = "night coding focus"
     cooldown_mode = "soft"
     limit = 3
@@ -1028,8 +1025,8 @@ Invoke-RestMethod `
 ```
 
 All tag arrays are optional. When tag ids are provided, they must belong to the
-authenticated user and match their expected groups: `scenario`, `state`, `type`,
-`attribute`, and excluded `attribute`. Optional `raw_text` is a scoring hint for
+authenticated user and match their expected groups: `scene`, `type`, and
+`feature`. Optional `raw_text` is a scoring hint for
 playlist name/description relevance only; this endpoint does not parse it as a
 natural-language prompt. Optional `cooldown_mode` accepts `off`, `soft`, or
 `strict`; omitting it uses `soft`.
@@ -1087,10 +1084,9 @@ Before accepting Phase 5, verify the feedback and recommendation endpoints with
 one local user and at least three `ready` tracks that have structured tags.
 Create or reuse tags in each supported group:
 
-- `scenario`
-- `state`
+- `scene`
 - `type`
-- `attribute`
+- `feature`
 
 Assign the tags to at least three ready tracks, then run the feedback and
 recommendation requests above with real local ids:
@@ -1102,11 +1098,9 @@ $recommendation = Invoke-RestMethod `
   -Headers $headers `
   -ContentType "application/json" `
   -Body (@{
-    scenario_tag_ids = @($scenarioTagId)
-    state_tag_ids = @($stateTagId)
+    scene_tag_ids = @($sceneTagId)
+    feature_tag_ids = @($featureTagId)
     type_tag_ids = @($typeTagId)
-    attribute_tag_ids = @($attributeTagId)
-    exclude_attribute_tag_ids = @()
     limit = 3
     client = "web"
   } | ConvertTo-Json -Depth 4)
@@ -1131,10 +1125,9 @@ Invoke-RestMethod `
         client_event_id = $feedbackEventId
         track_id = $recommendedTrackId
         feedback_type = "not_suitable_for_context"
-        scenario_tag_ids = @($scenarioTagId)
-        state_tag_ids = @($stateTagId)
+        scene_tag_ids = @($sceneTagId)
+        feature_tag_ids = @($featureTagId)
         type_tag_ids = @($typeTagId)
-        attribute_tag_ids = @($attributeTagId)
         occurred_at = (Get-Date).ToUniversalTime().ToString("o")
         client = "web"
       }
@@ -1151,11 +1144,9 @@ Invoke-RestMethod `
   -Headers $headers `
   -ContentType "application/json" `
   -Body (@{
-    scenario_tag_ids = @($scenarioTagId)
-    state_tag_ids = @($stateTagId)
+    scene_tag_ids = @($sceneTagId)
+    feature_tag_ids = @($featureTagId)
     type_tag_ids = @($typeTagId)
-    attribute_tag_ids = @($attributeTagId)
-    exclude_attribute_tag_ids = @()
     limit = 3
     client = "web"
   } | ConvertTo-Json -Depth 4)
@@ -1188,7 +1179,7 @@ the endpoint returns a documented fallback empty structured request.
 
 ```powershell
 # Reuse the login flow and header setup from the Login section above.
-# Ensure at least one tag exists in each group (scenario, state, type, attribute)
+# Ensure at least one tag exists in each group (scene, type, feature)
 # for the authenticated user.
 
 Invoke-RestMethod `
@@ -1205,11 +1196,10 @@ Invoke-RestMethod `
 Expected result with a working provider:
 
 - `provider_status` is `ok`.
-- `structured_request` contains Phase 5-compatible `scenario_tag_ids`,
-  `state_tag_ids`, `type_tag_ids`, `attribute_tag_ids`,
-  `exclude_attribute_tag_ids`, `limit` (default 3), and `client`.
-- `matched_tags` is a dict keyed by tag group (`scenario`, `state`, `type`,
-  `attribute`), each value a list of `{id, name, group}` objects.
+- `structured_request` contains Phase 5-compatible `scene_tag_ids`,
+  `type_tag_ids`, `feature_tag_ids`, `limit`, and `client`.
+- `matched_tags` is a dict keyed by tag group (`scene`, `type`, `feature`),
+  each value a list of `{id, name, group}` objects.
 - `unmatched_terms` lists any words the AI could not map.
 - `explanation` provides a short human-readable mapping summary when available.
 
@@ -1275,7 +1265,7 @@ delegated to `POST /api/recommendations`.
 
 ```powershell
 # Prerequisites: logged-in user, at least three ready tracks tagged with
-# structured tags (scenario, state, type, attribute), and a working AI provider.
+# structured tags (scene, type, feature), and a working AI provider.
 
 Invoke-RestMethod `
   -Method Post `
@@ -1385,8 +1375,8 @@ Expected result with a working provider:
 
 - `track_id` matches the requested track.
 - `provider_status` is `ok`.
-- `existing_tag_suggestions` is a dict keyed by tag group (`scenario`,
-  `state`, `type`, `attribute`), each value a list of objects with `tag_id`,
+- `existing_tag_suggestions` is a dict keyed by tag group (`scene`, `type`,
+  `feature`), each value a list of objects with `tag_id`,
   `name`, `group`, `confidence`, and `reason`.
 - `new_tag_suggestions` is an empty list when not requested.
 - `explanation` provides a short human-readable summary when available.
@@ -1445,8 +1435,8 @@ Invoke-RestMethod `
 ## Phase 6 AI Assistant V1 Closure
 
 Before accepting Phase 6, verify the AI endpoints with one local user and at
-least three `ready` tracks that have structured tags in the `scenario`, `state`,
-`type`, and `attribute` groups.
+least three `ready` tracks that have structured tags in the `scene`, `type`,
+and `feature` groups.
 
 Run the disabled or unconfigured provider check first, without committing any
 real provider key:
@@ -1640,8 +1630,8 @@ Open the Vite URL in a browser, usually `http://127.0.0.1:8081/`, then verify:
    becomes `ready` after refresh or polling.
 6. Open the track detail page, edit metadata, save it, refresh, and confirm the
    saved values are still shown.
-7. Open `Tags`, create a tag using only `scenario`, `state`, `type`, or
-   `attribute`, rename it, change its group, and delete one explicit tag.
+7. Open `Tags`, create a tag using only `scene`, `type`, or `feature`, rename
+   it, change its group, and delete one explicit tag.
 8. On the track detail page, assign and remove existing tags, save, refresh, and
    confirm the associations persist.
 9. On a ready track, use the browser playback control from the library or detail

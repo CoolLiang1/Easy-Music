@@ -9,7 +9,7 @@ internal fun formatRecommendationExplanationForDisplay(
 ): String {
     val parts = linkedSetOf<String>()
 
-    listOf("scenario", "state", "type", "attribute").forEach { group ->
+    listOf("scene", "type", "feature").forEach { group ->
         val tags = explanation.matchedTags[group].orEmpty()
         if (tags.isNotEmpty()) {
             parts += "${tagGroupLabels[group] ?: group}：${tags.joinToString(", ") { it.name }}"
@@ -67,14 +67,6 @@ private fun formatExplanationLabel(label: String): String {
         return "歌单名称/描述匹配：${match.groupValues[1]}"
     }
 
-    excludedAttributeRegex.matchEntire(normalized)?.let { match ->
-        return "命中排除属性：${match.groupValues[1]}"
-    }
-
-    matchedExcludedAttributeRegex.matchEntire(normalized)?.let { match ->
-        return "规避属性命中：${match.groupValues[1]}"
-    }
-
     return explanationLabels[normalized] ?: normalized.replace(Regex("[_-]+"), " ")
 }
 
@@ -85,10 +77,9 @@ private fun formatScoreDelta(delta: Double): String =
     String.format(Locale.US, "%.2f", delta).replace(Regex("""\.?0+$"""), "")
 
 private val tagGroupLabels = mapOf(
-    "scenario" to "场景匹配",
-    "state" to "状态匹配",
+    "scene" to "场景匹配",
     "type" to "类型匹配",
-    "attribute" to "属性匹配",
+    "feature" to "特点匹配",
 )
 
 private val explanationLabels = mapOf(
@@ -103,8 +94,6 @@ private val explanationLabels = mapOf(
     "no requested tag matches" to "没有命中当前选择的标签",
 )
 
-private val tagMatchRegex = Regex("""^matched (scenario|state|type|attribute) tags?: (.+)$""")
+private val tagMatchRegex = Regex("""^matched (scene|type|feature) tags?: (.+)$""")
 private val playlistMembershipRegex = Regex("""^playlist membership boost: (.+)$""")
 private val playlistContextRegex = Regex("""^playlist context boost: (.+)$""")
-private val excludedAttributeRegex = Regex("""^excluded attribute penalty: (.+)$""")
-private val matchedExcludedAttributeRegex = Regex("""^matched excluded attributes: (.+)$""")

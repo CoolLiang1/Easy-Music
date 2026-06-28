@@ -458,7 +458,7 @@ class EasyMusicDatabaseTest {
         album = "Foundation",
         durationSeconds = 180,
         contentType = "music",
-        tagsSnapshotJson = """[{"id":1,"name":"focus","group":"scenario"}]""",
+        tagsSnapshotJson = """[{"id":1,"name":"focus","group":"scene"}]""",
         sourceUpdatedAt = "2026-05-28T09:00:00Z",
         localFilePath = localFilePath,
         byteSize = byteSize,

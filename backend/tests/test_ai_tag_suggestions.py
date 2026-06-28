@@ -218,7 +218,7 @@ def test_suggest_tags_returns_error_for_unowned_track(
         headers=auth_headers(owner),
     )
 
-    # Track belongs to another user — error status in response
+    # Track belongs to another user - error status in response
     assert response.status_code == 200
     body = response.json()
     assert body["provider_status"] == "error"
@@ -316,15 +316,14 @@ def test_suggest_tags_maps_existing_tags_with_correct_groups(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user, "Piano Study", artist="Classical Composer")
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    calm = create_tag(db_session, user, "state", "Calm")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
     instrumental = create_tag(db_session, user, "type", "Instrumental")
-    piano = create_tag(db_session, user, "attribute", "Piano")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
         _suggestion_json(
-            existing_tag_ids=[focus.id, calm.id, instrumental.id, piano.id],
+            existing_tag_ids=[focus.id, calm.id, instrumental.id],
             explanation="Matched based on title and artist.",
         )
     )
@@ -342,14 +341,12 @@ def test_suggest_tags_maps_existing_tags_with_correct_groups(
     assert body["explanation"] == "Matched based on title and artist."
 
     existing = body["existing_tag_suggestions"]
-    assert "scenario" in existing
-    assert "state" in existing
+    assert "scene" in existing
+    assert "feature" in existing
     assert "type" in existing
-    assert "attribute" in existing
-    assert existing["scenario"][0]["name"] == "Focus"
-    assert existing["scenario"][0]["tag_id"] == focus.id
-    assert existing["state"][0]["name"] == "Calm"
-    assert existing["attribute"][0]["name"] == "Piano"
+    assert existing["scene"][0]["name"] == "Focus"
+    assert existing["scene"][0]["tag_id"] == focus.id
+    assert existing["feature"][0]["name"] == "Calm"
 
 
 # ---------------------------------------------------------------------------
@@ -363,10 +360,10 @@ def test_suggest_tags_rejects_invented_tag_id(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user, "Track")
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
 
     fake = _install_provider(client.app)
-    # AI returns a legit id AND an invented one — invented is silently dropped
+    # AI returns a legit id AND an invented one - invented is silently dropped
     fake.result = AiCompletionResult.ok(
         _suggestion_json(existing_tag_ids=[focus.id, 99999])
     )
@@ -382,8 +379,8 @@ def test_suggest_tags_rejects_invented_tag_id(
     assert body["provider_status"] == "ok"
     existing = body["existing_tag_suggestions"]
     # Only the valid tag appears
-    assert len(existing.get("scenario", [])) == 1
-    assert existing["scenario"][0]["tag_id"] == focus.id
+    assert len(existing.get("scene", [])) == 1
+    assert existing["scene"][0]["tag_id"] == focus.id
 
 
 def test_suggest_tags_rejects_another_users_tag_id(
@@ -393,7 +390,7 @@ def test_suggest_tags_rejects_another_users_tag_id(
     owner = create_user(db_session)
     other = create_user(db_session, username="other")
     track = create_track(db_session, owner, "Owner Track")
-    other_tag = create_tag(db_session, other, "scenario", "Stolen")
+    other_tag = create_tag(db_session, other, "scene", "Stolen")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
@@ -424,8 +421,8 @@ def test_suggest_tags_does_not_create_tags(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user, "Track")
-    # Only one tag exists — AI suggests it plus a new tag name
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    # Only one tag exists - AI suggests it plus a new tag name
+    focus = create_tag(db_session, user, "scene", "Focus")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
@@ -434,7 +431,7 @@ def test_suggest_tags_does_not_create_tags(
             new_tags=[
                 {
                     "name": "Meditation",
-                    "group": "scenario",
+                    "group": "scene",
                     "confidence": 0.8,
                     "reason": "Track title suggests meditation.",
                 }
@@ -472,8 +469,8 @@ def test_suggest_tags_does_not_assign_tags_to_track(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user, "Track")
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    calm = create_tag(db_session, user, "state", "Calm")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
@@ -506,7 +503,7 @@ def test_suggest_tags_includes_new_tag_suggestions_when_requested(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user, "Sunset Vibes", artist="Chill Artist")
-    chill = create_tag(db_session, user, "state", "Chill")
+    chill = create_tag(db_session, user, "feature", "Chill")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
@@ -515,7 +512,7 @@ def test_suggest_tags_includes_new_tag_suggestions_when_requested(
             new_tags=[
                 {
                     "name": "Sunset",
-                    "group": "scenario",
+                    "group": "scene",
                     "confidence": 0.9,
                     "reason": "Title strongly suggests sunset mood.",
                 },
@@ -551,7 +548,7 @@ def test_suggest_tags_excludes_new_tags_when_not_requested(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user, "Track")
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
 
     fake = _install_provider(client.app)
     # AI returns new tag suggestions but include_new_tag_suggestions is False
@@ -559,7 +556,7 @@ def test_suggest_tags_excludes_new_tags_when_not_requested(
         _suggestion_json(
             existing_tag_ids=[focus.id],
             new_tags=[
-                {"name": "New", "group": "scenario", "confidence": 0.5, "reason": ""}
+                {"name": "New", "group": "scene", "confidence": 0.5, "reason": ""}
             ],
         )
     )
@@ -595,7 +592,7 @@ def test_suggest_tags_prompt_includes_track_metadata(
         content_type="song",
         original_file_path="media/originals/test.mp3",
     )
-    create_tag(db_session, user, "scenario", "Focus")
+    create_tag(db_session, user, "scene", "Focus")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(_suggestion_json())
@@ -621,8 +618,8 @@ def test_suggest_tags_prompt_includes_tag_catalogue(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user, "Track")
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    calm = create_tag(db_session, user, "state", "Calm")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(_suggestion_json())
@@ -636,8 +633,8 @@ def test_suggest_tags_prompt_includes_tag_catalogue(
     user_msg = fake.calls[0].messages[1]["content"]
     assert f"id:{focus.id} Focus" in user_msg
     assert f"id:{calm.id} Calm" in user_msg
-    assert "[scenario]" in user_msg
-    assert "[state]" in user_msg
+    assert "[scene]" in user_msg
+    assert "[feature]" in user_msg
 
 
 def test_suggest_tags_uses_larger_completion_budget(

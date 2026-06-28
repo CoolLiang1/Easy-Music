@@ -2,9 +2,10 @@
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.recommendation import RecommendationRequest, RecommendationResult
+from app.schemas.tag import TagGroup
 
 
 class AiProviderStatus(str, Enum):
@@ -104,11 +105,11 @@ class AiIntentOutput(BaseModel):
     Every tag id must come from the tag catalogue supplied in the prompt.
     """
 
-    scenario_tag_ids: list[int] = Field(default_factory=list)
-    state_tag_ids: list[int] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    scene_tag_ids: list[int] = Field(default_factory=list)
     type_tag_ids: list[int] = Field(default_factory=list)
-    attribute_tag_ids: list[int] = Field(default_factory=list)
-    exclude_attribute_tag_ids: list[int] = Field(default_factory=list)
+    feature_tag_ids: list[int] = Field(default_factory=list)
     unmatched_terms: list[str] = Field(default_factory=list)
     explanation: str | None = None
 
@@ -118,7 +119,7 @@ class MatchedTagItem(BaseModel):
 
     id: int
     name: str
-    group: str
+    group: TagGroup
 
 
 class ParsedIntentResponse(BaseModel):
@@ -184,7 +185,7 @@ class ExistingTagSuggestion(BaseModel):
 
     tag_id: int
     name: str
-    group: str
+    group: TagGroup
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     reason: str = ""
 
@@ -192,8 +193,10 @@ class ExistingTagSuggestion(BaseModel):
 class NewTagSuggestion(BaseModel):
     """A suggested new tag name — returned as a suggestion only, never created."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str
-    group: str
+    group: TagGroup
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     reason: str = ""
 
@@ -205,6 +208,8 @@ class AiTagSuggestionOutput(BaseModel):
     ``new_tag_suggestions`` are suggestions only — the endpoint never creates
     or binds them automatically.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     existing_tag_ids: list[int] = Field(default_factory=list)
     new_tag_suggestions: list[NewTagSuggestion] = Field(default_factory=list)

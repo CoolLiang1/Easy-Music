@@ -25,11 +25,9 @@ import kotlinx.coroutines.withContext
 
 data class RecommendationHomeUiState(
     val groupedTags: RecommendationTagGroups = RecommendationTagGroups(),
-    val selectedScenarioTagIds: Set<Int> = emptySet(),
-    val selectedStateTagIds: Set<Int> = emptySet(),
+    val selectedSceneTagIds: Set<Int> = emptySet(),
     val selectedTypeTagIds: Set<Int> = emptySet(),
-    val desiredAttributeTagIds: Set<Int> = emptySet(),
-    val excludedAttributeTagIds: Set<Int> = emptySet(),
+    val selectedFeatureTagIds: Set<Int> = emptySet(),
     val isLoadingTags: Boolean = true,
     val isRequestingRecommendations: Boolean = false,
     val tagErrorMessage: String? = null,
@@ -44,11 +42,9 @@ data class RecommendationHomeUiState(
         get() = groupedTags.allTags.isNotEmpty()
 
     val selectedContextCount: Int
-        get() = selectedScenarioTagIds.size +
-            selectedStateTagIds.size +
+        get() = selectedSceneTagIds.size +
             selectedTypeTagIds.size +
-            desiredAttributeTagIds.size +
-            excludedAttributeTagIds.size
+            selectedFeatureTagIds.size
 }
 
 data class RecommendationFeedbackUiState(
@@ -58,13 +54,12 @@ data class RecommendationFeedbackUiState(
 )
 
 data class RecommendationTagGroups(
-    val scenarios: List<TagResponse> = emptyList(),
-    val states: List<TagResponse> = emptyList(),
+    val scenes: List<TagResponse> = emptyList(),
     val types: List<TagResponse> = emptyList(),
-    val attributes: List<TagResponse> = emptyList(),
+    val features: List<TagResponse> = emptyList(),
 ) {
     val allTags: List<TagResponse>
-        get() = scenarios + states + types + attributes
+        get() = scenes + types + features
 }
 
 data class AiRecommendationUiState(
@@ -100,19 +95,9 @@ class RecommendationHomeViewModel(
         loadTags(isNetworkAvailable)
     }
 
-    fun toggleScenario(tagId: Int) {
+    fun toggleScene(tagId: Int) {
         uiState = uiState.copy(
-            selectedScenarioTagIds = uiState.selectedScenarioTagIds.toggled(tagId),
-            recommendationMessage = null,
-            recommendationErrorMessage = null,
-            recommendationResults = emptyList(),
-            feedbackStates = emptyMap(),
-        )
-    }
-
-    fun toggleState(tagId: Int) {
-        uiState = uiState.copy(
-            selectedStateTagIds = uiState.selectedStateTagIds.toggled(tagId),
+            selectedSceneTagIds = uiState.selectedSceneTagIds.toggled(tagId),
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
@@ -130,21 +115,9 @@ class RecommendationHomeViewModel(
         )
     }
 
-    fun toggleDesiredAttribute(tagId: Int) {
+    fun toggleFeature(tagId: Int) {
         uiState = uiState.copy(
-            desiredAttributeTagIds = uiState.desiredAttributeTagIds.toggled(tagId),
-            excludedAttributeTagIds = uiState.excludedAttributeTagIds - tagId,
-            recommendationMessage = null,
-            recommendationErrorMessage = null,
-            recommendationResults = emptyList(),
-            feedbackStates = emptyMap(),
-        )
-    }
-
-    fun toggleExcludedAttribute(tagId: Int) {
-        uiState = uiState.copy(
-            excludedAttributeTagIds = uiState.excludedAttributeTagIds.toggled(tagId),
-            desiredAttributeTagIds = uiState.desiredAttributeTagIds - tagId,
+            selectedFeatureTagIds = uiState.selectedFeatureTagIds.toggled(tagId),
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
@@ -154,11 +127,9 @@ class RecommendationHomeViewModel(
 
     fun clearSelections() {
         uiState = uiState.copy(
-            selectedScenarioTagIds = emptySet(),
-            selectedStateTagIds = emptySet(),
+            selectedSceneTagIds = emptySet(),
             selectedTypeTagIds = emptySet(),
-            desiredAttributeTagIds = emptySet(),
-            excludedAttributeTagIds = emptySet(),
+            selectedFeatureTagIds = emptySet(),
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
@@ -360,10 +331,9 @@ class RecommendationHomeViewModel(
             clientEventId = UUID.randomUUID().toString(),
             trackId = trackId,
             feedbackType = feedbackType,
-            scenarioTagIds = parsedRequest?.scenarioTagIds ?: emptyList(),
-            stateTagIds = parsedRequest?.stateTagIds ?: emptyList(),
+            sceneTagIds = parsedRequest?.sceneTagIds ?: emptyList(),
             typeTagIds = parsedRequest?.typeTagIds ?: emptyList(),
-            attributeTagIds = parsedRequest?.attributeTagIds ?: emptyList(),
+            featureTagIds = parsedRequest?.featureTagIds ?: emptyList(),
             occurredAt = Instant.now().toString(),
         )
 
@@ -589,11 +559,9 @@ private fun RecommendationHomeUiState.withFeedbackState(
 
 private fun RecommendationHomeUiState.toRecommendationRequest(): RecommendationRequest =
     RecommendationRequest(
-        scenarioTagIds = selectedScenarioTagIds.sorted(),
-        stateTagIds = selectedStateTagIds.sorted(),
+        sceneTagIds = selectedSceneTagIds.sorted(),
         typeTagIds = selectedTypeTagIds.sorted(),
-        attributeTagIds = desiredAttributeTagIds.sorted(),
-        excludeAttributeTagIds = excludedAttributeTagIds.sorted(),
+        featureTagIds = selectedFeatureTagIds.sorted(),
     )
 
 private fun RecommendationHomeUiState.toFeedbackEventRequest(
@@ -604,19 +572,17 @@ private fun RecommendationHomeUiState.toFeedbackEventRequest(
         clientEventId = UUID.randomUUID().toString(),
         trackId = trackId,
         feedbackType = feedbackType,
-        scenarioTagIds = selectedScenarioTagIds.sorted(),
-        stateTagIds = selectedStateTagIds.sorted(),
+        sceneTagIds = selectedSceneTagIds.sorted(),
         typeTagIds = selectedTypeTagIds.sorted(),
-        attributeTagIds = desiredAttributeTagIds.sorted(),
+        featureTagIds = selectedFeatureTagIds.sorted(),
         occurredAt = Instant.now().toString(),
     )
 
 private fun List<TagResponse>.toRecommendationTagGroups(): RecommendationTagGroups =
     RecommendationTagGroups(
-        scenarios = filterGroup("scenario"),
-        states = filterGroup("state"),
+        scenes = filterGroup("scene"),
         types = filterGroup("type"),
-        attributes = filterGroup("attribute"),
+        features = filterGroup("feature"),
     )
 
 private fun List<TagResponse>.filterGroup(group: String): List<TagResponse> =

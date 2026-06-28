@@ -1,4 +1,4 @@
-export type TagGroup = "scenario" | "state" | "type" | "attribute";
+export type TagGroup = "scene" | "type" | "feature";
 
 export type Tag = {
   id: number;

@@ -11,8 +11,8 @@ class RecommendationReasonFormatterTest {
     fun formatsStructuredExplanationForDisplay() {
         val explanation = RecommendationExplanation(
             matchedTags = mapOf(
-                "scenario" to listOf(
-                    RecommendationExplanationTag(id = 1, name = "focus", group = "scenario"),
+                "scene" to listOf(
+                    RecommendationExplanationTag(id = 1, name = "focus", group = "scene"),
                 ),
             ),
             boosts = listOf(
@@ -45,7 +45,7 @@ class RecommendationReasonFormatterTest {
     @Test
     fun formatsPlaylistBoostsForDisplay() {
         val formatted = formatRecommendationReasonForDisplay(
-            "matched scenario tags: focus; playlist membership boost: Work Mix; playlist context boost: Focus Flow.",
+            "matched scene tags: focus; playlist membership boost: Work Mix; playlist context boost: Focus Flow.",
         )
 
         assertEquals(

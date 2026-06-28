@@ -138,7 +138,7 @@ def add_feedback_event(
 
 
 def assign_tag(db_session: Session, user: User, track: Track) -> None:
-    tag = Tag(user_id=user.id, name="Focus", group="scenario")
+    tag = Tag(user_id=user.id, name="Focus", group="scene")
     db_session.add(tag)
     db_session.commit()
     db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))

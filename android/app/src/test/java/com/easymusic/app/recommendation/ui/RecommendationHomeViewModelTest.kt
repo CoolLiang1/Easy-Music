@@ -38,7 +38,7 @@ class RecommendationHomeViewModelTest {
     }
 
     // -----------------------------------------------------------------------
-    // requestAiRecommendation — empty text
+    // requestAiRecommendation - empty text
     // -----------------------------------------------------------------------
 
     @Test
@@ -68,7 +68,7 @@ class RecommendationHomeViewModelTest {
     }
 
     // -----------------------------------------------------------------------
-    // requestAiRecommendation — offline
+    // requestAiRecommendation - offline
     // -----------------------------------------------------------------------
 
     @Test
@@ -94,11 +94,9 @@ class RecommendationHomeViewModelTest {
     @Test
     fun aiParsedContextHoldsStructuredRequestForFeedbackContext() {
         val structuredRequest = RecommendationRequest(
-            scenarioTagIds = listOf(1),
-            stateTagIds = listOf(2),
+            sceneTagIds = listOf(1),
+            featureTagIds = listOf(2),
             typeTagIds = listOf(3),
-            attributeTagIds = listOf(4),
-            excludeAttributeTagIds = listOf(5),
         )
         val context = AiParsedContext(
             structuredRequest = structuredRequest,
@@ -106,11 +104,9 @@ class RecommendationHomeViewModelTest {
             unmatchedTerms = listOf("unknown"),
         )
 
-        assertEquals(listOf(1), context.structuredRequest?.scenarioTagIds)
-        assertEquals(listOf(2), context.structuredRequest?.stateTagIds)
+        assertEquals(listOf(1), context.structuredRequest?.sceneTagIds)
+        assertEquals(listOf(2), context.structuredRequest?.featureTagIds)
         assertEquals(listOf(3), context.structuredRequest?.typeTagIds)
-        assertEquals(listOf(4), context.structuredRequest?.attributeTagIds)
-        assertEquals(listOf(5), context.structuredRequest?.excludeAttributeTagIds)
         assertEquals("Test explanation", context.explanation)
         assertEquals(listOf("unknown"), context.unmatchedTerms)
     }
@@ -218,11 +214,9 @@ class RecommendationHomeViewModelTest {
                             """
                             {
                               "structured_request": {
-                                "scenario_tag_ids": [],
-                                "state_tag_ids": [],
+                                "scene_tag_ids": [],
+                                "feature_tag_ids": [],
                                 "type_tag_ids": [],
-                                "attribute_tag_ids": [],
-                                "exclude_attribute_tag_ids": [],
                                 "limit": 3,
                                 "client": null
                               },
@@ -247,11 +241,9 @@ class RecommendationHomeViewModelTest {
                                 """
                                 {
                                   "structured_request": {
-                                    "scenario_tag_ids": [],
-                                    "state_tag_ids": [],
+                                    "scene_tag_ids": [],
+                                    "feature_tag_ids": [],
                                     "type_tag_ids": [],
-                                    "attribute_tag_ids": [],
-                                    "exclude_attribute_tag_ids": [],
                                     "limit": 3,
                                     "client": null
                                   },

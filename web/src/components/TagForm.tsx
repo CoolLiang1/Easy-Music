@@ -18,12 +18,7 @@ type FormState = {
   name: string;
 };
 
-export const tagGroups: TagGroup[] = [
-  "scenario",
-  "state",
-  "type",
-  "attribute",
-];
+export const tagGroups: TagGroup[] = ["scene", "type", "feature"];
 
 export function TagForm({
   disabled = false,
@@ -157,7 +152,7 @@ export function TagForm({
 
 function buildFormState(tag?: Tag): FormState {
   return {
-    group: tag?.group ?? "scenario",
+    group: tag?.group ?? "scene",
     name: tag?.name ?? "",
   };
 }

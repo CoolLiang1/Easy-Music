@@ -81,11 +81,9 @@ fun RecommendationHomeRoute(
         uiState = viewModel.uiState,
         isNetworkAvailable = isNetworkAvailable,
         onRefreshTags = { viewModel.refreshTags(isNetworkAvailable) },
-        onToggleScenario = viewModel::toggleScenario,
-        onToggleState = viewModel::toggleState,
+        onToggleScene = viewModel::toggleScene,
+        onToggleFeature = viewModel::toggleFeature,
         onToggleType = viewModel::toggleType,
-        onToggleDesiredAttribute = viewModel::toggleDesiredAttribute,
-        onToggleExcludedAttribute = viewModel::toggleExcludedAttribute,
         onClearSelections = viewModel::clearSelections,
         onRequestRecommendations = { viewModel.requestRecommendations(isNetworkAvailable) },
         onAiTextChanged = viewModel::updateAiText,
@@ -112,11 +110,9 @@ fun RecommendationHomeRoute(
 fun RecommendationHomeScreen(
     uiState: RecommendationHomeUiState,
     onRefreshTags: () -> Unit,
-    onToggleScenario: (Int) -> Unit,
-    onToggleState: (Int) -> Unit,
+    onToggleScene: (Int) -> Unit,
+    onToggleFeature: (Int) -> Unit,
     onToggleType: (Int) -> Unit,
-    onToggleDesiredAttribute: (Int) -> Unit,
-    onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
     onAiTextChanged: (String) -> Unit,
@@ -155,11 +151,9 @@ fun RecommendationHomeScreen(
             else -> RecommendationControls(
                 uiState = uiState,
                 isNetworkAvailable = isNetworkAvailable,
-                onToggleScenario = onToggleScenario,
-                onToggleState = onToggleState,
+                onToggleScene = onToggleScene,
+                onToggleFeature = onToggleFeature,
                 onToggleType = onToggleType,
-                onToggleDesiredAttribute = onToggleDesiredAttribute,
-                onToggleExcludedAttribute = onToggleExcludedAttribute,
                 onClearSelections = onClearSelections,
                 onRequestRecommendations = onRequestRecommendations,
                 onAiTextChanged = onAiTextChanged,
@@ -235,7 +229,7 @@ private fun RecommendationEmptyTags(onRefreshTags: () -> Unit) {
         )
         Text(
             modifier = Modifier.padding(top = 8.dp),
-            text = "请先在 Web 控制台创建场景、状态、类型或属性标签，然后重新加载。",
+            text = "请先在 Web 控制台创建场景、类型或特点标签，然后重新加载。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -286,11 +280,9 @@ private fun RecommendationError(
 private fun RecommendationControls(
     uiState: RecommendationHomeUiState,
     isNetworkAvailable: Boolean,
-    onToggleScenario: (Int) -> Unit,
-    onToggleState: (Int) -> Unit,
+    onToggleScene: (Int) -> Unit,
+    onToggleFeature: (Int) -> Unit,
     onToggleType: (Int) -> Unit,
-    onToggleDesiredAttribute: (Int) -> Unit,
-    onToggleExcludedAttribute: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
     onAiTextChanged: (String) -> Unit,
@@ -319,17 +311,17 @@ private fun RecommendationControls(
         // ── Structured Tag Controls (unchanged) ───────────────────────
         TagSection(
             title = "场景",
-            tags = uiState.groupedTags.scenarios,
-            selectedTagIds = uiState.selectedScenarioTagIds,
+            tags = uiState.groupedTags.scenes,
+            selectedTagIds = uiState.selectedSceneTagIds,
             emptyText = "暂无场景标签",
-            onToggleTag = onToggleScenario,
+            onToggleTag = onToggleScene,
         )
         TagSection(
-            title = "状态",
-            tags = uiState.groupedTags.states,
-            selectedTagIds = uiState.selectedStateTagIds,
-            emptyText = "暂无状态标签",
-            onToggleTag = onToggleState,
+            title = "特点",
+            tags = uiState.groupedTags.features,
+            selectedTagIds = uiState.selectedFeatureTagIds,
+            emptyText = "暂无特点标签",
+            onToggleTag = onToggleFeature,
         )
         TagSection(
             title = "类型",
@@ -337,13 +329,6 @@ private fun RecommendationControls(
             selectedTagIds = uiState.selectedTypeTagIds,
             emptyText = "暂无类型标签",
             onToggleTag = onToggleType,
-        )
-        AttributeSection(
-            tags = uiState.groupedTags.attributes,
-            desiredTagIds = uiState.desiredAttributeTagIds,
-            excludedTagIds = uiState.excludedAttributeTagIds,
-            onToggleDesired = onToggleDesiredAttribute,
-            onToggleExcluded = onToggleExcludedAttribute,
         )
 
         RecommendationStatus(uiState = uiState)
@@ -815,12 +800,11 @@ private fun AiParsedContextSection(context: AiParsedContext) {
         }
 
         // Matched tags by group
-        val groupOrder = listOf("scenario", "state", "type", "attribute")
+        val groupOrder = listOf("scene", "type", "feature")
         val groupLabels = mapOf(
-            "scenario" to "场景",
-            "state" to "状态",
+            "scene" to "场景",
             "type" to "类型",
-            "attribute" to "属性",
+            "feature" to "特点",
         )
 
         FlowRow(
@@ -928,71 +912,6 @@ private fun TrackResponse.artistAlbumLabel(): String =
 
 private fun Double.formatScore(): String =
     String.format(Locale.US, "%.1f", this)
-
-@Composable
-private fun AttributeSection(
-    tags: List<TagResponse>,
-    desiredTagIds: Set<Int>,
-    excludedTagIds: Set<Int>,
-    onToggleDesired: (Int) -> Unit,
-    onToggleExcluded: (Int) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = "属性",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (tags.isEmpty()) {
-            Text(
-                text = "暂无属性标签",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return
-        }
-        AttributeChipRow(
-            title = "期望",
-            tags = tags,
-            selectedTagIds = desiredTagIds,
-            onToggleTag = onToggleDesired,
-        )
-        AttributeChipRow(
-            title = "排除",
-            tags = tags,
-            selectedTagIds = excludedTagIds,
-            onToggleTag = onToggleExcluded,
-        )
-    }
-}
-
-@Composable
-private fun AttributeChipRow(
-    title: String,
-    tags: List<TagResponse>,
-    selectedTagIds: Set<Int>,
-    onToggleTag: (Int) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            tags.forEach { tag ->
-                FilterChip(
-                    selected = tag.id in selectedTagIds,
-                    onClick = { onToggleTag(tag.id) },
-                    label = { Text(tag.name) },
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun RecommendationStatus(uiState: RecommendationHomeUiState) {

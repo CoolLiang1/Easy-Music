@@ -27,10 +27,9 @@ class FeedbackEvent(Base):
     )
     client_event_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     feedback_type: Mapped[str] = mapped_column(String(50))
-    scenario_tag_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
-    state_tag_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
+    scene_tag_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     type_tag_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
-    attribute_tag_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
+    feature_tag_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     client: Mapped[str] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(

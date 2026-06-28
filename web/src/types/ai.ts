@@ -1,4 +1,5 @@
 import type { RecommendationRequest, RecommendationResult } from "./recommendation";
+import type { TagGroup } from "./tag";
 
 // ---------------------------------------------------------------------------
 // provider status
@@ -19,7 +20,7 @@ export type ParseListeningIntentRequest = {
 export type MatchedTagItem = {
   id: number;
   name: string;
-  group: string;
+  group: TagGroup;
 };
 
 export type ParsedIntentResponse = {
@@ -59,14 +60,14 @@ export type TagSuggestionRequest = {
 export type ExistingTagSuggestion = {
   tag_id: number;
   name: string;
-  group: string;
+  group: TagGroup;
   confidence: number;
   reason: string;
 };
 
 export type NewTagSuggestion = {
   name: string;
-  group: string;
+  group: TagGroup;
   confidence: number;
   reason: string;
 };

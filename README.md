@@ -93,6 +93,10 @@ Current documented progress:
   available, `not_today` remains a same-day hard exclusion, liked/dislike
   feedback affects scoring, and owner-scoped playlist membership plus playlist
   name/description relevance can boost tracks.
+- V2.4 tag taxonomy simplification: implemented. Tag groups are now `scene`,
+  `type`, and `feature`; old `scenario` and `state` categories migrate to
+  `scene` and `feature`, while old `attribute` tags and their track-tag links
+  are removed.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.

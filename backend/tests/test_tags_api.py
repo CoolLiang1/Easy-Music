@@ -54,7 +54,7 @@ def auth_headers(user: User) -> dict[str, str]:
 
 
 def create_tag(db_session: Session, user: User, name: str = "Focus") -> Tag:
-    tag = Tag(user_id=user.id, name=name, group="scenario")
+    tag = Tag(user_id=user.id, name=name, group="scene")
     db_session.add(tag)
     db_session.commit()
     db_session.refresh(tag)
@@ -66,14 +66,14 @@ def test_create_tag(client: TestClient, db_session: Session) -> None:
 
     response = client.post(
         "/api/tags",
-        json={"name": "Focus", "group": "scenario"},
+        json={"name": "Focus", "group": "scene"},
         headers=auth_headers(user),
     )
 
     assert response.status_code == 201
     body = response.json()
     assert body["name"] == "Focus"
-    assert body["group"] == "scenario"
+    assert body["group"] == "scene"
     assert body["id"]
     assert body["created_at"]
 
@@ -99,13 +99,13 @@ def test_update_tag(client: TestClient, db_session: Session) -> None:
 
     response = client.patch(
         f"/api/tags/{tag.id}",
-        json={"name": "Morning", "group": "state"},
+        json={"name": "Morning", "group": "feature"},
         headers=auth_headers(user),
     )
 
     assert response.status_code == 200
     assert response.json()["name"] == "Morning"
-    assert response.json()["group"] == "state"
+    assert response.json()["group"] == "feature"
 
 
 def test_delete_tag(client: TestClient, db_session: Session) -> None:
@@ -154,6 +154,25 @@ def test_tag_group_is_limited(
     response = getattr(client, method)(
         url,
         json={"name": "Invalid", "group": "mood"},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("method", ["post", "patch"])
+def test_attribute_group_is_not_accepted(
+    client: TestClient,
+    db_session: Session,
+    method: str,
+) -> None:
+    user = create_user(db_session)
+    tag = create_tag(db_session, user)
+    url = "/api/tags" if method == "post" else f"/api/tags/{tag.id}"
+
+    response = getattr(client, method)(
+        url,
+        json={"name": "Piano", "group": "attribute"},
         headers=auth_headers(user),
     )
 

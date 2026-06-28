@@ -35,13 +35,12 @@ type FeedbackState = {
 // constants
 // ---------------------------------------------------------------------------
 
-const TAG_GROUP_ORDER: TagGroup[] = ["scenario", "state", "type", "attribute"];
+const TAG_GROUP_ORDER: TagGroup[] = ["scene", "type", "feature"];
 
 const GROUP_LABELS: Record<TagGroup, string> = {
-  scenario: "场景",
-  state: "状态",
+  scene: "场景",
   type: "类型",
-  attribute: "期望属性",
+  feature: "特点",
 };
 
 const feedbackActions: Array<{
@@ -125,10 +124,9 @@ export function AiAssistantPage() {
               client_event_id: createClientEventId(),
               feedback_type: feedbackType,
               occurred_at: new Date().toISOString(),
-              scenario_tag_ids: structuredRequest.scenario_tag_ids,
-              state_tag_ids: structuredRequest.state_tag_ids,
+              scene_tag_ids: structuredRequest.scene_tag_ids,
               type_tag_ids: structuredRequest.type_tag_ids,
-              attribute_tag_ids: structuredRequest.attribute_tag_ids,
+              feature_tag_ids: structuredRequest.feature_tag_ids,
               track_id: result.track.id,
             },
           ],
@@ -276,7 +274,7 @@ function AiReadyContent({
       {results.length === 0 ? (
         <div className="empty-state">
           没有返回推荐。可能还没有可播放音轨，或所有可播放音轨都被冷却、
-          反馈、排除属性等规则过滤了。
+          反馈等规则过滤了。
         </div>
       ) : (
         <div className="recommendation-results">
@@ -349,28 +347,6 @@ function ParsedIntentSection({ parsed }: { parsed: AiRecommendResponse["parsed_i
           </div>
         );
       })}
-
-      {/* excluded attributes */}
-      <div className="recommendation-card">
-        <h2>排除属性</h2>
-        {parsed.structured_request.exclude_attribute_tag_ids &&
-        parsed.structured_request.exclude_attribute_tag_ids.length > 0 ? (
-          <div className="tag-chip-list">
-            {parsed.structured_request.exclude_attribute_tag_ids.map((id) => {
-              const tag = Object.values(matched)
-                .flat()
-                .find((t) => t.id === id);
-              return (
-                <span className="tag-chip readonly excluded" key={id}>
-                  {tag?.name ?? `#${id}`}
-                </span>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="recommendation-muted">未排除</p>
-        )}
-      </div>
 
       {/* unmatched terms */}
       {unmatched.length > 0 ? (

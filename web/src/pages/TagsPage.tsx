@@ -153,7 +153,7 @@ export function TagsPage() {
           <p className="eyebrow">标签</p>
           <h1 id="tags-title">标签管理</h1>
           <p className="page-copy">
-            管理用于编辑和推荐的场景、状态、类型和属性标签。
+            管理用于编辑和推荐的场景、类型和特点标签。
           </p>
         </div>
         {tagsState.name === "ready" ? (

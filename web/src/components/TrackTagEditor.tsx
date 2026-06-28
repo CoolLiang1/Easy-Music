@@ -15,7 +15,7 @@ type TrackTagEditorProps = {
   track: Track;
 };
 
-const tagGroups: TagGroup[] = ["scenario", "state", "type", "attribute"];
+const tagGroups: TagGroup[] = ["scene", "type", "feature"];
 
 export function TrackTagEditor({
   accessToken,

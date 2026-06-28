@@ -20,7 +20,6 @@ from app.schemas.ai import (
     NewTagSuggestion,
     TagSuggestionResponse,
 )
-from app.schemas.tag import TagGroup
 from app.services.ai_json import STRUCTURED_JSON_MAX_TOKENS, complete_and_parse_json
 from app.services.ai_provider import AiProviderService
 
@@ -28,7 +27,7 @@ from app.services.ai_provider import AiProviderService
 # public entry point
 # ---------------------------------------------------------------------------
 
-_VALID_GROUPS: frozenset = frozenset({"scenario", "state", "type", "attribute"})
+_VALID_GROUPS: frozenset = frozenset({"scene", "type", "feature"})
 
 
 def suggest_tags_for_track(
@@ -192,7 +191,7 @@ def _build_tag_suggestion_prompt(
         lines.append(
             "You may also suggest new tag names in new_tag_suggestions "
             "(name, group, confidence, reason). Only use groups: "
-            "scenario, state, type, attribute."
+            "scene, type, feature."
         )
     else:
         lines.append("Leave new_tag_suggestions empty.")
