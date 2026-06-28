@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listTags } from "../api/tags";
 import { deleteTrack, getTrack, updateTrack, updateTrackCover } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
+import { AiTrackOrganizationPanel } from "../components/AiTrackOrganizationPanel";
 import { PlaybackQueueActions } from "../components/PlaybackQueueActions";
 import { TrackCoverEditor } from "../components/TrackCoverEditor";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
@@ -149,6 +150,10 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
       setIsSavingCover(false);
     }
   };
+
+  const handleOrganizationApplied = useCallback(async () => {
+    await loadTrack(false);
+  }, [loadTrack]);
 
   const handleDeleteTrack = async () => {
     if (detailState.name !== "ready") {
@@ -311,6 +316,11 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
             onSave={saveTags}
             successMessage={tagSaveSuccess}
             track={detailState.track}
+          />
+          <AiTrackOrganizationPanel
+            accessToken={accessToken}
+            onApplied={handleOrganizationApplied}
+            trackId={detailState.track.id}
           />
           <section className="panel">
             <h2>技术字段</h2>

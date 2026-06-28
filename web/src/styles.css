@@ -1278,6 +1278,140 @@ h3 {
   color: var(--muted);
 }
 
+.ai-organization-panel {
+  border-left: 4px solid var(--teal);
+}
+
+.ai-organization-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ai-organization-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #274156;
+  font-size: 0.82rem;
+  font-weight: 850;
+  padding: 5px 9px;
+}
+
+.ai-organization-pill.ok {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+}
+
+.ai-organization-pill.disabled,
+.ai-organization-pill.unconfigured {
+  border-color: #d97706;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ai-organization-pill.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: var(--red);
+}
+
+.ai-organization-subpanel {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.ai-organization-subpanel h3 {
+  margin: 0 0 10px;
+  color: #213343;
+  font-size: 0.98rem;
+}
+
+.ai-organization-search-list,
+.ai-organization-choice-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-organization-search-item {
+  min-width: 0;
+  border-top: 1px solid #e5ebf2;
+  padding-top: 10px;
+}
+
+.ai-organization-search-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.ai-organization-search-item strong,
+.ai-organization-choice strong {
+  color: #213343;
+}
+
+.ai-organization-search-item p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.ai-organization-search-item a {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 5px;
+  color: var(--teal-dark);
+  font-size: 0.82rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.ai-organization-analysis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.ai-organization-choice {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #e5ebf2;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+  padding: 10px;
+}
+
+.ai-organization-choice input {
+  margin-top: 2px;
+}
+
+.ai-organization-choice span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ai-organization-choice small,
+.ai-organization-choice em {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .detail-list {
   display: grid;
   gap: 0;
