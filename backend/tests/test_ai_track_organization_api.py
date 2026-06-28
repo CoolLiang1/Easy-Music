@@ -22,11 +22,13 @@ from app.models.playlist import Playlist, PlaylistTrack
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_ai_organization import TrackAiAnalysis, TrackAiResearch
+from app.models.track_tag import TrackTag
 from app.models.user import User
 from app.schemas.ai import AiCompletionRequest, AiCompletionResult
 from app.schemas.ai_search import AiSearchProviderResult, AiSearchRequest, AiSearchResult
 from app.services.ai_provider import AiProviderService
 from app.services.ai_search_provider import AiSearchProviderService
+from app.services.ai_track_organization_cache import create_analysis_record
 
 
 @pytest.fixture
@@ -260,6 +262,32 @@ def _analysis_json(
             "summary": summary,
             "confidence": confidence,
         }
+    )
+
+
+def create_analysis(
+    db_session: Session,
+    user: User,
+    track: Track,
+    *,
+    existing_tag_suggestions: list[dict[str, Any]] | None = None,
+    new_tag_suggestions: list[dict[str, Any]] | None = None,
+    playlist_suggestions: list[dict[str, Any]] | None = None,
+) -> TrackAiAnalysis:
+    return create_analysis_record(
+        db_session,
+        user=user,
+        track=track,
+        research=None,
+        provider="openai-compatible",
+        model="gpt-test",
+        status="ok",
+        summary="Cached analysis.",
+        confidence=0.8,
+        existing_tag_suggestions=existing_tag_suggestions or [],
+        new_tag_suggestions=new_tag_suggestions or [],
+        playlist_suggestions=playlist_suggestions or [],
+        error_message=None,
     )
 
 
@@ -613,3 +641,250 @@ def test_invalid_legacy_tag_group_output_becomes_analysis_error(
     assert body["analysis_status"] == "error"
     assert body["analysis"]["status"] == "error"
     assert "schema" in body["analysis_error_message"].lower()
+
+
+def test_apply_existing_tag_is_idempotent(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    tag = create_tag(db_session, user, "scene", "Focus")
+    analysis = create_analysis(
+        db_session,
+        user,
+        track,
+        existing_tag_suggestions=[
+            {"tag_id": tag.id, "name": tag.name, "group": tag.group, "confidence": 0.9}
+        ],
+    )
+
+    for _ in range(2):
+        response = client.post(
+            f"/api/ai/tracks/{track.id}/organize/apply",
+            json={"analysis_id": analysis.id, "existing_tag_ids": [tag.id]},
+            headers=auth_headers(user),
+        )
+        assert response.status_code == 200
+        assert response.json()["applied_existing_tag_ids"] == [tag.id]
+
+    rows = list(
+        db_session.scalars(select(TrackTag).where(TrackTag.track_id == track.id))
+    )
+    assert len(rows) == 1
+    assert rows[0].tag_id == tag.id
+    assert rows[0].source == "user"
+
+
+def test_apply_new_tag_creates_and_assigns_selected_suggestion(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    unselected = "Unselected"
+    analysis = create_analysis(
+        db_session,
+        user,
+        track,
+        new_tag_suggestions=[
+            {"name": "Night", "group": "scene", "confidence": 0.8, "reason": "Fits."},
+            {"name": unselected, "group": "feature", "confidence": 0.7},
+        ],
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/organize/apply",
+        json={
+            "analysis_id": analysis.id,
+            "new_tags": [{"name": "Night", "group": "scene"}],
+        },
+        headers=auth_headers(user),
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert len(body["created_tag_ids"]) == 1
+    created = db_session.get(Tag, body["created_tag_ids"][0])
+    assert created is not None
+    assert created.name == "Night"
+    assert created.group == "scene"
+    assert db_session.get(TrackTag, (track.id, created.id)) is not None
+    assert db_session.scalar(
+        select(Tag).where(Tag.user_id == user.id, Tag.name == unselected)
+    ) is None
+
+
+def test_apply_new_tag_reuses_same_name_same_group(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    existing = create_tag(db_session, user, "feature", "Calm")
+    analysis = create_analysis(
+        db_session,
+        user,
+        track,
+        new_tag_suggestions=[
+            {"name": "calm", "group": "feature", "confidence": 0.9}
+        ],
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/organize/apply",
+        json={
+            "analysis_id": analysis.id,
+            "new_tags": [{"name": "calm", "group": "feature"}],
+        },
+        headers=auth_headers(user),
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["created_tag_ids"] == []
+    assert body["reused_tag_ids"] == [existing.id]
+    assert db_session.get(TrackTag, (track.id, existing.id)) is not None
+    assert len(list(db_session.scalars(select(Tag).where(Tag.user_id == user.id)))) == 1
+
+
+def test_apply_rejects_illegal_new_tag_group_before_service(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    analysis = create_analysis(
+        db_session,
+        user,
+        track,
+        new_tag_suggestions=[],
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/organize/apply",
+        json={
+            "analysis_id": analysis.id,
+            "new_tags": [{"name": "Legacy", "group": "attribute"}],
+        },
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 422
+
+
+def test_apply_playlist_is_idempotent_and_does_not_create_playlists(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    playlist = create_playlist(db_session, user)
+    analysis = create_analysis(
+        db_session,
+        user,
+        track,
+        playlist_suggestions=[
+            {
+                "playlist_id": playlist.id,
+                "name": playlist.name,
+                "track_count": 0,
+                "confidence": 0.8,
+            }
+        ],
+    )
+
+    for _ in range(2):
+        response = client.post(
+            f"/api/ai/tracks/{track.id}/organize/apply",
+            json={"analysis_id": analysis.id, "playlist_ids": [playlist.id]},
+            headers=auth_headers(user),
+        )
+        assert response.status_code == 200
+        assert response.json()["applied_playlist_ids"] == [playlist.id]
+
+    memberships = list(
+        db_session.scalars(
+            select(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
+        )
+    )
+    assert len(memberships) == 1
+    assert memberships[0].track_id == track.id
+    assert len(list(db_session.scalars(select(Playlist).where(Playlist.user_id == user.id)))) == 1
+
+
+def test_apply_rejects_unowned_or_unsuggested_items(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other = create_user(db_session, username="other")
+    track = create_track(db_session, owner)
+    owner_tag = create_tag(db_session, owner, "scene", "Focus")
+    other_tag = create_tag(db_session, other, "scene", "Hidden")
+    owner_playlist = create_playlist(db_session, owner)
+    other_playlist = create_playlist(db_session, other)
+    analysis = create_analysis(
+        db_session,
+        owner,
+        track,
+        existing_tag_suggestions=[
+            {"tag_id": owner_tag.id, "name": owner_tag.name, "group": owner_tag.group}
+        ],
+        playlist_suggestions=[
+            {"playlist_id": owner_playlist.id, "name": owner_playlist.name}
+        ],
+    )
+
+    tag_response = client.post(
+        f"/api/ai/tracks/{track.id}/organize/apply",
+        json={"analysis_id": analysis.id, "existing_tag_ids": [other_tag.id]},
+        headers=auth_headers(owner),
+    )
+    playlist_response = client.post(
+        f"/api/ai/tracks/{track.id}/organize/apply",
+        json={"analysis_id": analysis.id, "playlist_ids": [other_playlist.id]},
+        headers=auth_headers(owner),
+    )
+    invented_response = client.post(
+        f"/api/ai/tracks/{track.id}/organize/apply",
+        json={"analysis_id": analysis.id, "existing_tag_ids": [99999]},
+        headers=auth_headers(owner),
+    )
+
+    assert tag_response.status_code == 400
+    assert playlist_response.status_code == 400
+    assert invented_response.status_code == 400
+    assert list(db_session.scalars(select(TrackTag).where(TrackTag.track_id == track.id))) == []
+    assert list(
+        db_session.scalars(
+            select(PlaylistTrack).where(PlaylistTrack.playlist_id == owner_playlist.id)
+        )
+    ) == []
+
+
+def test_apply_rejects_stale_or_mismatched_analysis(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other = create_user(db_session, username="other")
+    owner_track = create_track(db_session, owner, title="Owner")
+    other_track = create_track(db_session, owner, title="Other")
+    hidden_track = create_track(db_session, other, title="Hidden")
+    owner_analysis_for_other_track = create_analysis(db_session, owner, other_track)
+    hidden_analysis = create_analysis(db_session, other, hidden_track)
+
+    mismatched = client.post(
+        f"/api/ai/tracks/{owner_track.id}/organize/apply",
+        json={"analysis_id": owner_analysis_for_other_track.id},
+        headers=auth_headers(owner),
+    )
+    unowned = client.post(
+        f"/api/ai/tracks/{owner_track.id}/organize/apply",
+        json={"analysis_id": hidden_analysis.id},
+        headers=auth_headers(owner),
+    )
+
+    assert mismatched.status_code == 400
+    assert unowned.status_code == 400

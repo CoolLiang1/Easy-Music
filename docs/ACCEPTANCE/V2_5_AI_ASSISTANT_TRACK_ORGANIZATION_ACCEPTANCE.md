@@ -143,15 +143,15 @@ Required behavior:
 
 Acceptance checklist:
 
-- [ ] Existing tag apply tested.
-- [ ] Existing tag idempotency tested.
-- [ ] New tag creation tested.
-- [ ] Same-name same-group tag reuse tested.
-- [ ] Illegal new tag group rejection tested.
-- [ ] Playlist apply tested.
-- [ ] Playlist idempotency tested.
-- [ ] Unowned tag/playlist rejection tested.
-- [ ] Stale or mismatched analysis rejection tested.
+- [x] Existing tag apply tested.
+- [x] Existing tag idempotency tested.
+- [x] New tag creation tested.
+- [x] Same-name same-group tag reuse tested.
+- [x] Illegal new tag group rejection tested.
+- [x] Playlist apply tested.
+- [x] Playlist idempotency tested.
+- [x] Unowned tag/playlist rejection tested.
+- [x] Stale or mismatched analysis rejection tested.
 
 ### Gate 5: Web Track Detail Flow
 
@@ -336,6 +336,18 @@ Result:
   `.\.venv\Scripts\python.exe -m pytest tests\test_ai_tag_suggestions.py tests\test_ai_intent.py tests\test_ai_recommend.py tests\test_ai_json.py tests\test_ai_provider.py tests\test_ai_client.py`
   from `backend/` with 97 passed. Existing AI Assistant V1 endpoints and
   provider/JSON helpers still pass after adding V2.5 organize schemas/routes.
+- [x] 2026-06-28: Passed
+  `.\.venv\Scripts\python.exe -m pytest tests\test_ai_track_organization_api.py`
+  from `backend/` with 19 passed. Covered V2.5.4 apply endpoint auth,
+  analysis ownership, existing tag apply/idempotency, new tag creation,
+  same-name same-group tag reuse, illegal tag group request rejection,
+  playlist apply/idempotency, unowned or unsuggested tag/playlist rejection,
+  stale or mismatched analysis rejection, and proof that unselected suggestions
+  are not applied.
+- [x] 2026-06-28: Passed
+  `.\.venv\Scripts\python.exe -m pytest tests\test_ai_track_organization_api.py tests\test_ai_track_organization_cache.py tests\test_ai_search_provider.py tests\test_ai_search_client.py tests\test_ai_tag_suggestions.py tests\test_ai_intent.py tests\test_ai_recommend.py tests\test_ai_json.py tests\test_ai_provider.py tests\test_ai_client.py`
+  from `backend/` with 136 passed. V2.5.1 through V2.5.4 focused checks and
+  existing AI Assistant V1 regression checks pass together.
 
 ### Web
 
@@ -368,7 +380,8 @@ Status as of 2026-06-28:
 - V2.5.1 Search Provider Configuration And Abstraction implemented.
 - V2.5.2 Research And Analysis Cache Models implemented.
 - V2.5.3 Single-Track Organization Analysis Endpoint implemented.
+- V2.5.4 Apply Selected Organization Suggestions implemented.
 - Search settings are documented in env examples and `docs/ENVIRONMENT.md`.
-- Focused backend automated checks for V2.5.1, V2.5.2, and V2.5.3 are recorded above.
-- Apply endpoint and Web UI are not implemented yet.
+- Focused backend automated checks for V2.5.1 through V2.5.4 are recorded above.
+- Web UI is not implemented yet.
 - Manual Web smoke flows have not been run because no V2.5 Web UI exists yet.

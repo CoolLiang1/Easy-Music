@@ -345,3 +345,25 @@ class TrackOrganizationResponse(BaseModel):
     analysis: TrackOrganizationAnalysisResponse | None = None
     research_error_message: str | None = None
     analysis_error_message: str | None = None
+
+
+class TrackOrganizationApplyNewTag(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    group: TagGroup
+
+
+class TrackOrganizationApplyRequest(BaseModel):
+    analysis_id: int
+    existing_tag_ids: list[int] = Field(default_factory=list)
+    new_tags: list[TrackOrganizationApplyNewTag] = Field(default_factory=list)
+    playlist_ids: list[int] = Field(default_factory=list)
+
+
+class TrackOrganizationApplyResponse(BaseModel):
+    track_id: int
+    analysis_id: int
+    applied_existing_tag_ids: list[int] = Field(default_factory=list)
+    created_tag_ids: list[int] = Field(default_factory=list)
+    reused_tag_ids: list[int] = Field(default_factory=list)
+    applied_playlist_ids: list[int] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
