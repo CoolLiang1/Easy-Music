@@ -7,6 +7,7 @@ from app.schemas.track import TrackResponse
 
 class PlaylistCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
 
     @field_validator("name")
     @classmethod
@@ -16,9 +17,18 @@ class PlaylistCreate(BaseModel):
             raise ValueError("Playlist name is required.")
         return name
 
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        description = value.strip()
+        return description or None
+
 
 class PlaylistUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
 
     @field_validator("name")
     @classmethod
@@ -29,6 +39,14 @@ class PlaylistUpdate(BaseModel):
         if not name:
             raise ValueError("Playlist name is required.")
         return name
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        description = value.strip()
+        return description or None
 
 
 class PlaylistTrackAdd(BaseModel):
@@ -44,6 +62,7 @@ class PlaylistSummaryResponse(BaseModel):
 
     id: int
     name: str
+    description: str | None = None
     track_count: int
     created_at: datetime
     updated_at: datetime
@@ -60,6 +79,7 @@ class PlaylistResponse(BaseModel):
 
     id: int
     name: str
+    description: str | None = None
     track_count: int
     tracks: list[PlaylistTrackResponse]
     created_at: datetime

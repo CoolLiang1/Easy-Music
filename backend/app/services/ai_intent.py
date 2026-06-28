@@ -96,6 +96,7 @@ def parse_listening_intent(
         type_tag_ids=ai_output.type_tag_ids,
         attribute_tag_ids=ai_output.attribute_tag_ids,
         exclude_attribute_tag_ids=ai_output.exclude_attribute_tag_ids,
+        raw_text=text,
         limit=3,
         client=client,
     )

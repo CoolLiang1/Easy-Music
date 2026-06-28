@@ -10,6 +10,21 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class RecommendationModelsTest {
     @Test
+    fun serializesOptionalCooldownModeAndRawText() {
+        val json = JSONObject(
+            RecommendationRequest(
+                scenarioTagIds = listOf(1),
+                rawText = "focus coding",
+                cooldownMode = RecommendationCooldownMode.Strict,
+            ).toJson(),
+        )
+
+        assertEquals("focus coding", json.getString("raw_text"))
+        assertEquals("strict", json.getString("cooldown_mode"))
+        assertEquals(1, json.getJSONArray("scenario_tag_ids").getInt(0))
+    }
+
+    @Test
     fun parsesRecommendationResponseWithThreeTracks() {
         val response = RecommendationResponse.fromJson(JSONObject(threeTrackResponseJson()))
 
@@ -18,6 +33,19 @@ class RecommendationModelsTest {
         assertEquals(listOf(1, 2, 3), response.results.map { it.rank })
         assertEquals(12.5, response.results[0].score, 0.0)
         assertEquals("Matched scenario and type tags.", response.results[0].reason)
+        assertEquals(
+            "focus",
+            response.results[0].explanation?.matchedTags?.get("scenario")?.single()?.name,
+        )
+        assertEquals(
+            "playlist context boost: Work Flow",
+            response.results[0].explanation?.boosts?.single()?.label,
+        )
+        assertEquals(1.5, response.results[0].explanation?.boosts?.single()?.scoreDelta ?: 0.0, 0.0)
+        assertEquals(
+            "active cooldown soft penalty",
+            response.results[0].explanation?.penalties?.single()?.label,
+        )
         assertEquals("Morning Focus", response.results[0].track.title)
         assertEquals("The Testers", response.results[0].track.artist)
         assertEquals("focus", response.results[0].track.tags.single().name)
@@ -51,6 +79,36 @@ class RecommendationModelsTest {
               "rank": 1,
               "score": 12.5,
               "reason": "Matched scenario and type tags.",
+              "explanation": {
+                "matched_tags": {
+                  "scenario": [
+                    {
+                      "id": 1,
+                      "name": "focus",
+                      "group": "scenario"
+                    }
+                  ]
+                },
+                "boosts": [
+                  {
+                    "label": "playlist context boost: Work Flow",
+                    "score_delta": 1.5
+                  }
+                ],
+                "penalties": [
+                  {
+                    "label": "active cooldown soft penalty",
+                    "score_delta": -1.0
+                  }
+                ],
+                "feedback_impacts": [
+                  {
+                    "label": "dislike feedback penalty",
+                    "score_delta": -8.0
+                  }
+                ],
+                "avoidance_reasons": []
+              },
               "track": ${trackJson(101, "Morning Focus", "The Testers")}
             },
             {

@@ -7,6 +7,7 @@ import { useAuth } from "../auth/AuthProvider";
 import {
   RecommendationExclusionsNotice,
   RecommendationExplanationDetails,
+  formatRecommendationReasonForDisplay,
 } from "../components/RecommendationExplanationDetails";
 import { feedbackLabels } from "../i18n/zh";
 import type { AiRecommendResponse, AiProviderStatus } from "../types/ai";
@@ -439,7 +440,9 @@ function AiResultCard({
       </dl>
 
       {/* Phase 5 deterministic rule reason */}
-      <p className="recommendation-reason">{result.reason}</p>
+      <p className="recommendation-reason">
+        {formatRecommendationReasonForDisplay(result.reason)}
+      </p>
       <RecommendationExplanationDetails explanation={result.explanation} />
 
       {track.tags.length > 0 ? (

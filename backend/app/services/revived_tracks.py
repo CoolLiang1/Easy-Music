@@ -18,6 +18,7 @@ NEGATIVE_FEEDBACK_SUPPRESSION_DAYS = 30
 MAX_REVIVED_CANDIDATES = 12
 
 STRONG_NEGATIVE_FEEDBACK_TYPES = {
+    "dislike",
     "tired",
     "not_suitable_for_context",
     "skip_recommendation",

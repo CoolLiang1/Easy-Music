@@ -31,13 +31,16 @@ deployment step, not a completed repository verification step.
 - [V2.1 Playlist Management Acceptance](docs/ACCEPTANCE/V2_1_PLAYLISTS_ACCEPTANCE.md)
 - [V2.1 Playback Queue Acceptance](docs/ACCEPTANCE/V2_1_PLAYBACK_QUEUE_ACCEPTANCE.md)
 - [V2.2 Playback Queue Acceptance](docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md)
+- [V2 Recommendation Foundation Tasks](docs/TASKS/V2_RECOMMENDATION_FOUNDATION_TASKS.md)
+- [V2 Recommendation Foundation Acceptance](docs/ACCEPTANCE/V2_RECOMMENDATION_FOUNDATION_ACCEPTANCE.md)
 
 ## Implemented Areas
 
 - Backend: FastAPI API, auth, tracks, tags, uploads, media streaming,
-  playlists, playback events, feedback events, recommendation endpoints, AI
-  assistant endpoints, health checks, structured logging, Alembic migrations,
-  and worker media processing.
+  playlists, playback events, feedback events, recommendation endpoints with
+  V2 cooldown modes and playlist scoring signals, AI assistant endpoints,
+  health checks, structured logging, Alembic migrations, and worker media
+  processing.
 - Web: React/Vite management console with login, upload flow, library, track
   editor, tag editor, playlist management, queued Web playback, recommendation test
   panel, and AI assistant/tag suggestion UI, plus import-directory review and
@@ -85,6 +88,11 @@ Current documented progress:
   on Web and Android, including queue editing UI, upcoming reorder,
   playlist-only repeat, and same-client source playlist sync. Automated checks
   plus Web and Android manual smoke are recorded as accepted.
+- V2 Recommendation Foundation: implemented. Recommendation cooldown now
+  defaults to soft scoring instead of hard exclusion, strict/off modes are
+  available, `not_today` remains a same-day hard exclusion, liked/dislike
+  feedback affects scoring, and owner-scoped playlist membership plus playlist
+  name/description relevance can boost tracks.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.

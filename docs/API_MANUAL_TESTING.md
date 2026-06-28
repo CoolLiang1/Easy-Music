@@ -601,8 +601,9 @@ Expected result:
 ## Manage Playlists
 
 V2.1 adds ordinary owner-scoped playlists. Playlists are manual private lists:
-no smart playlists, public sharing, collaboration, automatic generation, or
-recommendation ranking changes are included.
+no smart playlists, public sharing, collaboration, or automatic generation are
+included. V2 Recommendation Foundation uses owner-scoped playlist membership
+plus playlist name/description relevance as recommendation scoring signals.
 
 Create a playlist:
 
@@ -612,7 +613,7 @@ $playlist = Invoke-RestMethod `
   -Uri "http://127.0.0.1:8000/api/playlists" `
   -Headers $headers `
   -ContentType "application/json" `
-  -Body '{"name":"Night coding"}'
+  -Body '{"name":"Night coding","description":"Deep focus sessions"}'
 
 $playlist
 ```
@@ -625,7 +626,7 @@ Invoke-RestMethod `
   -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)" `
   -Headers $headers `
   -ContentType "application/json" `
-  -Body '{"name":"Late-night focus"}'
+  -Body '{"name":"Late-night focus","description":"Coding and reading focus"}'
 ```
 
 Add owned tracks. Repeating the same request is idempotent and should still
@@ -955,7 +956,7 @@ Invoke-RestMethod `
   } | ConvertTo-Json -Depth 4)
 ```
 
-Supported `feedback_type` values are `like`, `tired`, `not_today`,
+Supported `feedback_type` values are `like`, `dislike`, `tired`, `not_today`,
 `not_suitable_for_context`, and `skip_recommendation`. Context tag arrays are
 optional, but when present the tags must belong to the authenticated user and
 match their structured groups: `scenario`, `state`, `type`, and `attribute`.
@@ -970,6 +971,8 @@ Expected result:
 - A `track_id` or context tag not owned by the authenticated user is reported in
   `failed` without inserting that event.
 - `feedback_type: "like"` sets the track's `liked` field to `true`.
+- `feedback_type: "dislike"` records a strong recommendation penalty without
+  adding a track-level disliked column.
 - `feedback_type: "tired"` sets a default 14-day `cooldown_until` from
   `occurred_at`.
 
@@ -1017,6 +1020,8 @@ Invoke-RestMethod `
     type_tag_ids = @($typeTagId)
     attribute_tag_ids = @($attributeTagId)
     exclude_attribute_tag_ids = @()
+    raw_text = "night coding focus"
+    cooldown_mode = "soft"
     limit = 3
     client = "web"
   } | ConvertTo-Json -Depth 4)
@@ -1024,8 +1029,10 @@ Invoke-RestMethod `
 
 All tag arrays are optional. When tag ids are provided, they must belong to the
 authenticated user and match their expected groups: `scenario`, `state`, `type`,
-`attribute`, and excluded `attribute`. The request does not accept or parse a raw
-natural-language prompt.
+`attribute`, and excluded `attribute`. Optional `raw_text` is a scoring hint for
+playlist name/description relevance only; this endpoint does not parse it as a
+natural-language prompt. Optional `cooldown_mode` accepts `off`, `soft`, or
+`strict`; omitting it uses `soft`.
 
 Expected result:
 
@@ -1037,7 +1044,9 @@ Expected result:
   `matched_tags`, `boosts`, `penalties`, `feedback_impacts`, and
   `avoidance_reasons`.
 - The response includes `exclusions_considered` for ready tracks filtered before
-  ranking, such as active cooldown or same-day `not_today` feedback.
+  ranking, such as active cooldown in `strict` mode or same-day `not_today`
+  feedback. In default `soft` mode, active cooldown is a score penalty and can
+  appear in result reasons instead of `exclusions_considered`.
 - When there are no ready recommendation candidates, `results` is an empty
   array and the response is still `200 OK`.
 - A missing token returns `401 Unauthorized`.
@@ -1065,8 +1074,8 @@ Expected result:
   available.
 - Recently played ready tracks are omitted.
 - Tracks with active cooldown, same-day `not_today`, or recent strong negative
-  feedback (`tired`, `not_suitable_for_context`, `skip_recommendation`) are
-  suppressed.
+  feedback (`dislike`, `tired`, `not_suitable_for_context`,
+  `skip_recommendation`) are suppressed.
 - A missing token returns `401 Unauthorized`.
 - The endpoint is current-user scoped and does not modify tracks, playback
   events, feedback events, tags, media files, recommendation state, or Android
@@ -1160,7 +1169,8 @@ Expected closure result:
   rule-based ranking inputs as the score and reason text.
 - Feedback for the recommended track is accepted.
 - A repeated recommendation request can reflect feedback penalties such as
-  `not_today`, `not_suitable_for_context`, `skip_recommendation`, or `tired`.
+  `not_today`, `dislike`, `not_suitable_for_context`, `skip_recommendation`,
+  or `tired`, plus active-cooldown behavior from `cooldown_mode`.
 - No natural-language prompt, AI Assistant endpoint, social feature, or
   production ML service is involved.
 
@@ -1304,8 +1314,8 @@ Expected result with provider disabled or unconfigured:
 
 The AI endpoint must never bypass Phase 5 ranking constraints. Verify:
 
-1. A track with `cooldown_until` in the future must not appear in results
-   (cooldown exclusion from `recommend_tracks`).
+1. A track with `cooldown_until` in the future remains eligible by default but
+   receives the same active-cooldown soft penalty as `POST /api/recommendations`.
 2. A track with a `not_today` feedback event for today must not appear in
    results.
 3. A liked track that also matches tags should rank above an unliked but
@@ -1347,8 +1357,9 @@ Invoke-RestMethod `
 
 - The LLM only parses intent into tag ids — it never selects or returns track
   ids.
-- All ranking, cooldown, recent playback, and feedback penalties are handled by
-  the existing Phase 5 `recommend_tracks` service.
+- All ranking, cooldown mode behavior, recent playback penalties, playlist
+  scoring, and feedback penalties are handled by the backend recommendation
+  service.
 - The endpoint does not modify Android playback or cache behavior.
 
 ## Phase 6 Track Tag Suggestion

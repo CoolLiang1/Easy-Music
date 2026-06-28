@@ -57,13 +57,19 @@ Status as of 2026-06-27:
   browse/play flows. Web and Android also support client-side playback queues
   for playlist sequence, one-time shuffled, and reverse playback. Smart
   playlists, sharing, collaboration, auto-generation, cross-device queue sync,
-  server-side persistent queues, and recommendation algorithm changes remain
-  out of scope.
+  and server-side persistent queues remain out of scope. Playlist-based
+  recommendation scoring is covered separately by V2 Recommendation Foundation.
 - V2.2 playback queue: Implemented for local temporary client queues. Web and
   Android now expose first-class queue state, queue management, upcoming
   reorder, playlist-only repeat, and same-client source playlist sync.
   Automated checks plus Web and Android manual smoke are recorded as accepted
   in `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`.
+- V2 Recommendation Foundation: Implemented. Recommendation cooldown now
+  defaults to soft scoring instead of hard exclusion, `cooldown_mode` supports
+  `off`, `soft`, and `strict`, `not_today` remains a same-day hard exclusion,
+  `like` and `dislike` feedback affect ranking, and owner-scoped playlist
+  membership plus playlist name/description relevance are recommendation
+  scoring signals.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
@@ -254,6 +260,8 @@ Deliverables:
   - Optional user-provided video-to-audio processing.
 - V2.1 user-built playlist management and client-side playlist playback queue.
 - V2.2 first-class local playback queue module.
+- V2 recommendation foundation: soft/default cooldown, strict/off modes,
+  feedback scoring, and playlist membership/name/description boosts.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection

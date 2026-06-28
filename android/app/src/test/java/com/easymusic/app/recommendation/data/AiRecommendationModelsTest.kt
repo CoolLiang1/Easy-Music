@@ -62,6 +62,8 @@ class AiRecommendationModelsTest {
                 "type_tag_ids": [],
                 "attribute_tag_ids": [3],
                 "exclude_attribute_tag_ids": [4],
+                "raw_text": "calm focus music",
+                "cooldown_mode": "strict",
                 "limit": 3,
                 "client": "android"
               },
@@ -95,6 +97,8 @@ class AiRecommendationModelsTest {
         assertEquals(emptyList<Int>(), parsed.structuredRequest.typeTagIds)
         assertEquals(listOf(3), parsed.structuredRequest.attributeTagIds)
         assertEquals(listOf(4), parsed.structuredRequest.excludeAttributeTagIds)
+        assertEquals("calm focus music", parsed.structuredRequest.rawText)
+        assertEquals(RecommendationCooldownMode.Strict, parsed.structuredRequest.cooldownMode)
         assertEquals(3, parsed.structuredRequest.limit)
         assertEquals("android", parsed.structuredRequest.client)
 

@@ -6,6 +6,7 @@ import org.json.JSONObject
 data class PlaylistSummaryResponse(
     val id: Int,
     val name: String,
+    val description: String?,
     val trackCount: Int,
     val createdAt: String,
     val updatedAt: String,
@@ -15,6 +16,7 @@ data class PlaylistSummaryResponse(
             PlaylistSummaryResponse(
                 id = json.getInt("id"),
                 name = json.getString("name"),
+                description = json.optionalString("description"),
                 trackCount = json.getInt("track_count"),
                 createdAt = json.getString("created_at"),
                 updatedAt = json.getString("updated_at"),
@@ -40,6 +42,7 @@ data class PlaylistTrackResponse(
 data class PlaylistResponse(
     val id: Int,
     val name: String,
+    val description: String?,
     val trackCount: Int,
     val tracks: List<PlaylistTrackResponse>,
     val createdAt: String,
@@ -57,6 +60,7 @@ data class PlaylistResponse(
             return PlaylistResponse(
                 id = json.getInt("id"),
                 name = json.getString("name"),
+                description = json.optionalString("description"),
                 trackCount = json.getInt("track_count"),
                 tracks = tracks,
                 createdAt = json.getString("created_at"),
@@ -65,3 +69,6 @@ data class PlaylistResponse(
         }
     }
 }
+
+private fun JSONObject.optionalString(name: String): String? =
+    if (isNull(name)) null else getString(name)

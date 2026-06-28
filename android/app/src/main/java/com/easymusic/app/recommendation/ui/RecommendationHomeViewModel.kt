@@ -635,6 +635,7 @@ private fun Int.resultMessage(): String =
 private fun FeedbackType.successMessage(): String =
     when (this) {
         FeedbackType.Like -> "已标记喜欢。播放和离线缓存不会受影响。"
+        FeedbackType.Dislike -> "已标记不喜欢。再次请求可刷新推荐。"
         FeedbackType.Tired -> "已标记听腻了。再次请求可刷新推荐。"
         FeedbackType.NotToday -> "已标记今天不听。再次请求可刷新推荐。"
         FeedbackType.NotSuitableForContext -> "已标记不适合当前场景。再次请求可刷新推荐。"

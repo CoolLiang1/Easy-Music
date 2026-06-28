@@ -17,6 +17,7 @@ class PlaylistModelsTest {
                 {
                   "id": 7,
                   "name": "Night Coding",
+                  "description": "Late focus sessions",
                   "track_count": 3,
                   "created_at": "2026-06-26T10:00:00Z",
                   "updated_at": "2026-06-26T11:00:00Z"
@@ -27,6 +28,7 @@ class PlaylistModelsTest {
 
         assertEquals(7, summary.id)
         assertEquals("Night Coding", summary.name)
+        assertEquals("Late focus sessions", summary.description)
         assertEquals(3, summary.trackCount)
     }
 
@@ -36,6 +38,7 @@ class PlaylistModelsTest {
 
         assertEquals(7, playlist.id)
         assertEquals("Night Coding", playlist.name)
+        assertEquals("Late focus sessions", playlist.description)
         assertEquals(2, playlist.trackCount)
         assertEquals(listOf(1, 2), playlist.tracks.map { it.position })
         assertEquals("First Track", playlist.tracks[0].track.title)
@@ -48,6 +51,7 @@ class PlaylistModelsTest {
         {
           "id": 7,
           "name": "Night Coding",
+          "description": "Late focus sessions",
           "track_count": 2,
           "created_at": "2026-06-26T10:00:00Z",
           "updated_at": "2026-06-26T11:00:00Z",

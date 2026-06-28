@@ -5,6 +5,7 @@ import org.json.JSONObject
 
 enum class FeedbackType(val value: String) {
     Like("like"),
+    Dislike("dislike"),
     Tired("tired"),
     NotToday("not_today"),
     NotSuitableForContext("not_suitable_for_context"),

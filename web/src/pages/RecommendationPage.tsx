@@ -11,12 +11,14 @@ import { useAuth } from "../auth/AuthProvider";
 import {
   RecommendationExclusionsNotice,
   RecommendationExplanationDetails,
+  formatRecommendationReasonForDisplay,
 } from "../components/RecommendationExplanationDetails";
 import { tagGroups } from "../components/TagForm";
 import { feedbackLabels, formatDateTime, tagGroupLabels } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
 import type { FeedbackType } from "../types/feedback";
 import type {
+  RecommendationCooldownMode,
   RecommendationRequest,
   RecommendationResult,
   RecommendationResponse,
@@ -56,6 +58,18 @@ const initialSelections: SelectionState = {
   attribute: [],
 };
 
+const cooldownModeOptions: Array<{
+  label: string;
+  value: RecommendationCooldownMode;
+}> = [
+  { label: "Soft（默认）", value: "soft" },
+  { label: "Strict（旧行为）", value: "strict" },
+  { label: "Off（探索）", value: "off" },
+];
+
+const cooldownModeValues = cooldownModeOptions.map((option) => option.value);
+const cooldownModeStorageKey = "easy-music-recommendation-cooldown-mode";
+
 const feedbackActions: Array<{
   label: string;
   type: Extract<
@@ -77,6 +91,9 @@ export function RecommendationPage() {
   const [excludedAttributeTagIds, setExcludedAttributeTagIds] = useState<
     number[]
   >([]);
+  const [cooldownMode, setCooldownMode] = useState<RecommendationCooldownMode>(
+    () => readStoredCooldownMode(),
+  );
   const [recommendationState, setRecommendationState] =
     useState<RecommendationState>({ name: "idle" });
   const [revivedState, setRevivedState] = useState<RevivedState>({
@@ -143,6 +160,10 @@ export function RecommendationPage() {
     void loadRevivedTracks(true);
   }, [loadRevivedTracks]);
 
+  useEffect(() => {
+    writeStoredCooldownMode(cooldownMode);
+  }, [cooldownMode]);
+
   const groupedTags = useMemo(() => {
     const groups: Record<TagGroup, Tag[]> = {
       scenario: [],
@@ -169,10 +190,11 @@ export function RecommendationPage() {
       type_tag_ids: selectedTagIds.type,
       attribute_tag_ids: selectedTagIds.attribute,
       exclude_attribute_tag_ids: excludedAttributeTagIds,
+      cooldown_mode: cooldownMode,
       limit: 3,
       client: "web",
     }),
-    [excludedAttributeTagIds, selectedTagIds],
+    [cooldownMode, excludedAttributeTagIds, selectedTagIds],
   );
 
   const handleRequestRecommendations = async () => {
@@ -368,6 +390,25 @@ export function RecommendationPage() {
           </div>
 
           <div className="recommendation-toolbar">
+            <label className="field">
+              冷却模式
+              <select
+                aria-label="冷却模式"
+                disabled={recommendationState.name === "loading"}
+                onChange={(event) =>
+                  setCooldownMode(
+                    event.target.value as RecommendationCooldownMode,
+                  )
+                }
+                value={cooldownMode}
+              >
+                {cooldownModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               className="button primary"
               disabled={recommendationState.name === "loading"}
@@ -641,7 +682,9 @@ function RecommendationResultCard({
         </div>
       </dl>
 
-      <p className="recommendation-reason">{result.reason}</p>
+      <p className="recommendation-reason">
+        {formatRecommendationReasonForDisplay(result.reason)}
+      </p>
       <RecommendationExplanationDetails explanation={result.explanation} />
 
       {track.tags.length > 0 ? (
@@ -704,6 +747,25 @@ function createClientEventId() {
 
 function formatScore(score: number) {
   return `评分 ${Number.isInteger(score) ? score : score.toFixed(2)}`;
+}
+
+function readStoredCooldownMode(): RecommendationCooldownMode {
+  if (typeof window === "undefined") {
+    return "soft";
+  }
+
+  const storedValue = window.localStorage.getItem(cooldownModeStorageKey);
+  return isRecommendationCooldownMode(storedValue) ? storedValue : "soft";
+}
+
+function writeStoredCooldownMode(mode: RecommendationCooldownMode) {
+  window.localStorage.setItem(cooldownModeStorageKey, mode);
+}
+
+function isRecommendationCooldownMode(
+  value: string | null,
+): value is RecommendationCooldownMode {
+  return cooldownModeValues.includes(value as RecommendationCooldownMode);
 }
 
 function getErrorMessage(error: unknown, fallback: string) {

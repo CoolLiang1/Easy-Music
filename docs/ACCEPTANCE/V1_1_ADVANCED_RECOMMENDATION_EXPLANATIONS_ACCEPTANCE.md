@@ -12,7 +12,8 @@ In scope for this acceptance pass:
 - Backend recommendation results include structured explanation details:
   matched tags, boosts, penalties, feedback impact, and avoidance reasons.
 - Backend recommendation responses include `exclusions_considered` for tracks
-  filtered before ranking, such as active cooldown or same-day `not_today`.
+  filtered before ranking, such as strict-mode active cooldown or same-day
+  `not_today`.
 - Existing deterministic `reason` text remains available.
 - Rule-based ranking order is preserved.
 - Web structured Recommendation and AI Assistant result cards display

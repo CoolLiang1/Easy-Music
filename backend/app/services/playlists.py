@@ -28,6 +28,8 @@ class PlaylistTrackSignal:
     playlist_id: int
     track_id: int
     position: int
+    playlist_name: str
+    playlist_description: str | None = None
 
 
 def list_playlists(db: Session, user: User) -> list[PlaylistSummaryResponse]:
@@ -55,6 +57,7 @@ def list_playlists(db: Session, user: User) -> list[PlaylistSummaryResponse]:
         PlaylistSummaryResponse(
             id=playlist.id,
             name=playlist.name,
+            description=playlist.description,
             track_count=counts.get(playlist.id, 0),
             created_at=playlist.created_at,
             updated_at=playlist.updated_at,
@@ -64,7 +67,11 @@ def list_playlists(db: Session, user: User) -> list[PlaylistSummaryResponse]:
 
 
 def create_playlist(db: Session, user: User, payload: PlaylistCreate) -> Playlist:
-    playlist = Playlist(user_id=user.id, name=payload.name)
+    playlist = Playlist(
+        user_id=user.id,
+        name=payload.name,
+        description=payload.description,
+    )
     db.add(playlist)
     db.commit()
     db.refresh(playlist)
@@ -82,6 +89,8 @@ def update_playlist(db: Session, playlist: Playlist, payload: PlaylistUpdate) ->
     name = updates.get("name")
     if name is not None:
         playlist.name = name
+    if "description" in updates:
+        playlist.description = updates["description"]
 
     db.commit()
     db.refresh(playlist)
@@ -190,6 +199,7 @@ def build_playlist_response(db: Session, playlist: Playlist) -> PlaylistResponse
     return PlaylistResponse(
         id=playlist.id,
         name=playlist.name,
+        description=playlist.description,
         track_count=len(tracks),
         tracks=tracks,
         created_at=playlist.created_at,
@@ -203,6 +213,8 @@ def list_playlist_track_signals(db: Session, user: User) -> list[PlaylistTrackSi
             PlaylistTrack.playlist_id,
             PlaylistTrack.track_id,
             PlaylistTrack.position,
+            Playlist.name,
+            Playlist.description,
         )
         .join(Playlist, Playlist.id == PlaylistTrack.playlist_id)
         .join(Track, Track.id == PlaylistTrack.track_id)
@@ -214,8 +226,10 @@ def list_playlist_track_signals(db: Session, user: User) -> list[PlaylistTrackSi
             playlist_id=playlist_id,
             track_id=track_id,
             position=position,
+            playlist_name=playlist_name,
+            playlist_description=playlist_description,
         )
-        for playlist_id, track_id, position in rows
+        for playlist_id, track_id, position, playlist_name, playlist_description in rows
     ]
 
 

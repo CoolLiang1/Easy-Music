@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -17,6 +18,7 @@ from app.schemas.recommendation import (
     RecommendationRequest,
     RecommendationResult,
 )
+from app.services import playlists as playlist_service
 from app.services.tracks import build_track_response
 
 
@@ -29,6 +31,7 @@ TAG_MATCH_WEIGHTS = {
     "attribute": 1.0,
 }
 LIKED_BOOST = 1.0
+ACTIVE_COOLDOWN_SOFT_PENALTY = 5.0
 EXCLUDED_ATTRIBUTE_PENALTY = 4.0
 RECENT_PLAYBACK_WINDOWS = (
     (timedelta(days=1), 4.0),
@@ -38,6 +41,12 @@ RECENT_PLAYBACK_WINDOWS = (
 NOT_SUITABLE_CONTEXT_PENALTY = 4.0
 RECENT_SKIP_RECOMMENDATION_PENALTY = 3.0
 RECENT_SKIP_RECOMMENDATION_WINDOW = timedelta(days=7)
+DISLIKE_FEEDBACK_PENALTY = 8.0
+PLAYLIST_MEMBERSHIP_BOOST = 0.5
+PLAYLIST_MEMBERSHIP_BOOST_CAP = 1.5
+PLAYLIST_CONTEXT_BOOST = 1.5
+PLAYLIST_CONTEXT_BOOST_CAP = 3.0
+PLAYLIST_REASON_NAME_LIMIT = 3
 TAG_REQUEST_FIELDS = {
     "scenario_tag_ids": "scenario",
     "state_tag_ids": "state",
@@ -45,6 +54,20 @@ TAG_REQUEST_FIELDS = {
     "attribute_tag_ids": "attribute",
     "exclude_attribute_tag_ids": "attribute",
 }
+TERM_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "for",
+    "in",
+    "music",
+    "of",
+    "song",
+    "songs",
+    "the",
+    "to",
+}
+TERM_PATTERN = re.compile(r"[\w]+", re.UNICODE)
 
 
 @dataclass
@@ -123,12 +146,18 @@ def recommend_tracks_with_context(
     latest_playback = _load_latest_playback_events(db, user, track_ids)
     feedback_events = _load_recent_feedback_events(db, user, track_ids, ranking_time)
     requested_tag_ids = _requested_tag_ids(request)
+    playlist_signals = _load_playlist_signals_by_track(db, user, track_ids)
+    playlist_match_terms = _playlist_match_terms(request, tags_by_id)
 
     scored_tracks: list[_ScoredTrack] = []
     exclusions_considered: list[str] = []
     for track in tracks:
         cooldown_until = _as_naive_utc(track.cooldown_until)
-        if cooldown_until is not None and cooldown_until > ranking_time:
+        if (
+            request.cooldown_mode == "strict"
+            and cooldown_until is not None
+            and cooldown_until > ranking_time
+        ):
             exclusions_considered.append(
                 f"{track.title} excluded by active cooldown.",
             )
@@ -144,6 +173,12 @@ def recommend_tracks_with_context(
         scored = _ScoredTrack(track=track)
         _score_tag_matches(scored, request, track_tags.get(track.id, set()), tags_by_id)
         _score_liked(scored)
+        _score_active_cooldown(scored, cooldown_until, ranking_time, request.cooldown_mode)
+        _score_playlist_signals(
+            scored,
+            playlist_signals.get(track.id, []),
+            playlist_match_terms,
+        )
         _score_excluded_attributes(
             scored,
             request.exclude_attribute_tag_ids,
@@ -232,6 +267,19 @@ def _load_recent_feedback_events(
     return events_by_track
 
 
+def _load_playlist_signals_by_track(
+    db: Session,
+    user: User,
+    track_ids: list[int],
+) -> dict[int, list[playlist_service.PlaylistTrackSignal]]:
+    track_id_set = set(track_ids)
+    signals_by_track: dict[int, list[playlist_service.PlaylistTrackSignal]] = {}
+    for signal in playlist_service.list_playlist_track_signals(db, user):
+        if signal.track_id in track_id_set:
+            signals_by_track.setdefault(signal.track_id, []).append(signal)
+    return signals_by_track
+
+
 def _score_tag_matches(
     scored: _ScoredTrack,
     request: RecommendationRequest,
@@ -275,6 +323,71 @@ def _score_liked(scored: _ScoredTrack) -> None:
                 score_delta=LIKED_BOOST,
             ),
         )
+
+
+def _score_active_cooldown(
+    scored: _ScoredTrack,
+    cooldown_until: datetime | None,
+    now: datetime,
+    cooldown_mode: str,
+) -> None:
+    if cooldown_mode != "soft":
+        return
+    if cooldown_until is None or cooldown_until <= now:
+        return
+
+    scored.score -= ACTIVE_COOLDOWN_SOFT_PENALTY
+    part = RecommendationExplanationPart(
+        label="active cooldown soft penalty",
+        score_delta=-ACTIVE_COOLDOWN_SOFT_PENALTY,
+    )
+    scored.penalties.append(part)
+    scored.feedback_impacts.append(part)
+    scored.avoidance_reasons.append(
+        RecommendationExplanationPart(
+            label="active cooldown retained by soft mode",
+            score_delta=-ACTIVE_COOLDOWN_SOFT_PENALTY,
+        ),
+    )
+
+
+def _score_playlist_signals(
+    scored: _ScoredTrack,
+    signals: list[playlist_service.PlaylistTrackSignal],
+    match_terms: set[str],
+) -> None:
+    if not signals:
+        return
+
+    membership_delta = min(
+        PLAYLIST_MEMBERSHIP_BOOST * len(signals),
+        PLAYLIST_MEMBERSHIP_BOOST_CAP,
+    )
+    scored.score += membership_delta
+    scored.boosts.append(
+        RecommendationExplanationPart(
+            label=f"playlist membership boost: {_format_playlist_names(signals)}",
+            score_delta=membership_delta,
+        ),
+    )
+
+    matching_signals = [
+        signal for signal in signals if _playlist_signal_matches(signal, match_terms)
+    ]
+    if not matching_signals:
+        return
+
+    context_delta = min(
+        PLAYLIST_CONTEXT_BOOST * len(matching_signals),
+        PLAYLIST_CONTEXT_BOOST_CAP,
+    )
+    scored.score += context_delta
+    scored.boosts.append(
+        RecommendationExplanationPart(
+            label=f"playlist context boost: {_format_playlist_names(matching_signals)}",
+            score_delta=context_delta,
+        ),
+    )
 
 
 def _score_excluded_attributes(
@@ -342,11 +455,23 @@ def _score_feedback_penalties(
 ) -> None:
     applied_not_suitable = False
     applied_skip = False
+    applied_dislike = False
 
     for event in feedback_events:
         occurred_at = _as_naive_utc(event.occurred_at)
         if occurred_at is None:
             continue
+
+        if not applied_dislike and event.feedback_type == "dislike":
+            scored.score -= DISLIKE_FEEDBACK_PENALTY
+            part = RecommendationExplanationPart(
+                label="dislike feedback penalty",
+                score_delta=-DISLIKE_FEEDBACK_PENALTY,
+            )
+            scored.penalties.append(part)
+            scored.feedback_impacts.append(part)
+            scored.avoidance_reasons.append(part)
+            applied_dislike = True
 
         if (
             not applied_not_suitable
@@ -396,6 +521,69 @@ def _requested_tag_ids(request: RecommendationRequest) -> set[int]:
     ):
         tag_ids.update(_unique_ids(ids))
     return tag_ids
+
+
+def _playlist_match_terms(
+    request: RecommendationRequest,
+    tags_by_id: dict[int, Tag],
+) -> set[str]:
+    terms: set[str] = set()
+    if request.raw_text:
+        terms.update(_extract_terms(request.raw_text))
+
+    for tag_id in _requested_tag_ids(request):
+        tag = tags_by_id.get(tag_id)
+        if tag is None:
+            continue
+        terms.update(_extract_terms(tag.name))
+
+    return terms
+
+
+def _playlist_signal_matches(
+    signal: playlist_service.PlaylistTrackSignal,
+    match_terms: set[str],
+) -> bool:
+    if not match_terms:
+        return False
+
+    playlist_text = " ".join(
+        part
+        for part in (signal.playlist_name, signal.playlist_description or "")
+        if part
+    )
+    playlist_terms = _extract_terms(playlist_text)
+    if playlist_terms & match_terms:
+        return True
+
+    normalized_text = playlist_text.casefold()
+    return any(" " in term and term in normalized_text for term in match_terms)
+
+
+def _extract_terms(value: str) -> set[str]:
+    normalized = value.casefold()
+    terms = {
+        token
+        for token in TERM_PATTERN.findall(normalized)
+        if len(token) >= 2 and token not in TERM_STOPWORDS
+    }
+    stripped = normalized.strip()
+    if " " in stripped and len(stripped) >= 2:
+        terms.add(stripped)
+    return terms
+
+
+def _format_playlist_names(
+    signals: list[playlist_service.PlaylistTrackSignal],
+) -> str:
+    names = list(dict.fromkeys(signal.playlist_name for signal in signals))
+    displayed = names[:PLAYLIST_REASON_NAME_LIMIT]
+    suffix = (
+        f", +{len(names) - PLAYLIST_REASON_NAME_LIMIT} more"
+        if len(names) > PLAYLIST_REASON_NAME_LIMIT
+        else ""
+    )
+    return ", ".join(displayed) + suffix
 
 
 def _feedback_context_ids(event: FeedbackEvent) -> set[int]:

@@ -211,7 +211,9 @@ Invoke-RestMethod `
 The endpoint is authenticated, accepts small batches, validates track and
 context-tag ownership, and reports per-event `accepted`, `duplicate`, or
 `failed` results. `like` sets `tracks.liked` to `true`; `tired` records feedback
-and sets a default 14-day `tracks.cooldown_until` from `occurred_at`.
+and sets a default 14-day `tracks.cooldown_until` from `occurred_at`; `dislike`
+records a strong recommendation penalty without adding a track-level disliked
+column.
 
 Request structured Recommendation V1 results after applying Phase 5 Task 5.3:
 
@@ -227,6 +229,8 @@ Invoke-RestMethod `
     type_tag_ids = @($typeTagId)
     attribute_tag_ids = @($attributeTagId)
     exclude_attribute_tag_ids = @()
+    raw_text = "night coding focus"
+    cooldown_mode = "soft"
     limit = 3
     client = "web"
   } | ConvertTo-Json -Depth 4)
@@ -236,8 +240,14 @@ The endpoint is authenticated, accepts only structured tag id groups, validates
 tag ownership and tag group compatibility, and returns a `request_id` plus up to
 three ordered results. Each result includes `rank`, `score`, deterministic
 rule-based `reason`, structured explanation details, and the existing track
-response payload. The response also includes `exclusions_considered` for tracks
-filtered before ranking, such as cooldown and same-day `not_today` feedback.
+response payload. V2 Recommendation Foundation keeps `cooldown_mode` optional:
+`soft` is the default and applies an active-cooldown score penalty, `off`
+ignores active cooldown, and `strict` restores the previous hard exclusion.
+Same-day `not_today` feedback remains a hard exclusion. Optional `raw_text`
+is not parsed as a natural-language request by this endpoint; it is only a
+scoring hint for playlist name/description relevance alongside requested tag
+names. The response includes `exclusions_considered` for tracks filtered before
+ranking, such as strict cooldown or same-day `not_today` feedback.
 
 Review recently revived ready tracks after playback and feedback events exist:
 
@@ -276,7 +286,7 @@ $playlist = Invoke-RestMethod `
   -Uri "http://127.0.0.1:8000/api/playlists" `
   -Headers $headers `
   -ContentType "application/json" `
-  -Body '{"name":"Night coding"}'
+  -Body '{"name":"Night coding","description":"Deep focus sessions"}'
 
 Invoke-RestMethod `
   -Method Post `
@@ -296,7 +306,9 @@ Invoke-RestMethod `
 Playlist endpoints are authenticated and current-user scoped. Adding the same
 track twice is idempotent and leaves one playlist-track row. Reorder requests
 must contain exactly the playlist's current track ids. Deleting a track also
-removes playlist-track rows for that track.
+removes playlist-track rows for that track. Playlist descriptions are optional
+and are used with playlist names as Recommendation V2 Foundation scoring
+signals; they do not create smart or generated playlists.
 
 ## Docker Compose Local Flow
 
@@ -416,8 +428,9 @@ Available AI endpoints after Task 6.5:
   current user's existing tags.
 - `POST /api/ai/recommend` (authenticated) — parses natural-language intent via
   the AI, then delegates ranking to the existing Phase 5 recommendation service.
-  The LLM never selects track ids and never bypasses cooldown, recent-playback,
-  or feedback penalties.
+  The LLM never selects track ids and never bypasses active-cooldown scoring,
+  recent-playback penalties, playlist scoring, or feedback exclusions and
+  penalties.
 - `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) — suggests
   existing tags and optional new tag names for a track using AI-assisted
   metadata analysis. The endpoint never creates or assigns tags.
@@ -460,7 +473,9 @@ The V2.1 playlist page is available at `/playlists` after login. It can create,
 rename, delete, and open ordinary user playlists, add owned tracks, remove
 tracks, save order changes, and start a local Web playback queue in sequence,
 one-time shuffled, or reverse order. It does not create smart playlists,
-persist queue state on the backend, or change recommendation ranking.
+persist queue state on the backend, or automatically generate playlists.
+V2 Recommendation Foundation uses manually curated playlist membership plus
+playlist name/description relevance as backend recommendation scoring signals.
 
 V2.2 promotes Queue to first-class local temporary client state. Web exposes a
 global queue drawer for current/upcoming management, previous/next, remove,
@@ -644,14 +659,16 @@ The test suite covers:
 - Authenticated tag create, list, update, delete, validation, and ownership.
 - Authenticated track list, detail, update, delete, tag association, ownership,
   and streaming behavior.
-- Authenticated playlist CRUD, ownership isolation, add/remove, idempotent
-  duplicate add, reorder validation, and track-delete relationship cleanup.
+- Authenticated playlist CRUD, optional descriptions, ownership isolation,
+  add/remove, idempotent duplicate add, reorder validation, track-delete
+  relationship cleanup, and playlist signal isolation.
 - Authenticated playback-event bulk sync, validation, ownership, and duplicate
   retry behavior.
-- Authenticated feedback-event sync, context tag validation, `like`, `tired`,
-  and duplicate retry behavior.
+- Authenticated feedback-event sync, context tag validation, `like`, `dislike`,
+  `tired`, and duplicate retry behavior.
 - Authenticated structured recommendation requests, tag ownership/group
-  validation, empty results, ordered results, and deterministic reason fields.
+  validation, empty results, ordered results, cooldown `off`/`soft`/`strict`,
+  playlist scoring, feedback scoring, and deterministic reason fields.
 - Upload validation, original-file storage, and processing-job creation.
 - Media storage path generation and path traversal protection.
 - FFmpeg/ffprobe argument construction and structured failures.
@@ -704,7 +721,9 @@ opens a selected playlist, and can start Media3 playback queues in sequence,
 one-time shuffled, or reverse order. Media3 owns next/previous navigation after
 the queue is built, so notification, lock-screen, and headset controls continue
 to target the current queue. It does not edit playlists on Android, persist
-queue state on the backend, or change recommendation ranking.
+queue state on the backend, or automatically generate playlists. Manual
+playlist membership and playlist text can still affect backend recommendation
+scoring through V2 Recommendation Foundation.
 
 - Android emulator to host backend: use `http://10.0.2.2:8000`.
 - Connected device or emulator with port reverse: run

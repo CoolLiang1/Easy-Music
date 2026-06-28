@@ -114,6 +114,9 @@ data class ParsedIntentResponse(
                 typeTagIds = json.getIntArray("type_tag_ids"),
                 attributeTagIds = json.getIntArray("attribute_tag_ids"),
                 excludeAttributeTagIds = json.getIntArray("exclude_attribute_tag_ids"),
+                rawText = json.optNullableString("raw_text"),
+                cooldownMode = json.optNullableString("cooldown_mode")
+                    ?.let { RecommendationCooldownMode.fromValueOrNull(it) },
                 limit = json.getInt("limit"),
                 client = json.optNullableString("client") ?: "",
             )

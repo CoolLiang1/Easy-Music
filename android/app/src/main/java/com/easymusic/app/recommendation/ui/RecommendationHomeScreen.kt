@@ -533,7 +533,10 @@ private fun RecommendationResultCard(
             }
 
             Text(
-                text = result.reason,
+                text = result.explanation
+                    ?.let(::formatRecommendationExplanationForDisplay)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: formatRecommendationReasonForDisplay(result.reason),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

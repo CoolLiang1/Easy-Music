@@ -365,15 +365,15 @@ def test_ai_recommend_returns_empty_when_no_candidates(
 
 
 # ---------------------------------------------------------------------------
-# cooldown exclusion (proof LLM cannot bypass ranking)
+# cooldown penalty (proof LLM cannot bypass ranking)
 # ---------------------------------------------------------------------------
 
 
-def test_ai_recommend_excludes_cooldown_track(
+def test_ai_recommend_applies_default_soft_cooldown_penalty(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    """A track with future cooldown_until must not appear in AI results."""
+    """A track with future cooldown_until stays eligible but is penalized."""
     user = create_user(db_session)
     focus = create_tag(db_session, user, "scenario", "Focus")
 
@@ -394,9 +394,10 @@ def test_ai_recommend_excludes_cooldown_track(
     )
 
     assert response.status_code == 200
-    titles = [r["track"]["title"] for r in response.json()["results"]]
-    assert "Cooled Down" not in titles
-    assert "Available" in titles
+    results = response.json()["results"]
+    titles = [r["track"]["title"] for r in results]
+    assert titles == ["Available", "Cooled Down"]
+    assert "active cooldown soft penalty" in results[1]["reason"]
 
 
 # ---------------------------------------------------------------------------

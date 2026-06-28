@@ -1,11 +1,15 @@
 import type { Track } from "./track";
 
+export type RecommendationCooldownMode = "off" | "soft" | "strict";
+
 export type RecommendationRequest = {
   scenario_tag_ids?: number[];
   state_tag_ids?: number[];
   type_tag_ids?: number[];
   attribute_tag_ids?: number[];
   exclude_attribute_tag_ids?: number[];
+  raw_text?: string | null;
+  cooldown_mode?: RecommendationCooldownMode;
   limit?: number;
   client?: string | null;
 };

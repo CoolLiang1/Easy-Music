@@ -1,5 +1,6 @@
 export type FeedbackType =
   | "like"
+  | "dislike"
   | "tired"
   | "not_today"
   | "not_suitable_for_context"

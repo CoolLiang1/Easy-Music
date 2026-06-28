@@ -63,8 +63,9 @@ The backend keeps these modules separated at a high level:
 - Auth: authentication, token/session handling, password hashing, and access control.
 - Users: user records, ownership boundaries, and single-user-to-future-multi-user compatibility.
 - Tracks: library metadata, playback file references, status, and track updates.
-- Playlists: owner-scoped manually curated playlists and ordered playlist-track
-  membership for future recommendation signals.
+- Playlists: owner-scoped manually curated playlists, optional descriptions,
+  ordered playlist-track membership, and playlist signals consumed by
+  Recommendation V2 foundation scoring.
 - Tags: tag taxonomy, tag groups, and track-tag assignment.
 - Uploads: audio upload validation, original file persistence, and upload lifecycle state.
 - Video uploads: user-provided video validation, temporary media storage, and
@@ -301,6 +302,7 @@ Possible event types:
 Possible feedback types:
 
 - like
+- dislike
 - tired
 - not_today
 - not_suitable_for_context
@@ -311,6 +313,7 @@ Possible feedback types:
 - `id`
 - `user_id`
 - `raw_text`
+- `cooldown_mode`
 - `parsed_context_json`
 - `created_at`
 
@@ -369,12 +372,14 @@ Possible feedback types:
 - `id`
 - `user_id`
 - `name`
+- `description`
 - `created_at`
 - `updated_at`
 
 Playlists are ordinary user-created private lists. Version 2.1 does not include
 smart playlists, public sharing, collaboration, or automatic playlist
-generation.
+generation. Recommendation V2 foundation consumes only owner-scoped playlist
+membership plus playlist name/description relevance as scoring signals.
 
 ### 8.13 PlaylistTrack
 
@@ -385,8 +390,7 @@ generation.
 
 `playlist_tracks` is scoped through its parent playlist owner and only accepts
 tracks owned by the same user. The service also exposes a narrow read-only
-playlist signal method for future recommendation work, but Recommendation V1
-ranking does not consume playlist signals yet.
+playlist signal method consumed by Recommendation V2 foundation scoring.
 
 ## 9. Media Processing
 
@@ -512,8 +516,11 @@ Version 1 uses hybrid recommendation:
 - Attribute filters
 - Like status
 - Recent playback
-- Cooldown
+- Cooldown mode (`off`, `soft`, or `strict`)
 - Not-today feedback
+- Dislike feedback
+- Playlist membership
+- Playlist name/description relevance to requested text or tag names
 - Skip frequency
 - Not-suitable feedback for current context
 - Cached status on Android, if relevant
@@ -526,9 +533,9 @@ The API should return:
 - Two alternatives
 - Reason for each result
 - Structured explanation details for each result, including matched tags,
-  boosts, penalties, feedback impact, and avoidance reasons.
-- Top-level exclusions considered, such as active cooldown or same-day
-  `not_today` feedback filters.
+  playlist boosts, penalties, feedback impact, and avoidance reasons.
+- Top-level exclusions considered, such as same-day `not_today` feedback
+  filters or active cooldown when strict mode is requested.
 
 The structured explanation is derived from the same rule-based ranking inputs
 as the score and concise `reason` text. It does not change ranking order and

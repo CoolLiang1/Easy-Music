@@ -214,13 +214,15 @@ def test_revived_tracks_suppresses_cooldown_and_strong_negative_feedback(
         cooldown_until=NOW + timedelta(days=1),
     )
     tired = create_track(db_session, user, "Tired")
+    disliked = create_track(db_session, user, "Disliked")
     not_suitable = create_track(db_session, user, "Not Suitable")
     skipped = create_track(db_session, user, "Skipped")
     not_today = create_track(db_session, user, "Not Today")
 
-    for track in [available, cooldown, tired, not_suitable, skipped, not_today]:
+    for track in [available, cooldown, tired, disliked, not_suitable, skipped, not_today]:
         add_playback_event(db_session, user, track, NOW - timedelta(days=60))
     add_feedback_event(db_session, user, tired, "tired", NOW - timedelta(days=3))
+    add_feedback_event(db_session, user, disliked, "dislike", NOW - timedelta(days=3))
     add_feedback_event(
         db_session,
         user,

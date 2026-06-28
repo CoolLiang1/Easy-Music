@@ -31,6 +31,7 @@ class PlaylistRepositoryTest {
                     PlaylistSummaryResponse(
                         id = 1,
                         name = "Focus",
+                        description = null,
                         trackCount = 2,
                         createdAt = "2026-06-26T10:00:00Z",
                         updatedAt = "2026-06-26T11:00:00Z",
@@ -56,6 +57,7 @@ class PlaylistRepositoryTest {
                 PlaylistResponse(
                     id = 42,
                     name = "Night",
+                    description = null,
                     trackCount = 0,
                     tracks = emptyList(),
                     createdAt = "2026-06-26T10:00:00Z",
@@ -130,6 +132,7 @@ class PlaylistRepositoryTest {
                 PlaylistResponse(
                     id = 1,
                     name = "Unused",
+                    description = null,
                     trackCount = 0,
                     tracks = emptyList(),
                     createdAt = "2026-06-26T10:00:00Z",

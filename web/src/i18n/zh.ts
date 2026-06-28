@@ -10,6 +10,7 @@ export const tagGroupLabels: Record<TagGroup, string> = {
 
 export const feedbackLabels: Partial<Record<FeedbackType, string>> = {
   like: "喜欢",
+  dislike: "不喜欢",
   not_today: "今天不听",
   tired: "听腻了",
   not_suitable_for_context: "不适合当前场景",

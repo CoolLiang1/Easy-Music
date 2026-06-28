@@ -252,6 +252,26 @@ def test_sync_feedback_events_like_updates_track_liked(
     assert db_session.scalar(select(FeedbackEvent)).feedback_type == "like"
 
 
+def test_sync_feedback_events_accepts_dislike_without_track_state_change(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.post(
+        "/api/feedback-events",
+        json={"events": [feedback_event_payload(track.id, feedback_type="dislike")]},
+        headers=auth_headers(user),
+    )
+
+    db_session.refresh(track)
+    assert response.status_code == 200
+    assert track.liked is False
+    assert track.cooldown_until is None
+    assert db_session.scalar(select(FeedbackEvent)).feedback_type == "dislike"
+
+
 def test_sync_feedback_events_tired_sets_default_cooldown(
     client: TestClient,
     db_session: Session,

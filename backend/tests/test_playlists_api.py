@@ -83,8 +83,14 @@ def create_track(db_session: Session, user: User, title: str = "Track One") -> T
     return track
 
 
-def create_playlist(db_session: Session, user: User, name: str = "Focus Mix") -> Playlist:
-    playlist = Playlist(user_id=user.id, name=name)
+def create_playlist(
+    db_session: Session,
+    user: User,
+    name: str = "Focus Mix",
+    *,
+    description: str | None = None,
+) -> Playlist:
+    playlist = Playlist(user_id=user.id, name=name, description=description)
     db_session.add(playlist)
     db_session.commit()
     db_session.refresh(playlist)
@@ -118,13 +124,17 @@ def test_create_and_list_playlists_are_scoped_to_current_user(
 
     response = client.post(
         "/api/playlists",
-        json={"name": "  Study queue  "},
+        json={
+            "name": "  Study queue  ",
+            "description": "  Focus sessions and reading  ",
+        },
         headers=auth_headers(owner),
     )
 
     assert response.status_code == 201
     body = response.json()
     assert body["name"] == "Study queue"
+    assert body["description"] == "Focus sessions and reading"
     assert body["track_count"] == 0
     assert body["tracks"] == []
 
@@ -132,6 +142,9 @@ def test_create_and_list_playlists_are_scoped_to_current_user(
 
     assert list_response.status_code == 200
     assert [playlist["name"] for playlist in list_response.json()] == ["Study queue"]
+    assert [playlist["description"] for playlist in list_response.json()] == [
+        "Focus sessions and reading",
+    ]
 
 
 def test_get_update_and_delete_playlist(
@@ -143,12 +156,13 @@ def test_get_update_and_delete_playlist(
 
     update_response = client.patch(
         f"/api/playlists/{playlist.id}",
-        json={"name": "Night"},
+        json={"name": "Night", "description": "Late sessions"},
         headers=auth_headers(owner),
     )
 
     assert update_response.status_code == 200
     assert update_response.json()["name"] == "Night"
+    assert update_response.json()["description"] == "Late sessions"
 
     get_response = client.get(
         f"/api/playlists/{playlist.id}",
@@ -156,6 +170,7 @@ def test_get_update_and_delete_playlist(
     )
     assert get_response.status_code == 200
     assert get_response.json()["name"] == "Night"
+    assert get_response.json()["description"] == "Late sessions"
 
     delete_response = client.delete(
         f"/api/playlists/{playlist.id}",
@@ -369,7 +384,12 @@ def test_playlist_track_signals_are_current_user_scoped(
 ) -> None:
     owner = create_user(db_session)
     other_user = create_user(db_session, username="other")
-    owner_playlist = create_playlist(db_session, owner)
+    owner_playlist = create_playlist(
+        db_session,
+        owner,
+        name="Owner Focus",
+        description="Personal picks",
+    )
     other_playlist = create_playlist(db_session, other_user)
     owner_track = create_track(db_session, owner, title="Owner")
     other_track = create_track(db_session, other_user, title="Other")
@@ -382,6 +402,8 @@ def test_playlist_track_signals_are_current_user_scoped(
     assert signals[0].playlist_id == owner_playlist.id
     assert signals[0].track_id == owner_track.id
     assert signals[0].position == 2
+    assert signals[0].playlist_name == "Owner Focus"
+    assert signals[0].playlist_description == "Personal picks"
 
 
 def test_playlists_require_authentication(client: TestClient) -> None:

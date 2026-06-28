@@ -671,6 +671,7 @@ function toSummary(playlist: Playlist): PlaylistSummary {
   return {
     id: playlist.id,
     name: playlist.name,
+    description: playlist.description,
     track_count: playlist.track_count,
     created_at: playlist.created_at,
     updated_at: playlist.updated_at,

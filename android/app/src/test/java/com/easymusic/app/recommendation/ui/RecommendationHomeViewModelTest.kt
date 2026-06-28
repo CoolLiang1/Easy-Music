@@ -165,6 +165,7 @@ class RecommendationHomeViewModelTest {
     fun aiFeedbackUsesCorrectFeedbackTypes() {
         // Verify FeedbackType values match the expected POST /api/feedback-events contract
         assertEquals("like", FeedbackType.Like.value)
+        assertEquals("dislike", FeedbackType.Dislike.value)
         assertEquals("tired", FeedbackType.Tired.value)
         assertEquals("not_today", FeedbackType.NotToday.value)
         assertEquals("not_suitable_for_context", FeedbackType.NotSuitableForContext.value)

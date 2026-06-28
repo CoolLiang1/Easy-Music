@@ -3,6 +3,7 @@ import type { Track } from "./track";
 export type PlaylistSummary = {
   id: number;
   name: string;
+  description: string | null;
   track_count: number;
   created_at: string;
   updated_at: string;
@@ -20,10 +21,12 @@ export type Playlist = PlaylistSummary & {
 
 export type PlaylistCreate = {
   name: string;
+  description?: string | null;
 };
 
 export type PlaylistUpdate = {
   name?: string | null;
+  description?: string | null;
 };
 
 export type PlaylistTrackAdd = {

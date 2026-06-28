@@ -13,6 +13,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
 from app.models.feedback_event import FeedbackEvent
+from app.models.playlist import Playlist, PlaylistTrack
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
@@ -95,6 +96,36 @@ def create_tag(db_session: Session, user: User, group: str, name: str) -> Tag:
     db_session.commit()
     db_session.refresh(tag)
     return tag
+
+
+def create_playlist(
+    db_session: Session,
+    user: User,
+    name: str,
+    *,
+    description: str | None = None,
+) -> Playlist:
+    playlist = Playlist(user_id=user.id, name=name, description=description)
+    db_session.add(playlist)
+    db_session.commit()
+    db_session.refresh(playlist)
+    return playlist
+
+
+def add_playlist_track(
+    db_session: Session,
+    playlist: Playlist,
+    track: Track,
+    position: int = 1,
+) -> None:
+    db_session.add(
+        PlaylistTrack(
+            playlist_id=playlist.id,
+            track_id=track.id,
+            position=position,
+        ),
+    )
+    db_session.commit()
 
 
 def assign_tags(db_session: Session, track: Track, *tags: Tag) -> None:
@@ -243,6 +274,70 @@ def test_create_recommendations_includes_deterministic_reason_fields(
     assert "playback_file_path" in result["track"]
 
 
+def test_create_recommendations_defaults_cooldown_to_soft_penalty(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scenario", "Focus")
+    available = create_track(db_session, user, "Available")
+    cooldown = create_track(
+        db_session,
+        user,
+        "Cooldown",
+        cooldown_until=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    assign_tags(db_session, available, focus)
+    assign_tags(db_session, cooldown, focus)
+
+    response = client.post(
+        "/api/recommendations",
+        json={"scenario_tag_ids": [focus.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [result["track"]["title"] for result in body["results"]] == [
+        "Available",
+        "Cooldown",
+    ]
+    assert "active cooldown soft penalty" in body["results"][1]["reason"]
+    assert body["exclusions_considered"] == []
+
+
+def test_create_recommendations_includes_playlist_boost_reason(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scenario", "Focus")
+    track = create_track(db_session, user, "Playlisted")
+    assign_tags(db_session, track, focus)
+    playlist = create_playlist(
+        db_session,
+        user,
+        "Work Shelf",
+        description="Deep focus sessions",
+    )
+    add_playlist_track(db_session, playlist, track)
+
+    response = client.post(
+        "/api/recommendations",
+        json={"scenario_tag_ids": [focus.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert "playlist membership boost: Work Shelf" in result["reason"]
+    assert "playlist context boost: Work Shelf" in result["reason"]
+    assert result["explanation"]["boosts"][-1] == {
+        "label": "playlist context boost: Work Shelf",
+        "score_delta": 1.5,
+    }
+
+
 def test_create_recommendations_reports_exclusions_considered(
     client: TestClient,
     db_session: Session,
@@ -273,7 +368,7 @@ def test_create_recommendations_reports_exclusions_considered(
 
     response = client.post(
         "/api/recommendations",
-        json={"scenario_tag_ids": [focus.id]},
+        json={"scenario_tag_ids": [focus.id], "cooldown_mode": "strict"},
         headers=auth_headers(user),
     )
 
