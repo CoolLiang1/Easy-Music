@@ -314,6 +314,7 @@ Allow authenticated users to upload supported audio files, save originals, and c
   - M4A
   - WAV
   - OGG
+  - AAC
 - Upload size is limited by configuration.
 - File extension and basic content type are validated.
 - Original file is saved under controlled media storage.

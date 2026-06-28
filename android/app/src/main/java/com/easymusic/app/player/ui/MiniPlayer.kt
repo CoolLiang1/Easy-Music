@@ -7,7 +7,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
+import com.easymusic.app.player.domain.canSkipToNext
+import com.easymusic.app.player.domain.canSkipToPrevious
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -31,6 +41,8 @@ fun MiniPlayer(
     onOpenNowPlaying: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
     onTick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -77,21 +89,54 @@ fun MiniPlayer(
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
+                IconButton(
+                    enabled = uiState.canSkipToPrevious(),
+                    onClick = onPrevious,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "上一首",
+                    )
+                }
                 if (uiState.isPlaying) {
                     OutlinedButton(onClick = onPause) {
-                        Text("Pause")
+                        Icon(
+                            imageVector = Icons.Default.Pause,
+                            contentDescription = null,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("暂停")
                     }
                 } else {
                     Button(
                         enabled = track.isReady,
                         onClick = onPlay,
                     ) {
-                        Text("Play")
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("播放")
                     }
+                }
+                IconButton(
+                    enabled = uiState.canSkipToNext(),
+                    onClick = onNext,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "下一首",
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 OutlinedButton(onClick = onOpenNowPlaying) {
-                    Text("Open")
+                    Icon(
+                        imageVector = Icons.Default.OpenInFull,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("播放中")
                 }
             }
 
@@ -105,12 +150,12 @@ fun MiniPlayer(
 
 private fun PlaybackStatus.label(): String =
     when (this) {
-        PlaybackStatus.Idle -> "Ready"
-        PlaybackStatus.Buffering -> "Buffering"
-        PlaybackStatus.Playing -> "Playing"
-        PlaybackStatus.Paused -> "Paused"
-        PlaybackStatus.Ended -> "Finished"
-        PlaybackStatus.Error -> "Playback error"
+        PlaybackStatus.Idle -> "就绪"
+        PlaybackStatus.Buffering -> "缓冲中"
+        PlaybackStatus.Playing -> "播放中"
+        PlaybackStatus.Paused -> "已暂停"
+        PlaybackStatus.Ended -> "已结束"
+        PlaybackStatus.Error -> "播放错误"
     }
 
 private fun PlayerUiState.progressFraction(): Float {

@@ -82,7 +82,7 @@ class TrackDetailViewModel(
             uiState = uiState.copy(
                 cacheState = TrackCacheUiState(
                     status = CacheStatus.Failed,
-                    errorMessage = "You are offline. New cache downloads need the backend stream.",
+                    errorMessage = "当前离线。新的离线缓存下载需要连接后端音频流。",
                 ),
             )
             return
@@ -91,7 +91,7 @@ class TrackDetailViewModel(
         uiState = uiState.copy(
             cacheState = TrackCacheUiState(
                 status = CacheStatus.Caching,
-                message = "Starting cache download",
+                message = "正在开始缓存下载",
             ),
         )
 
@@ -104,7 +104,7 @@ class TrackDetailViewModel(
                 uiState = uiState.copy(
                     cacheState = TrackCacheUiState(
                         status = CacheStatus.Failed,
-                        errorMessage = "Please sign in again to cache this track.",
+                        errorMessage = "请重新登录后缓存这个音轨。",
                     ),
                 )
                 return@launch
@@ -126,7 +126,7 @@ class TrackDetailViewModel(
                         bytesDownloaded = result.cachedTrack.byteSize,
                         byteSize = result.cachedTrack.byteSize,
                         cachedAt = result.cachedTrack.cachedAt,
-                        message = "Cached for offline playback.",
+                        message = "已缓存，可离线播放。",
                     ),
                 )
 
@@ -145,7 +145,7 @@ class TrackDetailViewModel(
             playerController.stopIfPlayingCachedTrack(trackId)
             uiState = uiState.copy(
                 cacheState = uiState.cacheState.copy(
-                    message = "Deleting cached copy",
+                    message = "正在删除离线缓存",
                     errorMessage = null,
                 ),
             )
@@ -156,7 +156,7 @@ class TrackDetailViewModel(
                 TrackCacheDeleteResult.Success -> uiState.copy(
                     cacheState = TrackCacheUiState(
                         status = CacheStatus.NotCached,
-                        message = "Cached copy deleted from this device.",
+                        message = "已从这台设备删除离线缓存。",
                     ),
                 )
 
@@ -173,7 +173,7 @@ class TrackDetailViewModel(
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
                 isLoading = false,
-                errorMessage = "You are offline. Track detail refresh needs the backend.",
+                errorMessage = "当前离线。刷新音轨详情需要连接后端。",
                 errorKind = TrackDetailErrorKind.Other,
             )
             return
@@ -192,7 +192,7 @@ class TrackDetailViewModel(
 
             if (token == null) {
                 uiState = TrackDetailUiState(
-                    errorMessage = "Please sign in again to view this track.",
+                    errorMessage = "请重新登录后查看这个音轨。",
                     errorKind = TrackDetailErrorKind.Unauthorized,
                 )
                 return@launch
@@ -263,7 +263,7 @@ class TrackDetailViewModel(
                         byteSize = it.byteSize,
                         cachedAt = it.cachedAt,
                         message = if (it.cacheStatus == CacheStatus.Cached) {
-                            "Cached for offline playback."
+                            "已缓存，可离线播放。"
                         } else {
                             null
                         },
@@ -284,7 +284,7 @@ class TrackDetailViewModel(
                     uiState = uiState.copy(
                         cacheState = TrackCacheUiState(
                             status = CacheStatus.Failed,
-                            errorMessage = "Cache download stopped because you signed out.",
+                            errorMessage = "你已退出登录，缓存下载已停止。",
                         ),
                     )
                 }
@@ -294,9 +294,9 @@ class TrackDetailViewModel(
 
     private fun CacheDownloadProgress.label(): String =
         if (totalBytes != null) {
-            "Caching ${bytesDownloaded.formatBytes()} of ${totalBytes.formatBytes()}"
+            "正在缓存 ${bytesDownloaded.formatBytes()} / ${totalBytes.formatBytes()}"
         } else {
-            "Caching ${bytesDownloaded.formatBytes()}"
+            "正在缓存 ${bytesDownloaded.formatBytes()}"
         }
 }
 

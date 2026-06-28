@@ -13,7 +13,9 @@ management, track tag assignment, authenticated playback for ready tracks,
 a structured Recommendation V1 test panel, and an AI Assistant panel. The
 Android app supports authenticated library/detail flows, Media3 playback,
 Phase 4 manual offline cache behavior, a structured Recommendation Home, and
-natural-language AI recommendation input.
+natural-language AI recommendation input. V2.1 adds ordinary owner-scoped
+playlist management on the backend and Web, plus Web and Android playlist
+playback queues for sequence, shuffled-once, and reverse playback.
 
 Production deployment is covered separately.  For the full step-by-step
 guide see `docs/DEPLOYMENT.md`.  For production environment variables
@@ -67,6 +69,40 @@ the host:
 $env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@localhost:5432/easy_music_dev"
 $env:MEDIA_ROOT = ".\media"
 ```
+
+User-provided video upload uses a separate size limit and temporary media
+subdirectory:
+
+```powershell
+$env:TEMP_VIDEOS_DIR = "temp-videos"
+$env:MAX_VIDEO_UPLOAD_MB = "1024"
+```
+
+The API stores accepted videos under `MEDIA_ROOT\temp-videos` and creates a
+`video_extraction` processing job. The worker extracts audio from accepted
+videos via `extract_audio_from_video` (FFmpeg with `-vn`), stores the
+extracted audio as a controlled original, and then runs the existing audio
+processing pipeline (metadata, playback MP3, duplicate signals). Temp videos
+are deleted on successful extraction and kept for retry/debug on failure.
+
+V2 import tools are disabled by default. To test import-root safety, the
+read-only audio scan preview, confirmed audio import, and import batch history,
+configure throwaway directories outside the repository and outside
+`MEDIA_ROOT`; semicolons are safest for Windows paths:
+
+```powershell
+$env:IMPORT_ALLOWED_ROOTS = "D:\EasyMusicImport;E:\AnotherImport"
+$env:IMPORT_SCAN_MAX_FILES = "1000"
+$env:IMPORT_SCAN_MAX_DEPTH = "5"
+$env:IMPORT_SCAN_MAX_FILE_MB = "200"
+```
+
+Do not point import roots at `C:\`, `/`, your home directory, this repository,
+or the Easy Music media storage directory. Scan preview is read-only: it does
+not create tracks, processing jobs, hashes, copies, moves, or deletes.
+Confirmed import copies explicitly selected audio files into controlled Easy
+Music media storage, keeps the source files unchanged, creates normal
+processing tracks and jobs, and records safe import batch history for the Web.
 
 Apply migrations from `backend/`:
 
@@ -161,10 +197,9 @@ Invoke-RestMethod `
         client_event_id = $feedbackEventId
         track_id = $trackId
         feedback_type = "not_today"
-        scenario_tag_ids = @()
-        state_tag_ids = @()
+        scene_tag_ids = @()
+        feature_tag_ids = @()
         type_tag_ids = @()
-        attribute_tag_ids = @()
         occurred_at = (Get-Date).ToUniversalTime().ToString("o")
         client = "android"
       }
@@ -175,7 +210,9 @@ Invoke-RestMethod `
 The endpoint is authenticated, accepts small batches, validates track and
 context-tag ownership, and reports per-event `accepted`, `duplicate`, or
 `failed` results. `like` sets `tracks.liked` to `true`; `tired` records feedback
-and sets a default 14-day `tracks.cooldown_until` from `occurred_at`.
+and sets a default 14-day `tracks.cooldown_until` from `occurred_at`; `dislike`
+records a strong recommendation penalty without adding a track-level disliked
+column.
 
 Request structured Recommendation V1 results after applying Phase 5 Task 5.3:
 
@@ -186,11 +223,11 @@ Invoke-RestMethod `
   -Headers $headers `
   -ContentType "application/json" `
   -Body (@{
-    scenario_tag_ids = @($scenarioTagId)
-    state_tag_ids = @($stateTagId)
+    scene_tag_ids = @($sceneTagId)
+    feature_tag_ids = @($featureTagId)
     type_tag_ids = @($typeTagId)
-    attribute_tag_ids = @($attributeTagId)
-    exclude_attribute_tag_ids = @()
+    raw_text = "night coding focus"
+    cooldown_mode = "soft"
     limit = 3
     client = "web"
   } | ConvertTo-Json -Depth 4)
@@ -199,7 +236,76 @@ Invoke-RestMethod `
 The endpoint is authenticated, accepts only structured tag id groups, validates
 tag ownership and tag group compatibility, and returns a `request_id` plus up to
 three ordered results. Each result includes `rank`, `score`, deterministic
-rule-based `reason`, and the existing track response payload.
+rule-based `reason`, structured explanation details, and the existing track
+response payload. V2 Recommendation Foundation keeps `cooldown_mode` optional:
+`soft` is the default and applies an active-cooldown score penalty, `off`
+ignores active cooldown, and `strict` restores the previous hard exclusion.
+Same-day `not_today` feedback remains a hard exclusion. Optional `raw_text`
+is not parsed as a natural-language request by this endpoint; it is only a
+scoring hint for playlist name/description relevance alongside requested tag
+names. The response includes `exclusions_considered` for tracks filtered before
+ranking, such as strict cooldown or same-day `not_today` feedback.
+
+Review recently revived ready tracks after playback and feedback events exist:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/recommendations/revived" `
+  -Headers $headers
+```
+
+The revived endpoint is authenticated, current-user scoped, and read-only. It
+returns long-unplayed ready tracks before never-played ready tracks, includes
+track tags when available, and suppresses tracks with active cooldown,
+same-day `not_today`, or recent strong negative feedback.
+
+Review advisory duplicate candidates after applying V1.1 duplicate migrations
+and processing uploads:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks/duplicates" `
+  -Headers $headers
+```
+
+The duplicate endpoint is authenticated, current-user scoped, and read-only. It
+returns exact file-hash groups and conservative metadata/duration groups using a
+compact track payload that does not include internal media paths. Add
+`?track_id=$trackId` to filter groups for one owned track.
+
+Manage V2.1 playlists after applying the playlist migration:
+
+```powershell
+$playlist = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playlists" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"name":"Night coding","description":"Deep focus sessions"}'
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)/tracks" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ track_id = $trackId } | ConvertTo-Json)
+
+Invoke-RestMethod `
+  -Method Put `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)/tracks/order" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ track_ids = @($trackId) } | ConvertTo-Json)
+```
+
+Playlist endpoints are authenticated and current-user scoped. Adding the same
+track twice is idempotent and leaves one playlist-track row. Reorder requests
+must contain exactly the playlist's current track ids. Deleting a track also
+removes playlist-track rows for that track. Playlist descriptions are optional
+and are used with playlist names as Recommendation V2 Foundation scoring
+signals; they do not create smart or generated playlists.
 
 ## Docker Compose Local Flow
 
@@ -319,8 +425,9 @@ Available AI endpoints after Task 6.5:
   current user's existing tags.
 - `POST /api/ai/recommend` (authenticated) — parses natural-language intent via
   the AI, then delegates ranking to the existing Phase 5 recommendation service.
-  The LLM never selects track ids and never bypasses cooldown, recent-playback,
-  or feedback penalties.
+  The LLM never selects track ids and never bypasses active-cooldown scoring,
+  recent-playback penalties, playlist scoring, or feedback exclusions and
+  penalties.
 - `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) — suggests
   existing tags and optional new tag names for a track using AI-assisted
   metadata analysis. The endpoint never creates or assigns tags.
@@ -351,9 +458,46 @@ Run the Web development server from `web/`:
 npm run dev
 ```
 
-Vite prints the local browser URL, usually `http://localhost:5173/`. The Web
+Vite prints the local browser URL, usually `http://127.0.0.1:8081/`. The Web
 console calls the backend API after login, so run PostgreSQL, migrations, the
 API, and an initial local user before doing a full browser smoke test.
+
+On Windows, common Vite/dev ports such as `5173` or `3000` can fall inside TCP
+port ranges reserved by the OS or Hyper-V/WSL. The checked-in Vite config
+therefore uses `127.0.0.1:8081` for local Web development.
+
+The V2.1 playlist page is available at `/playlists` after login. It can create,
+rename, delete, and open ordinary user playlists, add owned tracks, remove
+tracks, save order changes, and start a local Web playback queue in sequence,
+one-time shuffled, or reverse order. It does not create smart playlists,
+persist queue state on the backend, or automatically generate playlists.
+V2 Recommendation Foundation uses manually curated playlist membership plus
+playlist name/description relevance as backend recommendation scoring signals.
+
+V2.2 promotes Queue to first-class local temporary client state. Web exposes a
+global queue drawer for current/upcoming management, previous/next, remove,
+clear, upcoming drag reorder, and playlist-only repeat. Android exposes the
+same local queue model through Media3 state and the Now Playing queue
+management surface. Queue remains process/page-local; there is no backend queue
+API and no cross-device queue sync.
+
+V2.2 acceptance is recorded in
+`docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`. Web automated checks and
+browser smoke are recorded as passed. Android automated checks and
+emulator/device smoke are recorded as passed.
+
+Android playback performance debugging notes are recorded in
+`docs/DEBUGGING/ANDROID_PLAYBACK_QUEUE_PERFORMANCE.md`. Start there if playback
+or playlist queue startup causes sustained app-wide jank, high main-thread CPU,
+or repeated media notification updates.
+
+The V2 import page is available at `/imports` after login. It reads the
+configured import roots from the backend, scans one configured root and optional
+relative subdirectory, lets the user explicitly select supported audio
+and video candidates, confirms import, and refreshes the latest import batch
+status using the existing track processing status. Video candidates are copied
+into temporary video storage and create `video_extraction` processing jobs;
+the worker extracts audio from them into the normal audio processing pipeline.
 
 Run the Web type check from `web/`:
 
@@ -407,10 +551,11 @@ backend:
    npm run dev
    ```
 
-5. Open the Vite URL, usually `http://localhost:5173/`, and log in with the
+5. Open the Vite URL, usually `http://127.0.0.1:8081/`, and log in with the
    local user.
 6. Visit `Upload`, upload an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
-   upload result creates a track with an initial processing status.
+   page shows per-file browser upload progress, then creates a track with an
+   initial processing status.
 7. Run a worker from the repository root:
 
    ```powershell
@@ -423,15 +568,26 @@ backend:
    docker compose up -d worker-loop
    ```
 
-8. Return to `Library` or the track detail page and use refresh, or wait for
-   lightweight polling while the track is processing, until the status becomes
-   `ready`.
-9. Open the track detail page and edit title, artist, album, content type,
-   source URL, liked state, cooldown date, and assigned tags as needed.
-10. Visit `Tags`, create a tag in one of the supported groups (`scenario`,
-    `state`, `type`, `attribute`), rename it, change its group, and delete one
+8. Return to `Upload`, `Library`, or the track detail page and use refresh, or
+   wait for lightweight polling while the track is processing, until the status
+   becomes `ready`. Failed processing should show the backend processing error
+   message when one is available.
+9. Select two or more tracks in Library, choose existing tags from the batch
+   tag panel, confirm adding and removing tags, and verify the affected rows
+   update without changing unselected tracks.
+10. Open `Reports` and confirm the read-only organization sections load:
+    untagged ready tracks, missing metadata, processing attention, duplicate
+    candidates, never played, rarely played, and expired cooldowns.
+11. Open the track detail page and edit title, artist, album, content type,
+   source URL, liked state, cooldown date, cover image, and assigned tags as
+   needed.
+12. Visit `Recommendations` and confirm the read-only Recently Revived section
+    loads quiet ready tracks, links to Track Detail, and does not auto-play,
+    auto-cache, or modify feedback.
+13. Visit `Tags`, create a tag in one of the supported groups (`scene`,
+    `type`, `feature`), rename it, change its group, and delete one
     explicit tag.
-11. For a ready track, use the playback control from the library row or track
+14. For a ready track, use the playback control from the library row or track
     detail page and confirm audio loads through the authenticated stream
     endpoint.
 
@@ -444,6 +600,41 @@ Expected result:
 - Ready tracks play in the browser.
 - Non-ready tracks keep playback disabled.
 
+## V1.1 Duplicate Detection Web Smoke Test
+
+Use this flow to verify the advisory duplicate-detection Web workflow after
+applying the V1.1 duplicate backend and Web tasks. Do not commit generated test
+media or local media/database state.
+
+1. Start PostgreSQL, apply migrations, start the API, and create or reuse a
+   local user.
+2. From `web/`, start Vite against the local API:
+
+   ```powershell
+   $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+   npm run dev
+   ```
+
+3. Log in through the Web console.
+4. Upload a unique supported audio file and confirm the upload result shows no
+   duplicate warning after the duplicate check finishes.
+5. Process the uploaded track with the worker until it is `ready`.
+6. Upload the same audio file again and confirm upload completion is not
+   blocked.
+7. Confirm the upload result shows an advisory duplicate warning with candidate
+   metadata and match reason.
+8. Open Library, then open `Review duplicates` or the sidebar `Duplicates`
+   route.
+9. Confirm `/duplicates` shows grouped exact or likely candidates.
+10. Open a candidate Track Detail link and confirm the existing detail page
+    still loads.
+11. Confirm no duplicate workflow deletes, merges, overwrites, hides, or
+    modifies tracks automatically.
+
+Record the result in
+`docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md`. Do not mark duplicate
+detection accepted until this browser smoke has passed.
+
 ## Automated Checks
 
 Run all Phase 1 backend tests from `backend/`:
@@ -452,18 +643,29 @@ Run all Phase 1 backend tests from `backend/`:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+Run the focused V2 import-root safety, scan-preview, confirmed-import, and
+batch-history checks from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_imports_config.py tests\test_imports_path_safety.py tests\test_imports_scan_api.py tests\test_imports_confirm_api.py tests\test_imports_batch_history_api.py
+```
+
 The test suite covers:
 
 - Auth login, invalid credentials, and current-user lookup.
 - Authenticated tag create, list, update, delete, validation, and ownership.
 - Authenticated track list, detail, update, delete, tag association, ownership,
   and streaming behavior.
+- Authenticated playlist CRUD, optional descriptions, ownership isolation,
+  add/remove, idempotent duplicate add, reorder validation, track-delete
+  relationship cleanup, and playlist signal isolation.
 - Authenticated playback-event bulk sync, validation, ownership, and duplicate
   retry behavior.
-- Authenticated feedback-event sync, context tag validation, `like`, `tired`,
-  and duplicate retry behavior.
+- Authenticated feedback-event sync, context tag validation, `like`, `dislike`,
+  `tired`, and duplicate retry behavior.
 - Authenticated structured recommendation requests, tag ownership/group
-  validation, empty results, ordered results, and deterministic reason fields.
+  validation, empty results, ordered results, cooldown `off`/`soft`/`strict`,
+  playlist scoring, feedback scoring, and deterministic reason fields.
 - Upload validation, original-file storage, and processing-job creation.
 - Media storage path generation and path traversal protection.
 - FFmpeg/ffprobe argument construction and structured failures.
@@ -500,8 +702,25 @@ cd android
 .\gradlew.bat test
 ```
 
+V1.1 Android launcher shortcuts are static shortcuts for Library,
+Recommendations, Cached Tracks, and Now Playing. They route through
+`MainActivity` and the existing auth/session recovery flow: signed-out launches
+show Login, while authenticated launches open the requested screen. The Now
+Playing shortcut opens the existing Now Playing screen and does not auto-start
+playback or create a new playback service.
+
 The Android backend base URL must stay configurable. Do not write production
 hosts, usernames, passwords, or bearer tokens into source files.
+
+V2.1 Android playlists are available from the bottom navigation after login.
+The Android client reads `GET /api/playlists` and `GET /api/playlists/{id}`,
+opens a selected playlist, and can start Media3 playback queues in sequence,
+one-time shuffled, or reverse order. Media3 owns next/previous navigation after
+the queue is built, so notification, lock-screen, and headset controls continue
+to target the current queue. It does not edit playlists on Android, persist
+queue state on the backend, or automatically generate playlists. Manual
+playlist membership and playlist text can still affect backend recommendation
+scoring through V2 Recommendation Foundation.
 
 - Android emulator to host backend: use `http://10.0.2.2:8000`.
 - Connected device or emulator with port reverse: run
@@ -667,7 +886,7 @@ architecture and Phase 4 cached playback source selection:
    ```
 
 5. In the Web console, create or reuse tags in the supported groups:
-   `scenario`, `state`, `type`, and `attribute`.
+   `scene`, `type`, and `feature`.
 6. Assign those tags to at least three ready tracks.
 7. Use the feedback and recommendation API smoke tests in
    `docs/API_MANUAL_TESTING.md` to verify `POST /api/feedback-events` and
@@ -719,8 +938,8 @@ playback, and Phase 4 cached playback source selection:
 3. Create or reuse the initial local user. If the database already has a user,
    keep using that account instead of creating another one.
 4. Upload and process enough audio files until at least three tracks are
-   `ready`, then assign structured tags in the `scenario`, `state`, `type`,
-   and `attribute` groups.
+   `ready`, then assign structured tags in the `scene`, `type`, and `feature`
+   groups.
 5. Configure development-only AI provider values if testing provider-ok
    behavior. Never commit a real key, production secret, or bearer token.
 6. Use the AI endpoint smoke tests in `docs/API_MANUAL_TESTING.md` to verify
@@ -758,6 +977,21 @@ Production deployment hardening, embeddings, audio analysis, training
 platforms, social features, automatic downloads, and playback rewrites remain
 outside this phase.
 
+## V1.1 Android Shortcut Smoke Test
+
+Use this flow after installing a debug build on an emulator or device:
+
+1. Long-press the Easy Music launcher icon and confirm shortcuts appear for
+   Library, Recommendations, Cached Tracks, and Now Playing.
+2. While signed out, open each shortcut and confirm the app lands on the
+   existing Login flow.
+3. Sign in, then open each shortcut again and confirm it routes to the named
+   screen.
+4. Open the Now Playing shortcut and confirm it does not auto-start playback;
+   it should show the existing Now Playing state or its empty state.
+5. Confirm normal Library navigation, cached playback selection, recommendation
+   selection, and background playback behavior still work.
+
 ## Database Migrations
 
 Backend migrations use Alembic with SQLAlchemy. The migration environment reads
@@ -786,6 +1020,7 @@ The recommended layout follows `docs/ARCHITECTURE.md`:
 | `/srv/easy-music/media/originals` | `/app/media/originals` | api, worker |
 | `/srv/easy-music/media/playback` | `/app/media/playback` | api, worker |
 | `/srv/easy-music/media/covers` | `/app/media/covers` | api, worker |
+| `/srv/easy-music/media/temp-videos` | `/app/media/temp-videos` | api, worker |
 | `/srv/easy-music/postgres` | `/var/lib/postgresql/data` | postgres |
 | `/srv/easy-music/backups` | (host only) | backup script |
 

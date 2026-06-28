@@ -1,4 +1,5 @@
 from collections.abc import Generator
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -78,19 +79,30 @@ def test_upload_audio_creates_track_and_saves_original(
     assert body["title"] == "My Song"
     assert body["format"] == "mp3"
     assert body["status"] == "processing"
+    assert body["processing_job_status"] == "pending"
+    assert body["processing_error_message"] is None
     assert body["original_file_path"].startswith("originals/user-")
+    assert body["original_file_size_bytes"] == len(b"audio bytes")
+    assert body["original_file_sha256"] == hashlib.sha256(b"audio bytes").hexdigest()
     assert body["playback_file_path"] is None
+    assert body["playback_file_sha256"] is None
+    assert body["normalized_metadata_key"] == "title=my song|artist=|album=|duration="
     assert body["tags"] == []
 
     track = db_session.get(Track, body["id"])
     assert track is not None
     assert track.user_id == user.id
     assert track.original_file_path == body["original_file_path"]
+    assert track.original_file_size_bytes == len(b"audio bytes")
+    assert track.original_file_sha256 == hashlib.sha256(b"audio bytes").hexdigest()
+    assert track.normalized_metadata_key == "title=my song|artist=|album=|duration="
     assert (tmp_path / track.original_file_path).read_bytes() == b"audio bytes"
 
     job = db_session.query(ProcessingJob).one()
     assert job.track_id == track.id
     assert job.status == "pending"
+    assert job.job_type == "audio_processing"
+    assert job.source_path is None
     assert job.error_message is None
 
 

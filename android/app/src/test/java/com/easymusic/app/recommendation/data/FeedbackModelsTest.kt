@@ -14,10 +14,9 @@ class FeedbackModelsTest {
             clientEventId = "feedback-123",
             trackId = 42,
             feedbackType = FeedbackType.NotSuitableForContext,
-            scenarioTagIds = listOf(1, 2),
-            stateTagIds = listOf(3),
+            sceneTagIds = listOf(1, 2),
+            featureTagIds = listOf(3),
             typeTagIds = listOf(4),
-            attributeTagIds = listOf(5, 6),
             occurredAt = "2026-05-29T08:00:00Z",
         )
 
@@ -28,10 +27,9 @@ class FeedbackModelsTest {
         assertEquals("not_suitable_for_context", json.getString("feedback_type"))
         assertEquals("2026-05-29T08:00:00Z", json.getString("occurred_at"))
         assertEquals("android", json.getString("client"))
-        assertEquals(listOf(1, 2), json.getJSONArray("scenario_tag_ids").toIntList())
-        assertEquals(listOf(3), json.getJSONArray("state_tag_ids").toIntList())
+        assertEquals(listOf(1, 2), json.getJSONArray("scene_tag_ids").toIntList())
+        assertEquals(listOf(3), json.getJSONArray("feature_tag_ids").toIntList())
         assertEquals(listOf(4), json.getJSONArray("type_tag_ids").toIntList())
-        assertEquals(listOf(5, 6), json.getJSONArray("attribute_tag_ids").toIntList())
     }
 
     @Test

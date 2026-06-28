@@ -129,3 +129,48 @@ def test_process_next_job_marks_job_failed_with_error_message(
 
 def test_process_next_job_returns_none_when_no_pending_jobs(db_session: Session) -> None:
     assert worker_jobs.process_next_job(db_session, MediaStorage()) is None
+
+
+def test_process_next_job_claims_and_processes_video_extraction_jobs(
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(db_session)
+    track = Track(
+        user_id=user.id,
+        title="Video",
+        content_type="song",
+        status="processing",
+    )
+    db_session.add(track)
+    db_session.flush()
+    job = ProcessingJob(
+        track_id=track.id,
+        status="pending",
+        job_type="video_extraction",
+        source_path="temp-videos/user-1/track-1/source.mp4",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
+    processed_by_video: list[int] = []
+
+    def video_handler_stub(db: Session, job: ProcessingJob, storage: MediaStorage) -> None:
+        processed_by_video.append(job.id)
+        t = db.get(Track, job.track_id)
+        assert t is not None
+        t.status = "ready"
+        db.commit()
+
+    monkeypatch.setattr(worker_jobs, "_process_video_extraction_job", video_handler_stub)
+
+    processed_job = worker_jobs.process_next_job(db_session, storage)
+
+    assert processed_job is not None
+    assert processed_job.id == job.id
+    assert processed_job.status == "succeeded"
+    assert processed_by_video == [job.id]
+    db_session.refresh(track)
+    assert track.status == "ready"

@@ -15,6 +15,8 @@ class ProcessingJob(Base):
         index=True,
     )
     status: Mapped[str] = mapped_column(String(50), index=True, default="pending")
+    job_type: Mapped[str] = mapped_column(String(50), index=True, default="audio_processing")
+    source_path: Mapped[str | None] = mapped_column(String(1024))
     error_message: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

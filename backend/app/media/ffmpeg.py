@@ -110,6 +110,50 @@ def probe_media(
     return payload
 
 
+def extract_audio_from_video(
+    source_path: str | Path,
+    destination_path: str | Path,
+    *,
+    settings: Settings | None = None,
+    runner: SubprocessRunner | None = None,
+    audio_bitrate: str = "192k",
+) -> None:
+    active_settings = settings or get_settings()
+    destination = Path(destination_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    args = [
+        active_settings.ffmpeg_path,
+        "-y",
+        "-i",
+        str(source_path),
+        "-vn",
+        "-codec:a",
+        "libmp3lame",
+        "-b:a",
+        audio_bitrate,
+        str(destination),
+    ]
+
+    try:
+        result = _run_media_command(args, runner=runner)
+    except FileNotFoundError as exc:
+        raise FFmpegError(
+            "ffmpeg executable was not found.",
+            executable=active_settings.ffmpeg_path,
+            args=args,
+        ) from exc
+
+    if result.returncode != 0:
+        raise FFmpegError(
+            "FFmpeg failed to extract audio from video.",
+            executable=active_settings.ffmpeg_path,
+            args=args,
+            returncode=result.returncode,
+            stderr=result.stderr,
+        )
+
+
 def generate_mp3_playback(
     source_path: str | Path,
     destination_path: str | Path,

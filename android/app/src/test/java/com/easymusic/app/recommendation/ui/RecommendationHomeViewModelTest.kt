@@ -38,7 +38,7 @@ class RecommendationHomeViewModelTest {
     }
 
     // -----------------------------------------------------------------------
-    // requestAiRecommendation — empty text
+    // requestAiRecommendation - empty text
     // -----------------------------------------------------------------------
 
     @Test
@@ -48,7 +48,7 @@ class RecommendationHomeViewModelTest {
         viewModel.requestAiRecommendation(isNetworkAvailable = true)
 
         assertEquals(
-            "Type a natural-language request first.",
+            "请先输入想听什么。",
             viewModel.uiState.aiState.errorMessage,
         )
         assertTrue(viewModel.uiState.aiState.results.isEmpty())
@@ -62,13 +62,13 @@ class RecommendationHomeViewModelTest {
         viewModel.requestAiRecommendation(isNetworkAvailable = true)
 
         assertEquals(
-            "Type a natural-language request first.",
+            "请先输入想听什么。",
             viewModel.uiState.aiState.errorMessage,
         )
     }
 
     // -----------------------------------------------------------------------
-    // requestAiRecommendation — offline
+    // requestAiRecommendation - offline
     // -----------------------------------------------------------------------
 
     @Test
@@ -79,7 +79,7 @@ class RecommendationHomeViewModelTest {
         viewModel.requestAiRecommendation(isNetworkAvailable = false)
 
         assertEquals(
-            "You are offline. AI recommendations need the backend.",
+            "当前离线。AI 推荐需要连接后端。",
             viewModel.uiState.aiState.errorMessage,
         )
         assertFalse(viewModel.uiState.aiState.isRequesting)
@@ -94,11 +94,9 @@ class RecommendationHomeViewModelTest {
     @Test
     fun aiParsedContextHoldsStructuredRequestForFeedbackContext() {
         val structuredRequest = RecommendationRequest(
-            scenarioTagIds = listOf(1),
-            stateTagIds = listOf(2),
+            sceneTagIds = listOf(1),
+            featureTagIds = listOf(2),
             typeTagIds = listOf(3),
-            attributeTagIds = listOf(4),
-            excludeAttributeTagIds = listOf(5),
         )
         val context = AiParsedContext(
             structuredRequest = structuredRequest,
@@ -106,11 +104,9 @@ class RecommendationHomeViewModelTest {
             unmatchedTerms = listOf("unknown"),
         )
 
-        assertEquals(listOf(1), context.structuredRequest?.scenarioTagIds)
-        assertEquals(listOf(2), context.structuredRequest?.stateTagIds)
+        assertEquals(listOf(1), context.structuredRequest?.sceneTagIds)
+        assertEquals(listOf(2), context.structuredRequest?.featureTagIds)
         assertEquals(listOf(3), context.structuredRequest?.typeTagIds)
-        assertEquals(listOf(4), context.structuredRequest?.attributeTagIds)
-        assertEquals(listOf(5), context.structuredRequest?.excludeAttributeTagIds)
         assertEquals("Test explanation", context.explanation)
         assertEquals(listOf("unknown"), context.unmatchedTerms)
     }
@@ -165,6 +161,7 @@ class RecommendationHomeViewModelTest {
     fun aiFeedbackUsesCorrectFeedbackTypes() {
         // Verify FeedbackType values match the expected POST /api/feedback-events contract
         assertEquals("like", FeedbackType.Like.value)
+        assertEquals("dislike", FeedbackType.Dislike.value)
         assertEquals("tired", FeedbackType.Tired.value)
         assertEquals("not_today", FeedbackType.NotToday.value)
         assertEquals("not_suitable_for_context", FeedbackType.NotSuitableForContext.value)
@@ -217,11 +214,9 @@ class RecommendationHomeViewModelTest {
                             """
                             {
                               "structured_request": {
-                                "scenario_tag_ids": [],
-                                "state_tag_ids": [],
+                                "scene_tag_ids": [],
+                                "feature_tag_ids": [],
                                 "type_tag_ids": [],
-                                "attribute_tag_ids": [],
-                                "exclude_attribute_tag_ids": [],
                                 "limit": 3,
                                 "client": null
                               },
@@ -246,11 +241,9 @@ class RecommendationHomeViewModelTest {
                                 """
                                 {
                                   "structured_request": {
-                                    "scenario_tag_ids": [],
-                                    "state_tag_ids": [],
+                                    "scene_tag_ids": [],
+                                    "feature_tag_ids": [],
                                     "type_tag_ids": [],
-                                    "attribute_tag_ids": [],
-                                    "exclude_attribute_tag_ids": [],
                                     "limit": 3,
                                     "client": null
                                   },

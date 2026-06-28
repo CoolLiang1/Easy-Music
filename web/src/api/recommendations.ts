@@ -2,6 +2,7 @@ import { apiRequest } from "./http";
 import type {
   RecommendationRequest,
   RecommendationResponse,
+  RevivedTracksResponse,
 } from "../types/recommendation";
 
 export function requestRecommendations(
@@ -12,5 +13,11 @@ export function requestRecommendations(
     method: "POST",
     accessToken,
     body: payload,
+  });
+}
+
+export function getRecentlyRevivedTracks(accessToken: string) {
+  return apiRequest<RevivedTracksResponse>("/api/recommendations/revived", {
+    accessToken,
   });
 }

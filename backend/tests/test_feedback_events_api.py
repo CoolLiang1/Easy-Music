@@ -115,10 +115,9 @@ def test_sync_feedback_events_inserts_owned_track_with_context(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user)
-    scenario = create_tag(db_session, user, "scenario", "Focus")
-    state = create_tag(db_session, user, "state", "Calm")
+    scene = create_tag(db_session, user, "scene", "Focus")
+    feature = create_tag(db_session, user, "feature", "Calm")
     kind = create_tag(db_session, user, "type", "Song")
-    attribute = create_tag(db_session, user, "attribute", "Piano")
 
     response = client.post(
         "/api/feedback-events",
@@ -126,10 +125,9 @@ def test_sync_feedback_events_inserts_owned_track_with_context(
             "events": [
                 {
                     **feedback_event_payload(track.id),
-                    "scenario_tag_ids": [scenario.id],
-                    "state_tag_ids": [state.id],
+                    "scene_tag_ids": [scene.id],
+                    "feature_tag_ids": [feature.id],
                     "type_tag_ids": [kind.id],
-                    "attribute_tag_ids": [attribute.id],
                 },
             ],
         },
@@ -145,7 +143,9 @@ def test_sync_feedback_events_inserts_owned_track_with_context(
     assert len(events) == 1
     assert events[0].track_id == track.id
     assert events[0].feedback_type == "not_today"
-    assert events[0].scenario_tag_ids == [scenario.id]
+    assert events[0].scene_tag_ids == [scene.id]
+    assert events[0].feature_tag_ids == [feature.id]
+    assert events[0].type_tag_ids == [kind.id]
     assert events[0].client == "android"
 
 
@@ -185,7 +185,7 @@ def test_sync_feedback_events_validates_context_tag_ownership(
     owner = create_user(db_session)
     other_user = create_user(db_session, username="other")
     track = create_track(db_session, owner)
-    hidden_tag = create_tag(db_session, other_user, "scenario", "Hidden")
+    hidden_tag = create_tag(db_session, other_user, "scene", "Hidden")
 
     response = client.post(
         "/api/feedback-events",
@@ -193,7 +193,7 @@ def test_sync_feedback_events_validates_context_tag_ownership(
             "events": [
                 {
                     **feedback_event_payload(track.id),
-                    "scenario_tag_ids": [hidden_tag.id],
+                    "scene_tag_ids": [hidden_tag.id],
                 },
             ],
         },
@@ -212,7 +212,7 @@ def test_sync_feedback_events_validates_context_tag_group(
 ) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user)
-    attribute = create_tag(db_session, user, "attribute", "Piano")
+    feature = create_tag(db_session, user, "feature", "Calm")
 
     response = client.post(
         "/api/feedback-events",
@@ -220,7 +220,7 @@ def test_sync_feedback_events_validates_context_tag_group(
             "events": [
                 {
                     **feedback_event_payload(track.id),
-                    "scenario_tag_ids": [attribute.id],
+                    "scene_tag_ids": [feature.id],
                 },
             ],
         },
@@ -229,8 +229,31 @@ def test_sync_feedback_events_validates_context_tag_group(
 
     assert response.status_code == 200
     assert response.json()["accepted"] == []
-    assert response.json()["failed"][0]["error"] == "Context tag group must be scenario."
+    assert response.json()["failed"][0]["error"] == "Context tag group must be scene."
     assert list(db_session.scalars(select(FeedbackEvent))) == []
+
+
+def test_sync_feedback_events_rejects_attribute_context_field(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.post(
+        "/api/feedback-events",
+        json={
+            "events": [
+                {
+                    **feedback_event_payload(track.id),
+                    "attribute_tag_ids": [1],
+                },
+            ],
+        },
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 422
 
 
 def test_sync_feedback_events_like_updates_track_liked(
@@ -250,6 +273,26 @@ def test_sync_feedback_events_like_updates_track_liked(
     assert response.status_code == 200
     assert track.liked is True
     assert db_session.scalar(select(FeedbackEvent)).feedback_type == "like"
+
+
+def test_sync_feedback_events_accepts_dislike_without_track_feature_change(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.post(
+        "/api/feedback-events",
+        json={"events": [feedback_event_payload(track.id, feedback_type="dislike")]},
+        headers=auth_headers(user),
+    )
+
+    db_session.refresh(track)
+    assert response.status_code == 200
+    assert track.liked is False
+    assert track.cooldown_until is None
+    assert db_session.scalar(select(FeedbackEvent)).feedback_type == "dislike"
 
 
 def test_sync_feedback_events_tired_sets_default_cooldown(

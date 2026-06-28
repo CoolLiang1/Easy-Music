@@ -57,23 +57,20 @@ class AiRecommendationModelsTest {
             """
             {
               "structured_request": {
-                "scenario_tag_ids": [1],
-                "state_tag_ids": [2],
+                "scene_tag_ids": [1],
+                "feature_tag_ids": [2],
                 "type_tag_ids": [],
-                "attribute_tag_ids": [3],
-                "exclude_attribute_tag_ids": [4],
+                "raw_text": "calm focus music",
+                "cooldown_mode": "strict",
                 "limit": 3,
                 "client": "android"
               },
               "matched_tags": {
-                "scenario": [
-                  {"id": 1, "name": "Focus", "group": "scenario"}
+                "scene": [
+                  {"id": 1, "name": "Focus", "group": "scene"}
                 ],
-                "state": [
-                  {"id": 2, "name": "Calm", "group": "state"}
-                ],
-                "attribute": [
-                  {"id": 3, "name": "Piano", "group": "attribute"}
+                "feature": [
+                  {"id": 2, "name": "Calm", "group": "feature"}
                 ]
               },
               "unmatched_terms": ["loud"],
@@ -90,19 +87,18 @@ class AiRecommendationModelsTest {
         assertEquals("Mapped 'calm focus' to Focus+Calm.", parsed.explanation)
 
         // structured request
-        assertEquals(listOf(1), parsed.structuredRequest.scenarioTagIds)
-        assertEquals(listOf(2), parsed.structuredRequest.stateTagIds)
+        assertEquals(listOf(1), parsed.structuredRequest.sceneTagIds)
+        assertEquals(listOf(2), parsed.structuredRequest.featureTagIds)
         assertEquals(emptyList<Int>(), parsed.structuredRequest.typeTagIds)
-        assertEquals(listOf(3), parsed.structuredRequest.attributeTagIds)
-        assertEquals(listOf(4), parsed.structuredRequest.excludeAttributeTagIds)
+        assertEquals("calm focus music", parsed.structuredRequest.rawText)
+        assertEquals(RecommendationCooldownMode.Strict, parsed.structuredRequest.cooldownMode)
         assertEquals(3, parsed.structuredRequest.limit)
         assertEquals("android", parsed.structuredRequest.client)
 
         // matched tags
-        assertEquals(3, parsed.matchedTags.size)
-        assertEquals("Focus", parsed.matchedTags["scenario"]!!.single().name)
-        assertEquals("Calm", parsed.matchedTags["state"]!!.single().name)
-        assertEquals("Piano", parsed.matchedTags["attribute"]!!.single().name)
+        assertEquals(2, parsed.matchedTags.size)
+        assertEquals("Focus", parsed.matchedTags["scene"]!!.single().name)
+        assertEquals("Calm", parsed.matchedTags["feature"]!!.single().name)
 
         // unmatched terms
         assertEquals(listOf("loud"), parsed.unmatchedTerms)
@@ -114,11 +110,9 @@ class AiRecommendationModelsTest {
             """
             {
               "structured_request": {
-                "scenario_tag_ids": [],
-                "state_tag_ids": [],
+                "scene_tag_ids": [],
+                "feature_tag_ids": [],
                 "type_tag_ids": [],
-                "attribute_tag_ids": [],
-                "exclude_attribute_tag_ids": [],
                 "limit": 3,
                 "client": null
               },
@@ -136,7 +130,7 @@ class AiRecommendationModelsTest {
         assertFalse(parsed.isOk)
         assertTrue(parsed.matchedTags.isEmpty())
         assertTrue(parsed.unmatchedTerms.isEmpty())
-        assertTrue(parsed.structuredRequest.scenarioTagIds.isEmpty())
+        assertTrue(parsed.structuredRequest.sceneTagIds.isEmpty())
     }
 
     @Test
@@ -145,11 +139,9 @@ class AiRecommendationModelsTest {
             """
             {
               "structured_request": {
-                "scenario_tag_ids": [],
-                "state_tag_ids": [],
+                "scene_tag_ids": [],
+                "feature_tag_ids": [],
                 "type_tag_ids": [],
-                "attribute_tag_ids": [],
-                "exclude_attribute_tag_ids": [],
                 "limit": 3,
                 "client": null
               },
@@ -183,11 +175,11 @@ class AiRecommendationModelsTest {
 
         // parsed intent
         assertEquals("ok", response.parsedIntent.providerStatus)
-        assertEquals("Focus", response.parsedIntent.matchedTags["scenario"]!!.single().name)
+        assertEquals("Focus", response.parsedIntent.matchedTags["scene"]!!.single().name)
 
         // results
         assertEquals("Morning Focus", response.results[0].track.title)
-        assertEquals("Matched scenario and state tags.", response.results[0].reason)
+        assertEquals("Matched scene and feature tags.", response.results[0].reason)
         assertTrue(response.results.all { it.track.isReady })
     }
 
@@ -198,16 +190,14 @@ class AiRecommendationModelsTest {
             {
               "parsed_intent": {
                 "structured_request": {
-                  "scenario_tag_ids": [1],
-                  "state_tag_ids": [],
+                  "scene_tag_ids": [1],
+                  "feature_tag_ids": [],
                   "type_tag_ids": [],
-                  "attribute_tag_ids": [],
-                  "exclude_attribute_tag_ids": [],
                   "limit": 3,
                   "client": "android"
                 },
                 "matched_tags": {
-                  "scenario": [{"id": 1, "name": "Focus", "group": "scenario"}]
+                  "scene": [{"id": 1, "name": "Focus", "group": "scene"}]
                 },
                 "unmatched_terms": [],
                 "explanation": null,
@@ -233,11 +223,9 @@ class AiRecommendationModelsTest {
             {
               "parsed_intent": {
                 "structured_request": {
-                  "scenario_tag_ids": [],
-                  "state_tag_ids": [],
+                  "scene_tag_ids": [],
+                  "feature_tag_ids": [],
                   "type_tag_ids": [],
-                  "attribute_tag_ids": [],
-                  "exclude_attribute_tag_ids": [],
                   "limit": 3,
                   "client": null
                 },
@@ -269,17 +257,15 @@ class AiRecommendationModelsTest {
         {
           "parsed_intent": {
             "structured_request": {
-              "scenario_tag_ids": [1],
-              "state_tag_ids": [2],
+              "scene_tag_ids": [1],
+              "feature_tag_ids": [2],
               "type_tag_ids": [],
-              "attribute_tag_ids": [],
-              "exclude_attribute_tag_ids": [],
               "limit": 3,
               "client": "android"
             },
             "matched_tags": {
-              "scenario": [{"id": 1, "name": "Focus", "group": "scenario"}],
-              "state": [{"id": 2, "name": "Calm", "group": "state"}]
+              "scene": [{"id": 1, "name": "Focus", "group": "scene"}],
+              "feature": [{"id": 2, "name": "Calm", "group": "feature"}]
             },
             "unmatched_terms": [],
             "explanation": "Matched to Focus+Calm.",
@@ -290,13 +276,13 @@ class AiRecommendationModelsTest {
             {
               "rank": 1,
               "score": 12.5,
-              "reason": "Matched scenario and state tags.",
+              "reason": "Matched scene and feature tags.",
               "track": ${trackJson(101, "Morning Focus", "The Testers")}
             },
             {
               "rank": 2,
               "score": 9.0,
-              "reason": "Matched scenario tag.",
+              "reason": "Matched scene tag.",
               "track": ${trackJson(102, "Quiet Work", null)}
             },
             {
@@ -338,7 +324,7 @@ class AiRecommendationModelsTest {
             {
               "id": 1,
               "name": "focus",
-              "group": "scenario",
+              "group": "scene",
               "created_at": "2026-05-29T07:00:00Z"
             }
           ]

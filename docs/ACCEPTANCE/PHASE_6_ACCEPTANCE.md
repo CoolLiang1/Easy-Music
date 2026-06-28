@@ -176,9 +176,9 @@ Expected backend behavior:
 
 - AI parse responses contain a Phase 5-compatible structured request.
 - AI recommend responses never contain LLM-selected track ids.
-- Track selection, ordering, score, cooldown exclusion, recent playback
-  handling, liked boost, and feedback penalties come from the Phase 5
-  recommendation service.
+- Track selection, ordering, score, cooldown handling, recent playback
+  handling, liked boost, playlist scoring, and feedback penalties come from the
+  backend recommendation service.
 - Tag suggestions are advisory only.
 
 ## Web Manual Flow

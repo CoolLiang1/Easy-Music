@@ -117,22 +117,18 @@ class _FakeClient:
 
 def _intent_json(
     *,
-    scenario: list[int] | None = None,
-    state: list[int] | None = None,
+    scene: list[int] | None = None,
+    feature: list[int] | None = None,
     type_: list[int] | None = None,
-    attribute: list[int] | None = None,
-    exclude: list[int] | None = None,
     unmatched: list[str] | None = None,
     explanation: str | None = None,
 ) -> str:
     """Build a valid AiIntentOutput JSON string for the fake client."""
     return json.dumps(
         {
-            "scenario_tag_ids": scenario or [],
-            "state_tag_ids": state or [],
+            "scene_tag_ids": scene or [],
+            "feature_tag_ids": feature or [],
             "type_tag_ids": type_ or [],
-            "attribute_tag_ids": attribute or [],
-            "exclude_attribute_tag_ids": exclude or [],
             "unmatched_terms": unmatched or [],
             "explanation": explanation,
         }
@@ -195,7 +191,7 @@ def test_parse_intent_returns_disabled_when_provider_is_disabled(
     assert response.status_code == 200
     body = response.json()
     assert body["provider_status"] == "disabled"
-    assert body["structured_request"]["scenario_tag_ids"] == []
+    assert body["structured_request"]["scene_tag_ids"] == []
     assert body["matched_tags"] == {}
 
 
@@ -243,20 +239,16 @@ def test_parse_intent_valid_mapping(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    calm = create_tag(db_session, user, "state", "Calm")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
     instrumental = create_tag(db_session, user, "type", "Instrumental")
-    piano = create_tag(db_session, user, "attribute", "Piano")
-    noisy = create_tag(db_session, user, "attribute", "Noisy")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
         _intent_json(
-            scenario=[focus.id],
-            state=[calm.id],
+            scene=[focus.id],
+            feature=[calm.id],
             type_=[instrumental.id],
-            attribute=[piano.id],
-            exclude=[noisy.id],
             unmatched=["some term"],
             explanation="Mapped 'calm focus' to Focus+Calm.",
         )
@@ -275,18 +267,15 @@ def test_parse_intent_valid_mapping(
     assert body["unmatched_terms"] == ["some term"]
 
     sr = body["structured_request"]
-    assert sr["scenario_tag_ids"] == [focus.id]
-    assert sr["state_tag_ids"] == [calm.id]
+    assert sr["scene_tag_ids"] == [focus.id]
+    assert sr["feature_tag_ids"] == [calm.id]
     assert sr["type_tag_ids"] == [instrumental.id]
-    assert sr["attribute_tag_ids"] == [piano.id]
-    assert sr["exclude_attribute_tag_ids"] == [noisy.id]
     assert sr["limit"] == 3
 
     mt = body["matched_tags"]
-    assert mt["scenario"][0]["name"] == "Focus"
-    assert mt["state"][0]["name"] == "Calm"
+    assert mt["scene"][0]["name"] == "Focus"
+    assert mt["feature"][0]["name"] == "Calm"
     assert mt["type"][0]["name"] == "Instrumental"
-    assert mt["attribute"][0]["name"] == "Piano"
 
 
 def test_parse_intent_with_no_tags_for_user(
@@ -307,7 +296,7 @@ def test_parse_intent_with_no_tags_for_user(
     assert response.status_code == 200
     body = response.json()
     assert body["provider_status"] == "ok"
-    assert body["structured_request"]["scenario_tag_ids"] == []
+    assert body["structured_request"]["scene_tag_ids"] == []
 
 
 def test_parse_intent_passes_client_field(
@@ -339,11 +328,11 @@ def test_parse_intent_rejects_tag_from_another_user(
 ) -> None:
     owner = create_user(db_session)
     other = create_user(db_session, username="other")
-    other_tag = create_tag(db_session, other, "scenario", "Stolen")
+    other_tag = create_tag(db_session, other, "scene", "Stolen")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
-        _intent_json(scenario=[other_tag.id])
+        _intent_json(scene=[other_tag.id])
     )
 
     response = client.post(
@@ -369,12 +358,12 @@ def test_parse_intent_rejects_tag_in_wrong_group(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    # Create an attribute tag but the AI puts it in scenario_tag_ids
-    piano = create_tag(db_session, user, "attribute", "Piano")
+    # Create a feature tag but the AI puts it in scene_tag_ids
+    calm = create_tag(db_session, user, "feature", "Calm")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
-        _intent_json(scenario=[piano.id])
+        _intent_json(scene=[calm.id])
     )
 
     response = client.post(
@@ -387,6 +376,35 @@ def test_parse_intent_rejects_tag_in_wrong_group(
     body = response.json()
     assert body["provider_status"] == "error"
     assert "group" in (body["explanation"] or "").lower()
+
+
+def test_parse_intent_rejects_old_attribute_output(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        json.dumps(
+            {
+                "scene_tag_ids": [],
+                "type_tag_ids": [],
+                "feature_tag_ids": [],
+                "attribute_tag_ids": [1],
+                "unmatched_terms": [],
+            },
+        ),
+    )
+
+    response = client.post(
+        "/api/ai/parse-listening-intent",
+        json={"text": "test", "fallback_to_empty": True},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "error"
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +420,7 @@ def test_parse_intent_rejects_invented_tag_id(
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(
-        _intent_json(scenario=[99999])
+        _intent_json(scene=[99999])
     )
 
     response = client.post(
@@ -435,7 +453,7 @@ def test_parse_intent_fallback_to_empty_is_default(
         headers=auth_headers(user),
     )
 
-    # fallback_to_empty defaults to True → 200 even when disabled
+    # fallback_to_empty defaults to True -> 200 even when disabled
     assert response.status_code == 200
     assert response.json()["provider_status"] == "disabled"
 
@@ -482,8 +500,8 @@ def test_parse_intent_prompt_includes_tag_catalogue(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    calm = create_tag(db_session, user, "state", "Calm")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(_intent_json())
@@ -507,7 +525,7 @@ def test_parse_intent_prompt_tells_ai_not_to_invent_tags(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    create_tag(db_session, user, "scenario", "Focus")
+    create_tag(db_session, user, "scene", "Focus")
 
     fake = _install_provider(client.app)
     fake.result = AiCompletionResult.ok(_intent_json())
@@ -555,14 +573,14 @@ def test_parse_intent_handles_not_implemented_provider(
 ) -> None:
     """Without a fake client the provider returns 'not_implemented' error."""
     user = create_user(db_session)
-    # Don't install a fake — use the real _get_ai_provider (no client injected)
+    # Don't install a fake - use the real _get_ai_provider (no client injected)
     response = client.post(
         "/api/ai/parse-listening-intent",
         json={"text": "any music", "fallback_to_empty": True},
         headers=auth_headers(user),
     )
 
-    # The real provider has no client → returns not_implemented error
+    # The real provider has no client -> returns not_implemented error
     # But the endpoint defaults ai_enabled=False, so it will be disabled
     # We need to test when ai is enabled but no client
     from app.api.routes.ai import _get_ai_provider

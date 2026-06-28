@@ -1,7 +1,11 @@
 import { AiAssistantPage } from "./pages/AiAssistantPage";
 import { AppLayout } from "./layout/AppLayout";
+import { DuplicateReviewPage } from "./pages/DuplicateReviewPage";
 import { LoginPage } from "./pages/LoginPage";
 import { LibraryPage } from "./pages/LibraryPage";
+import { LibraryReportsPage } from "./pages/LibraryReportsPage";
+import { ImportPage } from "./pages/ImportPage";
+import { PlaylistsPage } from "./pages/PlaylistsPage";
 import { RecommendationPage } from "./pages/RecommendationPage";
 import { TagsPage } from "./pages/TagsPage";
 import { TrackDetailPage } from "./pages/TrackDetailPage";
@@ -44,6 +48,10 @@ export default function App() {
     >
       <AppLayout onSignOut={() => setPlaceholderAuth(false)}>
         {route.name === "library" ? <LibraryPage /> : null}
+        {route.name === "playlists" ? <PlaylistsPage /> : null}
+        {route.name === "duplicates" ? <DuplicateReviewPage /> : null}
+        {route.name === "imports" ? <ImportPage /> : null}
+        {route.name === "reports" ? <LibraryReportsPage /> : null}
         {route.name === "upload" ? <UploadPage /> : null}
         {route.name === "tags" ? <TagsPage /> : null}
         {route.name === "aiAssistant" ? <AiAssistantPage /> : null}
@@ -53,13 +61,13 @@ export default function App() {
         ) : null}
         {route.name === "notFound" ? (
           <section className="page-panel">
-            <p className="eyebrow">Not found</p>
-            <h1>Page unavailable</h1>
+            <p className="eyebrow">未找到页面</p>
+            <h1>页面不可用</h1>
             <p className="page-copy">
-              This route is not part of the Phase 2 Web console.
+              当前地址不属于 Easy Music Web 控制台。
             </p>
             <RouteLink className="button primary" to="/library">
-              Go to library
+              回到曲库
             </RouteLink>
           </section>
         ) : null}

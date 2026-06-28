@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -20,11 +20,15 @@ class Track(Base):
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     content_type: Mapped[str] = mapped_column(String(50), default="song")
     original_file_path: Mapped[str | None] = mapped_column(String(1024))
+    original_file_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    original_file_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
     playback_file_path: Mapped[str | None] = mapped_column(String(1024))
+    playback_file_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
     cover_path: Mapped[str | None] = mapped_column(String(1024))
     source_url: Mapped[str | None] = mapped_column(String(2048))
     format: Mapped[str | None] = mapped_column(String(50))
     bitrate: Mapped[int | None] = mapped_column(Integer)
+    normalized_metadata_key: Mapped[str | None] = mapped_column(String(1024), index=True)
     status: Mapped[str] = mapped_column(String(50), default="uploading")
     liked: Mapped[bool] = mapped_column(Boolean, default=False)
     cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

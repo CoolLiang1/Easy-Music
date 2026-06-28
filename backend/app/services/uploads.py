@@ -7,10 +7,15 @@ from sqlalchemy.orm import Session
 from app.media.storage import MediaStorage
 from app.models.track import Track
 from app.models.user import User
+from app.services.duplicate_signals import (
+    build_normalized_metadata_key,
+    collect_file_duplicate_signal,
+)
 from app.services.jobs import create_processing_job
 
 
 ALLOWED_UPLOAD_TYPES = {
+    ".aac": {"audio/aac", "audio/x-aac", "audio/vnd.dlna.adts"},
     ".flac": {"audio/flac", "audio/x-flac"},
     ".m4a": {"audio/mp4", "audio/m4a", "audio/x-m4a"},
     ".mp3": {"audio/mpeg", "audio/mp3"},
@@ -90,7 +95,18 @@ def create_uploaded_track(
             destination.unlink()
         raise
 
+    original_signal = collect_file_duplicate_signal(destination)
+    if original_signal is not None:
+        track.original_file_size_bytes = original_signal.size_bytes
+        track.original_file_sha256 = original_signal.sha256
+
     track.original_file_path = storage.relative_media_path(destination)
+    track.normalized_metadata_key = build_normalized_metadata_key(
+        title=track.title,
+        artist=track.artist,
+        album=track.album,
+        duration_seconds=track.duration_seconds,
+    )
     track.status = "processing"
     create_processing_job(db, track)
     db.commit()

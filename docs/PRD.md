@@ -85,6 +85,7 @@ Build a usable personal cloud music app that supports:
   - M4A
   - WAV
   - OGG
+  - AAC
 - Preserve original upload
 - Generate MP3 playback version
 - Track metadata extraction

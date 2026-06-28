@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.tag import TagResponse
 
@@ -16,6 +16,25 @@ class TrackUpdate(BaseModel):
     tag_ids: list[int] | None = None
 
 
+class TrackBatchTagUpdate(BaseModel):
+    track_ids: list[int]
+    add_tag_ids: list[int] = Field(default_factory=list)
+    remove_tag_ids: list[int] = Field(default_factory=list)
+
+
+class TrackBatchTagResult(BaseModel):
+    track_id: int
+    status: str
+    error: str | None = None
+
+
+class TrackBatchTagUpdateResponse(BaseModel):
+    requested_track_count: int
+    updated_count: int
+    results: list[TrackBatchTagResult]
+    tracks: list["TrackResponse"]
+
+
 class TrackResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -26,12 +45,18 @@ class TrackResponse(BaseModel):
     duration_seconds: int | None
     content_type: str
     original_file_path: str | None
+    original_file_size_bytes: int | None
+    original_file_sha256: str | None
     playback_file_path: str | None
+    playback_file_sha256: str | None
     cover_path: str | None
     source_url: str | None
     format: str | None
     bitrate: int | None
+    normalized_metadata_key: str | None
     status: str
+    processing_job_status: str | None = None
+    processing_error_message: str | None = None
     liked: bool
     cooldown_until: datetime | None
     created_at: datetime

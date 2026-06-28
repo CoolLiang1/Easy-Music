@@ -21,10 +21,19 @@ from app.schemas.ai import (
     ParseListeningIntentRequest,
     TagSuggestionRequest,
     TagSuggestionResponse,
+    TrackOrganizationApplyRequest,
+    TrackOrganizationApplyResponse,
+    TrackOrganizationRequest,
+    TrackOrganizationResponse,
 )
-from app.services import ai_intent, ai_tag_suggestions
+from app.services import ai_intent, ai_tag_suggestions, ai_track_organization
 from app.services.ai_provider import AiProviderService
 from app.services.ai_client import OpenAiCompatibleClient
+from app.services.ai_search_client import TavilyCompatibleSearchClient
+from app.services.ai_search_provider import (
+    SUPPORTED_SEARCH_PROVIDER,
+    AiSearchProviderService,
+)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -39,6 +48,19 @@ def _get_ai_provider() -> AiProviderService:
     if settings.ai_enabled and settings.ai_api_key and settings.ai_model:
         client = OpenAiCompatibleClient(settings)
     return AiProviderService(settings, client=client)
+
+
+def _get_ai_search_provider() -> AiSearchProviderService:
+    settings = get_settings()
+    client = None
+    if (
+        settings.ai_search_enabled
+        and settings.ai_search_provider == SUPPORTED_SEARCH_PROVIDER
+        and settings.ai_search_api_key
+        and settings.ai_search_base_url
+    ):
+        client = TavilyCompatibleSearchClient(settings)
+    return AiSearchProviderService(settings, client=client)
 
 
 @router.post(
@@ -139,6 +161,79 @@ def suggest_track_tags(
         track_id,
         include_new_tag_suggestions=payload.include_new_tag_suggestions,
     )
+
+
+@router.post(
+    "/tracks/{track_id}/organize",
+    response_model=TrackOrganizationResponse,
+)
+def organize_track(
+    track_id: int,
+    payload: TrackOrganizationRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+    search_provider: Annotated[
+        AiSearchProviderService,
+        Depends(_get_ai_search_provider),
+    ],
+) -> TrackOrganizationResponse:
+    """Research and analyze one owned track for manual organization suggestions.
+
+    The endpoint stores cached research and analysis, but never applies tags,
+    creates tags, joins playlists, or changes recommendation behavior.
+    """
+    settings = get_settings()
+    try:
+        return ai_track_organization.organize_track(
+            db,
+            current_user,
+            ai_provider,
+            search_provider,
+            track_id,
+            force_refresh_search=payload.force_refresh_search,
+            force_reanalyze=payload.force_reanalyze,
+            search_cache_days=settings.ai_search_cache_days,
+        )
+    except ai_track_organization.TrackOrganizationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/tracks/{track_id}/organize/apply",
+    response_model=TrackOrganizationApplyResponse,
+)
+def apply_track_organization(
+    track_id: int,
+    payload: TrackOrganizationApplyRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TrackOrganizationApplyResponse:
+    """Apply only the user's selected organization suggestions.
+
+    The referenced analysis must belong to the current user and track. The
+    endpoint never applies unselected suggestions and never creates playlists.
+    """
+    try:
+        return ai_track_organization.apply_organization_suggestions(
+            db,
+            current_user,
+            track_id,
+            payload,
+        )
+    except ai_track_organization.TrackOrganizationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ai_track_organization.TrackOrganizationApplyValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 def _is_ok(provider_status) -> bool:

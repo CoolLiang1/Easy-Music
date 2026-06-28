@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-02:
+Status as of 2026-06-28:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -42,6 +42,38 @@ Status as of 2026-06-02:
   production Docker Compose, Caddy HTTPS config, production env template, host
   storage layout, database backup script, structured logging, health checks,
   and deployment documentation.
+- V1.1: Duplicate Detection is accepted. Better upload progress, batch tag
+  editing, library organization reports, cover editing, advanced recommendation
+  explanations, recently revived tracks, and Android launcher shortcuts are
+  implemented. Automated checks and manual acceptance are recorded in
+  `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`.
+- V2 import/video slice: Accepted for local closure. Automatic import tools
+  and optional user-provided video-to-audio processing are implemented through
+  safe configured import roots, scan/confirm flows, import batch history,
+  Web import UI, Web video upload, worker video extraction, mixed
+  audio/video imports, and documented automated plus browser smoke acceptance.
+- V2.1 playlist management: Implemented. Ordinary owner-scoped user playlists
+  now have backend CRUD/add/remove/reorder APIs, Web management UI, and Android
+  browse/play flows. Web and Android also support client-side playback queues
+  for playlist sequence, one-time shuffled, and reverse playback. Smart
+  playlists, sharing, collaboration, auto-generation, cross-device queue sync,
+  and server-side persistent queues remain out of scope. Playlist-based
+  recommendation scoring is covered separately by V2 Recommendation Foundation.
+- V2.2 playback queue: Implemented for local temporary client queues. Web and
+  Android now expose first-class queue state, queue management, upcoming
+  reorder, playlist-only repeat, and same-client source playlist sync.
+  Automated checks plus Web and Android manual smoke are recorded as accepted
+  in `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`.
+- V2 Recommendation Foundation: Implemented. Recommendation cooldown now
+  defaults to soft scoring instead of hard exclusion, `cooldown_mode` supports
+  `off`, `soft`, and `strict`, `not_today` remains a same-day hard exclusion,
+  `like` and `dislike` feedback affect ranking, and owner-scoped playlist
+  membership plus playlist name/description relevance are recommendation
+  scoring signals.
+- V2.4 tag taxonomy simplification: Implemented. Supported tag groups are now
+  `scene`, `type`, and `feature`; old `scenario` maps to `scene`, old `state`
+  maps to `feature`, and old `attribute` tags plus track-tag links are removed
+  during migration.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
@@ -162,7 +194,7 @@ Status: Accepted.
 Goals:
 
 - Recommend from structured context
-- Support scenario, state, and type tags
+- Support scene, type, and feature tags
 - Penalize recent plays
 - Respect cooldown and not-today feedback
 - Return one primary result and two alternatives
@@ -227,15 +259,20 @@ Deliverables:
 
 ## V2 Ideas
 
+- Completed local V2 slice:
+  - Automatic import tools.
+  - Optional user-provided video-to-audio processing.
+- V2.1 user-built playlist management and client-side playlist playback queue.
+- V2.2 first-class local playback queue module.
+- V2 recommendation foundation: soft/default cooldown, strict/off modes,
+  feedback scoring, and playlist membership/name/description boosts.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection
 - Language detection
 - Energy and mood analysis
 - Embedding-based recommendation
-- Automatic import tools
 - Optional Bilibili metadata import
-- Optional user-provided video-to-audio processing
 - Multi-user support
 - Windows desktop client if browser usage is not enough
 

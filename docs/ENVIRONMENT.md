@@ -23,7 +23,15 @@ contain placeholders only, not production-ready secrets.
 | `MEDIA_ROOT` | Yes | Yes | Root directory for managed media files. Use a relative development path or a deployment-managed mounted path; do not commit private machine-specific absolute paths. |
 | `ORIGINALS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for preserved original uploads. |
 | `PLAYBACK_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for generated playback files. |
+| `COVERS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for uploaded and extracted cover images. |
+| `TEMP_VIDEOS_DIR` | No | Yes | Directory name under `MEDIA_ROOT` for temporary user-provided video uploads before worker extraction. Defaults to `temp-videos`. |
 | `MAX_UPLOAD_MB` | Yes | Yes | Maximum accepted upload size in megabytes. Deployment should choose a value that fits storage and reverse proxy limits. |
+| `MAX_VIDEO_UPLOAD_MB` | No | Yes | Maximum accepted user-provided video upload size in megabytes. Defaults to `1024`; keep deployment reverse proxy limits compatible. |
+| `MAX_COVER_MB` | Yes | Yes | Maximum accepted cover-image upload size in megabytes. |
+| `IMPORT_ALLOWED_ROOTS` | No | No | Optional semicolon- or comma-separated allowlist of server-side import roots. Empty disables import tools. Use explicit directories outside the repository, outside user home roots, and outside `MEDIA_ROOT`; never commit private machine-specific paths. |
+| `IMPORT_SCAN_MAX_FILES` | No | No | Maximum supported audio candidates returned by one import scan. Defaults to `1000`. |
+| `IMPORT_SCAN_MAX_DEPTH` | No | No | Maximum recursive directory depth for import scan preview. Defaults to `5`. |
+| `IMPORT_SCAN_MAX_FILE_MB` | No | No | Maximum per-file size included as a supported import scan candidate. Defaults to `200`; larger files are returned as skipped. |
 | `FFMPEG_PATH` | Yes | Yes | Executable name or configured path for `ffmpeg`. Development can use `ffmpeg` when it is available on `PATH`. |
 | `FFPROBE_PATH` | Yes | Yes | Executable name or configured path for `ffprobe`. Development can use `ffprobe` when it is available on `PATH`. |
 | `CORS_ORIGINS` | Yes | Yes | Comma-separated list of allowed browser origins. Development should list local Web origins explicitly; deployment should list only deployed domains. |
@@ -34,11 +42,19 @@ contain placeholders only, not production-ready secrets.
 | `AI_API_KEY` | No | No | AI provider API key. Leave empty unless testing or deploying AI features with a real provider. Never commit a real key. |
 | `AI_MODEL` | No | No | AI model identifier used by the provider client. |
 | `AI_BASE_URL` | No | No | Base URL for the OpenAI-compatible provider. |
+| `AI_SEARCH_ENABLED` | No | No | Enables configured Search API calls for V2.5 AI track organization when set to `true`. Leave `false` to keep search in safe fallback mode. |
+| `AI_SEARCH_PROVIDER` | No | No | Search provider identifier. The first supported value is `tavily-compatible`. |
+| `AI_SEARCH_API_KEY` | No | No | Search provider API key. Leave empty unless testing or deploying search-assisted AI organization. Never commit a real key. |
+| `AI_SEARCH_BASE_URL` | No | No | Base URL for the Tavily-compatible Search API. |
+| `AI_SEARCH_MAX_RESULTS` | No | No | Maximum normalized search results requested for one track organization lookup. Defaults to `5`. |
+| `AI_SEARCH_CACHE_DAYS` | No | No | Number of days a future research cache record remains usable before refresh. Defaults to `30`. |
 | `CADDY_DOMAIN` | No | Yes | Public HTTPS domain used by the production Caddy service. |
 | `MEDIA_HOST_ORIGINALS` | No | Yes | Production host directory bind-mounted to `/app/media/originals`. |
 | `MEDIA_HOST_PLAYBACK` | No | Yes | Production host directory bind-mounted to `/app/media/playback`. |
 | `MEDIA_HOST_COVERS` | No | Yes | Production host directory bind-mounted to `/app/media/covers`. |
+| `MEDIA_HOST_TEMP_VIDEOS` | No | Yes | Production host directory bind-mounted to `/app/media/temp-videos` for temporary video extraction inputs. |
 | `POSTGRES_DATA_DIR` | No | Yes | Production host directory for PostgreSQL data. |
+| `CADDY_VIDEO_UPLOAD_LIMIT` | No | Yes | Caddy request-body limit for `/api/tracks/upload-video`, using a Caddy size string such as `1024MB`. |
 | `BACKUP_RETENTION_DAYS` | No | No | Documentation value for operator-managed database backup retention. The bundled backup script does not delete files. |
 
 ## Development Defaults
@@ -46,6 +62,37 @@ contain placeholders only, not production-ready secrets.
 `.env.example` uses local, development-safe placeholders. These values are meant to document expected names and formats only.
 
 The example intentionally avoids real credentials, tokens, private host paths, and production domains. Before any real deployment, replace passwords and secrets through the deployment environment rather than by editing committed files.
+
+`IMPORT_ALLOWED_ROOTS` is empty by default. For local V2 import testing, point it
+at one or more throwaway directories outside the repository and outside
+`MEDIA_ROOT`. Use semicolons for Windows paths, for example:
+
+```powershell
+$env:IMPORT_ALLOWED_ROOTS = "D:\EasyMusicImport;E:\AnotherImport"
+```
+
+Ubuntu-style container paths are also accepted when those directories are
+explicitly mounted into the backend container, for example:
+
+```bash
+IMPORT_ALLOWED_ROOTS=/app/imports/library-a;/app/imports/library-b
+```
+
+The scan endpoint is read-only and controlled by `IMPORT_SCAN_MAX_FILES`,
+`IMPORT_SCAN_MAX_DEPTH`, and `IMPORT_SCAN_MAX_FILE_MB`. These limits do not
+create tracks or copy files; they only constrain preview responses.
+
+User-provided video upload is controlled by `MAX_VIDEO_UPLOAD_MB` and
+`TEMP_VIDEOS_DIR`. Uploaded videos are temporary extraction inputs under
+`MEDIA_ROOT`; they are not exposed through track stream/download APIs and are
+not stored as track originals.
+
+AI search is controlled separately from the AI completion provider. It is off
+by default through `AI_SEARCH_ENABLED=false`. When enabled, the first supported
+provider is `tavily-compatible`, configured with `AI_SEARCH_API_KEY`,
+`AI_SEARCH_BASE_URL`, `AI_SEARCH_MAX_RESULTS`, and `AI_SEARCH_CACHE_DAYS`.
+Search results are normalized to title, snippet, and URL for AI organization;
+the backend does not scrape result pages or store page bodies.
 
 ## Deployment Expectations
 
@@ -56,6 +103,10 @@ Deployment values must:
 
 - Use strong unique values for `POSTGRES_PASSWORD` and `APP_SECRET_KEY`.
 - Use storage paths that point to the mounted persistent media location.
+- Mount `MEDIA_HOST_TEMP_VIDEOS` read-write into the API and worker containers
+  if video upload/extraction is enabled.
+- Leave `IMPORT_ALLOWED_ROOTS` empty unless import directories have been
+  explicitly created and mounted read-only into the API container.
 - Restrict `CORS_ORIGINS` to trusted deployed origins.
 - Set `CADDY_DOMAIN` to the public domain that points to the server.
 - Keep all real credentials and host-specific private paths outside version control.
@@ -66,4 +117,5 @@ Deployment values must:
 - Do not commit `.env` files with real values.
 - Do not hard-code machine-specific absolute paths.
 - Do not require AI provider credentials for non-AI development checks.
+- Do not require Search API credentials for non-search development checks.
 - Do not commit production `.env.production`; commit only `.env.production.example`.

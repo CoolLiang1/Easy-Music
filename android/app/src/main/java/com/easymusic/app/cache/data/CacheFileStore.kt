@@ -53,7 +53,7 @@ class CacheFileStore(
             val target = file.canonicalFile
 
             if (!target.path.startsWith(cacheRoot.path + File.separator)) {
-                return@withContext CacheFileDeleteResult.Failure("Cached file path is outside app cache storage.")
+                return@withContext CacheFileDeleteResult.Failure("离线缓存文件路径不在应用缓存目录内。")
             }
 
             if (!target.exists()) {
@@ -61,13 +61,13 @@ class CacheFileStore(
             }
 
             if (!target.isFile) {
-                return@withContext CacheFileDeleteResult.Failure("Cached path is not a file.")
+                return@withContext CacheFileDeleteResult.Failure("离线缓存路径不是文件。")
             }
 
             if (target.delete()) {
                 CacheFileDeleteResult.Deleted
             } else {
-                CacheFileDeleteResult.Failure("Cached file could not be deleted.")
+                CacheFileDeleteResult.Failure("无法删除离线缓存文件。")
             }
         }
 
@@ -95,11 +95,11 @@ class CacheFileStore(
             val statusCode = connection.responseCode
             if (statusCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
                 deleteOneFile(temporaryFile)
-                return@withContext CacheFileDownloadResult.Failure("Please sign in again to cache this track.")
+                return@withContext CacheFileDownloadResult.Failure("请重新登录后缓存这个音轨。")
             }
             if (statusCode !in 200..299) {
                 deleteOneFile(temporaryFile)
-                return@withContext CacheFileDownloadResult.Failure("Stream download failed with HTTP $statusCode.")
+                return@withContext CacheFileDownloadResult.Failure("音频流下载失败，HTTP $statusCode。")
             }
 
             val totalBytes = connection.contentLengthLong.takeIf { it > 0L }
@@ -129,7 +129,7 @@ class CacheFileStore(
             deleteOneFile(finalFile)
             if (!temporaryFile.renameTo(finalFile)) {
                 deleteOneFile(temporaryFile)
-                return@withContext CacheFileDownloadResult.Failure("Downloaded file could not be finalized.")
+                return@withContext CacheFileDownloadResult.Failure("下载文件无法完成保存。")
             }
 
             CacheFileDownloadResult.Success(
@@ -142,7 +142,7 @@ class CacheFileStore(
             throw exception
         } catch (exception: IOException) {
             deleteOneFile(temporaryFile)
-            CacheFileDownloadResult.Failure(exception.message ?: "Track download failed.")
+            CacheFileDownloadResult.Failure(exception.message ?: "音轨下载失败。")
         } finally {
             connection?.disconnect()
         }

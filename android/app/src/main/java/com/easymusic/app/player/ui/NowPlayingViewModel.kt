@@ -49,7 +49,7 @@ class NowPlayingViewModel(
             if (!isNetworkAvailable && state.playbackSource != PlaybackSource.OfflineCache) {
                 playerController.fail(
                     track = state.track,
-                    message = "You are offline. Online playback needs the backend stream; play a cached track instead.",
+                    message = "当前离线。在线播放需要连接后端音频流，请改为播放已缓存音轨。",
                 )
                 return
             }
@@ -64,8 +64,38 @@ class NowPlayingViewModel(
         playerController.pause()
     }
 
+    fun next() {
+        playerController.next()
+    }
+
+    fun previous() {
+        playerController.previous()
+    }
+
     fun seekTo(positionMs: Long) {
         playerController.seekTo(positionMs)
+    }
+
+    fun removeQueueItem(queueItemId: String) {
+        playerController.removeQueueItem(queueItemId)
+    }
+
+    fun clearQueue() {
+        playerController.clearQueue()
+    }
+
+    fun moveUpcomingItem(
+        queueItemId: String,
+        targetUpcomingIndex: Int,
+    ) {
+        playerController.moveUpcomingItem(
+            queueItemId = queueItemId,
+            targetUpcomingIndex = targetUpcomingIndex,
+        )
+    }
+
+    fun setRepeatPlaylist(enabled: Boolean) {
+        playerController.setRepeatPlaylist(enabled)
     }
 
     fun dispose() {

@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -38,6 +41,9 @@ import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.cache.domain.CachedTrack
 import com.easymusic.app.cache.domain.TrackCacheRepository
 import com.easymusic.app.player.domain.PlayerController
+import com.easymusic.app.ui.theme.BannerTone
+import com.easymusic.app.ui.theme.SectionHeader
+import com.easymusic.app.ui.theme.StatusBanner
 
 @Composable
 fun CachedTracksRoute(
@@ -82,8 +88,8 @@ fun CachedTracksScreen(
     pendingDelete?.let { track ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete Cached Copy") },
-            text = { Text("Remove the local cached file for \"${track.title}\" from this device?") },
+            title = { Text("删除离线缓存") },
+            text = { Text("要从这台设备删除“${track.title}”的本地缓存文件吗？") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -91,12 +97,12 @@ fun CachedTracksScreen(
                         onDeleteCachedTrack(track)
                     },
                 ) {
-                    Text("Delete")
+                    Text("删除")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) {
-                    Text("Cancel")
+                    Text("取消")
                 }
             },
         )
@@ -107,36 +113,28 @@ fun CachedTracksScreen(
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        Text(
-            text = "Cached Tracks",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            text = if (isNetworkAvailable) {
-                "Stored on this device"
+        SectionHeader(
+            title = "离线缓存",
+            subtitle = if (isNetworkAvailable) {
+                "已保存在这台设备上"
             } else {
-                "Stored on this device and playable while offline"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isNetworkAvailable) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.primary
+                "已保存在这台设备上，离线时也可播放"
             },
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         uiState.deleteErrorMessage?.let { message ->
-            Text(
-                modifier = Modifier.padding(bottom = 12.dp),
+            StatusBanner(
                 text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
+                tone = BannerTone.Error,
+                modifier = Modifier.padding(bottom = 12.dp),
+                action = {
+                    TextButton(onClick = onClearDeleteError) {
+                        Text("关闭")
+                    }
+                },
             )
-            TextButton(onClick = onClearDeleteError) {
-                Text("Dismiss")
-            }
         }
 
         if (uiState.cachedTracks.isEmpty()) {
@@ -169,13 +167,13 @@ private fun CachedTracksEmpty() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = "No cached tracks yet",
+            Text(
+                text = "还没有离线缓存音轨",
             style = MaterialTheme.typography.titleLarge,
         )
         Text(
             modifier = Modifier.padding(top = 8.dp),
-            text = "Cache a ready track from Track Detail and it will appear here for offline access.",
+            text = "在音轨详情中缓存一个可播放音轨后，它会出现在这里供离线访问。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -230,19 +228,19 @@ private fun CachedTrackRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = track.durationSeconds?.formatDuration() ?: "Duration unknown",
+                    text = track.durationSeconds?.formatDuration() ?: "时长未知",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = track.byteSize?.formatBytes() ?: "File size unknown",
+                    text = track.byteSize?.formatBytes() ?: "文件大小未知",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             Text(
-                text = "Cached ${track.cachedAt ?: "time unknown"}",
+                text = "缓存时间：${track.cachedAt ?: "未知"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -251,10 +249,21 @@ private fun CachedTrackRow(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(
+                    text = "点按卡片离线播放",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 OutlinedButton(onClick = onDeleteClick) {
-                    Text("Delete Cache")
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("删除缓存")
                 }
             }
         }
@@ -265,14 +274,14 @@ private fun CachedTrack.artistAlbumLabel(): String =
     listOfNotNull(artist, album)
         .filter { value -> value.isNotBlank() }
         .joinToString(separator = " - ")
-        .ifBlank { "Unknown artist or album" }
+        .ifBlank { "未知艺人或专辑" }
 
 private fun CacheStatus.label(): String =
     when (this) {
-        CacheStatus.NotCached -> "Not cached"
-        CacheStatus.Caching -> "Caching"
-        CacheStatus.Cached -> "Cached"
-        CacheStatus.Failed -> "Cache failed"
+        CacheStatus.NotCached -> "未缓存"
+        CacheStatus.Caching -> "缓存中"
+        CacheStatus.Cached -> "已缓存"
+        CacheStatus.Failed -> "缓存失败"
     }
 
 private fun Int.formatDuration(): String {

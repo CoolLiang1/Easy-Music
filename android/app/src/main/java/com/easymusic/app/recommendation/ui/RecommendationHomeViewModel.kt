@@ -25,11 +25,9 @@ import kotlinx.coroutines.withContext
 
 data class RecommendationHomeUiState(
     val groupedTags: RecommendationTagGroups = RecommendationTagGroups(),
-    val selectedScenarioTagIds: Set<Int> = emptySet(),
-    val selectedStateTagIds: Set<Int> = emptySet(),
+    val selectedSceneTagIds: Set<Int> = emptySet(),
     val selectedTypeTagIds: Set<Int> = emptySet(),
-    val desiredAttributeTagIds: Set<Int> = emptySet(),
-    val excludedAttributeTagIds: Set<Int> = emptySet(),
+    val selectedFeatureTagIds: Set<Int> = emptySet(),
     val isLoadingTags: Boolean = true,
     val isRequestingRecommendations: Boolean = false,
     val tagErrorMessage: String? = null,
@@ -44,11 +42,9 @@ data class RecommendationHomeUiState(
         get() = groupedTags.allTags.isNotEmpty()
 
     val selectedContextCount: Int
-        get() = selectedScenarioTagIds.size +
-            selectedStateTagIds.size +
+        get() = selectedSceneTagIds.size +
             selectedTypeTagIds.size +
-            desiredAttributeTagIds.size +
-            excludedAttributeTagIds.size
+            selectedFeatureTagIds.size
 }
 
 data class RecommendationFeedbackUiState(
@@ -58,13 +54,12 @@ data class RecommendationFeedbackUiState(
 )
 
 data class RecommendationTagGroups(
-    val scenarios: List<TagResponse> = emptyList(),
-    val states: List<TagResponse> = emptyList(),
+    val scenes: List<TagResponse> = emptyList(),
     val types: List<TagResponse> = emptyList(),
-    val attributes: List<TagResponse> = emptyList(),
+    val features: List<TagResponse> = emptyList(),
 ) {
     val allTags: List<TagResponse>
-        get() = scenarios + states + types + attributes
+        get() = scenes + types + features
 }
 
 data class AiRecommendationUiState(
@@ -100,19 +95,9 @@ class RecommendationHomeViewModel(
         loadTags(isNetworkAvailable)
     }
 
-    fun toggleScenario(tagId: Int) {
+    fun toggleScene(tagId: Int) {
         uiState = uiState.copy(
-            selectedScenarioTagIds = uiState.selectedScenarioTagIds.toggled(tagId),
-            recommendationMessage = null,
-            recommendationErrorMessage = null,
-            recommendationResults = emptyList(),
-            feedbackStates = emptyMap(),
-        )
-    }
-
-    fun toggleState(tagId: Int) {
-        uiState = uiState.copy(
-            selectedStateTagIds = uiState.selectedStateTagIds.toggled(tagId),
+            selectedSceneTagIds = uiState.selectedSceneTagIds.toggled(tagId),
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
@@ -130,21 +115,9 @@ class RecommendationHomeViewModel(
         )
     }
 
-    fun toggleDesiredAttribute(tagId: Int) {
+    fun toggleFeature(tagId: Int) {
         uiState = uiState.copy(
-            desiredAttributeTagIds = uiState.desiredAttributeTagIds.toggled(tagId),
-            excludedAttributeTagIds = uiState.excludedAttributeTagIds - tagId,
-            recommendationMessage = null,
-            recommendationErrorMessage = null,
-            recommendationResults = emptyList(),
-            feedbackStates = emptyMap(),
-        )
-    }
-
-    fun toggleExcludedAttribute(tagId: Int) {
-        uiState = uiState.copy(
-            excludedAttributeTagIds = uiState.excludedAttributeTagIds.toggled(tagId),
-            desiredAttributeTagIds = uiState.desiredAttributeTagIds - tagId,
+            selectedFeatureTagIds = uiState.selectedFeatureTagIds.toggled(tagId),
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
@@ -154,11 +127,9 @@ class RecommendationHomeViewModel(
 
     fun clearSelections() {
         uiState = uiState.copy(
-            selectedScenarioTagIds = emptySet(),
-            selectedStateTagIds = emptySet(),
+            selectedSceneTagIds = emptySet(),
             selectedTypeTagIds = emptySet(),
-            desiredAttributeTagIds = emptySet(),
-            excludedAttributeTagIds = emptySet(),
+            selectedFeatureTagIds = emptySet(),
             recommendationMessage = null,
             recommendationErrorMessage = null,
             recommendationResults = emptyList(),
@@ -170,7 +141,7 @@ class RecommendationHomeViewModel(
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
                 recommendationMessage = null,
-                recommendationErrorMessage = "You are offline. Recommendation requests need the backend.",
+                recommendationErrorMessage = "当前离线。推荐请求需要连接后端。",
                 recommendationResults = emptyList(),
                 feedbackStates = emptyMap(),
             )
@@ -243,7 +214,7 @@ class RecommendationHomeViewModel(
         if (text.isEmpty()) {
             uiState = uiState.copy(
                 aiState = uiState.aiState.copy(
-                    errorMessage = "Type a natural-language request first.",
+                    errorMessage = "请先输入想听什么。",
                 ),
             )
             return
@@ -252,7 +223,7 @@ class RecommendationHomeViewModel(
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
                 aiState = uiState.aiState.copy(
-                    errorMessage = "You are offline. AI recommendations need the backend.",
+                    errorMessage = "当前离线。AI 推荐需要连接后端。",
                     isRequesting = false,
                     results = emptyList(),
                     parsedContext = null,
@@ -344,7 +315,7 @@ class RecommendationHomeViewModel(
             uiState = uiState.withFeedbackState(
                 trackId = trackId,
                 state = RecommendationFeedbackUiState(
-                    errorMessage = "You are offline. Recommendation feedback needs the backend.",
+                    errorMessage = "当前离线。推荐反馈需要连接后端。",
                 ),
             )
             return
@@ -360,10 +331,9 @@ class RecommendationHomeViewModel(
             clientEventId = UUID.randomUUID().toString(),
             trackId = trackId,
             feedbackType = feedbackType,
-            scenarioTagIds = parsedRequest?.scenarioTagIds ?: emptyList(),
-            stateTagIds = parsedRequest?.stateTagIds ?: emptyList(),
+            sceneTagIds = parsedRequest?.sceneTagIds ?: emptyList(),
             typeTagIds = parsedRequest?.typeTagIds ?: emptyList(),
-            attributeTagIds = parsedRequest?.attributeTagIds ?: emptyList(),
+            featureTagIds = parsedRequest?.featureTagIds ?: emptyList(),
             occurredAt = Instant.now().toString(),
         )
 
@@ -399,7 +369,7 @@ class RecommendationHomeViewModel(
                         else -> uiState.withFeedbackState(
                             trackId = trackId,
                             state = RecommendationFeedbackUiState(
-                                errorMessage = "Feedback response did not include a result.",
+                                errorMessage = "反馈响应中没有结果。",
                             ),
                         )
                     }
@@ -437,7 +407,7 @@ class RecommendationHomeViewModel(
             uiState = uiState.withFeedbackState(
                 trackId = trackId,
                 state = RecommendationFeedbackUiState(
-                    errorMessage = "You are offline. Recommendation feedback needs the backend.",
+                    errorMessage = "当前离线。推荐反馈需要连接后端。",
                 ),
             )
             return
@@ -485,7 +455,7 @@ class RecommendationHomeViewModel(
                         else -> uiState.withFeedbackState(
                             trackId = trackId,
                             state = RecommendationFeedbackUiState(
-                                errorMessage = "Feedback response did not include a result.",
+                                errorMessage = "反馈响应中没有结果。",
                             ),
                         )
                     }
@@ -518,7 +488,7 @@ class RecommendationHomeViewModel(
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
                 isLoadingTags = false,
-                tagErrorMessage = "You are offline. Tag loading needs the backend.",
+                tagErrorMessage = "当前离线。加载标签需要连接后端。",
                 needsSignIn = false,
             )
             return
@@ -538,7 +508,7 @@ class RecommendationHomeViewModel(
             if (token == null) {
                 uiState = uiState.copy(
                     isLoadingTags = false,
-                    tagErrorMessage = "Please sign in again to load recommendation tags.",
+                    tagErrorMessage = "请重新登录后加载推荐标签。",
                     needsSignIn = true,
                 )
                 return@launch
@@ -589,11 +559,9 @@ private fun RecommendationHomeUiState.withFeedbackState(
 
 private fun RecommendationHomeUiState.toRecommendationRequest(): RecommendationRequest =
     RecommendationRequest(
-        scenarioTagIds = selectedScenarioTagIds.sorted(),
-        stateTagIds = selectedStateTagIds.sorted(),
+        sceneTagIds = selectedSceneTagIds.sorted(),
         typeTagIds = selectedTypeTagIds.sorted(),
-        attributeTagIds = desiredAttributeTagIds.sorted(),
-        excludeAttributeTagIds = excludedAttributeTagIds.sorted(),
+        featureTagIds = selectedFeatureTagIds.sorted(),
     )
 
 private fun RecommendationHomeUiState.toFeedbackEventRequest(
@@ -604,19 +572,17 @@ private fun RecommendationHomeUiState.toFeedbackEventRequest(
         clientEventId = UUID.randomUUID().toString(),
         trackId = trackId,
         feedbackType = feedbackType,
-        scenarioTagIds = selectedScenarioTagIds.sorted(),
-        stateTagIds = selectedStateTagIds.sorted(),
+        sceneTagIds = selectedSceneTagIds.sorted(),
         typeTagIds = selectedTypeTagIds.sorted(),
-        attributeTagIds = desiredAttributeTagIds.sorted(),
+        featureTagIds = selectedFeatureTagIds.sorted(),
         occurredAt = Instant.now().toString(),
     )
 
 private fun List<TagResponse>.toRecommendationTagGroups(): RecommendationTagGroups =
     RecommendationTagGroups(
-        scenarios = filterGroup("scenario"),
-        states = filterGroup("state"),
+        scenes = filterGroup("scene"),
         types = filterGroup("type"),
-        attributes = filterGroup("attribute"),
+        features = filterGroup("feature"),
     )
 
 private fun List<TagResponse>.filterGroup(group: String): List<TagResponse> =
@@ -627,16 +593,17 @@ private fun Set<Int>.toggled(tagId: Int): Set<Int> =
 
 private fun Int.resultMessage(): String =
     when (this) {
-        0 -> "No recommendations matched this context yet. Adjust the selected tags and request again."
-        1 -> "Recommendation request completed with 1 candidate."
-        else -> "Recommendation request completed with $this candidates."
+        0 -> "当前条件还没有匹配的推荐。调整已选标签后再试一次。"
+        1 -> "推荐请求完成，找到 1 个候选音轨。"
+        else -> "推荐请求完成，找到 $this 个候选音轨。"
     }
 
 private fun FeedbackType.successMessage(): String =
     when (this) {
-        FeedbackType.Like -> "Liked. Playback and cache behavior were not changed."
-        FeedbackType.Tired -> "Marked tired. Request again when you want a refreshed recommendation."
-        FeedbackType.NotToday -> "Marked not today. Request again to refresh."
-        FeedbackType.NotSuitableForContext -> "Marked not suitable for this context. Request again to refresh."
-        FeedbackType.SkipRecommendation -> "Skipped for recommendation. Request again to refresh."
+        FeedbackType.Like -> "已标记喜欢。播放和离线缓存不会受影响。"
+        FeedbackType.Dislike -> "已标记不喜欢。再次请求可刷新推荐。"
+        FeedbackType.Tired -> "已标记听腻了。再次请求可刷新推荐。"
+        FeedbackType.NotToday -> "已标记今天不听。再次请求可刷新推荐。"
+        FeedbackType.NotSuitableForContext -> "已标记不适合当前场景。再次请求可刷新推荐。"
+        FeedbackType.SkipRecommendation -> "已跳过这个推荐。再次请求可刷新推荐。"
     }

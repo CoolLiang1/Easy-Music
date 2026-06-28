@@ -173,6 +173,14 @@ Update this section when you discover something surprising.
 - Android playback/cache behavior crosses many layers: selected playback source,
   local Room cache state, Media3 player/session service, authenticated network
   data source, and offline playback-event recorder.
+- Android playback performance can be dominated by Media3 foreground
+  notification behavior. Do not manually call `onUpdateNotification` from a
+  `MediaSessionService.onStartCommand`; it can create a notification/service
+  update loop and sustained main-thread CPU on OEM Android builds.
+- The first V2 import/video slice is locally accepted. Import roots are
+  configured allowlists, disabled when empty, and must never imply arbitrary
+  filesystem browsing. Import and video flows must not download from external
+  sites and must not move, rename, delete, or modify source files.
 - Backend upload status depends on both the API creating a processing job and
   the worker actually running with writable shared media volumes.
 

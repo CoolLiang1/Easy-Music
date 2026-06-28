@@ -26,7 +26,7 @@ export function TagsPage() {
     if (!accessToken) {
       setTagsState({
         name: "error",
-        message: "Sign in again to load tags.",
+        message: "请重新登录后再加载标签。",
       });
       return;
     }
@@ -51,7 +51,7 @@ export function TagsPage() {
 
   const handleCreate = async (payload: TagCreate) => {
     if (!accessToken) {
-      setCreateError("Sign in again to create tags.");
+      setCreateError("请重新登录后再创建标签。");
       return;
     }
 
@@ -67,7 +67,7 @@ export function TagsPage() {
           ? { name: "ready", tags: [...current.tags, createdTag] }
           : { name: "ready", tags: [createdTag] },
       );
-      setCreateSuccess("Tag created.");
+      setCreateSuccess("标签已创建。");
     } catch (error: unknown) {
       setCreateError(getErrorMessage(error));
     } finally {
@@ -77,7 +77,7 @@ export function TagsPage() {
 
   const handleUpdate = async (payload: TagCreate) => {
     if (!accessToken || !editingTag) {
-      setEditError("Choose a tag before saving.");
+      setEditError("请先选择要保存的标签。");
       return;
     }
 
@@ -99,7 +99,7 @@ export function TagsPage() {
           : { name: "ready", tags: [updatedTag] },
       );
       setEditingTag(updatedTag);
-      setEditSuccess("Tag saved.");
+      setEditSuccess("标签已保存。");
     } catch (error: unknown) {
       setEditError(getErrorMessage(error));
     } finally {
@@ -109,11 +109,11 @@ export function TagsPage() {
 
   const handleDelete = async (tag: Tag) => {
     if (!accessToken) {
-      setListMessage("Sign in again to delete tags.");
+      setListMessage("请重新登录后再删除标签。");
       return;
     }
 
-    const shouldDelete = window.confirm(`Delete tag "${tag.name}"?`);
+    const shouldDelete = window.confirm(`确定删除标签“${tag.name}”吗？`);
     if (!shouldDelete) {
       return;
     }
@@ -138,7 +138,7 @@ export function TagsPage() {
         setEditingTag(null);
       }
 
-      setListMessage("Tag deleted.");
+      setListMessage("标签已删除。");
     } catch (error: unknown) {
       setListMessage(getErrorMessage(error));
     } finally {
@@ -148,11 +148,18 @@ export function TagsPage() {
 
   return (
     <section className="page-panel" aria-labelledby="tags-title">
-      <p className="eyebrow">Tags</p>
-      <h1 id="tags-title">Tag management</h1>
-      <p className="page-copy">
-        Create and maintain the tags used by the Web console.
-      </p>
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">标签</p>
+          <h1 id="tags-title">标签管理</h1>
+          <p className="page-copy">
+            管理用于编辑和推荐的场景、类型和特点标签。
+          </p>
+        </div>
+        {tagsState.name === "ready" ? (
+          <span className="score-pill">{tagsState.tags.length} 个标签</span>
+        ) : null}
+      </div>
       <TagForm
         disabled={isMutating}
         errorMessage={createError}
@@ -179,12 +186,12 @@ export function TagsPage() {
 
       {tagsState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Loading tags...
+          正在加载标签...
         </div>
       ) : null}
 
       {tagsState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {tagsState.message}
         </div>
       ) : null}
@@ -196,7 +203,7 @@ export function TagsPage() {
       ) : null}
 
       {tagsState.name === "ready" && tagsState.tags.length === 0 ? (
-        <div className="empty-state">No tags have been created yet.</div>
+        <div className="empty-state">还没有创建任何标签。</div>
       ) : null}
 
       {tagsState.name === "ready" && tagsState.tags.length > 0 ? (
@@ -220,5 +227,5 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Tag request failed.";
+  return "标签请求失败。";
 }

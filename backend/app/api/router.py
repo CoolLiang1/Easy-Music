@@ -4,8 +4,12 @@ from sqlalchemy import text
 from app.api.routes import (
     ai,
     auth,
+    duplicates,
     feedback_events,
+    imports,
+    library_reports,
     playback_events,
+    playlists,
     recommendations,
     tags,
     tracks,
@@ -16,8 +20,12 @@ from app.db.session import engine
 api_router = APIRouter()
 api_router.include_router(ai.router, prefix="/api")
 api_router.include_router(auth.router, prefix="/api")
+api_router.include_router(duplicates.router, prefix="/api")
 api_router.include_router(feedback_events.router, prefix="/api")
+api_router.include_router(imports.router, prefix="/api")
+api_router.include_router(library_reports.router, prefix="/api")
 api_router.include_router(playback_events.router, prefix="/api")
+api_router.include_router(playlists.router, prefix="/api")
 api_router.include_router(recommendations.router, prefix="/api")
 api_router.include_router(tags.router, prefix="/api")
 api_router.include_router(uploads.router, prefix="/api")

@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.easymusic.app.ShortcutRoutes
 import com.easymusic.app.auth.AuthRoutes
 import com.easymusic.app.auth.data.AuthApi
 import com.easymusic.app.auth.data.AuthTokenStore
@@ -35,18 +36,17 @@ import com.easymusic.app.library.LibraryRoute
 import com.easymusic.app.library.LibraryRoutes
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.playlist.PlaylistRoutes
+import com.easymusic.app.playlist.PlaylistsRoute
 import com.easymusic.app.player.NowPlayingRoute
 import com.easymusic.app.player.PlayerRoutes
 import com.easymusic.app.recommendation.ui.RecommendationHomeRoute
-
-private const val CACHED_TRACKS_ROUTE = "cached_tracks"
-private const val RECOMMENDATIONS_ROUTE = "recommendations"
 
 @Composable
 fun AppNavGraph(
     modifier: Modifier = Modifier,
     config: AppConfig = AppConfig.default(),
-    startRoute: String = AuthRoutes.LOGIN,
+    startRoute: String = ShortcutRoutes.DESTINATION_LIBRARY,
 ) {
     val context = LocalContext.current
     val authRepository = remember(context, config) {
@@ -87,12 +87,18 @@ fun AppNavGraph(
         when (session) {
             is AuthSession.Authenticated -> {
                 if (currentRoute == AuthRoutes.LOGIN) {
-                    currentRoute = LibraryRoutes.LIBRARY
+                    currentRoute = authenticatedRouteOrLibrary(startRoute)
                 }
             }
 
             AuthSession.Unauthenticated -> currentRoute = AuthRoutes.LOGIN
             AuthSession.Checking -> Unit
+        }
+    }
+
+    LaunchedEffect(startRoute, session) {
+        if (session is AuthSession.Authenticated) {
+            currentRoute = authenticatedRouteOrLibrary(startRoute)
         }
     }
 
@@ -121,8 +127,13 @@ fun AppNavGraph(
                 isLoggingOut = sessionState.isLoggingOut,
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
-                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
+                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
+                onNavigateToCachedTracks = {
+                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
+                },
+                onNavigateToRecommendations = {
+                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
+                },
                 isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
@@ -140,6 +151,38 @@ fun AppNavGraph(
             }
         }
 
+        PlaylistRoutes.PLAYLISTS -> {
+            val authenticated = session as? AuthSession.Authenticated ?: return
+            AppScaffold(
+                modifier = modifier,
+                session = authenticated,
+                isLoggingOut = sessionState.isLoggingOut,
+                currentRoute = currentRoute,
+                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
+                onNavigateToCachedTracks = {
+                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
+                },
+                onNavigateToRecommendations = {
+                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
+                },
+                isNetworkAvailable = isNetworkAvailable,
+                pendingPlaybackEventCount = pendingPlaybackEventCount,
+                playbackEventSyncMessage = pendingPlaybackEventError,
+                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
+                onLogout = sessionViewModel::logout,
+            ) { contentPadding ->
+                PlaylistsRoute(
+                    modifier = Modifier.padding(contentPadding),
+                    isNetworkAvailable = isNetworkAvailable,
+                    onTrackSelected = { track ->
+                        nowPlayingTrack = track
+                        currentRoute = PlayerRoutes.NOW_PLAYING
+                    },
+                )
+            }
+        }
+
         PlayerRoutes.NOW_PLAYING -> {
             val authenticated = session as? AuthSession.Authenticated ?: return
             AppScaffold(
@@ -148,8 +191,13 @@ fun AppNavGraph(
                 isLoggingOut = sessionState.isLoggingOut,
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
-                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
+                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
+                onNavigateToCachedTracks = {
+                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
+                },
+                onNavigateToRecommendations = {
+                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
+                },
                 isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
@@ -165,7 +213,7 @@ fun AppNavGraph(
             }
         }
 
-        CACHED_TRACKS_ROUTE -> {
+        ShortcutRoutes.DESTINATION_CACHED_TRACKS -> {
             val authenticated = session as? AuthSession.Authenticated ?: return
             AppScaffold(
                 modifier = modifier,
@@ -173,8 +221,13 @@ fun AppNavGraph(
                 isLoggingOut = sessionState.isLoggingOut,
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
-                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
+                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
+                onNavigateToCachedTracks = {
+                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
+                },
+                onNavigateToRecommendations = {
+                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
+                },
                 isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
@@ -192,7 +245,7 @@ fun AppNavGraph(
             }
         }
 
-        RECOMMENDATIONS_ROUTE -> {
+        ShortcutRoutes.DESTINATION_RECOMMENDATIONS -> {
             val authenticated = session as? AuthSession.Authenticated ?: return
             AppScaffold(
                 modifier = modifier,
@@ -200,8 +253,13 @@ fun AppNavGraph(
                 isLoggingOut = sessionState.isLoggingOut,
                 currentRoute = currentRoute,
                 onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToCachedTracks = { currentRoute = CACHED_TRACKS_ROUTE },
-                onNavigateToRecommendations = { currentRoute = RECOMMENDATIONS_ROUTE },
+                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
+                onNavigateToCachedTracks = {
+                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
+                },
+                onNavigateToRecommendations = {
+                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
+                },
                 isNetworkAvailable = isNetworkAvailable,
                 pendingPlaybackEventCount = pendingPlaybackEventCount,
                 playbackEventSyncMessage = pendingPlaybackEventError,
@@ -221,6 +279,18 @@ fun AppNavGraph(
         }
     }
 }
+
+private fun authenticatedRouteOrLibrary(route: String): String =
+    when (route) {
+        LibraryRoutes.LIBRARY,
+        PlaylistRoutes.PLAYLISTS,
+        ShortcutRoutes.DESTINATION_CACHED_TRACKS,
+        ShortcutRoutes.DESTINATION_RECOMMENDATIONS,
+        ShortcutRoutes.DESTINATION_NOW_PLAYING,
+        -> route
+
+        else -> LibraryRoutes.LIBRARY
+    }
 
 private fun CachedTrack.toTrackResponse(): TrackResponse =
     TrackResponse(

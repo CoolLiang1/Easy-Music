@@ -1,0 +1,27 @@
+{
+  "name": "Easy Music",
+  "short_name": "Easy Music",
+  "description": "Self-hosted personal cloud music for scenario-based listening.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf5ed",
+  "theme_color": "#faf5ed",
+  "icons": [
+    {
+      "src": "/icons/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

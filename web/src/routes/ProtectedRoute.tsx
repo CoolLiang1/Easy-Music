@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
+import { PlaybackQueueProvider } from "../player/PlaybackQueueProvider";
 import { navigateTo } from "./router";
 
 type ProtectedRouteProps = {
@@ -31,7 +32,7 @@ function ProtectedRouteContent({ children }: { children: ReactNode }) {
     return (
       <main className="login-shell">
         <section className="login-panel" aria-live="polite">
-          <p className="eyebrow">Phase 2 Web Console</p>
+          <p className="eyebrow">Easy Music</p>
           <h1>Checking session</h1>
           <p className="page-copy">
             Your saved browser session is being verified.
@@ -45,5 +46,5 @@ function ProtectedRouteContent({ children }: { children: ReactNode }) {
     return null;
   }
 
-  return children;
+  return <PlaybackQueueProvider>{children}</PlaybackQueueProvider>;
 }

@@ -42,11 +42,9 @@ class RecommendationRepositoryTest {
             tokenStore = tokenStore("token-123"),
         )
         val request = RecommendationRequest(
-            scenarioTagIds = listOf(1),
-            stateTagIds = listOf(2),
+            sceneTagIds = listOf(1),
+            featureTagIds = listOf(2),
             typeTagIds = listOf(3),
-            attributeTagIds = listOf(4),
-            excludeAttributeTagIds = listOf(5),
         )
 
         val result = repository.getRecommendations(request)
@@ -81,10 +79,9 @@ class RecommendationRepositoryTest {
             clientEventId = "feedback-1",
             trackId = 42,
             feedbackType = FeedbackType.SkipRecommendation,
-            scenarioTagIds = listOf(1),
-            stateTagIds = listOf(2),
+            sceneTagIds = listOf(1),
+            featureTagIds = listOf(2),
             typeTagIds = listOf(3),
-            attributeTagIds = listOf(4),
             occurredAt = "2026-05-29T08:00:00Z",
         )
 
@@ -222,11 +219,9 @@ class RecommendationRepositoryTest {
         """
         {
           "structured_request": {
-            "scenario_tag_ids": [],
-            "state_tag_ids": [],
+            "scene_tag_ids": [],
+            "feature_tag_ids": [],
             "type_tag_ids": [],
-            "attribute_tag_ids": [],
-            "exclude_attribute_tag_ids": [],
             "limit": 3,
             "client": null
           },
@@ -294,11 +289,9 @@ class RecommendationRepositoryTest {
                         """
                         {
                           "structured_request": {
-                            "scenario_tag_ids": [],
-                            "state_tag_ids": [],
+                            "scene_tag_ids": [],
+                            "feature_tag_ids": [],
                             "type_tag_ids": [],
-                            "attribute_tag_ids": [],
-                            "exclude_attribute_tag_ids": [],
                             "limit": 3,
                             "client": null
                           },

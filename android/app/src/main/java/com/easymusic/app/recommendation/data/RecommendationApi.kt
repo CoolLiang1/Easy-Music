@@ -32,7 +32,7 @@ private fun ApiResult<String>.parseRecommendationResponse(): ApiResult<Recommend
             ApiResult.Success(RecommendationResponse.fromJson(JSONObject(value)))
         } catch (exception: JSONException) {
             ApiResult.SerializationError(
-                message = exception.message ?: "Recommendation response could not be parsed.",
+                message = exception.message ?: "无法解析推荐响应。",
                 body = value,
                 cause = exception,
             )

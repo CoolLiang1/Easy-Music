@@ -10,6 +10,7 @@ from app.auth.password import hash_password
 from app.db.base import Base
 from app.models.feedback_event import FeedbackEvent
 from app.models.playback_event import PlaybackEvent
+from app.models.playlist import Playlist, PlaylistTrack
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
@@ -83,6 +84,36 @@ def create_tag(db_session: Session, user: User, group: str, name: str) -> Tag:
     return tag
 
 
+def create_playlist(
+    db_session: Session,
+    user: User,
+    name: str,
+    *,
+    description: str | None = None,
+) -> Playlist:
+    playlist = Playlist(user_id=user.id, name=name, description=description)
+    db_session.add(playlist)
+    db_session.commit()
+    db_session.refresh(playlist)
+    return playlist
+
+
+def add_playlist_track(
+    db_session: Session,
+    playlist: Playlist,
+    track: Track,
+    position: int = 1,
+) -> None:
+    db_session.add(
+        PlaylistTrack(
+            playlist_id=playlist.id,
+            track_id=track.id,
+            position=position,
+        ),
+    )
+    db_session.commit()
+
+
 def assign_tags(db_session: Session, track: Track, *tags: Tag) -> None:
     for tag in tags:
         db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
@@ -117,10 +148,9 @@ def add_feedback_event(
     feedback_type: str,
     occurred_at: datetime,
     *,
-    scenario_tag_ids: list[int] | None = None,
-    state_tag_ids: list[int] | None = None,
+    scene_tag_ids: list[int] | None = None,
+    feature_tag_ids: list[int] | None = None,
     type_tag_ids: list[int] | None = None,
-    attribute_tag_ids: list[int] | None = None,
 ) -> None:
     db_session.add(
         FeedbackEvent(
@@ -128,10 +158,9 @@ def add_feedback_event(
             track_id=track.id,
             client_event_id=f"feedback-{track.id}-{feedback_type}-{occurred_at.isoformat()}",
             feedback_type=feedback_type,
-            scenario_tag_ids=scenario_tag_ids,
-            state_tag_ids=state_tag_ids,
+            scene_tag_ids=scene_tag_ids,
+            feature_tag_ids=feature_tag_ids,
             type_tag_ids=type_tag_ids,
-            attribute_tag_ids=attribute_tag_ids,
             occurred_at=occurred_at,
             client="android",
         ),
@@ -144,7 +173,7 @@ def test_ranking_uses_ready_tracks_for_authenticated_user(
 ) -> None:
     user = create_user(db_session)
     other_user = create_user(db_session, username="other")
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     visible = create_track(db_session, user, "Visible")
     processing = create_track(db_session, user, "Processing", status="processing")
     hidden = create_track(db_session, other_user, "Hidden")
@@ -154,7 +183,7 @@ def test_ranking_uses_ready_tracks_for_authenticated_user(
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        RecommendationRequest(scene_tag_ids=[focus.id]),
         now=NOW,
     )
 
@@ -166,54 +195,62 @@ def test_tag_matches_rank_above_liked_but_contextless_track(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    scenario = create_tag(db_session, user, "scenario", "Focus")
+    scene = create_tag(db_session, user, "scene", "Focus")
     kind = create_tag(db_session, user, "type", "Instrumental")
     matching = create_track(db_session, user, "Context Match")
     liked_only = create_track(db_session, user, "Liked Only", liked=True)
-    assign_tags(db_session, matching, scenario, kind)
+    assign_tags(db_session, matching, scene, kind)
 
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[scenario.id], type_tag_ids=[kind.id]),
+        RecommendationRequest(scene_tag_ids=[scene.id], type_tag_ids=[kind.id]),
         now=NOW,
     )
 
     assert [result.track.title for result in results[:2]] == ["Context Match", "Liked Only"]
     assert results[0].score > results[1].score
-    assert "matched scenario tags: Focus" in results[0].reason
+    assert "matched scene tags: Focus" in results[0].reason
     assert "matched type tags: Instrumental" in results[0].reason
     assert "liked track boost" in results[1].reason
+    assert results[0].explanation.matched_tags["scene"][0].name == "Focus"
+    assert results[0].explanation.matched_tags["type"][0].name == "Instrumental"
+    assert results[1].explanation.boosts[0].label == "liked track boost"
+    assert results[1].explanation.boosts[0].score_delta == 1.0
 
 
-def test_excluded_attribute_penalty_changes_order(db_session: Session) -> None:
+def test_feature_match_changes_order(db_session: Session) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
-    noisy = create_tag(db_session, user, "attribute", "Noisy")
-    clean_track = create_track(db_session, user, "Clean")
-    noisy_track = create_track(db_session, user, "Noisy")
-    assign_tags(db_session, clean_track, focus)
-    assign_tags(db_session, noisy_track, focus, noisy)
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
+    feature_track = create_track(db_session, user, "Feature Match")
+    scene_only_track = create_track(db_session, user, "Scene Only")
+    assign_tags(db_session, feature_track, focus, calm)
+    assign_tags(db_session, scene_only_track, focus)
 
     results = recommend_tracks(
         db_session,
         user,
         RecommendationRequest(
-            scenario_tag_ids=[focus.id],
-            exclude_attribute_tag_ids=[noisy.id],
+            scene_tag_ids=[focus.id],
+            feature_tag_ids=[calm.id],
         ),
         now=NOW,
     )
 
-    assert [result.track.title for result in results[:2]] == ["Clean", "Noisy"]
-    assert "excluded attribute penalty: Noisy" in results[1].reason
+    assert [result.track.title for result in results[:2]] == [
+        "Feature Match",
+        "Scene Only",
+    ]
+    assert "matched feature tags: Calm" in results[0].reason
+    assert results[0].explanation.matched_tags["feature"][0].name == "Calm"
 
 
-def test_future_cooldown_and_same_day_not_today_are_excluded(
+def test_default_soft_cooldown_keeps_track_but_not_today_is_excluded(
     db_session: Session,
 ) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     available = create_track(db_session, user, "Available")
     cooled_down = create_track(
         db_session,
@@ -230,16 +267,44 @@ def test_future_cooldown_and_same_day_not_today_are_excluded(
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        RecommendationRequest(scene_tag_ids=[focus.id]),
         now=NOW,
     )
 
-    assert [result.track.title for result in results] == ["Available"]
+    assert [result.track.title for result in results] == ["Available", "Cooldown"]
+    assert "active cooldown soft penalty" in results[1].reason
+    assert results[1].explanation.feedback_impacts[0].label == (
+        "active cooldown soft penalty"
+    )
 
 
-def test_future_cooldown_excludes_track(db_session: Session) -> None:
+def test_cooldown_off_ignores_active_cooldown(db_session: Session) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    cooled_down = create_track(
+        db_session,
+        user,
+        "Cooldown",
+        cooldown_until=NOW + timedelta(hours=6),
+    )
+    available = create_track(db_session, user, "Available")
+    assign_tags(db_session, cooled_down, focus)
+    assign_tags(db_session, available, focus)
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scene_tag_ids=[focus.id], cooldown_mode="off"),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results[:2]] == ["Cooldown", "Available"]
+    assert "active cooldown" not in results[0].reason
+
+
+def test_cooldown_strict_excludes_active_cooldown(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scene", "Focus")
     available = create_track(db_session, user, "Available")
     cooled_down = create_track(
         db_session,
@@ -253,7 +318,7 @@ def test_future_cooldown_excludes_track(db_session: Session) -> None:
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        RecommendationRequest(scene_tag_ids=[focus.id], cooldown_mode="strict"),
         now=NOW,
     )
 
@@ -262,7 +327,7 @@ def test_future_cooldown_excludes_track(db_session: Session) -> None:
 
 def test_not_today_feedback_only_excludes_current_day(db_session: Session) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     available = create_track(db_session, user, "Available")
     yesterday_not_today = create_track(db_session, user, "Yesterday Not Today")
     today_not_today = create_track(db_session, user, "Today Not Today")
@@ -281,7 +346,7 @@ def test_not_today_feedback_only_excludes_current_day(db_session: Session) -> No
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        RecommendationRequest(scene_tag_ids=[focus.id]),
         now=NOW,
     )
 
@@ -293,7 +358,7 @@ def test_not_today_feedback_only_excludes_current_day(db_session: Session) -> No
 
 def test_recent_playback_penalty_is_applied(db_session: Session) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     fresh = create_track(db_session, user, "Fresh")
     recent = create_track(db_session, user, "Recent")
     assign_tags(db_session, fresh, focus)
@@ -303,17 +368,138 @@ def test_recent_playback_penalty_is_applied(db_session: Session) -> None:
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        RecommendationRequest(scene_tag_ids=[focus.id]),
         now=NOW,
     )
 
     assert [result.track.title for result in results[:2]] == ["Fresh", "Recent"]
     assert "recently played penalty" in results[1].reason
+    assert results[1].explanation.penalties[0].label == "recently played penalty"
+    assert results[1].explanation.penalties[0].score_delta == -4.0
+
+
+def test_dislike_feedback_strongly_penalizes_track(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scene", "Focus")
+    candidate = create_track(db_session, user, "Candidate")
+    disliked = create_track(db_session, user, "Disliked")
+    assign_tags(db_session, candidate, focus)
+    assign_tags(db_session, disliked, focus)
+    add_feedback_event(db_session, user, disliked, "dislike", NOW - timedelta(days=2))
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scene_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results[:2]] == ["Candidate", "Disliked"]
+    assert "dislike feedback penalty" in results[1].reason
+    assert results[1].explanation.feedback_impacts[0].label == (
+        "dislike feedback penalty"
+    )
+
+
+def test_playlist_membership_boost_changes_order(db_session: Session) -> None:
+    user = create_user(db_session)
+    plain = create_track(db_session, user, "Plain")
+    playlisted = create_track(db_session, user, "Playlisted")
+    playlist = create_playlist(db_session, user, "Owner Picks")
+    add_playlist_track(db_session, playlist, playlisted)
+
+    results = recommend_tracks(db_session, user, RecommendationRequest(), now=NOW)
+
+    assert [result.track.title for result in results[:2]] == ["Playlisted", "Plain"]
+    assert "playlist membership boost: Owner Picks" in results[0].reason
+    assert results[0].explanation.boosts[0].score_delta == 0.5
+
+
+def test_playlist_name_match_adds_context_boost(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scene", "Focus")
+    unrelated = create_track(db_session, user, "Unrelated Playlist")
+    relevant = create_track(db_session, user, "Relevant Playlist")
+    assign_tags(db_session, unrelated, focus)
+    assign_tags(db_session, relevant, focus)
+    add_playlist_track(
+        db_session,
+        create_playlist(db_session, user, "Archive"),
+        unrelated,
+    )
+    add_playlist_track(
+        db_session,
+        create_playlist(db_session, user, "Focus Coding"),
+        relevant,
+    )
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scene_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results[:2]] == [
+        "Relevant Playlist",
+        "Unrelated Playlist",
+    ]
+    assert "playlist context boost: Focus Coding" in results[0].reason
+
+
+def test_playlist_description_match_adds_context_boost(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scene", "Focus")
+    plain = create_track(db_session, user, "Plain")
+    described = create_track(db_session, user, "Described")
+    assign_tags(db_session, plain, focus)
+    assign_tags(db_session, described, focus)
+    playlist = create_playlist(
+        db_session,
+        user,
+        "Work Shelf",
+        description="Deep focus and quiet study",
+    )
+    add_playlist_track(db_session, playlist, described)
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scene_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results[:2]] == ["Described", "Plain"]
+    assert "playlist context boost: Work Shelf" in results[0].reason
+
+
+def test_other_users_playlist_does_not_boost_current_user_track(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    plain = create_track(db_session, user, "Plain")
+    cross_linked = create_track(db_session, user, "Cross Linked")
+    assign_tags(db_session, plain, focus)
+    assign_tags(db_session, cross_linked, focus)
+    other_playlist = create_playlist(db_session, other_user, "Focus Favorites")
+    add_playlist_track(db_session, other_playlist, cross_linked)
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scene_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results[:2]] == ["Plain", "Cross Linked"]
+    assert "playlist" not in results[1].reason
 
 
 def test_not_suitable_context_overlap_penalizes_track(db_session: Session) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     candidate = create_track(db_session, user, "Candidate")
     penalized = create_track(db_session, user, "Penalized")
     assign_tags(db_session, candidate, focus)
@@ -324,23 +510,26 @@ def test_not_suitable_context_overlap_penalizes_track(db_session: Session) -> No
         penalized,
         "not_suitable_for_context",
         NOW - timedelta(days=2),
-        scenario_tag_ids=[focus.id],
+        scene_tag_ids=[focus.id],
     )
 
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        RecommendationRequest(scene_tag_ids=[focus.id]),
         now=NOW,
     )
 
     assert [result.track.title for result in results[:2]] == ["Candidate", "Penalized"]
     assert "not suitable for this context penalty" in results[1].reason
+    assert results[1].explanation.feedback_impacts[0].label == (
+        "not suitable for this context penalty"
+    )
 
 
 def test_recent_skip_recommendation_penalty_is_applied(db_session: Session) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     candidate = create_track(db_session, user, "Candidate")
     skipped = create_track(db_session, user, "Skipped")
     assign_tags(db_session, candidate, focus)
@@ -356,17 +545,20 @@ def test_recent_skip_recommendation_penalty_is_applied(db_session: Session) -> N
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id]),
+        RecommendationRequest(scene_tag_ids=[focus.id]),
         now=NOW,
     )
 
     assert [result.track.title for result in results[:2]] == ["Candidate", "Skipped"]
     assert "recent recommendation skip penalty" in results[1].reason
+    assert results[1].explanation.feedback_impacts[0].label == (
+        "recent recommendation skip penalty"
+    )
 
 
 def test_returns_at_most_three_without_placeholders(db_session: Session) -> None:
     user = create_user(db_session)
-    focus = create_tag(db_session, user, "scenario", "Focus")
+    focus = create_tag(db_session, user, "scene", "Focus")
     for index in range(5):
         track = create_track(db_session, user, f"Track {index}")
         assign_tags(db_session, track, focus)
@@ -374,7 +566,7 @@ def test_returns_at_most_three_without_placeholders(db_session: Session) -> None
     results = recommend_tracks(
         db_session,
         user,
-        RecommendationRequest(scenario_tag_ids=[focus.id], limit=10),
+        RecommendationRequest(scene_tag_ids=[focus.id], limit=10),
         now=NOW,
     )
 

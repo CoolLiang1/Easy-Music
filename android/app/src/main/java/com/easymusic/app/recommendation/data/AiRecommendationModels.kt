@@ -109,11 +109,12 @@ data class ParsedIntentResponse(
 
         private fun parseStructuredRequest(json: JSONObject): RecommendationRequest =
             RecommendationRequest(
-                scenarioTagIds = json.getIntArray("scenario_tag_ids"),
-                stateTagIds = json.getIntArray("state_tag_ids"),
+                sceneTagIds = json.getIntArray("scene_tag_ids"),
                 typeTagIds = json.getIntArray("type_tag_ids"),
-                attributeTagIds = json.getIntArray("attribute_tag_ids"),
-                excludeAttributeTagIds = json.getIntArray("exclude_attribute_tag_ids"),
+                featureTagIds = json.getIntArray("feature_tag_ids"),
+                rawText = json.optNullableString("raw_text"),
+                cooldownMode = json.optNullableString("cooldown_mode")
+                    ?.let { RecommendationCooldownMode.fromValueOrNull(it) },
                 limit = json.getInt("limit"),
                 client = json.optNullableString("client") ?: "",
             )

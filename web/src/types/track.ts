@@ -16,6 +16,8 @@ export type Track = {
   format: string | null;
   bitrate: number | null;
   status: TrackStatus;
+  processing_job_status: string | null;
+  processing_error_message: string | null;
   liked: boolean;
   cooldown_until: string | null;
   created_at: string;
@@ -46,3 +48,22 @@ export type TrackMetadataUpdate = Pick<
 >;
 
 export type TrackTagUpdate = Pick<TrackUpdate, "tag_ids">;
+
+export type TrackBatchTagUpdate = {
+  track_ids: number[];
+  add_tag_ids?: number[];
+  remove_tag_ids?: number[];
+};
+
+export type TrackBatchTagResult = {
+  track_id: number;
+  status: "updated" | "failed" | string;
+  error: string | null;
+};
+
+export type TrackBatchTagUpdateResponse = {
+  requested_track_count: number;
+  updated_count: number;
+  results: TrackBatchTagResult[];
+  tracks: Track[];
+};

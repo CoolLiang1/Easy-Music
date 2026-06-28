@@ -1,5 +1,6 @@
 import type { Tag } from "../types/tag";
-import { tagGroupLabels, tagGroups } from "./TagForm";
+import { formatDateTime, tagGroupLabels } from "../i18n/zh";
+import { tagGroups } from "./TagForm";
 
 type TagListProps = {
   disabled?: boolean;
@@ -15,46 +16,27 @@ export function TagList({
   tags,
 }: TagListProps) {
   return (
-    <div style={{ display: "grid", gap: "18px", marginTop: "30px" }}>
+    <div className="recommendation-results">
       {tagGroups.map((group) => {
         const groupTags = tags.filter((tag) => tag.group === group);
 
         return (
           <section
             aria-labelledby={`tag-group-${group}`}
+            className="panel"
             key={group}
-            style={{
-              border: "1px solid #d5dde8",
-              borderRadius: "8px",
-              background: "#f8fafc",
-              padding: "22px",
-            }}
           >
             <h2 id={`tag-group-${group}`}>{tagGroupLabels[group]}</h2>
             {groupTags.length === 0 ? (
-              <p
-                style={{
-                  color: "#64748b",
-                  fontWeight: 700,
-                  margin: "12px 0 0",
-                }}
-              >
-                No tags in this group.
+              <p className="recommendation-muted">
+                这个分组暂无标签。
               </p>
             ) : (
-              <div style={{ display: "grid", gap: "12px", marginTop: "16px" }}>
+              <div className="item-list">
                 {groupTags.map((tag) => (
                   <article
+                    className="item-card"
                     key={tag.id}
-                    style={{
-                      alignItems: "center",
-                      border: "1px solid #d5dde8",
-                      borderRadius: "8px",
-                      display: "grid",
-                      gap: "14px",
-                      gridTemplateColumns: "minmax(0, 1fr) auto",
-                      padding: "14px",
-                    }}
                   >
                     <div style={{ minWidth: 0 }}>
                       <p
@@ -75,7 +57,7 @@ export function TagList({
                           margin: "6px 0 0",
                         }}
                       >
-                        Created {formatDateTime(tag.created_at)}
+                        创建于 {formatDateTime(tag.created_at)}
                       </p>
                     </div>
                     <div
@@ -92,7 +74,7 @@ export function TagList({
                         onClick={() => onEdit(tag)}
                         type="button"
                       >
-                        Edit
+                        编辑
                       </button>
                       <button
                         className="button secondary"
@@ -100,7 +82,7 @@ export function TagList({
                         onClick={() => void onDelete(tag)}
                         type="button"
                       >
-                        Delete
+                        删除
                       </button>
                     </div>
                   </article>
@@ -112,16 +94,4 @@ export function TagList({
       })}
     </div>
   );
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }

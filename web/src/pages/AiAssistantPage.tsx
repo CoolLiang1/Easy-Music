@@ -4,6 +4,12 @@ import { aiRecommend } from "../api/ai";
 import { syncFeedbackEvents } from "../api/feedback";
 import { ApiClientError } from "../api/http";
 import { useAuth } from "../auth/AuthProvider";
+import {
+  RecommendationExclusionsNotice,
+  RecommendationExplanationDetails,
+  formatRecommendationReasonForDisplay,
+} from "../components/RecommendationExplanationDetails";
+import { feedbackLabels } from "../i18n/zh";
 import type { AiRecommendResponse, AiProviderStatus } from "../types/ai";
 import type { FeedbackType } from "../types/feedback";
 import type { RecommendationResult, RecommendationRequest } from "../types/recommendation";
@@ -29,13 +35,12 @@ type FeedbackState = {
 // constants
 // ---------------------------------------------------------------------------
 
-const TAG_GROUP_ORDER: TagGroup[] = ["scenario", "state", "type", "attribute"];
+const TAG_GROUP_ORDER: TagGroup[] = ["scene", "type", "feature"];
 
 const GROUP_LABELS: Record<TagGroup, string> = {
-  scenario: "Scenario",
-  state: "State",
-  type: "Type",
-  attribute: "Desired attributes",
+  scene: "场景",
+  type: "类型",
+  feature: "特点",
 };
 
 const feedbackActions: Array<{
@@ -45,10 +50,10 @@ const feedbackActions: Array<{
     "like" | "not_today" | "tired" | "not_suitable_for_context"
   >;
 }> = [
-  { label: "Like", type: "like" },
-  { label: "Not today", type: "not_today" },
-  { label: "Tired", type: "tired" },
-  { label: "Not suitable", type: "not_suitable_for_context" },
+  { label: feedbackLabels.like ?? "喜欢", type: "like" },
+  { label: feedbackLabels.not_today ?? "今天不听", type: "not_today" },
+  { label: feedbackLabels.tired ?? "听腻了", type: "tired" },
+  { label: feedbackLabels.not_suitable_for_context ?? "不适合", type: "not_suitable_for_context" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -70,7 +75,7 @@ export function AiAssistantPage() {
     if (!accessToken) {
       setAiState({
         name: "error",
-        message: "Sign in again to use the AI Assistant.",
+        message: "请重新登录后再使用 AI 助手。",
       });
       return;
     }
@@ -88,7 +93,7 @@ export function AiAssistantPage() {
     } catch (error: unknown) {
       setAiState({
         name: "error",
-        message: getErrorMessage(error, "AI recommendation request failed."),
+        message: getErrorMessage(error, "AI 推荐请求失败。"),
       });
     }
   }, [accessToken, text]);
@@ -102,14 +107,14 @@ export function AiAssistantPage() {
       if (!accessToken) {
         setFeedbackState({
           key: `${result.track.id}:${feedbackType}`,
-          message: "Sign in again to send feedback.",
+          message: "请重新登录后再发送反馈。",
           status: "error",
         });
         return;
       }
 
       const key = `${result.track.id}:${feedbackType}`;
-      setFeedbackState({ key, message: "Sending feedback...", status: "sending" });
+      setFeedbackState({ key, message: "正在发送反馈...", status: "sending" });
 
       try {
         const response = await syncFeedbackEvents(accessToken, {
@@ -119,10 +124,9 @@ export function AiAssistantPage() {
               client_event_id: createClientEventId(),
               feedback_type: feedbackType,
               occurred_at: new Date().toISOString(),
-              scenario_tag_ids: structuredRequest.scenario_tag_ids,
-              state_tag_ids: structuredRequest.state_tag_ids,
+              scene_tag_ids: structuredRequest.scene_tag_ids,
               type_tag_ids: structuredRequest.type_tag_ids,
-              attribute_tag_ids: structuredRequest.attribute_tag_ids,
+              feature_tag_ids: structuredRequest.feature_tag_ids,
               track_id: result.track.id,
             },
           ],
@@ -132,7 +136,7 @@ export function AiAssistantPage() {
         if (failed) {
           setFeedbackState({
             key,
-            message: failed.error || "Feedback was not accepted.",
+            message: failed.error || "反馈未被接受。",
             status: "error",
           });
           return;
@@ -143,14 +147,14 @@ export function AiAssistantPage() {
           key,
           message:
             accepted?.status === "duplicate"
-              ? "Feedback was already recorded."
-              : "Feedback recorded.",
+              ? "反馈已记录过。"
+              : "反馈已记录。",
           status: "success",
         });
       } catch (error: unknown) {
         setFeedbackState({
           key,
-          message: getErrorMessage(error, "Feedback request failed."),
+          message: getErrorMessage(error, "反馈请求失败。"),
           status: "error",
         });
       }
@@ -162,19 +166,17 @@ export function AiAssistantPage() {
 
   return (
     <section className="page-panel" aria-labelledby="ai-assistant-title">
-      <p className="eyebrow">AI Assistant V1</p>
-      <h1 id="ai-assistant-title">Natural-language recommendations</h1>
+      <p className="eyebrow">AI 助手</p>
+      <h1 id="ai-assistant-title">自然语言推荐</h1>
       <p className="page-copy">
-        Describe what you want to listen to in your own words. The AI Assistant
-        parses your request into structured context and delegates ranking to the
-        existing recommendation service — it never selects tracks directly and
-        never bypasses cooldown or feedback penalties.
+        用自己的话描述现在想听什么。AI 助手会把请求解析成结构化上下文，
+        再交给现有推荐服务排序；它不会直接选择音轨，也不会绕过冷却或反馈惩罚。
       </p>
 
       {/* ---- input ---- */}
       <div className="recommendation-toolbar">
         <input
-          aria-label="Natural-language listening request"
+          aria-label="自然语言收听请求"
           className="text-input"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -182,7 +184,7 @@ export function AiAssistantPage() {
               void handleRequest();
             }
           }}
-          placeholder='e.g. "calm instrumental focus music for working"'
+          placeholder='例如：“适合专注工作的安静纯音乐”'
           type="text"
           value={text}
         />
@@ -193,30 +195,28 @@ export function AiAssistantPage() {
           type="button"
         >
           {aiState.name === "loading"
-            ? "Asking AI..."
-            : "Get AI recommendations"}
+            ? "正在询问 AI..."
+            : "获取 AI 推荐"}
         </button>
       </div>
 
       {/* ---- states: idle ---- */}
       {aiState.name === "idle" ? (
         <div className="empty-state">
-          Type a natural-language request above and click the button to get
-          AI-assisted recommendations.
+          在上方输入自然语言请求，然后点击按钮获取 AI 辅助推荐。
         </div>
       ) : null}
 
       {/* ---- states: loading ---- */}
       {aiState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          The AI Assistant is parsing your request and the recommendation
-          service is ranking results...
+          AI 助手正在解析请求，推荐服务正在排序结果...
         </div>
       ) : null}
 
       {/* ---- states: error ---- */}
       {aiState.name === "error" ? (
-        <div className="empty-state" role="alert">
+        <div className="empty-state error" role="alert">
           {aiState.message}
         </div>
       ) : null}
@@ -269,11 +269,12 @@ function AiReadyContent({
       <ParsedIntentSection parsed={parsed} />
 
       {/* ---- results ---- */}
+      <RecommendationExclusionsNotice exclusions={response.exclusions_considered} />
+
       {results.length === 0 ? (
         <div className="empty-state">
-          No recommendations were returned. There may be no ready tracks for
-          this account, or all ready tracks may be filtered by cooldown,
-          feedback, or excluded attributes.
+          没有返回推荐。可能还没有可播放音轨，或所有可播放音轨都被冷却、
+          反馈等规则过滤了。
         </div>
       ) : (
         <div className="recommendation-results">
@@ -303,15 +304,15 @@ function ProviderStatusBadge({ status }: { status: AiProviderStatus }) {
 
   const messages: Record<AiProviderStatus, string> = {
     ok: "",
-    disabled: "AI provider is disabled. Set AI_ENABLED=true in backend config.",
+    disabled: "AI provider 已禁用。请在后端配置中设置 AI_ENABLED=true。",
     unconfigured:
-      "AI provider is not fully configured. Check AI_API_KEY and AI_MODEL.",
+      "AI provider 尚未完整配置。请检查 AI_API_KEY 和 AI_MODEL。",
     error:
-      "AI provider encountered an error. Check backend logs for details.",
+      "AI provider 发生错误。请查看后端日志了解详情。",
   };
 
   return (
-    <div className="empty-state" role="alert">
+    <div className="empty-state error" role="alert">
       {messages[status]}
     </div>
   );
@@ -326,7 +327,7 @@ function ParsedIntentSection({ parsed }: { parsed: AiRecommendResponse["parsed_i
     parsed;
 
   return (
-    <section className="recommendation-grid" aria-label="Parsed intent">
+    <section className="recommendation-grid" aria-label="已解析意图">
       {TAG_GROUP_ORDER.map((group) => {
         const items = matched[group];
         return (
@@ -341,38 +342,16 @@ function ParsedIntentSection({ parsed }: { parsed: AiRecommendResponse["parsed_i
                 ))}
               </div>
             ) : (
-              <p className="recommendation-muted">None matched</p>
+              <p className="recommendation-muted">未匹配</p>
             )}
           </div>
         );
       })}
 
-      {/* excluded attributes */}
-      <div className="recommendation-card">
-        <h2>Excluded attributes</h2>
-        {parsed.structured_request.exclude_attribute_tag_ids &&
-        parsed.structured_request.exclude_attribute_tag_ids.length > 0 ? (
-          <div className="tag-chip-list">
-            {parsed.structured_request.exclude_attribute_tag_ids.map((id) => {
-              const tag = Object.values(matched)
-                .flat()
-                .find((t) => t.id === id);
-              return (
-                <span className="tag-chip readonly excluded" key={id}>
-                  {tag?.name ?? `#${id}`}
-                </span>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="recommendation-muted">None excluded</p>
-        )}
-      </div>
-
       {/* unmatched terms */}
       {unmatched.length > 0 ? (
         <div className="recommendation-card">
-          <h2>Unmatched terms</h2>
+          <h2>未匹配词</h2>
           <p className="recommendation-muted">{unmatched.join(", ")}</p>
         </div>
       ) : null}
@@ -383,7 +362,7 @@ function ParsedIntentSection({ parsed }: { parsed: AiRecommendResponse["parsed_i
           className="recommendation-card"
           style={{ gridColumn: "1 / -1" }}
         >
-          <h2>AI explanation</h2>
+          <h2>AI 解释</h2>
           <p className="recommendation-reason">{explanation}</p>
         </div>
       ) : null}
@@ -417,30 +396,33 @@ function AiResultCard({
     <article className="recommendation-result-card">
       <div className="recommendation-result-heading">
         <div>
-          <p className="eyebrow">{isPrimary ? "Primary" : "Alternative"}</p>
-          <h2>{track.title || "Untitled track"}</h2>
+          <p className="eyebrow">{isPrimary ? "首选" : "备选"}</p>
+          <h2>{track.title || "未命名音轨"}</h2>
         </div>
         <span className="score-pill">
-          Rank {result.rank} · {formatScore(result.score)}
+          排名 {result.rank} / {formatScore(result.score)}
         </span>
       </div>
 
       <dl className="recommendation-meta">
         <div>
-          <dt>Artist</dt>
-          <dd>{track.artist || "Not set"}</dd>
+          <dt>艺人</dt>
+          <dd>{track.artist || "未设置"}</dd>
         </div>
         <div>
-          <dt>Album</dt>
-          <dd>{track.album || "Not set"}</dd>
+          <dt>专辑</dt>
+          <dd>{track.album || "未设置"}</dd>
         </div>
       </dl>
 
       {/* Phase 5 deterministic rule reason */}
-      <p className="recommendation-reason">{result.reason}</p>
+      <p className="recommendation-reason">
+        {formatRecommendationReasonForDisplay(result.reason)}
+      </p>
+      <RecommendationExplanationDetails explanation={result.explanation} />
 
       {track.tags.length > 0 ? (
-        <div className="tag-chip-list" aria-label="Track tags">
+        <div className="tag-chip-list" aria-label="音轨标签">
           {track.tags.map((tag) => (
             <span className="tag-chip readonly" key={tag.id}>
               {tag.name}
@@ -448,7 +430,7 @@ function AiResultCard({
           ))}
         </div>
       ) : (
-        <p className="recommendation-muted">No tags attached to this track.</p>
+        <p className="recommendation-muted">这个音轨没有分配标签。</p>
       )}
 
       {/* feedback actions */}
@@ -467,7 +449,7 @@ function AiResultCard({
               onClick={() => onFeedback(result, action.type)}
               type="button"
             >
-              {isSending ? "Sending..." : action.label}
+              {isSending ? "正在发送..." : action.label}
             </button>
           );
         })}
@@ -497,16 +479,16 @@ function createClientEventId() {
 }
 
 function formatScore(score: number) {
-  return `Score ${Number.isInteger(score) ? score : score.toFixed(2)}`;
+  return `评分 ${Number.isInteger(score) ? score : score.toFixed(2)}`;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiClientError) {
     if (error.status === 401) {
-      return "Your session is unauthorized. Sign in again and retry.";
+      return "当前会话未授权。请重新登录后重试。";
     }
     if (error.status === 503) {
-      return "AI provider is unavailable. Check that AI_ENABLED, AI_API_KEY, and AI_MODEL are configured in the backend.";
+      return "AI provider 不可用。请确认后端已配置 AI_ENABLED、AI_API_KEY 和 AI_MODEL。";
     }
   }
   if (error instanceof Error && error.message) {

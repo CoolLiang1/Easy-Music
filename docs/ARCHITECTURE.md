@@ -63,8 +63,16 @@ The backend keeps these modules separated at a high level:
 - Auth: authentication, token/session handling, password hashing, and access control.
 - Users: user records, ownership boundaries, and single-user-to-future-multi-user compatibility.
 - Tracks: library metadata, playback file references, status, and track updates.
+- Playlists: owner-scoped manually curated playlists, optional descriptions,
+  ordered playlist-track membership, and playlist signals consumed by
+  Recommendation V2 foundation scoring.
 - Tags: tag taxonomy, tag groups, and track-tag assignment.
 - Uploads: audio upload validation, original file persistence, and upload lifecycle state.
+- Video uploads: user-provided video validation, temporary media storage, and
+  creation of video extraction processing jobs.
+- Imports: optional administrator-configured local import roots, path safety
+  checks, read-only scan preview, explicit confirmed import, and small batch
+  history for Web status display.
 - Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
 - Playback events: online/offline playback event ingestion and duplicate-safe sync.
 - Feedback events: recommendation feedback ingestion and cooldown/avoidance inputs.
@@ -95,6 +103,7 @@ Recommended mounted paths:
 - `/srv/easy-music/media/originals`
 - `/srv/easy-music/media/playback`
 - `/srv/easy-music/media/covers`
+- `/srv/easy-music/media/temp-videos`
 - `/srv/easy-music/postgres`
 
 ## 5. Backend
@@ -123,6 +132,10 @@ Recommended mounted paths:
 - AI assistant
 - Android cache sync
 
+Playback queue state is client-local. The backend persists playlists and their
+ordered tracks, but it does not persist current playback queues or synchronize
+queue state across devices.
+
 ## 6. Android App
 
 ### 6.1 Technology
@@ -139,6 +152,10 @@ Recommended mounted paths:
 - Login
 - Recommendation home
 - Cloud playback
+- Playlist browsing and playback handoff
+- Local playback queue management with history/current/upcoming, playlist
+  sequence/shuffle/reverse generation, upcoming reorder, and playlist-only
+  repeat
 - Background playback
 - Notification and lock screen controls
 - Headset control integration
@@ -169,11 +186,15 @@ Android should store:
 - Login
 - Audio upload
 - Library management
+- Playlist management
 - Track editing
 - Tag management
 - AI tag confirmation
 - Recommendation testing
 - Web playback
+- Client-side playback queue with history/current/upcoming, queue editing,
+  playlist sequence/shuffle/reverse generation, upcoming reorder, and
+  playlist-only repeat
 - Playback history
 
 ## 8. Data Model Draft
@@ -197,11 +218,15 @@ Version 1 is single-user, but tables should still include `user_id`.
 - `duration_seconds`
 - `content_type`
 - `original_file_path`
+- `original_file_size_bytes`
+- `original_file_sha256`
 - `playback_file_path`
+- `playback_file_sha256`
 - `cover_path`
 - `source_url`
 - `format`
 - `bitrate`
+- `normalized_metadata_key`
 - `status`
 - `liked`
 - `cooldown_until`
@@ -225,10 +250,13 @@ Possible statuses:
 
 Possible groups:
 
-- scenario
-- state
+- scene
 - type
-- attribute
+- feature
+
+V2.4 simplified the tag taxonomy to these three groups. Existing `scenario`
+tags migrate to `scene`, existing `state` tags migrate to `feature`, and
+`attribute` tags plus their track-tag links are removed by migration.
 
 ### 8.4 TrackTag
 
@@ -268,8 +296,8 @@ Possible event types:
 - `id`
 - `user_id`
 - `track_id`
-- `scenario_context`
-- `state_context`
+- `scene_tag_ids`
+- `feature_tag_ids`
 - `type_context`
 - `feedback_type`
 - `occurred_at`
@@ -277,6 +305,7 @@ Possible event types:
 Possible feedback types:
 
 - like
+- dislike
 - tired
 - not_today
 - not_suitable_for_context
@@ -287,6 +316,7 @@ Possible feedback types:
 - `id`
 - `user_id`
 - `raw_text`
+- `cooldown_mode`
 - `parsed_context_json`
 - `created_at`
 
@@ -299,6 +329,72 @@ Possible feedback types:
 - `score`
 - `reason`
 
+### 8.9 ImportBatch
+
+- `id`
+- `user_id`
+- `root_id`
+- `status`
+- `message`
+- `requested_count`
+- `imported_count`
+- `skipped_count`
+- `failed_count`
+- `created_at`
+- `updated_at`
+
+### 8.10 ImportItem
+
+- `id`
+- `batch_id`
+- `user_id`
+- `root_id`
+- `relative_source_path`
+- `display_name`
+- `status`
+- `track_id`
+- `error_message`
+- `created_at`
+- `updated_at`
+
+### 8.11 ProcessingJob
+
+- `id`
+- `track_id`
+- `status`
+- `job_type`
+- `source_path`
+- `error_message`
+- `started_at`
+- `finished_at`
+- `created_at`
+- `updated_at`
+
+### 8.12 Playlist
+
+- `id`
+- `user_id`
+- `name`
+- `description`
+- `created_at`
+- `updated_at`
+
+Playlists are ordinary user-created private lists. Version 2.1 does not include
+smart playlists, public sharing, collaboration, or automatic playlist
+generation. Recommendation V2 foundation consumes only owner-scoped playlist
+membership plus playlist name/description relevance as scoring signals.
+
+### 8.13 PlaylistTrack
+
+- `playlist_id`
+- `track_id`
+- `position`
+- `created_at`
+
+`playlist_tracks` is scoped through its parent playlist owner and only accepts
+tracks owned by the same user. The service also exposes a narrow read-only
+playlist signal method consumed by Recommendation V2 foundation scoring.
+
 ## 9. Media Processing
 
 ### 9.1 Upload
@@ -310,22 +406,97 @@ Supported upload formats:
 - M4A
 - WAV
 - OGG
+- AAC
+
+Supported user-provided video upload formats:
+
+- MP4
+- MKV
+- MOV
+- WEBM
 
 ### 9.2 Processing Pipeline
 
 1. Save original file.
-2. Extract metadata.
-3. Generate normalized MP3 playback file.
-4. Extract or generate cover if available.
-5. Create or update Track.
-6. Ask AI for tag suggestions.
-7. Mark track as ready or failed.
+2. Store advisory duplicate signals for the original, including file size and
+   SHA-256 hash when the saved file is readable.
+3. Extract metadata.
+4. Generate normalized MP3 playback file.
+5. Store a normalized metadata key and playback SHA-256 hash when available.
+6. Extract or generate cover if available.
+7. Create or update Track.
+8. Ask AI for tag suggestions.
+9. Mark track as ready or failed.
+
+V1.1 also allows the owner to replace a track cover image from the Web Track
+Detail page. Replacement covers are stored under the configured cover media
+directory and update only `tracks.cover_path`; they do not regenerate playback
+audio or modify the preserved original audio file.
 
 ### 9.3 Playback Format
 
 Version 1 uses MP3 playback files for compatibility.
 
 Original files are preserved for future reprocessing.
+
+### 9.4 Duplicate Signals
+
+V1.1 stores duplicate-detection signals on each track for later advisory
+duplicate review. The signals are scoped through the existing `tracks.user_id`
+ownership boundary and include original file size, original file SHA-256,
+normalized metadata key, and playback file SHA-256 when processing has produced
+a playback file. These values do not include local filesystem paths, secrets, or
+media contents.
+
+Duplicate detection remains advisory. Signal storage must not block uploads and
+must not delete, merge, overwrite, or hide tracks automatically.
+
+### 9.5 Import Root Safety
+
+V2 import tools are disabled when `IMPORT_ALLOWED_ROOTS` is empty. When enabled,
+the backend treats configured roots as an allowlist of server-side directories.
+Requested paths are relative to one configured root, resolved before use, and
+rejected if they escape the root or target broad locations such as a drive root,
+OS root, user home directory, repository root, or `MEDIA_ROOT`.
+
+The import API surface is intentionally small:
+
+- `GET /api/imports/configuration` returns enabled state and safe root labels.
+- `POST /api/imports/scan` scans one configured root/subdirectory for supported
+  audio candidates and skipped files.
+- `POST /api/imports` imports only explicitly selected audio files by copying
+  them into controlled original media storage, creating normal tracks and normal
+  pending processing jobs.
+- `GET /api/imports/batches/latest` and `GET /api/imports/batches/{batch_id}`
+  return the current user's safe import batch history for Web status display.
+
+Scan preview responses include safe relative paths, basenames, extensions,
+sizes, support status, skipped reasons, and applied scan limits. They do not
+expose unrestricted absolute paths, run FFmpeg/ffprobe, create tracks, create
+processing jobs, hash files, copy files, delete files, move files, or modify
+source directories.
+
+Confirmed import responses and batch history store only safe source display
+data: configured root id, relative source path, basename, per-file status,
+resulting track id, UI-safe error message, and timestamps. They do not expose
+absolute import source paths. Imported item track details are built from the
+existing safe track response, and track processing status remains the source of
+truth for transcoding results.
+
+### 9.6 Temporary Video Uploads
+
+`POST /api/tracks/upload-video` accepts explicit user-provided video files for
+later audio extraction. The request validates extension, content type, upload
+size, and a basic file signature, then stores the video under
+`MEDIA_ROOT/TEMP_VIDEOS_DIR` using media storage helpers.
+
+Video uploads create a normal `Track` with `processing` status and a pending
+`ProcessingJob` with `job_type="video_extraction"` and a safe relative
+`source_path` to the temporary video. The track response does not expose the
+temporary path, and the video is not stored as `tracks.original_file_path`,
+playback media, or cover media. Worker extraction is handled separately by the
+V2 worker task; until then, the existing audio worker only claims
+`audio_processing` jobs and leaves video extraction jobs pending.
 
 ## 10. Recommendation System
 
@@ -342,14 +513,16 @@ Version 1 uses hybrid recommendation:
 
 ### 10.2 Rule Ranking Inputs
 
-- Scenario tag match
-- State tag match
+- Scene tag match
 - Type tag match
-- Attribute filters
+- Feature tag match
 - Like status
 - Recent playback
-- Cooldown
+- Cooldown mode (`off`, `soft`, or `strict`)
 - Not-today feedback
+- Dislike feedback
+- Playlist membership
+- Playlist name/description relevance to requested text or tag names
 - Skip frequency
 - Not-suitable feedback for current context
 - Cached status on Android, if relevant
@@ -361,6 +534,14 @@ The API should return:
 - One primary recommendation
 - Two alternatives
 - Reason for each result
+- Structured explanation details for each result, including matched tags,
+  playlist boosts, penalties, feedback impact, and avoidance reasons.
+- Top-level exclusions considered, such as same-day `not_today` feedback
+  filters or active cooldown when strict mode is requested.
+
+The structured explanation is derived from the same rule-based ranking inputs
+as the score and concise `reason` text. It does not change ranking order and
+does not let AI select tracks.
 
 ## 11. API Draft
 
@@ -374,11 +555,26 @@ The API should return:
 
 - `GET /api/tracks`
 - `POST /api/tracks/upload`
+- `POST /api/tracks/upload-video`
 - `GET /api/tracks/{id}`
 - `PATCH /api/tracks/{id}`
+- `PUT /api/tracks/{id}/cover`
+- `GET /api/tracks/{id}/cover`
 - `DELETE /api/tracks/{id}`
+- `GET /api/tracks/duplicates`
 - `GET /api/tracks/{id}/stream`
 - `GET /api/tracks/{id}/download-cache`
+
+### Playlists
+
+- `GET /api/playlists`
+- `POST /api/playlists`
+- `GET /api/playlists/{id}`
+- `PATCH /api/playlists/{id}`
+- `DELETE /api/playlists/{id}`
+- `POST /api/playlists/{id}/tracks`
+- `DELETE /api/playlists/{id}/tracks/{track_id}`
+- `PUT /api/playlists/{id}/tracks/order`
 
 ### Tags
 
@@ -386,6 +582,14 @@ The API should return:
 - `POST /api/tags`
 - `PATCH /api/tags/{id}`
 - `DELETE /api/tags/{id}`
+
+### Imports
+
+- `GET /api/imports/configuration`
+- `POST /api/imports/scan`
+- `POST /api/imports`
+- `GET /api/imports/batches/latest`
+- `GET /api/imports/batches/{batch_id}`
 
 ### Playback And Feedback
 
@@ -396,6 +600,7 @@ The API should return:
 ### Recommendation
 
 - `POST /api/recommendations`
+- `GET /api/recommendations/revived`
 
 ### AI
 

@@ -68,7 +68,15 @@ services:
       MEDIA_ROOT: /app/media
       ORIGINALS_DIR: ${ORIGINALS_DIR:-originals}
       PLAYBACK_DIR: ${PLAYBACK_DIR:-playback}
+      COVERS_DIR: ${COVERS_DIR:-covers}
+      TEMP_VIDEOS_DIR: ${TEMP_VIDEOS_DIR:-temp-videos}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-200}
+      MAX_VIDEO_UPLOAD_MB: ${MAX_VIDEO_UPLOAD_MB:-1024}
+      MAX_COVER_MB: ${MAX_COVER_MB:-10}
+      IMPORT_ALLOWED_ROOTS: ${IMPORT_ALLOWED_ROOTS:-}
+      IMPORT_SCAN_MAX_FILES: ${IMPORT_SCAN_MAX_FILES:-1000}
+      IMPORT_SCAN_MAX_DEPTH: ${IMPORT_SCAN_MAX_DEPTH:-5}
+      IMPORT_SCAN_MAX_FILE_MB: ${IMPORT_SCAN_MAX_FILE_MB:-200}
       FFMPEG_PATH: ${FFMPEG_PATH:-ffmpeg}
       FFPROBE_PATH: ${FFPROBE_PATH:-ffprobe}
       CORS_ORIGINS: ${CORS_ORIGINS:?err}
@@ -83,6 +91,7 @@ services:
       - ${MEDIA_HOST_ORIGINALS:-./media/originals}:/app/media/originals
       - ${MEDIA_HOST_PLAYBACK:-./media/playback}:/app/media/playback
       - ${MEDIA_HOST_COVERS:-./media/covers}:/app/media/covers
+      - ${MEDIA_HOST_TEMP_VIDEOS:-./media/temp-videos}:/app/media/temp-videos
     healthcheck:
       test:
         [
@@ -127,7 +136,15 @@ services:
       MEDIA_ROOT: /app/media
       ORIGINALS_DIR: ${ORIGINALS_DIR:-originals}
       PLAYBACK_DIR: ${PLAYBACK_DIR:-playback}
+      COVERS_DIR: ${COVERS_DIR:-covers}
+      TEMP_VIDEOS_DIR: ${TEMP_VIDEOS_DIR:-temp-videos}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-200}
+      MAX_VIDEO_UPLOAD_MB: ${MAX_VIDEO_UPLOAD_MB:-1024}
+      MAX_COVER_MB: ${MAX_COVER_MB:-10}
+      IMPORT_ALLOWED_ROOTS: ${IMPORT_ALLOWED_ROOTS:-}
+      IMPORT_SCAN_MAX_FILES: ${IMPORT_SCAN_MAX_FILES:-1000}
+      IMPORT_SCAN_MAX_DEPTH: ${IMPORT_SCAN_MAX_DEPTH:-5}
+      IMPORT_SCAN_MAX_FILE_MB: ${IMPORT_SCAN_MAX_FILE_MB:-200}
       FFMPEG_PATH: ${FFMPEG_PATH:-ffmpeg}
       FFPROBE_PATH: ${FFPROBE_PATH:-ffprobe}
       WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-5}
@@ -142,6 +159,7 @@ services:
       - ${MEDIA_HOST_ORIGINALS:-./media/originals}:/app/media/originals
       - ${MEDIA_HOST_PLAYBACK:-./media/playback}:/app/media/playback
       - ${MEDIA_HOST_COVERS:-./media/covers}:/app/media/covers
+      - ${MEDIA_HOST_TEMP_VIDEOS:-./media/temp-videos}:/app/media/temp-videos
     command: ["python", "-m", "app.worker", "--loop"]
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'app\\.worker'"]
@@ -179,6 +197,7 @@ services:
       - "443:443"
     environment:
       CADDY_DOMAIN: ${CADDY_DOMAIN:?err}
+      CADDY_VIDEO_UPLOAD_LIMIT: ${CADDY_VIDEO_UPLOAD_LIMIT:-1024MB}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ${WEB_DIST_PATH:-./web/dist}:/srv/web:ro

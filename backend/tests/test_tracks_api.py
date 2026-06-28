@@ -15,6 +15,9 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
 from app.media.storage import MediaStorage, get_media_storage
+from app.models.feedback_event import FeedbackEvent
+from app.models.playback_event import PlaybackEvent
+from app.models.processing_job import ProcessingJob
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
@@ -82,8 +85,13 @@ def create_track(db_session: Session, user: User, title: str = "Track One") -> T
     return track
 
 
-def create_tag(db_session: Session, user: User, name: str = "Focus") -> Tag:
-    tag = Tag(user_id=user.id, name=name, group="scenario")
+def create_tag(
+    db_session: Session,
+    user: User,
+    name: str = "Focus",
+    group: str = "scene",
+) -> Tag:
+    tag = Tag(user_id=user.id, name=name, group=group)
     db_session.add(tag)
     db_session.commit()
     db_session.refresh(tag)
@@ -119,6 +127,33 @@ def test_get_track_detail(client: TestClient, db_session: Session) -> None:
     assert body["title"] == "Track One"
     assert body["artist"] == "Artist"
     assert body["tags"][0]["name"] == "Focus"
+    assert body["processing_job_status"] is None
+    assert body["processing_error_message"] is None
+
+
+def test_get_track_detail_includes_latest_processing_failure(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.status = "failed"
+    db_session.add(
+        ProcessingJob(
+            track_id=track.id,
+            status="failed",
+            error_message="ffmpeg could not decode the uploaded file",
+        ),
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/tracks/{track.id}", headers=auth_headers(user))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "failed"
+    assert body["processing_job_status"] == "failed"
+    assert body["processing_error_message"] == "ffmpeg could not decode the uploaded file"
 
 
 def test_update_track_metadata(client: TestClient, db_session: Session) -> None:
@@ -197,6 +232,173 @@ def test_cannot_associate_another_users_tag(
     assert response.status_code == 404
 
 
+def test_batch_adds_tags_to_selected_tracks(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    tag = create_tag(db_session, user, name="Focus")
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [first.id, second.id], "add_tag_ids": [tag.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 2
+    assert body["updated_count"] == 2
+    assert body["results"] == [
+        {"track_id": first.id, "status": "updated", "error": None},
+        {"track_id": second.id, "status": "updated", "error": None},
+    ]
+    assert [track["id"] for track in body["tracks"]] == [first.id, second.id]
+    assert [tag["name"] for tag in body["tracks"][0]["tags"]] == ["Focus"]
+    assert [tag["name"] for tag in body["tracks"][1]["tags"]] == ["Focus"]
+
+
+def test_batch_removes_tags_from_selected_tracks(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    keep = create_tag(db_session, user, name="Keep", group="feature")
+    remove = create_tag(db_session, user, name="Remove", group="type")
+    for track in (first, second):
+        db_session.add(TrackTag(track_id=track.id, tag_id=keep.id))
+        db_session.add(TrackTag(track_id=track.id, tag_id=remove.id))
+    db_session.commit()
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [first.id, second.id], "remove_tag_ids": [remove.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["updated_count"] == 2
+    assert [tag["name"] for tag in response.json()["tracks"][0]["tags"]] == ["Keep"]
+    assert [tag["name"] for tag in response.json()["tracks"][1]["tags"]] == ["Keep"]
+
+
+def test_batch_tag_update_rejects_invalid_tag(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    track = create_track(db_session, user)
+    hidden_tag = create_tag(db_session, other_user)
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [track.id], "add_tag_ids": [hidden_tag.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Tag not found for current user."
+    assert db_session.query(TrackTag).filter_by(track_id=track.id).count() == 0
+
+
+def test_batch_tag_update_reports_invalid_track_as_partial_failure(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    tag = create_tag(db_session, user)
+    missing_track_id = track.id + 100
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [track.id, missing_track_id], "add_tag_ids": [tag.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 2
+    assert body["updated_count"] == 1
+    assert body["results"] == [
+        {"track_id": track.id, "status": "updated", "error": None},
+        {
+            "track_id": missing_track_id,
+            "status": "failed",
+            "error": "Track not found for current user.",
+        },
+    ]
+    assert [tag["name"] for tag in body["tracks"][0]["tags"]] == ["Focus"]
+
+
+def test_batch_tag_update_is_scoped_to_current_user(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    owner_track = create_track(db_session, owner, title="Owner")
+    other_track = create_track(db_session, other_user, title="Hidden")
+    tag = create_tag(db_session, owner)
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [owner_track.id, other_track.id], "add_tag_ids": [tag.id]},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["updated_count"] == 1
+    assert body["results"][1] == {
+        "track_id": other_track.id,
+        "status": "failed",
+        "error": "Track not found for current user.",
+    }
+    assert db_session.query(TrackTag).filter_by(track_id=owner_track.id).count() == 1
+    assert db_session.query(TrackTag).filter_by(track_id=other_track.id).count() == 0
+
+
+def test_batch_tag_update_requires_authentication(client: TestClient) -> None:
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [1], "add_tag_ids": [1]},
+    )
+
+    assert response.status_code == 401
+
+
+def test_batch_tag_update_requires_selection_and_tag_action(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    no_tracks_response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [], "add_tag_ids": [1]},
+        headers=auth_headers(user),
+    )
+    no_tag_action_response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [track.id]},
+        headers=auth_headers(user),
+    )
+
+    assert no_tracks_response.status_code == 400
+    assert no_tracks_response.json()["detail"] == "Choose at least one track."
+    assert no_tag_action_response.status_code == 400
+    assert no_tag_action_response.json()["detail"] == (
+        "Choose at least one tag to add or remove."
+    )
+
+
 def test_delete_track(client: TestClient, db_session: Session) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user)
@@ -209,6 +411,142 @@ def test_delete_track(client: TestClient, db_session: Session) -> None:
     assert response.status_code == 204
     assert db_session.get(Track, track.id) is None
     assert db_session.get(TrackTag, (track.id, tag.id)) is None
+
+
+def test_delete_track_removes_related_rows_and_media_files(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.cover_path = "covers/track.jpg"
+    tag = create_tag(db_session, user)
+    db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
+    db_session.add(
+        PlaybackEvent(
+            user_id=user.id,
+            track_id=track.id,
+            client_event_id="playback-delete-test",
+            event_type="play",
+            position_seconds=0,
+            duration_seconds=180,
+            occurred_at=datetime.now(timezone.utc),
+            client="web",
+        ),
+    )
+    db_session.add(
+        FeedbackEvent(
+            user_id=user.id,
+            track_id=track.id,
+            client_event_id="feedback-delete-test",
+            feedback_type="like",
+            scene_tag_ids=[],
+            feature_tag_ids=[],
+            type_tag_ids=[],
+            occurred_at=datetime.now(timezone.utc),
+            client="web",
+        ),
+    )
+    db_session.add(ProcessingJob(track_id=track.id, status="pending"))
+    db_session.commit()
+    db_session.refresh(track)
+
+    media_paths = [
+        tmp_path / track.original_file_path,
+        tmp_path / track.playback_file_path,
+        tmp_path / track.cover_path,
+    ]
+    for media_path in media_paths:
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        media_path.write_bytes(b"media")
+
+    track_id = track.id
+    tag_id = tag.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
+
+    assert response.status_code == 204
+    assert db_session.get(Track, track_id) is None
+    assert db_session.get(TrackTag, (track_id, tag_id)) is None
+    assert db_session.query(PlaybackEvent).filter_by(track_id=track_id).count() == 0
+    assert db_session.query(FeedbackEvent).filter_by(track_id=track_id).count() == 0
+    assert db_session.query(ProcessingJob).filter_by(track_id=track_id).count() == 0
+    for media_path in media_paths:
+        assert not media_path.exists()
+
+
+def test_delete_track_reports_media_file_failure(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    tag = create_tag(db_session, user)
+    db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
+    db_session.commit()
+
+    original_path = tmp_path / track.original_file_path
+    original_path.parent.mkdir(parents=True, exist_ok=True)
+    original_path.write_bytes(b"original")
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True, exist_ok=True)
+    playback_path.write_bytes(b"playback")
+
+    def failing_unlink(self: Path, missing_ok: bool = False) -> None:
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+    track_id = track.id
+    tag_id = tag.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "Unable to delete stored media file 'originals/track.mp3'. "
+        "Check backend media volume permissions and try again."
+    )
+    assert db_session.get(Track, track_id) is not None
+    assert db_session.get(TrackTag, (track_id, tag_id)) is not None
+    assert original_path.exists()
+    assert playback_path.exists()
+
+
+def test_delete_track_rejects_unsafe_media_path(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.original_file_path = "../outside.mp3"
+    db_session.commit()
+    track_id = track.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "Track references an unsafe stored media path and was not deleted."
+    )
+    assert db_session.get(Track, track_id) is not None
+
+
+def test_cannot_delete_another_users_track(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    track = create_track(db_session, other_user)
+    track_id = track.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(owner))
+
+    assert response.status_code == 404
+    assert db_session.get(Track, track_id) is not None
 
 
 def test_tracks_require_authentication(client: TestClient) -> None:
@@ -336,5 +674,148 @@ def test_cannot_stream_missing_playback_file(
     track = create_track(db_session, user)
 
     response = client.get(f"/api/tracks/{track.id}/stream", headers=auth_headers(user))
+
+    assert response.status_code == 404
+
+
+def test_update_track_cover_saves_valid_image(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={
+            "file": (
+                "../cover.png",
+                b"\x89PNG\r\n\x1a\ncover bytes",
+                "image/png",
+            ),
+        },
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["cover_path"].startswith(f"covers/user-{user.id}/track-{track.id}/")
+    assert body["cover_path"].endswith("_cover.png")
+    assert ".." not in body["cover_path"]
+
+    db_session.refresh(track)
+    assert track.cover_path == body["cover_path"]
+    assert (tmp_path / track.cover_path).read_bytes() == b"\x89PNG\r\n\x1a\ncover bytes"
+
+
+def test_update_track_cover_requires_authentication(client: TestClient) -> None:
+    response = client.put(
+        "/api/tracks/1/cover",
+        files={"file": ("cover.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+    )
+
+    assert response.status_code == 401
+
+
+def test_update_track_cover_is_scoped_to_current_user(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    hidden_track = create_track(db_session, other_user)
+
+    response = client.put(
+        f"/api/tracks/{hidden_track.id}/cover",
+        files={"file": ("cover.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 404
+
+
+def test_update_track_cover_rejects_invalid_content_type(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.txt", b"not an image", "text/plain")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"] == "Unsupported cover image type."
+
+
+def test_update_track_cover_rejects_mismatched_image_content(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.png", b"not a png", "image/png")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"] == "Uploaded cover image content does not match its type."
+
+
+def test_update_track_cover_rejects_oversized_file(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    content = b"\x89PNG\r\n\x1a\n" + b"x" * (10 * 1024 * 1024 + 1)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.png", content, "image/png")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Cover image exceeds the configured size limit."
+
+
+def test_get_track_cover_returns_stored_image(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.cover_path = "covers/user-1/track-1/cover.jpg"
+    db_session.commit()
+    cover_path = tmp_path / track.cover_path
+    cover_path.parent.mkdir(parents=True)
+    cover_path.write_bytes(b"\xff\xd8\xffjpeg")
+
+    response = client.get(f"/api/tracks/{track.id}/cover", headers=auth_headers(user))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/jpeg")
+    assert response.content == b"\xff\xd8\xffjpeg"
+
+
+def test_get_track_cover_rejects_unsafe_path(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.cover_path = "../outside.jpg"
+    db_session.commit()
+
+    response = client.get(f"/api/tracks/{track.id}/cover", headers=auth_headers(user))
 
     assert response.status_code == 404

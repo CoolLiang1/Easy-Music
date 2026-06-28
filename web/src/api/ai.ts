@@ -6,6 +6,10 @@ import type {
   ParseListeningIntentRequest,
   TagSuggestionRequest,
   TagSuggestionResponse,
+  TrackOrganizationApplyRequest,
+  TrackOrganizationApplyResponse,
+  TrackOrganizationRequest,
+  TrackOrganizationResponse,
 } from "../types/ai";
 
 export function parseListeningIntent(
@@ -37,6 +41,36 @@ export function suggestTrackTags(
 ) {
   return apiRequest<TagSuggestionResponse>(
     `/api/ai/tracks/${encodeURIComponent(trackId)}/suggest-tags`,
+    {
+      method: "POST",
+      accessToken,
+      body: payload,
+    },
+  );
+}
+
+export function organizeTrack(
+  accessToken: string,
+  trackId: number | string,
+  payload: TrackOrganizationRequest = {},
+) {
+  return apiRequest<TrackOrganizationResponse>(
+    `/api/ai/tracks/${encodeURIComponent(trackId)}/organize`,
+    {
+      method: "POST",
+      accessToken,
+      body: payload,
+    },
+  );
+}
+
+export function applyTrackOrganization(
+  accessToken: string,
+  trackId: number | string,
+  payload: TrackOrganizationApplyRequest,
+) {
+  return apiRequest<TrackOrganizationApplyResponse>(
+    `/api/ai/tracks/${encodeURIComponent(trackId)}/organize/apply`,
     {
       method: "POST",
       accessToken,

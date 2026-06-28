@@ -29,18 +29,18 @@ fun LoginRoute(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Login",
+            text = "登录",
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "Authentication UI will be added in a later task.",
+            text = "认证界面将在后续任务中完善。",
             style = MaterialTheme.typography.bodyMedium,
         )
         Button(
             modifier = Modifier.padding(top = 24.dp),
             onClick = onContinueToLibrary,
         ) {
-            Text("Open Library")
+            Text("打开曲库")
         }
     }
 }

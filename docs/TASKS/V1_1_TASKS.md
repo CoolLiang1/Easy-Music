@@ -957,5 +957,6 @@ Requirements:
 - Run the smallest relevant automated checks for the current task and state
   any checks that could not be run.
 - Inspect the diff before finishing.
-- Do not commit unless the user explicitly asks.
+- commit this change.
+- Finished this task,tell me the suggestion of what to do next.
 ```

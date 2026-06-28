@@ -60,26 +60,12 @@ export function TrackMetadataForm({
   const message = validationError ?? errorMessage;
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: "30px" }}>
-      <div
-        style={{
-          border: "1px solid #d5dde8",
-          borderRadius: "8px",
-          background: "#f8fafc",
-          padding: "22px",
-        }}
-      >
-        <h2>Editable metadata</h2>
-        <div
-          style={{
-            display: "grid",
-            gap: "16px",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            marginTop: "18px",
-          }}
-        >
-          <label style={fieldStyle} htmlFor={titleId}>
-            Title
+    <form className="panel" onSubmit={handleSubmit}>
+      <div className="form-card">
+        <h2>可编辑元数据</h2>
+        <div className="form-grid">
+          <label className="field" htmlFor={titleId}>
+            标题
             <input
               disabled={disabled}
               id={titleId}
@@ -91,14 +77,13 @@ export function TrackMetadataForm({
                 }))
               }
               required
-              style={inputStyle}
               type="text"
               value={formState.title}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={artistId}>
-            Artist
+          <label className="field" htmlFor={artistId}>
+            艺人
             <input
               disabled={disabled}
               id={artistId}
@@ -109,14 +94,13 @@ export function TrackMetadataForm({
                   artist: event.target.value,
                 }))
               }
-              style={inputStyle}
               type="text"
               value={formState.artist}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={albumId}>
-            Album
+          <label className="field" htmlFor={albumId}>
+            专辑
             <input
               disabled={disabled}
               id={albumId}
@@ -127,14 +111,13 @@ export function TrackMetadataForm({
                   album: event.target.value,
                 }))
               }
-              style={inputStyle}
               type="text"
               value={formState.album}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={contentTypeId}>
-            Content type
+          <label className="field" htmlFor={contentTypeId}>
+            内容类型
             <input
               disabled={disabled}
               id={contentTypeId}
@@ -146,14 +129,13 @@ export function TrackMetadataForm({
                 }))
               }
               required
-              style={inputStyle}
               type="text"
               value={formState.contentType}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={sourceUrlId}>
-            Source URL
+          <label className="field" htmlFor={sourceUrlId}>
+            来源 URL
             <input
               disabled={disabled}
               id={sourceUrlId}
@@ -164,14 +146,13 @@ export function TrackMetadataForm({
                 }))
               }
               placeholder="https://example.com"
-              style={inputStyle}
               type="url"
               value={formState.sourceUrl}
             />
           </label>
 
-          <label style={fieldStyle} htmlFor={cooldownUntilId}>
-            Cooldown date
+          <label className="field" htmlFor={cooldownUntilId}>
+            冷却截止时间
             <input
               disabled={disabled}
               id={cooldownUntilId}
@@ -181,7 +162,6 @@ export function TrackMetadataForm({
                   cooldownUntil: event.target.value,
                 }))
               }
-              style={inputStyle}
               type="datetime-local"
               value={formState.cooldownUntil}
             />
@@ -211,13 +191,13 @@ export function TrackMetadataForm({
             }
             type="checkbox"
           />
-          Liked
+          喜欢
         </label>
 
         {message ? (
           <p
+            className="status-message error"
             role="alert"
-            style={{ color: "#991b1b", fontWeight: 700, margin: "16px 0 0" }}
           >
             {message}
           </p>
@@ -226,37 +206,21 @@ export function TrackMetadataForm({
         {successMessage ? (
           <p
             aria-live="polite"
-            style={{ color: "#166534", fontWeight: 800, margin: "16px 0 0" }}
+            className="status-message success"
           >
             {successMessage}
           </p>
         ) : null}
       </div>
 
-      <div className="login-actions">
+      <div className="toolbar">
         <button className="button primary" disabled={disabled} type="submit">
-          {disabled ? "Saving..." : "Save metadata"}
+          {disabled ? "正在保存..." : "保存元数据"}
         </button>
       </div>
     </form>
   );
 }
-
-const fieldStyle = {
-  color: "#18212f",
-  display: "grid",
-  fontWeight: 800,
-  gap: "8px",
-} as const;
-
-const inputStyle = {
-  border: "1px solid #b9c5d4",
-  borderRadius: "8px",
-  color: "#18212f",
-  minHeight: "42px",
-  padding: "9px 11px",
-  width: "100%",
-} as const;
 
 function buildFormState(track: Track): FormState {
   return {
@@ -272,11 +236,11 @@ function buildFormState(track: Track): FormState {
 
 function getValidationError(formState: FormState) {
   if (!formState.title.trim()) {
-    return "Title is required.";
+    return "请输入标题。";
   }
 
   if (!formState.contentType.trim()) {
-    return "Content type is required.";
+    return "请输入内容类型。";
   }
 
   return null;

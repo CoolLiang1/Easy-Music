@@ -63,7 +63,7 @@ class LibraryViewModel(
             uiState = uiState.copy(
                 isLoading = false,
                 isRefreshing = false,
-                errorMessage = "You are offline. Library refresh needs the backend; open Cached Tracks to play music stored on this device.",
+                errorMessage = "当前离线。刷新曲库需要连接后端；可打开离线缓存播放这台设备上的音乐。",
                 needsSignIn = false,
             )
             return
@@ -84,7 +84,7 @@ class LibraryViewModel(
             if (token == null) {
                 uiState = LibraryUiState(
                     cacheStatesByTrackId = currentCacheStates,
-                    errorMessage = "Please sign in again to load your library.",
+                    errorMessage = "请重新登录后加载曲库。",
                     needsSignIn = true,
                 )
                 return@launch

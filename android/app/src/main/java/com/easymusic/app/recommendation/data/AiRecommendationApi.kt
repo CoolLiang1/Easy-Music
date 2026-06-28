@@ -47,7 +47,7 @@ private fun ApiResult<String>.parseParsedIntentResponse(): ApiResult<ParsedInten
             ApiResult.Success(ParsedIntentResponse.fromJson(JSONObject(value)))
         } catch (exception: JSONException) {
             ApiResult.SerializationError(
-                message = exception.message ?: "AI parse intent response could not be parsed.",
+                message = exception.message ?: "无法解析 AI 意图响应。",
                 body = value,
                 cause = exception,
             )
@@ -65,7 +65,7 @@ private fun ApiResult<String>.parseAiRecommendResponse(): ApiResult<AiRecommendR
             ApiResult.Success(AiRecommendResponse.fromJson(JSONObject(value)))
         } catch (exception: JSONException) {
             ApiResult.SerializationError(
-                message = exception.message ?: "AI recommend response could not be parsed.",
+                message = exception.message ?: "无法解析 AI 推荐响应。",
                 body = value,
                 cause = exception,
             )

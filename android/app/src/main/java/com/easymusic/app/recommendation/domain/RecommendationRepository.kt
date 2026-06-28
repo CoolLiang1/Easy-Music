@@ -25,7 +25,7 @@ class RecommendationRepository(
         request: RecommendationRequest,
     ): ApiResult<RecommendationResponse> {
         val token = tokenStore.readToken()
-            ?: return ApiResult.Unauthorized("Please sign in again to request recommendations.")
+            ?: return ApiResult.Unauthorized("请重新登录后请求推荐。")
 
         return recommendationApi.getRecommendations(
             bearerToken = token,
@@ -37,7 +37,7 @@ class RecommendationRepository(
         request: AiParseIntentRequest,
     ): ApiResult<ParsedIntentResponse> {
         val token = tokenStore.readToken()
-            ?: return ApiResult.Unauthorized("Please sign in again to use the AI Assistant.")
+            ?: return ApiResult.Unauthorized("请重新登录后使用 AI 助手。")
 
         return aiRecommendationApi.parseListeningIntent(
             bearerToken = token,
@@ -49,7 +49,7 @@ class RecommendationRepository(
         request: AiRecommendRequest,
     ): ApiResult<AiRecommendResponse> {
         val token = tokenStore.readToken()
-            ?: return ApiResult.Unauthorized("Please sign in again to use the AI Assistant.")
+            ?: return ApiResult.Unauthorized("请重新登录后使用 AI 助手。")
 
         return aiRecommendationApi.aiRecommend(
             bearerToken = token,
@@ -65,7 +65,7 @@ class RecommendationRepository(
         events: List<FeedbackEventRequest>,
     ): ApiResult<FeedbackResponse> {
         val token = tokenStore.readToken()
-            ?: return ApiResult.Unauthorized("Please sign in again to send recommendation feedback.")
+            ?: return ApiResult.Unauthorized("请重新登录后发送推荐反馈。")
 
         return feedbackApi.sendFeedbackEvents(
             bearerToken = token,

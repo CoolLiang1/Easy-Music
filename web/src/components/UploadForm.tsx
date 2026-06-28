@@ -1,13 +1,15 @@
 import { type ChangeEvent, type FormEvent, useId, useState } from "react";
 
-const acceptedAudioExtensions = [".mp3", ".flac", ".m4a", ".wav", ".ogg"];
+const acceptedAudioExtensions = [".mp3", ".flac", ".m4a", ".wav", ".ogg", ".aac"];
 const acceptedAudioMimeTypes = [
+  "audio/aac",
   "audio/flac",
   "audio/m4a",
   "audio/mp4",
   "audio/mpeg",
   "audio/ogg",
   "audio/wav",
+  "audio/x-aac",
   "audio/x-m4a",
   "audio/x-wav",
 ];
@@ -42,56 +44,41 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: "28px" }}>
-      <div
-        style={{
-          border: "1px solid #d5dde8",
-          borderRadius: "8px",
-          background: "#f8fafc",
-          padding: "22px",
-        }}
-      >
-        <label
-          htmlFor={fileInputId}
-          style={{
-            color: "#18212f",
-            display: "block",
-            fontWeight: 800,
-            marginBottom: "10px",
-          }}
-        >
-          Audio files
+    <form className="panel" onSubmit={handleSubmit}>
+      <div className="form-card">
+        <label className="field" htmlFor={fileInputId}>
+          音频文件
+          <input
+            accept={acceptedAudioExtensions.join(",")}
+            disabled={disabled}
+            id={fileInputId}
+            multiple
+            onChange={handleFileChange}
+            type="file"
+          />
         </label>
-        <input
-          accept={acceptedAudioExtensions.join(",")}
-          disabled={disabled}
-          id={fileInputId}
-          multiple
-          onChange={handleFileChange}
-          type="file"
-        />
-        <p style={{ color: "#526174", lineHeight: 1.55, margin: "12px 0 0" }}>
-          Accepted formats: MP3, FLAC, M4A, WAV, and OGG.
+        <p className="recommendation-muted">
+          支持格式：MP3、FLAC、M4A、WAV、OGG、AAC。
         </p>
         {selectedFiles.length > 0 ? (
-          <p style={{ color: "#334155", fontWeight: 700, margin: "12px 0 0" }}>
-            {selectedFiles.length} file{selectedFiles.length === 1 ? "" : "s"} selected.
+          <p className="status-message">
+            已选择 {selectedFiles.length} 个文件。
           </p>
         ) : null}
         {validationError ? (
-          <p role="alert" style={{ color: "#991b1b", fontWeight: 700, margin: "12px 0 0" }}>
+          <p className="status-message error" role="alert">
             {validationError}
           </p>
         ) : null}
       </div>
 
-      <div className="login-actions">
+      <div className="toolbar">
         <button
           className="button primary"
           disabled={disabled || selectedFiles.length === 0}
           type="submit"
         >
-          {disabled ? "Uploading..." : "Upload selected files"}
+          {disabled ? "正在上传..." : "上传选中文件"}
         </button>
       </div>
     </form>
@@ -100,12 +87,12 @@ export function UploadForm({ disabled = false, onUpload }: UploadFormProps) {
 
 function getValidationError(files: File[]) {
   if (files.length === 0) {
-    return "Choose at least one supported audio file.";
+    return "请选择至少一个支持的音频文件。";
   }
 
   const unsupportedFile = files.find((file) => !isSupportedAudioFile(file));
   if (unsupportedFile) {
-    return `${unsupportedFile.name} is not a supported audio file.`;
+    return `${unsupportedFile.name} 不是支持的音频文件。`;
   }
 
   return null;

@@ -163,5 +163,5 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Request failed.";
+  return "请求失败。";
 }

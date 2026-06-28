@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Easy Music</string>
+    <string name="shortcut_library_short_label">曲库</string>
+    <string name="shortcut_library_long_label">打开曲库</string>
+    <string name="shortcut_recommend_short_label">推荐</string>
+    <string name="shortcut_recommend_long_label">打开推荐</string>
+    <string name="shortcut_cached_short_label">离线缓存</string>
+    <string name="shortcut_cached_long_label">打开离线缓存</string>
+    <string name="shortcut_now_playing_short_label">播放中</string>
+    <string name="shortcut_now_playing_long_label">打开播放中</string>
 </resources>

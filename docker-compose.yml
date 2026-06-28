@@ -28,6 +28,7 @@ services:
     volumes:
       - media_originals:/app/media/originals
       - media_playback:/app/media/playback
+      - media_temp_videos:/app/media/temp-videos
     ports:
       - "8000:8000"
     depends_on:
@@ -47,6 +48,7 @@ services:
     volumes:
       - media_originals:/app/media/originals
       - media_playback:/app/media/playback
+      - media_temp_videos:/app/media/temp-videos
     depends_on:
       - postgres
     command: ["python", "-m", "app.worker"]
@@ -65,6 +67,7 @@ services:
     volumes:
       - media_originals:/app/media/originals
       - media_playback:/app/media/playback
+      - media_temp_videos:/app/media/temp-videos
     depends_on:
       - postgres
     command: ["python", "-m", "app.worker", "--loop"]
@@ -73,3 +76,4 @@ volumes:
   postgres_data:
   media_originals:
   media_playback:
+  media_temp_videos:
