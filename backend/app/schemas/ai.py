@@ -201,6 +201,16 @@ class NewTagSuggestion(BaseModel):
     reason: str = ""
 
 
+class TagSearchContextItem(BaseModel):
+    """Normalized search result item used inside the suggest-tags prompt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = ""
+    snippet: str = ""
+    url: str = ""
+
+
 class AiTagExistingSuggestionOutput(BaseModel):
     """Existing-tag suggestion shape returned by the provider."""
 

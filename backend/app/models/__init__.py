@@ -1,5 +1,6 @@
 """ORM models are imported here for Alembic autogeneration."""
 
+from app.models.ai_tag_search_cache import AiTagSearchCache
 from app.models.tag import Tag
 from app.models.feedback_event import FeedbackEvent
 from app.models.import_batch import ImportBatch, ImportItem
@@ -11,6 +12,7 @@ from app.models.track_tag import TrackTag
 from app.models.user import User
 
 __all__ = [
+    "AiTagSearchCache",
     "FeedbackEvent",
     "ImportBatch",
     "ImportItem",

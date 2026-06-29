@@ -25,6 +25,8 @@ from app.schemas.ai import (
 from app.services import ai_intent, ai_tag_suggestions
 from app.services.ai_provider import AiProviderService
 from app.services.ai_client import OpenAiCompatibleClient
+from app.services.ai_tag_search import AiTagSearchService
+from app.services.ai_tag_search_client import TavilyTagSearchClient
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -39,6 +41,20 @@ def _get_ai_provider() -> AiProviderService:
     if settings.ai_enabled and settings.ai_api_key and settings.ai_model:
         client = OpenAiCompatibleClient(settings)
     return AiProviderService(settings, client=client)
+
+
+def _get_ai_tag_search() -> AiTagSearchService:
+    """Construct the optional search helper used only by suggest-tags."""
+    settings = get_settings()
+    client = None
+    if (
+        settings.ai_tag_search_enabled
+        and settings.ai_tag_search_provider.strip().lower() == "tavily"
+        and settings.ai_tag_search_api_key
+        and settings.ai_tag_search_base_url
+    ):
+        client = TavilyTagSearchClient(settings)
+    return AiTagSearchService(settings, client=client)
 
 
 @router.post(
@@ -125,6 +141,7 @@ def suggest_track_tags(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
     ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+    ai_tag_search: Annotated[AiTagSearchService, Depends(_get_ai_tag_search)],
 ) -> TagSuggestionResponse:
     """Suggest tags for one track using AI-assisted metadata analysis.
 
@@ -138,6 +155,7 @@ def suggest_track_tags(
         ai_provider,
         track_id,
         include_new_tag_suggestions=payload.include_new_tag_suggestions,
+        search_service=ai_tag_search,
     )
 
 

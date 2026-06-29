@@ -391,10 +391,31 @@ $env:AI_MODEL = "deepseek-chat"
 $env:AI_BASE_URL = "https://api.deepseek.com/v1"
 ```
 
-V2.5 does not add a search provider or a DeepSeek web-search switch. If a future
-DeepSeek API workflow needs networked search, it should be modeled explicitly
-with an external Search API plus a tool/function-calling flow. That is outside
-the V2.5 AI Tag Suggestions V2 scope.
+V2.5 does not use a DeepSeek built-in web-search switch. Search-assisted tag
+suggestions use an explicit Tavily Search API call inside
+`POST /api/ai/tracks/{track_id}/suggest-tags`, then pass normalized
+title/snippet/URL summaries to the OpenAI-compatible completion provider.
+
+### Local Backend AI Tag Search Settings
+
+Search is disabled by default and scoped only to AI tag suggestions. It does
+not create an organization module, playlist suggestions, Android UI, or
+auto-apply behavior.
+
+```powershell
+$env:AI_TAG_SEARCH_ENABLED = "true"
+$env:AI_TAG_SEARCH_PROVIDER = "tavily"
+$env:AI_TAG_SEARCH_API_KEY = "your-own-tavily-key"
+$env:AI_TAG_SEARCH_BASE_URL = "https://api.tavily.com"
+$env:AI_TAG_SEARCH_MAX_RESULTS = "5"
+$env:AI_TAG_SEARCH_CACHE_DAYS = "30"
+```
+
+When tag search is disabled, unconfigured, fails, or returns no results,
+`suggest-tags` falls back to the metadata-only prompt and still returns the
+normal AI provider status. The cache stores only query, status, timestamp, and
+normalized search result title/snippet/URL summaries; it does not store page
+bodies or API keys.
 
 ### Docker Compose
 
@@ -408,6 +429,14 @@ AI_PROVIDER=openai-compatible
 AI_API_KEY=your-own-provider-key
 AI_MODEL=gpt-4o-mini
 AI_BASE_URL=https://api.openai.com/v1
+
+# Optional suggest-tags-only Tavily search context
+AI_TAG_SEARCH_ENABLED=true
+AI_TAG_SEARCH_PROVIDER=tavily
+AI_TAG_SEARCH_API_KEY=your-own-tavily-key
+AI_TAG_SEARCH_BASE_URL=https://api.tavily.com
+AI_TAG_SEARCH_MAX_RESULTS=5
+AI_TAG_SEARCH_CACHE_DAYS=30
 ```
 
 Recreate the `api` service after changing `.env`:
@@ -419,7 +448,8 @@ docker compose up -d --force-recreate api
 ### Provider Abstraction
 
 - `backend/app/core/config.py` — settings fields (`AI_ENABLED`, `AI_PROVIDER`,
-  `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`).
+  `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, and suggest-tags-only
+  `AI_TAG_SEARCH_*` settings).
 - `backend/app/services/ai_provider.py` — `AiProviderService` that detects
   disabled/unconfigured state and delegates to an injectable client.
 - `backend/app/services/ai_json.py` — `extract_json`, prompt builders, and the
@@ -430,7 +460,12 @@ docker compose up -d --force-recreate api
   returned tag ids through the Phase 5 recommendation tag checks.
 - `backend/app/services/ai_tag_suggestions.py` — `suggest_tags_for_track` service
   that suggests existing tags (by id) and optional new tag names for a track
-  using track metadata and the user's tag taxonomy.  Never creates or assigns tags.
+  using track metadata, optional Tavily search summaries, and the user's tag
+  taxonomy.  Never creates or assigns tags.
+- `backend/app/services/ai_tag_search.py` — suggest-tags-only query generation,
+  search fallback handling, and normalized search result cache.
+- `backend/app/services/ai_tag_search_client.py` — Tavily Search API client
+  that reads only title/snippet/URL summaries and never page bodies.
 - `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
   `ParseListeningIntentRequest`, `ParsedIntentResponse`, and supporting schemas.
 
@@ -447,17 +482,19 @@ Available AI endpoints after V2.5:
 - `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) — suggests
   existing tags and optional new tag names for a track using AI-assisted
   metadata analysis. V2.5 improves the prompt and provider output schema around
-  `scene`, `type`, and `feature`. The endpoint never creates or assigns tags.
+  `scene`, `type`, and `feature`, and can optionally include Tavily
+  title/snippet/URL summaries as prompt context. The endpoint never creates or
+  assigns tags.
 
 Focused V2.5 backend tests use fake AI providers and do not require live network
 access or real provider keys:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\test_ai_tag_suggestions.py tests\test_ai_intent.py tests\test_ai_recommend.py tests\test_ai_json.py tests\test_ai_provider.py
+.\.venv\Scripts\python.exe -m pytest tests\test_ai_tag_suggestions.py tests\test_ai_tag_search.py tests\test_ai_tag_search_client.py tests\test_ai_intent.py tests\test_ai_recommend.py tests\test_ai_json.py tests\test_ai_provider.py
 ```
 
-Passing fake-provider tests does not prove real provider connectivity or browser
-behavior. Record any real-provider or Web smoke separately in
+Passing fake-provider tests does not prove real AI provider, real Tavily, or
+browser behavior. Record any real-provider or Web smoke separately in
 `docs/ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md`.
 
 ## Web Setup
@@ -529,9 +566,11 @@ The existing Web AI tag suggestion controls remain available from track tag
 editing after login. They call
 `POST /api/ai/tracks/{track_id}/suggest-tags`, show existing-tag suggestions
 with confidence/reasons, and can display optional new-tag name ideas. The
-endpoint does not create tags or assign tags automatically. Android UI, batch
-organization, lyrics analysis, web scraping/search providers, playlist
-suggestions, and recommendation scoring changes remain out of scope for V2.5.
+backend may internally enrich the prompt with configured Tavily search
+summaries, but the Web request/response shape is unchanged. The endpoint does
+not create tags or assign tags automatically. Android UI, batch organization,
+lyrics analysis, web scraping, playlist suggestions, and recommendation scoring
+changes remain out of scope for V2.5.
 
 Run the Web type check from `web/`:
 

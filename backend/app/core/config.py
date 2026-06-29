@@ -55,6 +55,33 @@ class Settings(BaseSettings):
     ai_api_key: str = Field(default="", validation_alias="AI_API_KEY")
     ai_model: str = Field(default="", validation_alias="AI_MODEL")
     ai_base_url: str = Field(default="", validation_alias="AI_BASE_URL")
+    ai_tag_search_enabled: bool = Field(
+        default=False,
+        validation_alias="AI_TAG_SEARCH_ENABLED",
+    )
+    ai_tag_search_provider: str = Field(
+        default="tavily",
+        validation_alias="AI_TAG_SEARCH_PROVIDER",
+    )
+    ai_tag_search_api_key: str = Field(
+        default="",
+        validation_alias="AI_TAG_SEARCH_API_KEY",
+    )
+    ai_tag_search_base_url: str = Field(
+        default="https://api.tavily.com",
+        validation_alias="AI_TAG_SEARCH_BASE_URL",
+    )
+    ai_tag_search_max_results: int = Field(
+        default=5,
+        ge=1,
+        le=5,
+        validation_alias="AI_TAG_SEARCH_MAX_RESULTS",
+    )
+    ai_tag_search_cache_days: int = Field(
+        default=30,
+        ge=0,
+        validation_alias="AI_TAG_SEARCH_CACHE_DAYS",
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -77,9 +77,11 @@ Status as of 2026-06-29:
 - V2.5 AI Tag Suggestions V2: Implemented as quality improvements to the
   existing `POST /api/ai/tracks/{track_id}/suggest-tags` flow. It strengthens
   `scene`/`type`/`feature` prompt guidance, supports richer existing-tag
-  suggestions with confidence and reasons, keeps legacy provider output
-  compatibility, and documents DeepSeek as an OpenAI-compatible provider option
-  without adding search, organization, playlist suggestions, or auto-apply.
+  suggestions with confidence and reasons, can optionally use
+  suggest-tags-only Tavily title/snippet/URL search context, keeps legacy
+  provider output compatibility, and documents DeepSeek as an OpenAI-compatible
+  provider option without adding organization, playlist suggestions, or
+  auto-apply.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
@@ -273,7 +275,8 @@ Deliverables:
 - V2 recommendation foundation: soft/default cooldown, strict/off modes,
   feedback scoring, and playlist membership/name/description boosts.
 - V2.5 AI tag suggestion quality pass for the existing suggest-tags endpoint,
-  including OpenAI-compatible DeepSeek provider guidance.
+  including OpenAI-compatible DeepSeek provider guidance and optional Tavily
+  search context.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection

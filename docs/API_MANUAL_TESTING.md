@@ -1437,8 +1437,9 @@ Invoke-RestMethod `
 V2.5 keeps the existing authenticated endpoint:
 `POST /api/ai/tracks/{track_id}/suggest-tags`. The slice improves prompt and
 schema quality for `scene`, `type`, and `feature` tag suggestions. It does not
-add AI organization, search, playlist suggestions, Android UI, auto-apply, or
-recommendation changes.
+add AI organization, playlist suggestions, Android UI, auto-apply, or
+recommendation changes. Search is optional internal prompt context for this
+endpoint only.
 
 ### Configure OpenAI-Compatible AI
 
@@ -1453,10 +1454,25 @@ $env:AI_MODEL = "deepseek-chat"
 $env:AI_BASE_URL = "https://api.deepseek.com/v1"
 ```
 
-V2.5 does not add `AI_SEARCH_*` settings, Tavily, a search provider, or web
-scraping. If a future DeepSeek workflow needs networked search, it should use an
-explicit external Search API plus a tool/function-calling flow; that is outside
-this acceptance scope.
+### Optional Tavily Search Context
+
+Configure Tavily only when you want search-assisted tag suggestions. Never
+commit real keys.
+
+```powershell
+$env:AI_TAG_SEARCH_ENABLED = "true"
+$env:AI_TAG_SEARCH_PROVIDER = "tavily"
+$env:AI_TAG_SEARCH_API_KEY = "your-own-tavily-key"
+$env:AI_TAG_SEARCH_BASE_URL = "https://api.tavily.com"
+$env:AI_TAG_SEARCH_MAX_RESULTS = "5"
+$env:AI_TAG_SEARCH_CACHE_DAYS = "30"
+```
+
+This does not add `AI_SEARCH_*`, `/organize`, `/organize/apply`, a Web Track
+Detail organization panel, or web scraping. The backend sends only normalized
+Tavily title/snippet/URL summaries to the AI tag suggestion prompt. If search is
+disabled, unconfigured, failed, or empty, the endpoint falls back to the
+metadata-only prompt.
 
 ### Suggest Tags For One Track
 
@@ -1482,6 +1498,9 @@ Expected result:
 - With a working provider, existing suggestions are grouped by `scene`, `type`,
   and `feature`, and each item includes `tag_id`, `name`, `group`,
   `confidence`, and `reason`.
+- When `AI_TAG_SEARCH_ENABLED=true` and Tavily is configured, the AI prompt may
+  include the first configured search title/snippet/URL summaries.
+- Search errors or no results do not fail the endpoint.
 - Existing tag ids are limited to the authenticated user's tag catalogue.
 - Legacy provider output with `existing_tag_ids` is still accepted.
 - New tag suggestions are returned only when requested, use only `scene`,

@@ -6,6 +6,7 @@ to select from the supplied tag catalogue — it never creates or assigns tags.
 """
 
 import os
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,10 +19,14 @@ from app.schemas.ai import (
     AiTagSuggestionOutput,
     ExistingTagSuggestion,
     NewTagSuggestion,
+    TagSearchContextItem,
     TagSuggestionResponse,
 )
 from app.services.ai_json import STRUCTURED_JSON_MAX_TOKENS, complete_and_parse_json
 from app.services.ai_provider import AiProviderService
+
+if TYPE_CHECKING:
+    from app.services.ai_tag_search import AiTagSearchService
 
 # ---------------------------------------------------------------------------
 # public entry point
@@ -37,6 +42,7 @@ def suggest_tags_for_track(
     track_id: int,
     *,
     include_new_tag_suggestions: bool = False,
+    search_service: "AiTagSearchService | None" = None,
 ) -> TagSuggestionResponse:
     """Suggest tags for one track using AI-assisted analysis of metadata.
 
@@ -65,12 +71,22 @@ def suggest_tags_for_track(
     )
     tags_by_id: dict[int, Tag] = {tag.id: tag for tag in tags}
 
-    # 3. Build prompt with track metadata and tag catalogue
+    # 3. Optionally fetch search context for a better prompt.
+    search_results: list[TagSearchContextItem] = []
+    if provider.status == AiProviderStatus.OK and search_service is not None:
+        search_context = search_service.search_for_track(db, track)
+        if search_context.status == "ok":
+            search_results = search_context.results
+
+    # 4. Build prompt with track metadata, optional search, and tag catalogue
     user_message = _build_tag_suggestion_prompt(
-        track, tags, include_new=include_new_tag_suggestions,
+        track,
+        tags,
+        include_new=include_new_tag_suggestions,
+        search_results=search_results,
     )
 
-    # 4. Call AI
+    # 5. Call AI
     ai_output, completion_result, parse_error = complete_and_parse_json(
         provider,
         user_message,
@@ -81,8 +97,8 @@ def suggest_tags_for_track(
             "the supplied catalogue; never invent, guess, or hallucinate tag "
             "ids. New tag groups, when allowed, must be exactly scene, type, "
             "or feature. Do not suggest playlists, do not apply tags, do not "
-            "use lyrics, and do not claim web-search knowledge unless it is "
-            "present in the supplied metadata."
+            "use lyrics, and only use search context when it is explicitly "
+            "present in the user message."
         ),
         max_tokens=STRUCTURED_JSON_MAX_TOKENS,
         temperature=0.2,
@@ -90,7 +106,7 @@ def suggest_tags_for_track(
 
     provider_status = completion_result.provider_status
 
-    # 5. Provider unavailable
+    # 6. Provider unavailable
     if provider_status in (AiProviderStatus.DISABLED, AiProviderStatus.UNCONFIGURED):
         return _empty_fallback(track_id, provider_status)
 
@@ -105,7 +121,7 @@ def suggest_tags_for_track(
             ),
         )
 
-    # 6. Validate existing tag ids returned by AI
+    # 7. Validate existing tag ids returned by AI
     valid_suggestions: list[ExistingTagSuggestion] = []
     seen_tag_ids: set[int] = set()
     for suggestion in _iter_existing_tag_outputs(ai_output):
@@ -127,12 +143,12 @@ def suggest_tags_for_track(
             ),
         )
 
-    # 7. Group by tag group
+    # 8. Group by tag group
     grouped: dict[str, list[ExistingTagSuggestion]] = {}
     for suggestion in valid_suggestions:
         grouped.setdefault(suggestion.group, []).append(suggestion)
 
-    # 8. Validate new tag suggestions
+    # 9. Validate new tag suggestions
     clean_new: list[NewTagSuggestion] = []
     seen_new: set[tuple[str, str]] = set()
     if include_new_tag_suggestions:
@@ -174,6 +190,7 @@ def _build_tag_suggestion_prompt(
     tags: list[Tag],
     *,
     include_new: bool = False,
+    search_results: list[TagSearchContextItem] | None = None,
 ) -> str:
     """Build the full user prompt with track metadata and tag catalogue."""
     lines: list[str] = []
@@ -192,6 +209,24 @@ def _build_tag_suggestion_prompt(
         basename = os.path.basename(track.original_file_path)
         if basename:
             lines.append(f"  original_filename: {basename}")
+
+    # Optional search context
+    lines.append("")
+    if search_results:
+        lines.append("Search context:")
+        lines.append(
+            "  Use these search result titles/snippets only as supporting "
+            "context. They may be incomplete or wrong; prefer local metadata "
+            "and the user's tag catalogue when uncertain."
+        )
+        for index, item in enumerate(search_results, start=1):
+            lines.append(f"  {index}. title: {item.title}")
+            if item.snippet:
+                lines.append(f"     snippet: {item.snippet}")
+            if item.url:
+                lines.append(f"     url: {item.url}")
+    else:
+        lines.append("Search context: (none)")
 
     # Tag catalogue
     lines.append("")

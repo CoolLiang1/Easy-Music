@@ -102,8 +102,10 @@ Current documented progress:
 - V2.5 AI Tag Suggestions V2: implemented as quality improvements to the
   existing `POST /api/ai/tracks/{track_id}/suggest-tags` flow. The endpoint now
   gives stronger `scene`/`type`/`feature` guidance, supports richer existing-tag
-  suggestion output with confidence and reasons, keeps legacy provider output
-  compatibility, and documents DeepSeek as an OpenAI-compatible provider option.
+  suggestion output with confidence and reasons, can optionally use
+  suggest-tags-only Tavily title/snippet/URL search context, keeps legacy
+  provider output compatibility, and documents DeepSeek as an OpenAI-compatible
+  provider option.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.

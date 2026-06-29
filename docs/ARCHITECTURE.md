@@ -77,7 +77,10 @@ The backend keeps these modules separated at a high level:
 - Playback events: online/offline playback event ingestion and duplicate-safe sync.
 - Feedback events: recommendation feedback ingestion and cooldown/avoidance inputs.
 - Recommendation: structured rule-based ranking and result explanation.
-- AI assistant: provider abstraction, intent parsing, recommendation composition, and tag suggestions.
+- AI assistant: provider abstraction, intent parsing, recommendation composition,
+  and tag suggestions. Tag suggestions can optionally enrich their prompt with
+  configured Tavily title/snippet/URL search summaries through the existing
+  suggest-tags endpoint only.
 - Worker: background job execution for media processing.
 
 ## 4. Deployment
@@ -270,6 +273,23 @@ Possible sources:
 - user
 - ai
 - system
+
+### 8.4.1 AiTagSearchCache
+
+Suggest-tags-only cache for optional Tavily search summaries:
+
+- `id`
+- `provider`
+- `query`
+- `status`
+- `results_json` containing normalized title/snippet/URL items only
+- `searched_at`
+- `created_at`
+- `updated_at`
+
+The cache is used only to reduce repeated search API calls for
+`POST /api/ai/tracks/{track_id}/suggest-tags`. It does not store API keys, page
+bodies, playlist suggestions, analysis decisions, or apply events.
 
 ### 8.5 PlaybackEvent
 
@@ -607,6 +627,10 @@ does not let AI select tracks.
 - `POST /api/ai/parse-listening-intent`
 - `POST /api/ai/recommend`
 - `POST /api/ai/tracks/{track_id}/suggest-tags`
+
+`suggest-tags` may internally use configured Tavily search context, but this
+does not add `/organize`, `/organize/apply`, playlist suggestions, Android UI,
+or automatic tag application.
 
 ## 12. Security
 

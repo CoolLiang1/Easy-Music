@@ -42,6 +42,12 @@ contain placeholders only, not production-ready secrets.
 | `AI_API_KEY` | No | No | AI provider API key. Leave empty unless testing or deploying AI features with a real provider. Never commit a real key. |
 | `AI_MODEL` | No | No | AI model identifier used by the provider client. |
 | `AI_BASE_URL` | No | No | Base URL for the OpenAI-compatible provider. |
+| `AI_TAG_SEARCH_ENABLED` | No | No | Enables optional Tavily search context for `POST /api/ai/tracks/{track_id}/suggest-tags` only. Defaults to `false`. |
+| `AI_TAG_SEARCH_PROVIDER` | No | No | Suggest-tags search provider. The first supported value is `tavily`. |
+| `AI_TAG_SEARCH_API_KEY` | No | No | Tavily Search API key for tag suggestions. Never commit a real key. |
+| `AI_TAG_SEARCH_BASE_URL` | No | No | Tavily-compatible base URL. Defaults to `https://api.tavily.com`. |
+| `AI_TAG_SEARCH_MAX_RESULTS` | No | No | Maximum search summaries included in the AI tag suggestion prompt. Defaults to `5`; supported maximum is `5`. |
+| `AI_TAG_SEARCH_CACHE_DAYS` | No | No | Number of days to reuse cached search summaries. Defaults to `30`; set `0` to disable cache reuse. |
 | `CADDY_DOMAIN` | No | Yes | Public HTTPS domain used by the production Caddy service. |
 | `MEDIA_HOST_ORIGINALS` | No | Yes | Production host directory bind-mounted to `/app/media/originals`. |
 | `MEDIA_HOST_PLAYBACK` | No | Yes | Production host directory bind-mounted to `/app/media/playback`. |
@@ -59,9 +65,10 @@ The example intentionally avoids real credentials, tokens, private host paths, a
 
 AI providers use the OpenAI-compatible contract. DeepSeek-style testing can use
 `AI_PROVIDER=openai-compatible`, a DeepSeek model id such as `deepseek-chat`,
-and `AI_BASE_URL=https://api.deepseek.com/v1`. V2.5 does not add `AI_SEARCH_*`
-settings, a search provider, or web scraping; any future networked search flow
-must be modeled with an explicit external Search API plus tool/function calling.
+and `AI_BASE_URL=https://api.deepseek.com/v1`. V2.5 optionally adds
+suggest-tags-only `AI_TAG_SEARCH_*` settings for Tavily title/snippet/URL prompt
+context. It does not add broad `AI_SEARCH_*` settings, web scraping, or any
+organization/apply endpoint.
 
 `IMPORT_ALLOWED_ROOTS` is empty by default. For local V2 import testing, point it
 at one or more throwaway directories outside the repository and outside
