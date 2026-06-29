@@ -173,8 +173,8 @@ Required behavior:
 
 Acceptance checklist:
 
-- [x] Web typecheck passes.
-- [x] Web build passes.
+- [ ] Web typecheck passes.
+- [ ] Web build passes.
 - [ ] Manual Web smoke covers search-disabled fallback.
 - [ ] Manual Web smoke covers fake or real search success.
 - [ ] Manual Web smoke covers applying existing tags.
@@ -227,9 +227,7 @@ Expected:
 
 Result:
 
-- [x] 2026-06-28: Passed `npm run typecheck` from `web/`.
-- [x] 2026-06-28: Passed `npm run build` from `web/`.
-- [ ] Manual Web smoke not run yet.
+- [ ] Not run.
 
 ### Smoke 2: Search Success And Analysis Success
 
@@ -383,8 +381,7 @@ Status as of 2026-06-28:
 - V2.5.2 Research And Analysis Cache Models implemented.
 - V2.5.3 Single-Track Organization Analysis Endpoint implemented.
 - V2.5.4 Apply Selected Organization Suggestions implemented.
-- V2.5.5 Web Track Detail AI Organization Panel implemented.
 - Search settings are documented in env examples and `docs/ENVIRONMENT.md`.
 - Focused backend automated checks for V2.5.1 through V2.5.4 are recorded above.
-- Web typecheck/build are recorded above.
-- Manual Web smoke flows have not been run yet.
+- Web UI is not implemented yet.
+- Manual Web smoke flows have not been run because no V2.5 Web UI exists yet.
