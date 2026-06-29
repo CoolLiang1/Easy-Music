@@ -151,11 +151,13 @@ class _FakeClient:
 def _suggestion_json(
     *,
     existing_tag_ids: list[int] | None = None,
+    existing_tag_suggestions: list[dict[str, Any]] | None = None,
     new_tags: list[dict[str, Any]] | None = None,
     explanation: str | None = None,
 ) -> str:
     return json.dumps(
         {
+            "existing_tag_suggestions": existing_tag_suggestions or [],
             "existing_tag_ids": existing_tag_ids or [],
             "new_tag_suggestions": new_tags or [],
             "explanation": explanation,
@@ -347,6 +349,80 @@ def test_suggest_tags_maps_existing_tags_with_correct_groups(
     assert existing["scene"][0]["name"] == "Focus"
     assert existing["scene"][0]["tag_id"] == focus.id
     assert existing["feature"][0]["name"] == "Calm"
+
+
+def test_suggest_tags_uses_v2_existing_suggestion_reason_and_confidence(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Late Night Piano")
+    focus = create_tag(db_session, user, "scene", "Focus")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        _suggestion_json(
+            existing_tag_suggestions=[
+                {
+                    "tag_id": focus.id,
+                    "confidence": 0.93,
+                    "reason": "Sparse piano metadata fits focused listening.",
+                }
+            ],
+            explanation="V2 structured suggestion.",
+        )
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    suggestion = body["existing_tag_suggestions"]["scene"][0]
+    assert suggestion["tag_id"] == focus.id
+    assert suggestion["confidence"] == 0.93
+    assert suggestion["reason"] == "Sparse piano metadata fits focused listening."
+    assert body["explanation"] == "V2 structured suggestion."
+
+
+def test_suggest_tags_filters_legacy_groups_from_catalogue_and_output(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Legacy Group Track")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    legacy = create_tag(db_session, user, "attribute", "Legacy")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        _suggestion_json(
+            existing_tag_suggestions=[
+                {"tag_id": focus.id, "confidence": 0.8, "reason": "Valid."},
+                {"tag_id": legacy.id, "confidence": 0.9, "reason": "Invalid group."},
+            ],
+        )
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["tag_id"] for item in body["existing_tag_suggestions"]["scene"]] == [
+        focus.id
+    ]
+    assert "attribute" not in body["existing_tag_suggestions"]
+
+    user_msg = fake.calls[0].messages[1]["content"]
+    assert f"id:{focus.id} Focus" in user_msg
+    assert f"id:{legacy.id} Legacy" not in user_msg
 
 
 # ---------------------------------------------------------------------------
@@ -542,6 +618,57 @@ def test_suggest_tags_includes_new_tag_suggestions_when_requested(
     assert body["new_tag_suggestions"][1]["name"] == "Lo-Fi"
 
 
+def test_suggest_tags_cleans_and_deduplicates_new_tag_suggestions(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Night Focus Track")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        _suggestion_json(
+            new_tags=[
+                {
+                    "name": " Night Focus ",
+                    "group": "scene",
+                    "confidence": 0.9,
+                    "reason": "Useful listening context.",
+                },
+                {
+                    "name": "night focus",
+                    "group": "scene",
+                    "confidence": 0.7,
+                    "reason": "Duplicate.",
+                },
+                {
+                    "name": " ",
+                    "group": "feature",
+                    "confidence": 0.5,
+                    "reason": "Empty after trim.",
+                },
+                {
+                    "name": "Legacy",
+                    "group": "attribute",
+                    "confidence": 0.8,
+                    "reason": "Old taxonomy group.",
+                },
+            ],
+        )
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={"include_new_tag_suggestions": True},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["new_tag_suggestions"]) == 1
+    assert body["new_tag_suggestions"][0]["name"] == "Night Focus"
+
+
 def test_suggest_tags_excludes_new_tags_when_not_requested(
     client: TestClient,
     db_session: Session,
@@ -635,6 +762,37 @@ def test_suggest_tags_prompt_includes_tag_catalogue(
     assert f"id:{calm.id} Calm" in user_msg
     assert "[scene]" in user_msg
     assert "[feature]" in user_msg
+
+
+def test_suggest_tags_prompt_includes_v2_taxonomy_and_schema_contract(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Taxonomy Track")
+    create_tag(db_session, user, "scene", "Focus")
+    create_tag(db_session, user, "type", "Instrumental")
+    create_tag(db_session, user, "feature", "Calm")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(_suggestion_json())
+
+    client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={"include_new_tag_suggestions": True},
+        headers=auth_headers(user),
+    )
+
+    user_msg = fake.calls[0].messages[1]["content"]
+    system_msg = fake.calls[0].messages[0]["content"]
+    assert "Taxonomy guide" in user_msg
+    assert "scene = when or where" in user_msg
+    assert "type = musical or content format" in user_msg
+    assert "feature = sound, mood, energy" in user_msg
+    assert "existing_tag_suggestions" in user_msg
+    assert "confidence" in user_msg
+    assert "Do not include markdown" in user_msg
+    assert "do not claim web-search knowledge" in system_msg
 
 
 def test_suggest_tags_uses_larger_completion_budget(

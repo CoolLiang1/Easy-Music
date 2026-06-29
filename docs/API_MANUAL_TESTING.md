@@ -1432,6 +1432,76 @@ Invoke-RestMethod `
   source_url, original filename basename) and the full user tag catalogue.
 - Internal storage paths are not exposed beyond the filename basename.
 
+## V2.5 AI Tag Suggestions V2
+
+V2.5 keeps the existing authenticated endpoint:
+`POST /api/ai/tracks/{track_id}/suggest-tags`. The slice improves prompt and
+schema quality for `scene`, `type`, and `feature` tag suggestions. It does not
+add AI organization, search, playlist suggestions, Android UI, auto-apply, or
+recommendation changes.
+
+### Configure OpenAI-Compatible AI
+
+Use the Phase 6 AI provider settings. For DeepSeek-style testing, configure the
+same OpenAI-compatible provider contract with your own local key:
+
+```powershell
+$env:AI_ENABLED = "true"
+$env:AI_PROVIDER = "openai-compatible"
+$env:AI_API_KEY = "your-own-deepseek-key"
+$env:AI_MODEL = "deepseek-chat"
+$env:AI_BASE_URL = "https://api.deepseek.com/v1"
+```
+
+V2.5 does not add `AI_SEARCH_*` settings, Tavily, a search provider, or web
+scraping. If a future DeepSeek workflow needs networked search, it should use an
+explicit external Search API plus a tool/function-calling flow; that is outside
+this acceptance scope.
+
+### Suggest Tags For One Track
+
+```powershell
+$suggestions = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/tracks/$trackId/suggest-tags" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"include_new_tag_suggestions": true}'
+
+$suggestions.provider_status
+$suggestions.existing_tag_suggestions
+$suggestions.new_tag_suggestions
+```
+
+Expected result:
+
+- Missing auth returns `401 Unauthorized`.
+- Missing or unowned tracks return `provider_status: error` in the response.
+- Disabled or unconfigured AI returns `provider_status: disabled` or
+  `unconfigured`, empty suggestions, and `200 OK`.
+- With a working provider, existing suggestions are grouped by `scene`, `type`,
+  and `feature`, and each item includes `tag_id`, `name`, `group`,
+  `confidence`, and `reason`.
+- Existing tag ids are limited to the authenticated user's tag catalogue.
+- Legacy provider output with `existing_tag_ids` is still accepted.
+- New tag suggestions are returned only when requested, use only `scene`,
+  `type`, or `feature`, and remain names only.
+- The endpoint does not create, rename, delete, or assign tags.
+
+### Web Tag Suggestion Smoke
+
+After starting the backend and Web app, log in and open one owned track's tag
+editing UI. Verify:
+
+1. The existing AI tag suggestion controls load without breaking track editing.
+2. Running suggestions calls `POST /api/ai/tracks/{track_id}/suggest-tags`.
+3. Existing tag suggestions show confidence and reason text.
+4. Optional new tag name suggestions are informational only.
+5. No tags are assigned until the user explicitly saves selected tag changes
+   through the normal track edit flow.
+6. Provider disabled, unconfigured, or error states remain visible without
+   crashing the page.
+
 ## Phase 6 AI Assistant V1 Closure
 
 Before accepting Phase 6, verify the AI endpoints with one local user and at

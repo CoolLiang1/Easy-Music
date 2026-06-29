@@ -380,6 +380,22 @@ When `AI_ENABLED` is `false` or `AI_API_KEY` / `AI_MODEL` are empty, the
 provider service returns a documented `disabled` or `unconfigured` status.
 Downstream AI endpoints can map these to clear responses without crashing.
 
+DeepSeek can be tested through the same OpenAI-compatible provider contract.
+Use your own key and DeepSeek model/base URL values in a local environment only:
+
+```powershell
+$env:AI_ENABLED = "true"
+$env:AI_PROVIDER = "openai-compatible"
+$env:AI_API_KEY = "your-own-deepseek-key"
+$env:AI_MODEL = "deepseek-chat"
+$env:AI_BASE_URL = "https://api.deepseek.com/v1"
+```
+
+V2.5 does not add a search provider or a DeepSeek web-search switch. If a future
+DeepSeek API workflow needs networked search, it should be modeled explicitly
+with an external Search API plus a tool/function-calling flow. That is outside
+the V2.5 AI Tag Suggestions V2 scope.
+
 ### Docker Compose
 
 The `.env.example` file at the repository root includes placeholder AI variables.
@@ -418,7 +434,7 @@ docker compose up -d --force-recreate api
 - `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
   `ParseListeningIntentRequest`, `ParsedIntentResponse`, and supporting schemas.
 
-Available AI endpoints after Task 6.5:
+Available AI endpoints after V2.5:
 
 - `POST /api/ai/parse-listening-intent` (authenticated) — maps natural-language
   listening requests to Phase 5-compatible structured tag ids using only the
@@ -430,9 +446,19 @@ Available AI endpoints after Task 6.5:
   penalties.
 - `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) — suggests
   existing tags and optional new tag names for a track using AI-assisted
-  metadata analysis. The endpoint never creates or assigns tags.
+  metadata analysis. V2.5 improves the prompt and provider output schema around
+  `scene`, `type`, and `feature`. The endpoint never creates or assigns tags.
 
-Later tasks will add the actual HTTP provider client and additional AI endpoints.
+Focused V2.5 backend tests use fake AI providers and do not require live network
+access or real provider keys:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_ai_tag_suggestions.py tests\test_ai_intent.py tests\test_ai_recommend.py tests\test_ai_json.py tests\test_ai_provider.py
+```
+
+Passing fake-provider tests does not prove real provider connectivity or browser
+behavior. Record any real-provider or Web smoke separately in
+`docs/ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md`.
 
 ## Web Setup
 
@@ -498,6 +524,14 @@ and video candidates, confirms import, and refreshes the latest import batch
 status using the existing track processing status. Video candidates are copied
 into temporary video storage and create `video_extraction` processing jobs;
 the worker extracts audio from them into the normal audio processing pipeline.
+
+The existing Web AI tag suggestion controls remain available from track tag
+editing after login. They call
+`POST /api/ai/tracks/{track_id}/suggest-tags`, show existing-tag suggestions
+with confidence/reasons, and can display optional new-tag name ideas. The
+endpoint does not create tags or assign tags automatically. Android UI, batch
+organization, lyrics analysis, web scraping/search providers, playlist
+suggestions, and recommendation scoring changes remain out of scope for V2.5.
 
 Run the Web type check from `web/`:
 

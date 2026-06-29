@@ -201,6 +201,27 @@ class NewTagSuggestion(BaseModel):
     reason: str = ""
 
 
+class AiTagExistingSuggestionOutput(BaseModel):
+    """Existing-tag suggestion shape returned by the provider."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tag_id: int
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    reason: str = ""
+
+
+class AiTagNewSuggestionOutput(BaseModel):
+    """New-tag suggestion shape returned by the provider before validation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    group: str
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    reason: str = ""
+
+
 class AiTagSuggestionOutput(BaseModel):
     """Shape the AI must return for tag suggestions.
 
@@ -211,8 +232,11 @@ class AiTagSuggestionOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    existing_tag_suggestions: list[AiTagExistingSuggestionOutput] = Field(
+        default_factory=list,
+    )
     existing_tag_ids: list[int] = Field(default_factory=list)
-    new_tag_suggestions: list[NewTagSuggestion] = Field(default_factory=list)
+    new_tag_suggestions: list[AiTagNewSuggestionOutput] = Field(default_factory=list)
     explanation: str | None = None
 
 

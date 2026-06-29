@@ -59,7 +59,7 @@ def suggest_tags_for_track(
     tags = list(
         db.scalars(
             select(Tag)
-            .where(Tag.user_id == user.id)
+            .where(Tag.user_id == user.id, Tag.group.in_(_VALID_GROUPS))
             .order_by(Tag.group, Tag.created_at, Tag.id),
         ),
     )
@@ -76,9 +76,13 @@ def suggest_tags_for_track(
         user_message,
         AiTagSuggestionOutput,
         system_instruction=(
-            "Only use tag ids from the catalogue in the user message. "
-            "Never invent, guess, or hallucinate tag ids. "
-            "Only suggest new tag names when explicitly instructed."
+            "You improve a personal music library by suggesting tags for one "
+            "track. Return strict JSON only. Use existing tag ids only from "
+            "the supplied catalogue; never invent, guess, or hallucinate tag "
+            "ids. New tag groups, when allowed, must be exactly scene, type, "
+            "or feature. Do not suggest playlists, do not apply tags, do not "
+            "use lyrics, and do not claim web-search knowledge unless it is "
+            "present in the supplied metadata."
         ),
         max_tokens=STRUCTURED_JSON_MAX_TOKENS,
         temperature=0.2,
@@ -103,18 +107,23 @@ def suggest_tags_for_track(
 
     # 6. Validate existing tag ids returned by AI
     valid_suggestions: list[ExistingTagSuggestion] = []
-    for tag_id in ai_output.existing_tag_ids:
-        tag = tags_by_id.get(tag_id)
+    seen_tag_ids: set[int] = set()
+    for suggestion in _iter_existing_tag_outputs(ai_output):
+        tag = tags_by_id.get(suggestion["tag_id"])
         if tag is None:
             # invented / unowned id — skip silently
             continue
+        if tag.group not in _VALID_GROUPS or tag.id in seen_tag_ids:
+            continue
+        seen_tag_ids.add(tag.id)
         valid_suggestions.append(
             ExistingTagSuggestion(
                 tag_id=tag.id,
                 name=tag.name,
                 group=tag.group,
-                confidence=0.7,
-                reason=f"AI matched '{tag.name}' to this track.",
+                confidence=suggestion["confidence"],
+                reason=suggestion["reason"]
+                or f"AI matched '{tag.name}' to this track.",
             ),
         )
 
@@ -125,11 +134,26 @@ def suggest_tags_for_track(
 
     # 8. Validate new tag suggestions
     clean_new: list[NewTagSuggestion] = []
+    seen_new: set[tuple[str, str]] = set()
     if include_new_tag_suggestions:
         for suggestion in ai_output.new_tag_suggestions:
             if suggestion.group not in _VALID_GROUPS:
                 continue
-            clean_new.append(suggestion)
+            name = suggestion.name.strip()
+            if not name:
+                continue
+            key = (suggestion.group, name.casefold())
+            if key in seen_new:
+                continue
+            seen_new.add(key)
+            clean_new.append(
+                NewTagSuggestion(
+                    name=name,
+                    group=suggestion.group,
+                    confidence=suggestion.confidence,
+                    reason=suggestion.reason,
+                ),
+            )
 
     return TagSuggestionResponse(
         track_id=track_id,
@@ -182,21 +206,68 @@ def _build_tag_suggestion_prompt(
 
     # Instruction
     lines.append("")
+    lines.append("Taxonomy guide:")
     lines.append(
-        "Suggest the most appropriate existing tags from the catalogue above "
-        "for this track. Return their ids in existing_tag_ids."
+        "  scene = when or where the owner would listen, such as focus, sleep, "
+        "commute, workout, rainy day, late night."
+    )
+    lines.append(
+        "  type = musical or content format, such as instrumental, vocal, OST, "
+        "podcast, live, lo-fi, piano."
+    )
+    lines.append(
+        "  feature = sound, mood, energy, texture, era, season, or atmosphere, "
+        "such as calm, bright, heavy, warm, nostalgic."
+    )
+    lines.append("")
+    lines.append(
+        "Suggest the most appropriate existing tags from the catalogue above. "
+        "Prefer precise tags over broad guesses. Return existing tags as "
+        "existing_tag_suggestions items with tag_id, confidence, and a short "
+        "reason. Use confidence 0.0-1.0 based only on the metadata supplied."
     )
 
     if include_new:
         lines.append(
             "You may also suggest new tag names in new_tag_suggestions "
-            "(name, group, confidence, reason). Only use groups: "
-            "scene, type, feature."
+            "(name, group, confidence, reason). Suggest new tags only when the "
+            "existing catalogue is missing a useful scene/type/feature concept. "
+            "Only use groups: scene, type, feature."
         )
     else:
         lines.append("Leave new_tag_suggestions empty.")
 
+    lines.append(
+        "Return JSON with keys: existing_tag_suggestions, existing_tag_ids, "
+        "new_tag_suggestions, explanation. Keep existing_tag_ids empty unless "
+        "you cannot return the richer existing_tag_suggestions shape. Do not "
+        "include markdown or prose outside JSON."
+    )
+
     return "\n".join(lines)
+
+
+def _iter_existing_tag_outputs(
+    ai_output: AiTagSuggestionOutput,
+) -> list[dict[str, int | float | str]]:
+    if ai_output.existing_tag_suggestions:
+        return [
+            {
+                "tag_id": item.tag_id,
+                "confidence": item.confidence,
+                "reason": item.reason,
+            }
+            for item in ai_output.existing_tag_suggestions
+        ]
+
+    return [
+        {
+            "tag_id": tag_id,
+            "confidence": 0.7,
+            "reason": "",
+        }
+        for tag_id in ai_output.existing_tag_ids
+    ]
 
 
 def _empty_fallback(

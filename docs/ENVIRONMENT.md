@@ -57,6 +57,12 @@ contain placeholders only, not production-ready secrets.
 
 The example intentionally avoids real credentials, tokens, private host paths, and production domains. Before any real deployment, replace passwords and secrets through the deployment environment rather than by editing committed files.
 
+AI providers use the OpenAI-compatible contract. DeepSeek-style testing can use
+`AI_PROVIDER=openai-compatible`, a DeepSeek model id such as `deepseek-chat`,
+and `AI_BASE_URL=https://api.deepseek.com/v1`. V2.5 does not add `AI_SEARCH_*`
+settings, a search provider, or web scraping; any future networked search flow
+must be modeled with an explicit external Search API plus tool/function calling.
+
 `IMPORT_ALLOWED_ROOTS` is empty by default. For local V2 import testing, point it
 at one or more throwaway directories outside the repository and outside
 `MEDIA_ROOT`. Use semicolons for Windows paths, for example:

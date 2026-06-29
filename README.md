@@ -33,18 +33,20 @@ deployment step, not a completed repository verification step.
 - [V2.2 Playback Queue Acceptance](docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md)
 - [V2 Recommendation Foundation Tasks](docs/TASKS/V2_RECOMMENDATION_FOUNDATION_TASKS.md)
 - [V2 Recommendation Foundation Acceptance](docs/ACCEPTANCE/V2_RECOMMENDATION_FOUNDATION_ACCEPTANCE.md)
+- [V2.5 AI Tag Suggestions V2 Tasks](docs/TASKS/V2_5_AI_TAG_SUGGESTIONS_V2_TASKS.md)
+- [V2.5 AI Tag Suggestions V2 Acceptance](docs/ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md)
 
 ## Implemented Areas
 
 - Backend: FastAPI API, auth, tracks, tags, uploads, media streaming,
   playlists, playback events, feedback events, recommendation endpoints with
   V2 cooldown modes and playlist scoring signals, AI assistant endpoints,
-  health checks, structured logging, Alembic migrations, and worker media
-  processing.
+  enhanced AI tag suggestions, health checks, structured logging, Alembic
+  migrations, and worker media processing.
 - Web: React/Vite management console with login, upload flow, library, track
   editor, tag editor, playlist management, queued Web playback, recommendation test
-  panel, and AI assistant/tag suggestion UI, plus import-directory review and
-  optional user-provided video-to-audio upload.
+  panel, AI assistant/tag suggestion UI, import-directory review, and optional
+  user-provided video-to-audio upload.
 - Android: Kotlin/Jetpack Compose client with login, library, track detail,
   playlist browsing, Media3 queue playback service, background/notification controls,
   manual offline cache, cached playback, playback-event sync, and
@@ -97,6 +99,11 @@ Current documented progress:
   `type`, and `feature`; old `scenario` and `state` categories migrate to
   `scene` and `feature`, while old `attribute` tags and their track-tag links
   are removed.
+- V2.5 AI Tag Suggestions V2: implemented as quality improvements to the
+  existing `POST /api/ai/tracks/{track_id}/suggest-tags` flow. The endpoint now
+  gives stronger `scene`/`type`/`feature` guidance, supports richer existing-tag
+  suggestion output with confidence and reasons, keeps legacy provider output
+  compatibility, and documents DeepSeek as an OpenAI-compatible provider option.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
 under `docs/` for the detailed record.
