@@ -26,7 +26,8 @@ from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
-from app.schemas.ai import AiCompletionRequest, AiCompletionResult
+from app.schemas.ai import AiCompletionRequest, AiCompletionResult, TagSearchContextItem
+from app.services.ai_tag_search import TagSearchContext
 from app.services.ai_provider import AiProviderService
 
 
@@ -107,6 +108,7 @@ def create_track(
     content_type: str = "song",
     status: str = "ready",
     original_file_path: str = "originals/test.mp3",
+    source_url: str | None = None,
 ) -> Track:
     track = Track(
         user_id=user.id,
@@ -118,7 +120,7 @@ def create_track(
         original_file_path=original_file_path,
         playback_file_path="playback/track.mp3",
         cover_path=None,
-        source_url=None,
+        source_url=source_url,
         format="mp3",
         bitrate=320,
         status=status,
@@ -148,14 +150,26 @@ class _FakeClient:
         return AiCompletionResult.ok("{}")
 
 
+class _FakeTagSearchService:
+    def __init__(self, context: TagSearchContext):
+        self.context = context
+        self.calls: list[Track] = []
+
+    def search_for_track(self, db: Session, track: Track) -> TagSearchContext:
+        self.calls.append(track)
+        return self.context
+
+
 def _suggestion_json(
     *,
     existing_tag_ids: list[int] | None = None,
+    existing_tag_suggestions: list[dict[str, Any]] | None = None,
     new_tags: list[dict[str, Any]] | None = None,
     explanation: str | None = None,
 ) -> str:
     return json.dumps(
         {
+            "existing_tag_suggestions": existing_tag_suggestions or [],
             "existing_tag_ids": existing_tag_ids or [],
             "new_tag_suggestions": new_tags or [],
             "explanation": explanation,
@@ -184,6 +198,21 @@ def _install_provider(
         return AiProviderService(settings, client=fake)
 
     app.dependency_overrides[_get_ai_provider] = override
+    return fake
+
+
+def _install_tag_search(
+    app: Any,
+    context: TagSearchContext,
+) -> _FakeTagSearchService:
+    from app.api.routes.ai import _get_ai_tag_search
+
+    fake = _FakeTagSearchService(context)
+
+    def override() -> _FakeTagSearchService:
+        return fake
+
+    app.dependency_overrides[_get_ai_tag_search] = override
     return fake
 
 
@@ -347,6 +376,80 @@ def test_suggest_tags_maps_existing_tags_with_correct_groups(
     assert existing["scene"][0]["name"] == "Focus"
     assert existing["scene"][0]["tag_id"] == focus.id
     assert existing["feature"][0]["name"] == "Calm"
+
+
+def test_suggest_tags_uses_v2_existing_suggestion_reason_and_confidence(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Late Night Piano")
+    focus = create_tag(db_session, user, "scene", "Focus")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        _suggestion_json(
+            existing_tag_suggestions=[
+                {
+                    "tag_id": focus.id,
+                    "confidence": 0.93,
+                    "reason": "Sparse piano metadata fits focused listening.",
+                }
+            ],
+            explanation="V2 structured suggestion.",
+        )
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    suggestion = body["existing_tag_suggestions"]["scene"][0]
+    assert suggestion["tag_id"] == focus.id
+    assert suggestion["confidence"] == 0.93
+    assert suggestion["reason"] == "Sparse piano metadata fits focused listening."
+    assert body["explanation"] == "V2 structured suggestion."
+
+
+def test_suggest_tags_filters_legacy_groups_from_catalogue_and_output(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Legacy Group Track")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    legacy = create_tag(db_session, user, "attribute", "Legacy")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        _suggestion_json(
+            existing_tag_suggestions=[
+                {"tag_id": focus.id, "confidence": 0.8, "reason": "Valid."},
+                {"tag_id": legacy.id, "confidence": 0.9, "reason": "Invalid group."},
+            ],
+        )
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["tag_id"] for item in body["existing_tag_suggestions"]["scene"]] == [
+        focus.id
+    ]
+    assert "attribute" not in body["existing_tag_suggestions"]
+
+    user_msg = fake.calls[0].messages[1]["content"]
+    assert f"id:{focus.id} Focus" in user_msg
+    assert f"id:{legacy.id} Legacy" not in user_msg
 
 
 # ---------------------------------------------------------------------------
@@ -542,6 +645,57 @@ def test_suggest_tags_includes_new_tag_suggestions_when_requested(
     assert body["new_tag_suggestions"][1]["name"] == "Lo-Fi"
 
 
+def test_suggest_tags_cleans_and_deduplicates_new_tag_suggestions(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Night Focus Track")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        _suggestion_json(
+            new_tags=[
+                {
+                    "name": " Night Focus ",
+                    "group": "scene",
+                    "confidence": 0.9,
+                    "reason": "Useful listening context.",
+                },
+                {
+                    "name": "night focus",
+                    "group": "scene",
+                    "confidence": 0.7,
+                    "reason": "Duplicate.",
+                },
+                {
+                    "name": " ",
+                    "group": "feature",
+                    "confidence": 0.5,
+                    "reason": "Empty after trim.",
+                },
+                {
+                    "name": "Legacy",
+                    "group": "attribute",
+                    "confidence": 0.8,
+                    "reason": "Old taxonomy group.",
+                },
+            ],
+        )
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={"include_new_tag_suggestions": True},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["new_tag_suggestions"]) == 1
+    assert body["new_tag_suggestions"][0]["name"] == "Night Focus"
+
+
 def test_suggest_tags_excludes_new_tags_when_not_requested(
     client: TestClient,
     db_session: Session,
@@ -612,6 +766,105 @@ def test_suggest_tags_prompt_includes_track_metadata(
     assert "media/originals" not in user_msg  # full path NOT exposed
 
 
+def test_suggest_tags_prompt_includes_search_context_when_available(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Blue Archive OST", artist="Mitsukiyo")
+    create_tag(db_session, user, "type", "OST")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(_suggestion_json())
+    search = _install_tag_search(
+        client.app,
+        TagSearchContext(
+            query="Blue Archive OST Mitsukiyo music",
+            status="ok",
+            results=[
+                TagSearchContextItem(
+                    title="Blue Archive Original Soundtrack",
+                    snippet="Game soundtrack information and composer metadata.",
+                    url="https://example.test/blue-archive-ost",
+                )
+            ],
+        ),
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert len(search.calls) == 1
+    user_msg = fake.calls[0].messages[1]["content"]
+    assert "Search context:" in user_msg
+    assert "Blue Archive Original Soundtrack" in user_msg
+    assert "Game soundtrack information" in user_msg
+    assert "https://example.test/blue-archive-ost" in user_msg
+
+
+def test_suggest_tags_falls_back_to_metadata_prompt_when_search_fails(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Metadata Only")
+    create_tag(db_session, user, "scene", "Focus")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(_suggestion_json())
+    _install_tag_search(
+        client.app,
+        TagSearchContext(
+            query="Metadata Only music",
+            status="error",
+            error_message="search provider unavailable",
+        ),
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "ok"
+    user_msg = fake.calls[0].messages[1]["content"]
+    assert "Search context: (none)" in user_msg
+    assert "search provider unavailable" not in user_msg
+
+
+def test_suggest_tags_skips_search_when_ai_provider_disabled(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Disabled AI")
+    _install_provider(client.app, ai_enabled=False)
+    search = _install_tag_search(
+        client.app,
+        TagSearchContext(
+            query="Disabled AI music",
+            status="ok",
+            results=[TagSearchContextItem(title="Should not be used")],
+        ),
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider_status"] == "disabled"
+    assert search.calls == []
+
+
 def test_suggest_tags_prompt_includes_tag_catalogue(
     client: TestClient,
     db_session: Session,
@@ -635,6 +888,37 @@ def test_suggest_tags_prompt_includes_tag_catalogue(
     assert f"id:{calm.id} Calm" in user_msg
     assert "[scene]" in user_msg
     assert "[feature]" in user_msg
+
+
+def test_suggest_tags_prompt_includes_v2_taxonomy_and_schema_contract(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Taxonomy Track")
+    create_tag(db_session, user, "scene", "Focus")
+    create_tag(db_session, user, "type", "Instrumental")
+    create_tag(db_session, user, "feature", "Calm")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(_suggestion_json())
+
+    client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={"include_new_tag_suggestions": True},
+        headers=auth_headers(user),
+    )
+
+    user_msg = fake.calls[0].messages[1]["content"]
+    system_msg = fake.calls[0].messages[0]["content"]
+    assert "Taxonomy guide" in user_msg
+    assert "scene = when or where" in user_msg
+    assert "type = musical or content format" in user_msg
+    assert "feature = sound, mood, energy" in user_msg
+    assert "existing_tag_suggestions" in user_msg
+    assert "confidence" in user_msg
+    assert "Do not include markdown" in user_msg
+    assert "only use search context when it is explicitly present" in system_msg
 
 
 def test_suggest_tags_uses_larger_completion_budget(

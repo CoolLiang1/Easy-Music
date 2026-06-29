@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.recommendation import RecommendationRequest, RecommendationResult
 from app.schemas.tag import TagGroup
-from app.schemas.ai_search import AiSearchProviderStatus, AiSearchResult
 
 
 class AiProviderStatus(str, Enum):
@@ -202,6 +201,37 @@ class NewTagSuggestion(BaseModel):
     reason: str = ""
 
 
+class TagSearchContextItem(BaseModel):
+    """Normalized search result item used inside the suggest-tags prompt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = ""
+    snippet: str = ""
+    url: str = ""
+
+
+class AiTagExistingSuggestionOutput(BaseModel):
+    """Existing-tag suggestion shape returned by the provider."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tag_id: int
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    reason: str = ""
+
+
+class AiTagNewSuggestionOutput(BaseModel):
+    """New-tag suggestion shape returned by the provider before validation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    group: str
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    reason: str = ""
+
+
 class AiTagSuggestionOutput(BaseModel):
     """Shape the AI must return for tag suggestions.
 
@@ -212,8 +242,11 @@ class AiTagSuggestionOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    existing_tag_suggestions: list[AiTagExistingSuggestionOutput] = Field(
+        default_factory=list,
+    )
     existing_tag_ids: list[int] = Field(default_factory=list)
-    new_tag_suggestions: list[NewTagSuggestion] = Field(default_factory=list)
+    new_tag_suggestions: list[AiTagNewSuggestionOutput] = Field(default_factory=list)
     explanation: str | None = None
 
 
@@ -231,139 +264,3 @@ class TagSuggestionResponse(BaseModel):
     new_tag_suggestions: list[NewTagSuggestion] = Field(default_factory=list)
     explanation: str | None = None
     provider_status: AiProviderStatus
-
-
-# ---------------------------------------------------------------------------
-# AI track organization
-# ---------------------------------------------------------------------------
-
-
-class TrackOrganizationRequest(BaseModel):
-    """Request for ``POST /api/ai/tracks/{track_id}/organize``."""
-
-    force_refresh_search: bool = False
-    force_reanalyze: bool = False
-
-
-class TrackOrganizationExistingTagSuggestion(BaseModel):
-    tag_id: int
-    name: str
-    group: TagGroup
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-    reason: str = ""
-
-
-class TrackOrganizationNewTagSuggestion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(min_length=1, max_length=255)
-    group: TagGroup
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-    reason: str = ""
-
-
-class TrackOrganizationPlaylistSuggestion(BaseModel):
-    playlist_id: int
-    name: str
-    description: str | None = None
-    track_count: int = 0
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-    reason: str = ""
-
-
-class TrackOrganizationExistingTagOutput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    tag_id: int
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-    reason: str = ""
-
-
-class TrackOrganizationPlaylistOutput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    playlist_id: int
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-    reason: str = ""
-
-
-class TrackOrganizationAiOutput(BaseModel):
-    """Shape the AI must return for one-track organization analysis."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    existing_tag_suggestions: list[TrackOrganizationExistingTagOutput] = Field(
-        default_factory=list,
-    )
-    new_tag_suggestions: list[TrackOrganizationNewTagSuggestion] = Field(
-        default_factory=list,
-    )
-    playlist_suggestions: list[TrackOrganizationPlaylistOutput] = Field(
-        default_factory=list,
-    )
-    summary: str | None = None
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-
-
-class TrackOrganizationResearchResponse(BaseModel):
-    id: int
-    query: str
-    provider: str
-    status: AiSearchProviderStatus
-    results: list[AiSearchResult] = Field(default_factory=list)
-    error_message: str | None = None
-    fetched_at: str
-    expires_at: str
-
-
-class TrackOrganizationAnalysisResponse(BaseModel):
-    id: int
-    research_id: int | None = None
-    provider: str
-    model: str | None = None
-    status: AiProviderStatus
-    summary: str | None = None
-    confidence: float | None = None
-    existing_tag_suggestions: list[TrackOrganizationExistingTagSuggestion] = Field(
-        default_factory=list,
-    )
-    new_tag_suggestions: list[TrackOrganizationNewTagSuggestion] = Field(
-        default_factory=list,
-    )
-    playlist_suggestions: list[TrackOrganizationPlaylistSuggestion] = Field(
-        default_factory=list,
-    )
-    error_message: str | None = None
-    created_at: str
-
-
-class TrackOrganizationResponse(BaseModel):
-    track_id: int
-    research_status: AiSearchProviderStatus
-    analysis_status: AiProviderStatus
-    research: TrackOrganizationResearchResponse | None = None
-    analysis: TrackOrganizationAnalysisResponse | None = None
-    research_error_message: str | None = None
-    analysis_error_message: str | None = None
-
-
-class TrackOrganizationApplyNewTag(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
-    group: TagGroup
-
-
-class TrackOrganizationApplyRequest(BaseModel):
-    analysis_id: int
-    existing_tag_ids: list[int] = Field(default_factory=list)
-    new_tags: list[TrackOrganizationApplyNewTag] = Field(default_factory=list)
-    playlist_ids: list[int] = Field(default_factory=list)
-
-
-class TrackOrganizationApplyResponse(BaseModel):
-    track_id: int
-    analysis_id: int
-    applied_existing_tag_ids: list[int] = Field(default_factory=list)
-    created_tag_ids: list[int] = Field(default_factory=list)
-    reused_tag_ids: list[int] = Field(default_factory=list)
-    applied_playlist_ids: list[int] = Field(default_factory=list)
-    skipped: list[str] = Field(default_factory=list)

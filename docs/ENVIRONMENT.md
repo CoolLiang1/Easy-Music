@@ -42,12 +42,12 @@ contain placeholders only, not production-ready secrets.
 | `AI_API_KEY` | No | No | AI provider API key. Leave empty unless testing or deploying AI features with a real provider. Never commit a real key. |
 | `AI_MODEL` | No | No | AI model identifier used by the provider client. |
 | `AI_BASE_URL` | No | No | Base URL for the OpenAI-compatible provider. |
-| `AI_SEARCH_ENABLED` | No | No | Enables configured Search API calls for V2.5 AI track organization when set to `true`. Leave `false` to keep search in safe fallback mode. |
-| `AI_SEARCH_PROVIDER` | No | No | Search provider identifier. The first supported value is `tavily-compatible`. |
-| `AI_SEARCH_API_KEY` | No | No | Search provider API key. Leave empty unless testing or deploying search-assisted AI organization. Never commit a real key. |
-| `AI_SEARCH_BASE_URL` | No | No | Base URL for the Tavily-compatible Search API. |
-| `AI_SEARCH_MAX_RESULTS` | No | No | Maximum normalized search results requested for one track organization lookup. Defaults to `5`. |
-| `AI_SEARCH_CACHE_DAYS` | No | No | Number of days a future research cache record remains usable before refresh. Defaults to `30`. |
+| `AI_TAG_SEARCH_ENABLED` | No | No | Enables optional Tavily search context for `POST /api/ai/tracks/{track_id}/suggest-tags` only. Defaults to `false`. |
+| `AI_TAG_SEARCH_PROVIDER` | No | No | Suggest-tags search provider. The first supported value is `tavily`. |
+| `AI_TAG_SEARCH_API_KEY` | No | No | Tavily Search API key for tag suggestions. Never commit a real key. |
+| `AI_TAG_SEARCH_BASE_URL` | No | No | Tavily-compatible base URL. Defaults to `https://api.tavily.com`. |
+| `AI_TAG_SEARCH_MAX_RESULTS` | No | No | Maximum search summaries included in the AI tag suggestion prompt. Defaults to `5`; supported maximum is `5`. |
+| `AI_TAG_SEARCH_CACHE_DAYS` | No | No | Number of days to reuse cached search summaries. Defaults to `30`; set `0` to disable cache reuse. |
 | `CADDY_DOMAIN` | No | Yes | Public HTTPS domain used by the production Caddy service. |
 | `MEDIA_HOST_ORIGINALS` | No | Yes | Production host directory bind-mounted to `/app/media/originals`. |
 | `MEDIA_HOST_PLAYBACK` | No | Yes | Production host directory bind-mounted to `/app/media/playback`. |
@@ -62,6 +62,13 @@ contain placeholders only, not production-ready secrets.
 `.env.example` uses local, development-safe placeholders. These values are meant to document expected names and formats only.
 
 The example intentionally avoids real credentials, tokens, private host paths, and production domains. Before any real deployment, replace passwords and secrets through the deployment environment rather than by editing committed files.
+
+AI providers use the OpenAI-compatible contract. DeepSeek-style testing can use
+`AI_PROVIDER=openai-compatible`, a DeepSeek model id such as `deepseek-chat`,
+and `AI_BASE_URL=https://api.deepseek.com/v1`. V2.5 optionally adds
+suggest-tags-only `AI_TAG_SEARCH_*` settings for Tavily title/snippet/URL prompt
+context. It does not add broad `AI_SEARCH_*` settings, web scraping, or any
+organization/apply endpoint.
 
 `IMPORT_ALLOWED_ROOTS` is empty by default. For local V2 import testing, point it
 at one or more throwaway directories outside the repository and outside
@@ -87,13 +94,6 @@ User-provided video upload is controlled by `MAX_VIDEO_UPLOAD_MB` and
 `MEDIA_ROOT`; they are not exposed through track stream/download APIs and are
 not stored as track originals.
 
-AI search is controlled separately from the AI completion provider. It is off
-by default through `AI_SEARCH_ENABLED=false`. When enabled, the first supported
-provider is `tavily-compatible`, configured with `AI_SEARCH_API_KEY`,
-`AI_SEARCH_BASE_URL`, `AI_SEARCH_MAX_RESULTS`, and `AI_SEARCH_CACHE_DAYS`.
-Search results are normalized to title, snippet, and URL for AI organization;
-the backend does not scrape result pages or store page bodies.
-
 ## Deployment Expectations
 
 Deployment configuration should provide the same variable names through
@@ -117,5 +117,4 @@ Deployment values must:
 - Do not commit `.env` files with real values.
 - Do not hard-code machine-specific absolute paths.
 - Do not require AI provider credentials for non-AI development checks.
-- Do not require Search API credentials for non-search development checks.
 - Do not commit production `.env.production`; commit only `.env.production.example`.

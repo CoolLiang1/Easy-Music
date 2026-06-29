@@ -2,28 +2,24 @@
 
 This document describes the local development workflow for Easy Music.
 
-Easy Music has completed Phase 1–6: backend core, Web management console,
-Android Media3 player, Android manual offline cache, Recommendation V1, and AI
-Assistant V1.  The FastAPI backend, PostgreSQL migrations, media storage
-helpers, upload endpoint, authenticated track/tag APIs, streaming endpoint,
-playback-event sync endpoint, Recommendation V1 feedback endpoint, structured
-recommendation endpoint, and worker flow exist. The Web app supports browser
-login, library viewing, upload, processing refresh, metadata editing, tag
-management, track tag assignment, authenticated playback for ready tracks,
-a structured Recommendation V1 test panel, and an AI Assistant panel. The
-Android app supports authenticated library/detail flows, Media3 playback,
-Phase 4 manual offline cache behavior, a structured Recommendation Home, and
-natural-language AI recommendation input. V2.1 adds ordinary owner-scoped
-playlist management on the backend and Web, plus Web and Android playlist
-playback queues for sequence, shuffled-once, and reverse playback.
+Easy Music has reached local functional closure for the initial product. The
+current repository includes backend core APIs, Web management flows, Android
+Media3 playback and offline cache, Recommendation V2 foundation, playlists,
+client playback queues, import/video processing, simplified tags, AI Assistant
+V1, and AI Tag Suggestions V2.
 
-Production deployment is covered separately.  For the full step-by-step
-guide see `docs/DEPLOYMENT.md`.  For production environment variables
-refer to `.env.production.example` in the repository root.
+Use `README.md` and `docs/ROADMAP.md` for the current progress record before
+starting work. Production deployment is covered separately in
+`docs/DEPLOYMENT.md`, and the first real Ubuntu/domain/HTTPS smoke should be
+recorded in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
 
 Production ML or training platforms, social features, automatic full-library
 offline sync, complex download queue management, and background caching of the
 entire library remain outside the current scope.
+
+The next planned work is UI optimization. Use
+`docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md` as the task entry point and keep UI
+changes scoped to existing flows unless a later task explicitly expands scope.
 
 ## Workflow
 
@@ -372,13 +368,50 @@ $env:AI_BASE_URL = "https://api.openai.com/v1"
 | -------------- | ---------------------------- | ------------------------------------------ |
 | `AI_ENABLED`   | `false`                      | Must be `true` for any AI feature to work. |
 | `AI_PROVIDER`  | `""`                         | Provider identifier; currently only `openai-compatible` is expected. |
-| `AI_API_KEY`   | `""`                         | Your own key — never commit it.            |
+| `AI_API_KEY`   | `""`                         | Your own key; never commit it.             |
 | `AI_MODEL`     | `""`                         | Model id recognised by the provider, e.g. `gpt-4o-mini`. |
 | `AI_BASE_URL`  | `""`                         | Provider API base, e.g. `https://api.openai.com/v1`. |
 
 When `AI_ENABLED` is `false` or `AI_API_KEY` / `AI_MODEL` are empty, the
 provider service returns a documented `disabled` or `unconfigured` status.
 Downstream AI endpoints can map these to clear responses without crashing.
+
+DeepSeek can be tested through the same OpenAI-compatible provider contract.
+Use your own key and DeepSeek model/base URL values in a local environment only:
+
+```powershell
+$env:AI_ENABLED = "true"
+$env:AI_PROVIDER = "openai-compatible"
+$env:AI_API_KEY = "your-own-deepseek-key"
+$env:AI_MODEL = "deepseek-chat"
+$env:AI_BASE_URL = "https://api.deepseek.com/v1"
+```
+
+V2.5 does not use a DeepSeek built-in web-search switch. Search-assisted tag
+suggestions use an explicit Tavily Search API call inside
+`POST /api/ai/tracks/{track_id}/suggest-tags`, then pass normalized
+title/snippet/URL summaries to the OpenAI-compatible completion provider.
+
+### Local Backend AI Tag Search Settings
+
+Search is disabled by default and scoped only to AI tag suggestions. It does
+not create an organization module, playlist suggestions, Android UI, or
+auto-apply behavior.
+
+```powershell
+$env:AI_TAG_SEARCH_ENABLED = "true"
+$env:AI_TAG_SEARCH_PROVIDER = "tavily"
+$env:AI_TAG_SEARCH_API_KEY = "your-own-tavily-key"
+$env:AI_TAG_SEARCH_BASE_URL = "https://api.tavily.com"
+$env:AI_TAG_SEARCH_MAX_RESULTS = "5"
+$env:AI_TAG_SEARCH_CACHE_DAYS = "30"
+```
+
+When tag search is disabled, unconfigured, fails, or returns no results,
+`suggest-tags` falls back to the metadata-only prompt and still returns the
+normal AI provider status. The cache stores only query, status, timestamp, and
+normalized search result title/snippet/URL summaries; it does not store page
+bodies or API keys.
 
 ### Docker Compose
 
@@ -392,6 +425,14 @@ AI_PROVIDER=openai-compatible
 AI_API_KEY=your-own-provider-key
 AI_MODEL=gpt-4o-mini
 AI_BASE_URL=https://api.openai.com/v1
+
+# Optional suggest-tags-only Tavily search context
+AI_TAG_SEARCH_ENABLED=true
+AI_TAG_SEARCH_PROVIDER=tavily
+AI_TAG_SEARCH_API_KEY=your-own-tavily-key
+AI_TAG_SEARCH_BASE_URL=https://api.tavily.com
+AI_TAG_SEARCH_MAX_RESULTS=5
+AI_TAG_SEARCH_CACHE_DAYS=30
 ```
 
 Recreate the `api` service after changing `.env`:
@@ -402,37 +443,55 @@ docker compose up -d --force-recreate api
 
 ### Provider Abstraction
 
-- `backend/app/core/config.py` — settings fields (`AI_ENABLED`, `AI_PROVIDER`,
-  `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`).
-- `backend/app/services/ai_provider.py` — `AiProviderService` that detects
+- `backend/app/core/config.py` - settings fields (`AI_ENABLED`, `AI_PROVIDER`,
+  `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, and suggest-tags-only
+  `AI_TAG_SEARCH_*` settings).
+- `backend/app/services/ai_provider.py` - `AiProviderService` that detects
   disabled/unconfigured state and delegates to an injectable client.
-- `backend/app/services/ai_json.py` — `extract_json`, prompt builders, and the
+- `backend/app/services/ai_json.py` - `extract_json`, prompt builders, and the
   `complete_and_parse_json` pipeline that validates LLM output against a Pydantic
   model.
-- `backend/app/services/ai_intent.py` — `parse_listening_intent` service that
+- `backend/app/services/ai_intent.py` - `parse_listening_intent` service that
   loads the user's tag catalogue, builds a prompt, calls the AI, and re-validates
   returned tag ids through the Phase 5 recommendation tag checks.
-- `backend/app/services/ai_tag_suggestions.py` — `suggest_tags_for_track` service
+- `backend/app/services/ai_tag_suggestions.py` - `suggest_tags_for_track` service
   that suggests existing tags (by id) and optional new tag names for a track
-  using track metadata and the user's tag taxonomy.  Never creates or assigns tags.
-- `backend/app/schemas/ai.py` — `AiCompletionRequest`, `AiCompletionResult`,
+  using track metadata, optional Tavily search summaries, and the user's tag
+  taxonomy.  Never creates or assigns tags.
+- `backend/app/services/ai_tag_search.py` - suggest-tags-only query generation,
+  search fallback handling, and normalized search result cache.
+- `backend/app/services/ai_tag_search_client.py` - Tavily Search API client
+  that reads only title/snippet/URL summaries and never page bodies.
+- `backend/app/schemas/ai.py` - `AiCompletionRequest`, `AiCompletionResult`,
   `ParseListeningIntentRequest`, `ParsedIntentResponse`, and supporting schemas.
 
-Available AI endpoints after Task 6.5:
+Available AI endpoints after V2.5:
 
-- `POST /api/ai/parse-listening-intent` (authenticated) — maps natural-language
+- `POST /api/ai/parse-listening-intent` (authenticated) - maps natural-language
   listening requests to Phase 5-compatible structured tag ids using only the
   current user's existing tags.
-- `POST /api/ai/recommend` (authenticated) — parses natural-language intent via
+- `POST /api/ai/recommend` (authenticated) - parses natural-language intent via
   the AI, then delegates ranking to the existing Phase 5 recommendation service.
   The LLM never selects track ids and never bypasses active-cooldown scoring,
   recent-playback penalties, playlist scoring, or feedback exclusions and
   penalties.
-- `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) — suggests
+- `POST /api/ai/tracks/{track_id}/suggest-tags` (authenticated) - suggests
   existing tags and optional new tag names for a track using AI-assisted
-  metadata analysis. The endpoint never creates or assigns tags.
+  metadata analysis. V2.5 improves the prompt and provider output schema around
+  `scene`, `type`, and `feature`, and can optionally include Tavily
+  title/snippet/URL summaries as prompt context. The endpoint never creates or
+  assigns tags.
 
-Later tasks will add the actual HTTP provider client and additional AI endpoints.
+Focused V2.5 backend tests use fake AI providers and do not require live network
+access or real provider keys:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_ai_tag_suggestions.py tests\test_ai_tag_search.py tests\test_ai_tag_search_client.py tests\test_ai_intent.py tests\test_ai_recommend.py tests\test_ai_json.py tests\test_ai_provider.py
+```
+
+Passing fake-provider tests does not prove real AI provider, real Tavily, or
+browser behavior. Record any real-provider or Web smoke separately in
+`docs/ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md`.
 
 ## Web Setup
 
@@ -498,6 +557,16 @@ and video candidates, confirms import, and refreshes the latest import batch
 status using the existing track processing status. Video candidates are copied
 into temporary video storage and create `video_extraction` processing jobs;
 the worker extracts audio from them into the normal audio processing pipeline.
+
+The existing Web AI tag suggestion controls remain available from track tag
+editing after login. They call
+`POST /api/ai/tracks/{track_id}/suggest-tags`, show existing-tag suggestions
+with confidence/reasons, and can display optional new-tag name ideas. The
+backend may internally enrich the prompt with configured Tavily search
+summaries, but the Web request/response shape is unchanged. The endpoint does
+not create tags or assign tags automatically. Android UI, batch organization,
+lyrics analysis, web scraping, playlist suggestions, and recommendation scoring
+changes remain out of scope for V2.5.
 
 Run the Web type check from `web/`:
 

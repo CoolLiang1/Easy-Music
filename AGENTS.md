@@ -160,6 +160,11 @@ Update this section when you discover something surprising.
 - Some older docs may describe historical phase boundaries. Prefer current
   `README.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, and acceptance docs
   when judging current status.
+- The initial usable product and current V2 slices are locally complete as of
+  2026-06-29. For the next planned work, start from
+  `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md` for UI polish and
+  `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md` for the first real
+  Ubuntu/domain/HTTPS deployment smoke record.
 - AI endpoints can return successful HTTP responses with provider status
   `disabled`, `unconfigured`, or `error`. This is often expected fallback
   behavior, not necessarily a transport failure.

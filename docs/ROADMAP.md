@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-28:
+Status as of 2026-06-29:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -74,10 +74,29 @@ Status as of 2026-06-28:
   `scene`, `type`, and `feature`; old `scenario` maps to `scene`, old `state`
   maps to `feature`, and old `attribute` tags plus track-tag links are removed
   during migration.
+- V2.5 AI Tag Suggestions V2: Implemented as quality improvements to the
+  existing `POST /api/ai/tracks/{track_id}/suggest-tags` flow. It strengthens
+  `scene`/`type`/`feature` prompt guidance, supports richer existing-tag
+  suggestions with confidence and reasons, can optionally use
+  suggest-tags-only Tavily title/snippet/URL search context, keeps legacy
+  provider output compatibility, and documents DeepSeek as an OpenAI-compatible
+  provider option without adding organization, playlist suggestions, or
+  auto-apply.
 
 The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
 infrastructure and is intentionally deferred to first deployment.
+
+## Next Planned Work
+
+1. UI optimization across the existing Web and Android product surfaces. This
+   is a polish and usability pass over existing flows, not a feature expansion.
+   Start from `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`.
+2. First real Ubuntu production smoke. Use `docs/DEPLOYMENT.md` and record the
+   result in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
+3. After production smoke, update `README.md`, this roadmap,
+   `docs/DEPLOYMENT.md`, and the production smoke acceptance record with any
+   deployment caveats or fixes discovered on the server.
 
 ## Phase 0: Project Foundation
 
@@ -266,6 +285,9 @@ Deliverables:
 - V2.2 first-class local playback queue module.
 - V2 recommendation foundation: soft/default cooldown, strict/off modes,
   feedback scoring, and playlist membership/name/description boosts.
+- V2.5 AI tag suggestion quality pass for the existing suggest-tags endpoint,
+  including OpenAI-compatible DeepSeek provider guidance and optional Tavily
+  search context.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection
