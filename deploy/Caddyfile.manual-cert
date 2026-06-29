@@ -1,0 +1,48 @@
+# Easy Music Caddy configuration using an operator-provided certificate.
+#
+# Use this when the server can receive traffic on a non-standard HTTPS port
+# such as 25443, but inbound 80/443 are blocked by the upstream network.
+# Obtain the certificate separately, for example with DNS-01 validation, then
+# mount fullchain.pem and privkey.pem into /certs.
+{
+	auto_https disable_redirects
+}
+
+:443 {
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	tls /certs/fullchain.pem /certs/privkey.pem
+
+	handle /api/tracks/upload {
+		request_body {
+			max_size {$CADDY_AUDIO_UPLOAD_LIMIT:200MB}
+		}
+		reverse_proxy api:8000
+	}
+
+	handle /api/tracks/upload-video {
+		request_body {
+			max_size {$CADDY_VIDEO_UPLOAD_LIMIT:1024MB}
+		}
+		reverse_proxy api:8000
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}

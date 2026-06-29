@@ -33,6 +33,10 @@ Before starting a production deployment, confirm:
 - A public domain whose DNS A record points to the server public IP.
 - Inbound TCP ports 80 and 443 open in the host firewall and cloud security
   group.
+- If the upstream network blocks inbound 80/443 but allows a high port, an
+  operator-provided certificate from DNS validation can be used with
+  `deploy/Caddyfile.manual-cert` and a public HTTPS URL such as
+  `https://music.example.com:25443`.
 - At least 2 GB free disk space for a small test deployment. Use much more for
   a real music library.
 
@@ -135,6 +139,10 @@ APP_SECRET_KEY=replace-with-openssl-rand-hex-32
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 CORS_ORIGINS=https://music.example.com
 CADDY_DOMAIN=music.example.com
+CADDY_HTTP_PORT=80
+CADDY_HTTPS_PORT=443
+CADDYFILE_PATH=./deploy/Caddyfile
+CADDY_CERT_DIR=/srv/easy-music/caddy-certs
 VITE_API_BASE_URL=https://music.example.com
 VITE_MAX_VIDEO_UPLOAD_MB=1024
 
@@ -175,6 +183,11 @@ IMPORT_SCAN_MAX_FILE_MB=200
 Rules:
 
 - `CADDY_DOMAIN` is the bare domain, for example `music.example.com`.
+- `CADDY_HTTP_PORT` and `CADDY_HTTPS_PORT` are the published host ports. Keep
+  them as `80` and `443` for standard automatic HTTPS.
+- `CADDYFILE_PATH=./deploy/Caddyfile` uses Caddy automatic HTTPS. Use
+  `./deploy/Caddyfile.manual-cert` only when you have provided
+  `/certs/fullchain.pem` and `/certs/privkey.pem` through `CADDY_CERT_DIR`.
 - `CORS_ORIGINS` includes the scheme, for example `https://music.example.com`.
 - `VITE_API_BASE_URL` also includes the scheme and must match the public HTTPS
   origin before running `npm run build`.
@@ -335,6 +348,60 @@ sudo ufw status
 The domain must resolve to the server public IP, and ports 80 and 443 must be
 reachable from the internet.
 
+### Alternative: Non-Standard HTTPS Port With DNS-Validated Certificate
+
+Use this path only when the host can receive traffic on a high port, but the
+upstream network blocks inbound 80/443. Caddy will not obtain a certificate in
+this mode; you must provide a certificate for the domain, usually from DNS-01
+validation through your DNS provider.
+
+Example public origin:
+
+```text
+https://music.example.com:25443
+```
+
+Copy the certificate files to the host:
+
+```bash
+sudo mkdir -p /srv/easy-music/caddy-certs
+sudo cp /path/to/fullchain.pem /srv/easy-music/caddy-certs/fullchain.pem
+sudo cp /path/to/privkey.pem /srv/easy-music/caddy-certs/privkey.pem
+sudo chmod 644 /srv/easy-music/caddy-certs/fullchain.pem
+sudo chmod 600 /srv/easy-music/caddy-certs/privkey.pem
+```
+
+Set production values:
+
+```env
+CORS_ORIGINS=https://music.example.com:25443
+VITE_API_BASE_URL=https://music.example.com:25443
+CADDY_DOMAIN=music.example.com
+CADDY_HTTP_PORT=80
+CADDY_HTTPS_PORT=25443
+CADDYFILE_PATH=./deploy/Caddyfile.manual-cert
+CADDY_CERT_DIR=/srv/easy-music/caddy-certs
+```
+
+Rebuild the Web app with the same public origin:
+
+```bash
+cd /srv/easy-music/repo/web
+export VITE_API_BASE_URL="https://music.example.com:25443"
+export VITE_MAX_VIDEO_UPLOAD_MB="1024"
+npm run build
+cd ..
+```
+
+Recreate Caddy and verify:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  up -d --force-recreate caddy
+docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 caddy
+curl -sS https://music.example.com:25443/health
+```
+
 ## Step 7 - Create the First User
 
 Run this only once. The command refuses to create a user if any user already
@@ -372,7 +439,41 @@ If processing stalls:
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 worker
 ```
 
-## Step 9 - Back Up the Database
+## Step 9 - Build and Install the Android App
+
+The Android app defaults to the local emulator backend
+`http://10.0.2.2:8000`. For production use, build the APK with the deployed
+HTTPS origin passed as a Gradle property. Do not commit the real domain into
+source files.
+
+From a development machine with Android SDK platform tools installed:
+
+```bash
+cd android
+./gradlew assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com
+```
+
+For a non-standard HTTPS port:
+
+```bash
+cd android
+./gradlew assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com:25443
+```
+
+On Windows PowerShell, use `.\gradlew.bat` instead of `./gradlew`.
+
+Install to a connected Android device:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Then open Easy Music on the device, log in with the production account, browse
+the library, and play a ready track. Android requires a certificate trusted by
+the device; DNS-validated public certificates work normally, including on a
+non-standard HTTPS port.
+
+## Step 10 - Back Up the Database
 
 After the first successful deployment:
 
