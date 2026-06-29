@@ -13,12 +13,11 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,25 +98,21 @@ fun MiniPlayer(
                     )
                 }
                 if (uiState.isPlaying) {
-                    OutlinedButton(onClick = onPause) {
+                    FilledTonalIconButton(onClick = onPause) {
                         Icon(
                             imageVector = Icons.Default.Pause,
-                            contentDescription = null,
+                            contentDescription = "暂停",
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("暂停")
                     }
                 } else {
-                    Button(
+                    FilledTonalIconButton(
                         enabled = track.isReady,
                         onClick = onPlay,
                     ) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
+                            contentDescription = "播放",
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("播放")
                     }
                 }
                 IconButton(
@@ -129,14 +124,11 @@ fun MiniPlayer(
                         contentDescription = "下一首",
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                OutlinedButton(onClick = onOpenNowPlaying) {
+                IconButton(onClick = onOpenNowPlaying) {
                     Icon(
                         imageVector = Icons.Default.OpenInFull,
-                        contentDescription = null,
+                        contentDescription = "打开播放中",
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("播放中")
                 }
             }
 

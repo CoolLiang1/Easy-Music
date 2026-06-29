@@ -2,6 +2,7 @@ package com.easymusic.app.cache.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -116,11 +117,16 @@ fun CachedTracksScreen(
         SectionHeader(
             title = "离线缓存",
             subtitle = if (isNetworkAvailable) {
-                "已保存在这台设备上"
+                "这台设备已保存的音轨，可直接离线播放"
             } else {
                 "已保存在这台设备上，离线时也可播放"
             },
         )
+
+        if (uiState.cachedTracks.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            CachedTracksStats(cachedTracks = uiState.cachedTracks)
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -167,8 +173,8 @@ private fun CachedTracksEmpty() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-            Text(
-                text = "还没有离线缓存音轨",
+        Text(
+            text = "还没有离线缓存音轨",
             style = MaterialTheme.typography.titleLarge,
         )
         Text(
@@ -177,6 +183,20 @@ private fun CachedTracksEmpty() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun CachedTracksStats(cachedTracks: List<CachedTrack>) {
+    val totalBytes = cachedTracks.sumOf { track -> track.byteSize ?: 0L }
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AssistChip(onClick = {}, label = { Text("${cachedTracks.size} 首") })
+        AssistChip(onClick = {}, label = { Text(totalBytes.formatBytes()) })
     }
 }
 
@@ -253,7 +273,7 @@ private fun CachedTrackRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "点按卡片离线播放",
+                    text = "点按播放",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -263,7 +283,7 @@ private fun CachedTrackRow(
                         contentDescription = null,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("删除缓存")
+                    Text("删除")
                 }
             }
         }

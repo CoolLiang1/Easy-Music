@@ -199,7 +199,7 @@ private fun PlaylistsOverview(
 ) {
     SectionHeader(
         title = "歌单",
-        subtitle = if (isNetworkAvailable) "打开手动歌单并播放其中音轨" else "离线时无法刷新云端歌单",
+        subtitle = if (isNetworkAvailable) "浏览手动歌单，并按顺序、随机或倒序播放" else "离线时无法刷新云端歌单；当前播放不受影响",
         action = {
             OutlinedButton(
                 enabled = !uiState.isRefreshing && isNetworkAvailable,
@@ -223,6 +223,11 @@ private fun PlaylistsOverview(
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    if (uiState.playlists.isNotEmpty()) {
+        PlaylistsStats(playlists = uiState.playlists)
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
     when {
         uiState.isLoading -> LoadingState(text = "正在加载歌单")
         uiState.errorMessage != null && uiState.playlists.isEmpty() -> ErrorState(
@@ -243,6 +248,24 @@ private fun PlaylistsOverview(
             onRefresh = onRefresh,
             onPlaylistSelected = onPlaylistSelected,
         )
+    }
+}
+
+@Composable
+private fun PlaylistsStats(playlists: List<PlaylistSummaryResponse>) {
+    val totalTracks = playlists.sumOf { playlist -> playlist.trackCount }
+    val emptyCount = playlists.count { playlist -> playlist.trackCount == 0 }
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AssistChip(onClick = {}, label = { Text("歌单 ${playlists.size}") })
+        AssistChip(onClick = {}, label = { Text("音轨 $totalTracks") })
+        if (emptyCount > 0) {
+            AssistChip(onClick = {}, label = { Text("空歌单 $emptyCount") })
+        }
     }
 }
 
@@ -312,6 +335,17 @@ private fun PlaylistCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            playlist.description
+                ?.takeIf { description -> description.isNotBlank() }
+                ?.let { description ->
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
         }
     }
 }
@@ -330,7 +364,9 @@ private fun PlaylistDetail(
 ) {
     SectionHeader(
         title = playlist.name,
-        subtitle = "${playlist.trackCount} 首音轨",
+        subtitle = playlist.description
+            ?.takeIf { description -> description.isNotBlank() }
+            ?: "${playlist.trackCount} 首音轨",
         action = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onBack) {
@@ -360,6 +396,7 @@ private fun PlaylistDetail(
 
     PlaylistPlaybackActions(
         enabled = playlist.tracks.isNotEmpty() && isNetworkAvailable,
+        trackCount = playlist.tracks.count { item -> item.track.isReady },
         onPlayPlaylist = onPlayPlaylist,
     )
 
@@ -399,35 +436,43 @@ private fun PlaylistDetail(
 @Composable
 private fun PlaylistPlaybackActions(
     enabled: Boolean,
+    trackCount: Int,
     onPlayPlaylist: (PlaybackQueueMode) -> Unit,
 ) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Button(
-            enabled = enabled,
-            onClick = { onPlayPlaylist(PlaybackQueueMode.Sequence) },
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = if (trackCount > 0) "将 $trackCount 首可播放音轨加入本机播放队列" else "歌单里还没有可播放音轨",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("顺序播放")
-        }
-        OutlinedButton(
-            enabled = enabled,
-            onClick = { onPlayPlaylist(PlaybackQueueMode.Shuffle) },
-        ) {
-            Text("随机播放")
-        }
-        OutlinedButton(
-            enabled = enabled,
-            onClick = { onPlayPlaylist(PlaybackQueueMode.Reverse) },
-        ) {
-            Text("倒序播放")
+            Button(
+                enabled = enabled && trackCount > 0,
+                onClick = { onPlayPlaylist(PlaybackQueueMode.Sequence) },
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("顺序播放")
+            }
+            OutlinedButton(
+                enabled = enabled && trackCount > 0,
+                onClick = { onPlayPlaylist(PlaybackQueueMode.Shuffle) },
+            ) {
+                Text("随机播放")
+            }
+            OutlinedButton(
+                enabled = enabled && trackCount > 0,
+                onClick = { onPlayPlaylist(PlaybackQueueMode.Reverse) },
+            ) {
+                Text("倒序播放")
+            }
         }
     }
 }
