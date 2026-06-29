@@ -61,9 +61,9 @@ const cooldownModeOptions: Array<{
   label: string;
   value: RecommendationCooldownMode;
 }> = [
-  { label: "Soft（默认）", value: "soft" },
-  { label: "Strict（旧行为）", value: "strict" },
-  { label: "Off（探索）", value: "off" },
+  { label: "柔性冷却（默认）", value: "soft" },
+  { label: "严格冷却（旧行为）", value: "strict" },
+  { label: "关闭冷却（探索）", value: "off" },
 ];
 
 const cooldownModeValues = cooldownModeOptions.map((option) => option.value);

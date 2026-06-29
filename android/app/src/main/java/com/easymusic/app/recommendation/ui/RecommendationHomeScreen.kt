@@ -175,7 +175,7 @@ private fun RecommendationHeader(
     SectionHeader(
         title = "推荐",
         subtitle = if (isNetworkAvailable) {
-            "输入自然语言，或选择结构化标签"
+            "输入自然语言，或按场景 / 类型 / 特点选择标签"
         } else {
             "推荐标签和推荐请求需要连接后端"
         },
@@ -292,7 +292,6 @@ private fun RecommendationControls(
     onTrackSelected: (TrackResponse) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        // ── AI Assistant Section ──────────────────────────────────────
         AiAssistantSection(
             aiState = uiState.aiState,
             feedbackStates = uiState.feedbackStates,
@@ -304,11 +303,12 @@ private fun RecommendationControls(
         )
 
         SectionHeader(
-            title = "结构化控制",
-            subtitle = "需要可预测匹配时，使用明确标签",
+            title = "结构化推荐",
+            subtitle = "需要可预测匹配时，直接选择已有标签",
         )
 
-        // ── Structured Tag Controls (unchanged) ───────────────────────
+        SelectionSummary(uiState = uiState)
+
         TagSection(
             title = "场景",
             tags = uiState.groupedTags.scenes,
@@ -317,18 +317,18 @@ private fun RecommendationControls(
             onToggleTag = onToggleScene,
         )
         TagSection(
-            title = "特点",
-            tags = uiState.groupedTags.features,
-            selectedTagIds = uiState.selectedFeatureTagIds,
-            emptyText = "暂无特点标签",
-            onToggleTag = onToggleFeature,
-        )
-        TagSection(
             title = "类型",
             tags = uiState.groupedTags.types,
             selectedTagIds = uiState.selectedTypeTagIds,
             emptyText = "暂无类型标签",
             onToggleTag = onToggleType,
+        )
+        TagSection(
+            title = "特点",
+            tags = uiState.groupedTags.features,
+            selectedTagIds = uiState.selectedFeatureTagIds,
+            emptyText = "暂无特点标签",
+            onToggleTag = onToggleFeature,
         )
 
         RecommendationStatus(uiState = uiState)
@@ -339,10 +339,10 @@ private fun RecommendationControls(
             onTrackSelected = onTrackSelected,
         )
 
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedButton(
                 enabled = uiState.selectedContextCount > 0 && !uiState.isRequestingRecommendations,
@@ -365,6 +365,35 @@ private fun RecommendationControls(
             }
         }
     }
+}
+
+@Composable
+private fun SelectionSummary(uiState: RecommendationHomeUiState) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        FlowRow(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SummaryChip(label = "场景 ${uiState.selectedSceneTagIds.size}")
+            SummaryChip(label = "类型 ${uiState.selectedTypeTagIds.size}")
+            SummaryChip(label = "特点 ${uiState.selectedFeatureTagIds.size}")
+        }
+    }
+}
+
+@Composable
+private fun SummaryChip(label: String) {
+    FilterChip(
+        selected = false,
+        onClick = {},
+        label = { Text(label) },
+    )
 }
 
 @Composable
@@ -628,7 +657,7 @@ private fun TagSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = title,
+            text = "$title · ${tags.size}",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -672,7 +701,7 @@ private fun AiAssistantSection(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(
             title = "AI 助手",
-            subtitle = "自然语言会解析为同一套规则推荐流程",
+            subtitle = "自然语言会先解析成场景 / 类型 / 特点，再走规则推荐",
         )
 
         Column(
@@ -704,7 +733,7 @@ private fun AiAssistantSection(
                     when {
                         !isNetworkAvailable -> "离线"
                         aiState.isRequesting -> "..."
-                        else -> "获取"
+                        else -> "获取推荐"
                     },
                 )
             }
@@ -755,7 +784,7 @@ private fun AiAssistantSection(
 @Composable
 private fun AiLoadingBanner() {
     StatusBanner(
-        text = "AI 正在解析你的请求...",
+        text = "AI 正在解析你的请求…",
         tone = BannerTone.Warning,
         action = {
             CircularProgressIndicator(modifier = Modifier.height(16.dp).width(16.dp))
@@ -771,10 +800,10 @@ private fun AiErrorBanner(message: String) {
 @Composable
 private fun AiProviderStatusBanner(status: String) {
     val message = when (status) {
-        "disabled" -> "AI provider 已禁用。请在后端配置中设置 AI_ENABLED=true。"
-        "unconfigured" -> "AI provider 尚未配置。请检查 AI_API_KEY 和 AI_MODEL。"
-        "error" -> "AI provider 发生错误。请查看后端日志。"
-        else -> "AI provider 状态：$status"
+        "disabled" -> "AI 服务已禁用。请在后端配置中设置 AI_ENABLED=true。"
+        "unconfigured" -> "AI 服务尚未配置。请检查 AI_API_KEY 和 AI_MODEL。"
+        "error" -> "AI 服务发生错误。请查看后端日志。"
+        else -> "AI 服务状态：$status"
     }
 
     StatusBanner(text = message, tone = BannerTone.Error)

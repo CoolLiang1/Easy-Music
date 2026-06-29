@@ -28,7 +28,7 @@ export function PlaybackQueueActions({
   };
 
   return (
-    <div className="track-playlist-add">
+    <div className="track-playlist-add track-queue-actions">
       <div className="track-playlist-add-controls">
         <button
           className={buttonClassName}

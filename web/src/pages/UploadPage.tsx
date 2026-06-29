@@ -131,9 +131,9 @@ export function UploadPage() {
       <div className="page-header-row">
         <div>
           <p className="eyebrow">上传</p>
-          <h1 id="upload-title">上传音频</h1>
+          <h1 id="upload-title">上传音频与视频</h1>
           <p className="page-copy">
-            将支持的音频文件加入曲库，并查看上传进度、重复检查和后台处理状态。
+            将支持的音频或用户提供的视频加入曲库，并查看上传进度、重复检查和后台处理状态。
           </p>
         </div>
         {results.length > 0 ? (

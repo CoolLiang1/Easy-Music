@@ -117,7 +117,7 @@ fun TrackDetailScreen(
     ) {
         SectionHeader(
             title = "音轨详情",
-            subtitle = if (isNetworkAvailable) "云端元数据和本地离线缓存状态" else "离线时无法获取云端元数据",
+            subtitle = if (isNetworkAvailable) "查看元数据、播放状态和这台设备的缓存" else "离线时无法获取云端元数据；可继续管理已缓存音轨",
             action = {
                 OutlinedButton(onClick = onBackToLibrary) {
                     Icon(
@@ -125,7 +125,7 @@ fun TrackDetailScreen(
                         contentDescription = null,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("曲库")
+                    Text("返回曲库")
                 }
             },
         )
@@ -261,10 +261,16 @@ private fun DetailContent(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                DetailStatusChips(
+                    track = track,
+                    cacheState = cacheState,
+                    isCurrentTrack = isCurrentTrack,
+                    playbackStatus = playbackSummary.status,
+                )
                 MetadataRow(label = "艺人", value = track.artist.orUnknown())
                 MetadataRow(label = "专辑", value = track.album.orUnknown())
                 MetadataRow(label = "时长", value = track.durationSeconds?.formatDuration() ?: "未知")
-                MetadataRow(label = "内容类型", value = track.contentType)
+                MetadataRow(label = "文件类型", value = track.contentType)
                 MetadataRow(label = "喜欢", value = if (track.liked) "是" else "否")
                 MetadataRow(label = "冷却截止", value = track.cooldownUntil ?: "无")
                 MetadataRow(label = "创建时间", value = track.createdAt)
@@ -412,6 +418,44 @@ private fun DetailContent(
 }
 
 @Composable
+private fun DetailStatusChips(
+    track: TrackResponse,
+    cacheState: TrackCacheUiState,
+    isCurrentTrack: Boolean,
+    playbackStatus: PlaybackStatus,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AssistChip(
+            onClick = {},
+            label = { Text(if (track.isReady) "可播放" else formatStatus(track.status)) },
+            enabled = track.isReady,
+        )
+        AssistChip(
+            onClick = {},
+            label = { Text(cacheState.status.detailCacheChipLabel()) },
+            enabled = cacheState.status == CacheStatus.Cached,
+        )
+        if (isCurrentTrack) {
+            AssistChip(
+                onClick = {},
+                label = { Text(playbackStatus.detailChipLabel()) },
+                enabled = true,
+            )
+        }
+        if (track.liked) {
+            AssistChip(
+                onClick = {},
+                label = { Text("喜欢") },
+                enabled = true,
+            )
+        }
+    }
+}
+
+@Composable
 private fun CacheMetadata(cacheState: TrackCacheUiState) {
     if (cacheState.status != CacheStatus.Cached) {
         return
@@ -498,6 +542,14 @@ private fun PlaybackStatus.detailChipLabel(): String =
         PlaybackStatus.Ended -> "已结束"
         PlaybackStatus.Error -> "错误"
         PlaybackStatus.Idle -> "已加载"
+    }
+
+private fun CacheStatus.detailCacheChipLabel(): String =
+    when (this) {
+        CacheStatus.NotCached -> "未缓存"
+        CacheStatus.Caching -> "缓存中"
+        CacheStatus.Cached -> "已缓存"
+        CacheStatus.Failed -> "缓存失败"
     }
 
 private fun Int.formatDuration(): String {

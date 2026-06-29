@@ -34,7 +34,11 @@ export function TrackTable({
 
   return (
     <div className="table-wrap">
-      <table className="track-table">
+      <table
+        className={
+          canAddToPlaylist ? "track-table library-track-table" : "track-table"
+        }
+      >
         <thead>
           <tr>
             {[
@@ -79,6 +83,10 @@ export function TrackTable({
                 >
                   {track.title || "未命名音轨"}
                 </RouteLink>
+                <span className="track-title-meta">
+                  {[track.artist, track.album].filter(Boolean).join(" · ") ||
+                    "未设置艺人/专辑"}
+                </span>
               </td>
               <td>{track.artist || <span className="meta-muted">未设置</span>}</td>
               <td>{track.album || <span className="meta-muted">未设置</span>}</td>

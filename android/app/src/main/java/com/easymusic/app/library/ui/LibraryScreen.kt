@@ -97,6 +97,14 @@ fun LibraryScreen(
             onRefresh = onRefresh,
         )
 
+        if (uiState.tracks.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            LibraryStats(
+                tracks = uiState.tracks,
+                cacheStatesByTrackId = uiState.cacheStatesByTrackId,
+            )
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
@@ -138,7 +146,7 @@ private fun LibraryHeader(
 ) {
     SectionHeader(
         title = "曲库",
-        subtitle = if (isNetworkAvailable) "云端音轨、离线缓存状态和当前播放" else "离线时无法刷新云端曲库",
+        subtitle = if (isNetworkAvailable) "浏览云端音轨，检查缓存与播放状态" else "离线时无法刷新云端曲库；已缓存音轨仍可播放",
         action = {
             OutlinedButton(
                 enabled = !isRefreshing && isNetworkAvailable,
@@ -187,7 +195,7 @@ private fun LibraryEmpty(onRefresh: () -> Unit) {
         )
         Text(
             modifier = Modifier.padding(top = 8.dp),
-            text = "上传后的音轨会在后端处理完成后显示在这里。",
+            text = "在 Web 管理端上传或导入音频后，处理完成的音轨会出现在这里。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -196,6 +204,38 @@ private fun LibraryEmpty(onRefresh: () -> Unit) {
             onClick = onRefresh,
         ) {
             Text("刷新")
+        }
+    }
+}
+
+@Composable
+private fun LibraryStats(
+    tracks: List<TrackResponse>,
+    cacheStatesByTrackId: Map<Int, LibraryCacheUiState>,
+) {
+    val readyCount = tracks.count { track -> track.isReady }
+    val cachedCount = tracks.count { track ->
+        cacheStatesByTrackId[track.id]?.status == CacheStatus.Cached
+    }
+    val processingCount = tracks.count { track ->
+        track.status.equals("processing", ignoreCase = true) ||
+            track.status.equals("uploaded", ignoreCase = true)
+    }
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AssistChip(onClick = {}, label = { Text("全部 ${tracks.size}") })
+        AssistChip(onClick = {}, label = { Text("可播放 $readyCount") })
+        AssistChip(
+            onClick = {},
+            label = { Text("已缓存 $cachedCount") },
+            enabled = cachedCount > 0,
+        )
+        if (processingCount > 0) {
+            AssistChip(onClick = {}, label = { Text("处理中 $processingCount") })
         }
     }
 }
@@ -401,7 +441,7 @@ private fun TrackResponse.rowPlaybackLabel(
     status: PlaybackStatus,
 ): String {
     if (!isCurrentTrack) {
-        return if (isReady) "点按打开" else "尚不可播放"
+        return if (isReady) "查看详情" else "查看处理状态"
     }
 
     return when (status) {

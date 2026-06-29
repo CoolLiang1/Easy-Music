@@ -32,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -94,7 +95,7 @@ fun NowPlayingScreen(
     ) {
         SectionHeader(
             title = "播放中",
-            subtitle = uiState.playbackSource.sourceLabel(isNetworkAvailable),
+            subtitle = uiState.queueSummary(),
             action = {
                 OutlinedButton(onClick = onBackToLibrary) {
                     Icon(
@@ -102,7 +103,7 @@ fun NowPlayingScreen(
                         contentDescription = null,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("曲库")
+                    Text("返回曲库")
                 }
             },
         )
@@ -149,6 +150,11 @@ fun NowPlayingScreen(
                             )
                         },
                         enabled = true,
+                    )
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(uiState.status.playbackLabel()) },
+                        enabled = uiState.status != PlaybackStatus.Error,
                     )
                 }
             }
@@ -275,25 +281,21 @@ private fun PlaybackControls(
         }
         Spacer(modifier = Modifier.width(16.dp))
         if (uiState.isPlaying) {
-            OutlinedButton(onClick = onPause) {
+            FilledTonalIconButton(onClick = onPause) {
                 Icon(
                     imageVector = Icons.Default.Pause,
-                    contentDescription = null,
+                    contentDescription = "暂停",
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("暂停")
             }
         } else {
-            Button(
+            FilledTonalIconButton(
                 enabled = canPlayCurrentTrack,
                 onClick = onPlay,
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
+                    contentDescription = if (uiState.status == PlaybackStatus.Ended) "重新播放" else "播放",
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (uiState.status == PlaybackStatus.Ended) "重新播放" else "播放")
             }
         }
         Spacer(modifier = Modifier.width(16.dp))
@@ -561,8 +563,11 @@ private fun QueueItemCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            OutlinedButton(onClick = onRemove) {
-                Text("移除")
+            IconButton(onClick = onRemove) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "移除",
+                )
             }
         }
     }
@@ -652,6 +657,16 @@ private fun PlaybackQueueMode?.modeLabel(): String =
         PlaybackQueueMode.Shuffle -> "随机一次"
         PlaybackQueueMode.Reverse -> "倒序"
         null -> "单曲"
+    }
+
+private fun PlaybackStatus.playbackLabel(): String =
+    when (this) {
+        PlaybackStatus.Idle -> "已加载"
+        PlaybackStatus.Buffering -> "缓冲中"
+        PlaybackStatus.Playing -> "播放中"
+        PlaybackStatus.Paused -> "已暂停"
+        PlaybackStatus.Ended -> "已结束"
+        PlaybackStatus.Error -> "播放错误"
     }
 
 private fun TrackResponse.subtitle(): String =

@@ -84,24 +84,9 @@ export function AiTagSuggestions({
   const isLoading = suggestState.name === "loading";
 
   return (
-    <div
-      style={{
-        border: "1px solid #d5dde8",
-        borderRadius: "8px",
-        background: "#f0f4ff",
-        marginTop: "24px",
-        padding: "22px",
-      }}
-    >
-      <div
-        style={{
-          alignItems: "center",
-          display: "flex",
-          gap: "14px",
-          justifyContent: "space-between",
-        }}
-      >
-        <h2 style={{ margin: 0 }}>AI 标签建议</h2>
+    <div className="ai-suggestions-panel">
+      <div className="ai-suggestions-header">
+        <h2>AI 标签建议</h2>
         <button
           className="button secondary"
           disabled={isLoading}
@@ -131,7 +116,7 @@ export function AiTagSuggestions({
       ) : null}
 
       {suggestState.name === "error" ? (
-        <div role="alert" style={{ color: "#991b1b", fontWeight: 700, marginTop: "14px" }}>
+        <div className="status-message error" role="alert">
           {suggestState.message}
         </div>
       ) : null}
@@ -230,18 +215,7 @@ function ProviderWarning({ status }: { status: AiProviderStatus }) {
   };
 
   return (
-    <div
-      role="alert"
-      style={{
-        background: "#fef3c7",
-        border: "1px solid #d97706",
-        borderRadius: "6px",
-        color: "#92400e",
-        fontWeight: 700,
-        marginBottom: "14px",
-        padding: "10px 14px",
-      }}
-    >
+    <div className="status-callout warning" role="alert">
       {messages[status]}
     </div>
   );
@@ -261,57 +235,27 @@ function SuggestionGroup({
   selectedSet,
 }: SuggestionGroupProps) {
   return (
-    <div
-      style={{
-        border: "1px solid #d5dde8",
-        borderRadius: "8px",
-        background: "#fff",
-        marginBottom: "12px",
-        padding: "14px",
-      }}
-    >
-      <h3 style={{ fontSize: "0.95rem", margin: "0 0 10px" }}>
-        {tagGroupLabels[group]}
-      </h3>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+    <div className="ai-suggestion-group">
+      <h3>{tagGroupLabels[group]}</h3>
+      <div className="ai-suggestion-chip-list">
         {items.map((suggestion) => {
           const isSelected = selectedSet.has(suggestion.tag_id);
           return (
             <div
+              className={
+                isSelected ? "ai-suggestion-chip selected" : "ai-suggestion-chip"
+              }
               key={suggestion.tag_id}
-              style={{
-                alignItems: "center",
-                background: isSelected ? "#dcfce7" : "#f8fafc",
-                border: isSelected
-                  ? "1px solid #16a34a"
-                  : "1px solid #d5dde8",
-                borderRadius: "8px",
-                display: "flex",
-                gap: "8px",
-                padding: "6px 12px",
-              }}
               title={`${suggestion.reason}（置信度：${suggestion.confidence.toFixed(2)}）`}
             >
-              <span style={{ fontWeight: 800, fontSize: "0.9rem" }}>
+              <span className="ai-suggestion-chip-name">
                 {suggestion.name}
               </span>
-              <span
-                style={{
-                  color: "#64748b",
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
-                }}
-              >
+              <span className="ai-suggestion-chip-confidence">
                 {Math.round(suggestion.confidence * 100)}%
               </span>
               {isSelected ? (
-                <span
-                  style={{
-                    color: "#16a34a",
-                    fontSize: "0.8rem",
-                    fontWeight: 800,
-                  }}
-                >
+                <span className="ai-suggestion-selected-label">
                   &#10003; 已添加
                 </span>
               ) : (
@@ -337,40 +281,20 @@ function SuggestionGroup({
 
 function NewTagSuggestionsPanel({ items }: { items: NewTagSuggestion[] }) {
   return (
-    <div
-      style={{
-        border: "1px dashed #d5dde8",
-        borderRadius: "8px",
-        background: "#fefce8",
-        marginTop: "14px",
-        padding: "14px",
-      }}
-    >
-      <h3 style={{ fontSize: "0.95rem", margin: "0 0 8px" }}>
-        新标签想法（仅建议，不会自动创建）
-      </h3>
+    <div className="ai-new-tags-panel">
+      <h3>新标签想法（仅建议，不会自动创建）</h3>
       <p className="recommendation-muted" style={{ marginBottom: "10px" }}>
         这些标签名称尚不存在。请先在标签页面创建，再分配给这个音轨。
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+      <div className="ai-suggestion-chip-list">
         {items.map((suggestion, index) => (
           <span
+            className="ai-new-tag-chip"
             key={`${suggestion.name}-${index}`}
-            style={{
-              background: "#fefce8",
-              border: "1px dashed #ca8a04",
-              borderRadius: "8px",
-              color: "#854d0e",
-              fontSize: "0.85rem",
-              fontWeight: 700,
-              padding: "4px 10px",
-            }}
             title={`${suggestion.reason}（置信度：${suggestion.confidence.toFixed(2)}）`}
           >
             {suggestion.name}{" "}
-            <span style={{ color: "#a16207", fontWeight: 600 }}>
-              ({suggestion.group})
-            </span>
+            <span>({suggestion.group})</span>
           </span>
         ))}
       </div>

@@ -119,3 +119,30 @@ Out of scope:
 - Relevant automated checks pass.
 - Manual smoke results are recorded in a relevant acceptance document or in the
   task completion notes.
+
+## Progress Notes
+
+### 2026-06-29 Web UI optimization round 1
+
+- Completed a focused Web UI consistency pass without backend API, Android, or
+  product feature changes.
+- Improved the app shell/sidebar, active navigation, always-available playback
+  queue entry, button hierarchy, table readability, mobile wrapping, and shared
+  AI tag suggestion styling.
+- Aligned Upload, Import, Recommendations, Library, and queue-facing copy toward
+  consistent Chinese UI terminology.
+- Verification: `npm run typecheck` and `npm run build` passed from `web/`.
+
+### 2026-06-29 Android UI optimization round 1
+
+- Completed a focused Android Compose UI consistency pass without backend API,
+  Web, navigation architecture, Media3 playback, cache, recommendation, playlist,
+  or queue behavior changes.
+- Improved Library, Track Detail, Playlists, Now Playing/Queue,
+  Recommendation, and Cached Tracks surfaces with clearer summaries, spacing,
+  button hierarchy, empty/error copy, queue controls, and phone-width playback
+  controls.
+- Kept Chinese taxonomy terminology aligned as 场景 / 类型 / 特点 in the
+  recommendation flow.
+- Verification: `.\gradlew.bat test` and `.\gradlew.bat build` passed from
+  `android/`.

@@ -209,7 +209,7 @@ export function LibraryPage() {
         >
           {isRefreshing ? "正在刷新..." : "刷新状态"}
         </button>
-        <RouteLink className="button secondary" to="/upload">
+        <RouteLink className="button primary" to="/upload">
           上传音频
         </RouteLink>
         <RouteLink className="button secondary" to="/reports">
