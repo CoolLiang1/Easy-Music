@@ -16,10 +16,19 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+
+        val apiBaseUrl = providers.gradleProperty("easyMusicApiBaseUrl")
+            .orElse("")
+            .get()
+            .trim()
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        buildConfigField("String", "EASY_MUSIC_API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {

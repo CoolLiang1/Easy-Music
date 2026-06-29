@@ -439,7 +439,41 @@ If processing stalls:
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 worker
 ```
 
-## Step 9 - Back Up the Database
+## Step 9 - Build and Install the Android App
+
+The Android app defaults to the local emulator backend
+`http://10.0.2.2:8000`. For production use, build the APK with the deployed
+HTTPS origin passed as a Gradle property. Do not commit the real domain into
+source files.
+
+From a development machine with Android SDK platform tools installed:
+
+```bash
+cd android
+./gradlew assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com
+```
+
+For a non-standard HTTPS port:
+
+```bash
+cd android
+./gradlew assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com:25443
+```
+
+On Windows PowerShell, use `.\gradlew.bat` instead of `./gradlew`.
+
+Install to a connected Android device:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Then open Easy Music on the device, log in with the production account, browse
+the library, and play a ready track. Android requires a certificate trusted by
+the device; DNS-validated public certificates work normally, including on a
+non-standard HTTPS port.
+
+## Step 10 - Back Up the Database
 
 After the first successful deployment:
 

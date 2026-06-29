@@ -22,6 +22,7 @@ contain placeholders only, not production-ready secrets.
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Yes | Yes | Access token lifetime in minutes. The development example favors convenience and can be tightened for deployment. |
 | `VITE_API_BASE_URL` | Yes for Web | Yes for Web build | Public API origin baked into the React build. For production, set it to the deployed HTTPS origin before `npm run build`. |
 | `VITE_MAX_VIDEO_UPLOAD_MB` | No | No | Web UI display/client-side limit for user-provided video uploads. Keep it aligned with `MAX_VIDEO_UPLOAD_MB`. |
+| `easyMusicApiBaseUrl` Gradle property | No | Yes for Android production APK | Public API origin baked into the Android APK at build time. Pass it with `-PeasyMusicApiBaseUrl=https://music.example.com`; omit it for emulator-local development. |
 | `MEDIA_ROOT` | Yes | Yes | Root directory for managed media files inside the backend container. With `docker-compose.prod.yml`, keep this as `/app/media`; configure host storage through `MEDIA_HOST_*` variables instead. |
 | `ORIGINALS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for preserved original uploads. |
 | `PLAYBACK_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for generated playback files. |
