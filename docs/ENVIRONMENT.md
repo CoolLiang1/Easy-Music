@@ -51,6 +51,10 @@ contain placeholders only, not production-ready secrets.
 | `AI_TAG_SEARCH_MAX_RESULTS` | No | No | Maximum search summaries included in the AI tag suggestion prompt. Defaults to `5`; supported maximum is `5`. |
 | `AI_TAG_SEARCH_CACHE_DAYS` | No | No | Number of days to reuse cached search summaries. Defaults to `30`; set `0` to disable cache reuse. |
 | `CADDY_DOMAIN` | No | Yes | Public HTTPS domain used by the production Caddy service. |
+| `CADDY_HTTP_PORT` | No | No | Host port published to Caddy container port 80. Defaults to `80`. |
+| `CADDY_HTTPS_PORT` | No | No | Host port published to Caddy container port 443. Defaults to `443`; use a reachable high port such as `25443` only with a matching public Web origin. |
+| `CADDYFILE_PATH` | No | No | Caddyfile mounted into the Caddy container. Defaults to `./deploy/Caddyfile`; use `./deploy/Caddyfile.manual-cert` for operator-provided certificates. |
+| `CADDY_CERT_DIR` | No | No | Host directory mounted read-only to `/certs` for `fullchain.pem` and `privkey.pem` when using `deploy/Caddyfile.manual-cert`. |
 | `MEDIA_HOST_ORIGINALS` | No | Yes | Production host directory bind-mounted to `/app/media/originals`. |
 | `MEDIA_HOST_PLAYBACK` | No | Yes | Production host directory bind-mounted to `/app/media/playback`. |
 | `MEDIA_HOST_COVERS` | No | Yes | Production host directory bind-mounted to `/app/media/covers`. |
@@ -117,6 +121,9 @@ Deployment values must:
   explicitly created and mounted read-only into the API container.
 - Restrict `CORS_ORIGINS` to trusted deployed origins.
 - Set `CADDY_DOMAIN` to the public domain that points to the server.
+- If inbound 80/443 are blocked by the upstream network, use a reachable
+  high-port HTTPS origin, `deploy/Caddyfile.manual-cert`, and an
+  operator-provided certificate from DNS validation.
 - Keep all real credentials and host-specific private paths outside version control.
 
 ## Rules

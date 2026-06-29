@@ -39,6 +39,8 @@ Status as of 2026-06-29:
 - [ ] Production services build and start.
 - [ ] Alembic migrations are applied to the production database.
 - [ ] Caddy obtains a valid HTTPS certificate for the configured domain.
+- [ ] If non-standard HTTPS is required, Caddy serves a DNS-validated
+  operator-provided certificate on the documented public port.
 - [ ] `/health` returns healthy status over HTTPS.
 - [ ] Initial user creation succeeds, or an existing admin user is confirmed.
 - [ ] Web login works over HTTPS.
