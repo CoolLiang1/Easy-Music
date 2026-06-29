@@ -122,6 +122,17 @@ Out of scope:
 
 ## Progress Notes
 
+### 2026-06-29 Web UI optimization round 1
+
+- Completed a focused Web UI consistency pass without backend API, Android, or
+  product feature changes.
+- Improved the app shell/sidebar, active navigation, always-available playback
+  queue entry, button hierarchy, table readability, mobile wrapping, and shared
+  AI tag suggestion styling.
+- Aligned Upload, Import, Recommendations, Library, and queue-facing copy toward
+  consistent Chinese UI terminology.
+- Verification: `npm run typecheck` and `npm run build` passed from `web/`.
+
 ### 2026-06-29 Android UI optimization round 1
 
 - Completed a focused Android Compose UI consistency pass without backend API,

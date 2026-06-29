@@ -134,6 +134,9 @@ export function PlaybackQueueDrawer({
             <h3 id="queue-upcoming-title">即将播放</h3>
             <span>{queueState.upcoming.length} 首</span>
           </div>
+          {queueState.upcoming.length > 1 ? (
+            <p className="queue-drawer-note">拖动音轨可调整即将播放的顺序。</p>
+          ) : null}
 
           {queueState.upcoming.length === 0 ? (
             <p className="queue-empty">队列后面还没有音轨。</p>

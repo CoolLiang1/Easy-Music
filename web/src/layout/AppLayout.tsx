@@ -43,28 +43,35 @@ export function AppLayout({ children, onSignOut }: AppLayoutProps) {
   const { state: queueState } = usePlaybackQueue();
   const [isQueueDrawerOpen, setIsQueueDrawerOpen] = useState(false);
   const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+  const activePath = currentPath.startsWith("/tracks/") ? "/library" : currentPath;
+  const queueCount =
+    queueState.history.length +
+    queueState.upcoming.length +
+    (queueState.current ? 1 : 0);
 
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="主导航">
-        <div>
+        <div className="sidebar-brand-block">
           <p className="eyebrow">个人曲库</p>
           <RouteLink className="brand" to="/library">
             Easy Music
           </RouteLink>
+          <p className="sidebar-subtitle">上传、整理、播放和推荐</p>
         </div>
 
         <nav className="nav-list">
           {navGroups.map((group) => (
-            <div key={group.label}>
+            <div className="nav-group" key={group.label}>
               <p className="nav-group-label">{group.label}</p>
               {group.items.map((item) => (
                 <RouteLink
                   className={
-                    currentPath === item.path ? "nav-link active" : "nav-link"
+                    activePath === item.path ? "nav-link active" : "nav-link"
                   }
                   key={item.path}
                   to={item.path}
+                  aria-current={activePath === item.path ? "page" : undefined}
                 >
                   {item.label}
                 </RouteLink>
@@ -74,6 +81,14 @@ export function AppLayout({ children, onSignOut }: AppLayoutProps) {
         </nav>
 
         <div className="sidebar-footer">
+          <button
+            className="button secondary sidebar-queue-button"
+            onClick={() => setIsQueueDrawerOpen(true)}
+            type="button"
+          >
+            <span>播放队列</span>
+            <strong>{queueCount} 首</strong>
+          </button>
           <button className="button secondary" onClick={onSignOut} type="button">
             退出登录
           </button>

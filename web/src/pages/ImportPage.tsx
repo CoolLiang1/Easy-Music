@@ -44,7 +44,7 @@ export function ImportPage() {
     if (!accessToken) {
       setPageState({
         name: "error",
-        message: "Please sign in again before using imports.",
+        message: "请重新登录后再使用导入功能。",
       });
       return;
     }
@@ -93,7 +93,7 @@ export function ImportPage() {
 
   const handleScan = async () => {
     if (!accessToken || !selectedRootId) {
-      setActionError("Choose a configured import root before scanning.");
+      setActionError("请先选择已配置的导入根目录。");
       return;
     }
 
@@ -118,13 +118,13 @@ export function ImportPage() {
 
   const handleConfirm = async () => {
     if (!accessToken || !selectedRootId) {
-      setActionError("Choose a configured import root before importing.");
+      setActionError("请先选择已配置的导入根目录。");
       return;
     }
 
     const paths = [...selectedPaths];
     if (paths.length === 0) {
-      setActionError("Select at least one scanned file.");
+      setActionError("请至少选择一个扫描到的文件。");
       return;
     }
 
@@ -151,7 +151,7 @@ export function ImportPage() {
 
   const refreshLatestBatch = async () => {
     if (!accessToken) {
-      setActionError("Please sign in again before refreshing import status.");
+      setActionError("请重新登录后再刷新导入状态。");
       return;
     }
 
@@ -201,24 +201,23 @@ export function ImportPage() {
     <section className="page-panel" aria-labelledby="import-title">
       <div className="page-header-row">
         <div>
-          <p className="eyebrow">Import</p>
-          <h1 id="import-title">Import audio & video</h1>
+          <p className="eyebrow">导入</p>
+          <h1 id="import-title">导入音频与视频</h1>
           <p className="page-copy">
-            Scan a configured server-side import root, select audio or video
-            files, then import them into the normal Easy Music processing flow.
-            Video files will have their audio extracted automatically.
+            扫描已配置的服务器导入目录，选择音频或视频文件，并加入 Easy Music
+            的标准处理流程。视频文件会自动提取音频。
           </p>
         </div>
         {scanResult ? (
           <span className="score-pill">
-            {scanResult.candidates.length} candidates
+            {scanResult.candidates.length} 个候选
           </span>
         ) : null}
       </div>
 
       {pageState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
-          Loading import configuration...
+          正在加载导入配置...
         </div>
       ) : null}
 
@@ -304,10 +303,10 @@ function ImportScanPanel({
 
   return (
     <div className="panel">
-      <h2>Scan</h2>
+      <h2>扫描目录</h2>
       <div className="form-grid">
         <label className="field">
-          Import root
+          导入根目录
           <select
             onChange={(event) => onRootChange(event.target.value)}
             value={selectedRootId}
@@ -320,10 +319,10 @@ function ImportScanPanel({
           </select>
         </label>
         <label className="field">
-          Relative subdirectory
+          相对子目录
           <input
             onChange={(event) => onRelativeSubdirChange(event.target.value)}
-            placeholder="Optional"
+            placeholder="可选"
             type="text"
             value={relativeSubdir}
           />
@@ -336,7 +335,7 @@ function ImportScanPanel({
           onClick={onScan}
           type="button"
         >
-          {isScanning ? "Scanning..." : "Scan"}
+          {isScanning ? "正在扫描..." : "开始扫描"}
         </button>
       </div>
     </div>
@@ -374,49 +373,49 @@ function ScanResultPanel({
     <div className="panel">
       <div className="recommendation-result-heading">
         <div>
-          <h2>Scan result</h2>
+          <h2>扫描结果</h2>
           <p className="recommendation-muted">
-            {result.message} Root: {result.root?.label ?? "Unavailable"}.
-            Directory: {result.scanned_relative_path ?? "."}.
+            {result.message} 根目录：{result.root?.label ?? "不可用"}。
+            扫描目录：{result.scanned_relative_path ?? "."}。
           </p>
         </div>
-        <span className="score-pill">{selectedCount} selected</span>
+        <span className="score-pill">已选择 {selectedCount} 个</span>
       </div>
 
       {result.candidates.length === 0 ? (
-        <div className="empty-state">No supported audio or video files were found.</div>
+        <div className="empty-state">没有找到支持的音频或视频文件。</div>
       ) : (
         <>
-          <div className="toolbar" style={{ flexWrap: "wrap", gap: "8px" }}>
-            <span style={{ fontSize: "0.9rem", color: "#526174" }}>
-              {audioCount} audio / {videoCount} video
+          <div className="toolbar segmented-toolbar">
+            <span className="toolbar-label">
+              {audioCount} 个音频 / {videoCount} 个视频
             </span>
             <button
               className={`button ${mediaKindFilter === "all" ? "primary" : "secondary"}`}
               onClick={() => onMediaKindFilterChange("all")}
               type="button"
             >
-              All
+              全部
             </button>
             <button
               className={`button ${mediaKindFilter === "audio" ? "primary" : "secondary"}`}
               onClick={() => onMediaKindFilterChange("audio")}
               type="button"
             >
-              Audio
+              音频
             </button>
             <button
               className={`button ${mediaKindFilter === "video" ? "primary" : "secondary"}`}
               onClick={() => onMediaKindFilterChange("video")}
               type="button"
             >
-              Video
+              视频
             </button>
             <button className="button secondary" onClick={onSelectAll} type="button">
-              Select candidates
+              选择候选
             </button>
             <button className="button secondary" onClick={onClearSelection} type="button">
-              Clear selection
+              清空选择
             </button>
             <button
               className="button primary"
@@ -424,7 +423,7 @@ function ScanResultPanel({
               onClick={onConfirm}
               type="button"
             >
-              {isConfirming ? "Importing..." : "Import selected"}
+              {isConfirming ? "正在导入..." : "导入已选"}
             </button>
           </div>
           <CandidateTable
@@ -437,8 +436,8 @@ function ScanResultPanel({
 
       <ScanSkippedList skipped={result.skipped} />
       <p className="hint-text">
-        Limit: {result.limits.max_files} files, depth {result.limits.max_depth},
-        max {formatBytes(result.limits.max_file_size_bytes)} per file.
+        限制：最多 {result.limits.max_files} 个文件，深度 {result.limits.max_depth}，
+        单文件最大 {formatBytes(result.limits.max_file_size_bytes)}。
       </p>
     </div>
   );
@@ -458,13 +457,13 @@ function CandidateTable({
       <table className="track-table import-table">
         <thead>
           <tr>
-            <th scope="col">Select</th>
-            <th scope="col">File</th>
-            <th scope="col">Path</th>
-            <th scope="col">Kind</th>
-            <th scope="col">Type</th>
-            <th scope="col">Size</th>
-            <th scope="col">Status</th>
+            <th scope="col">选择</th>
+            <th scope="col">文件</th>
+            <th scope="col">路径</th>
+            <th scope="col">媒体</th>
+            <th scope="col">格式</th>
+            <th scope="col">大小</th>
+            <th scope="col">状态</th>
           </tr>
         </thead>
         <tbody>
@@ -472,7 +471,7 @@ function CandidateTable({
             <tr key={candidate.relative_path}>
               <td>
                 <input
-                  aria-label={`Select ${candidate.basename}`}
+                  aria-label={`选择 ${candidate.basename}`}
                   checked={selectedPaths.has(candidate.relative_path)}
                   onChange={() => onTogglePath(candidate.relative_path)}
                   type="checkbox"
@@ -501,7 +500,7 @@ function ScanSkippedList({ skipped }: { skipped: ImportScanSkippedItem[] }) {
 
   return (
     <div className="import-subpanel">
-      <h3>Skipped</h3>
+      <h3>已跳过</h3>
       <ul className="item-list">
         {skipped.map((item) => (
           <li className="item-card" key={`${item.relative_path}-${item.reason}`}>
@@ -525,13 +524,13 @@ function ConfirmResultPanel({ result }: { result: ImportConfirmResponse }) {
     <div className="panel">
       <div className="recommendation-result-heading">
         <div>
-          <h2>Import result</h2>
+          <h2>导入结果</h2>
           <p className="recommendation-muted">
-            {result.message} Batch #{result.batch_id ?? "none"}.
+            {result.message} 批次：#{result.batch_id ?? "无"}。
           </p>
         </div>
         <span className="score-pill">
-          {result.imported_count} imported / {result.failed_count} failed
+          {result.imported_count} 个已导入 / {result.failed_count} 个失败
         </span>
       </div>
       <ul className="item-list">
@@ -569,10 +568,10 @@ function LatestBatchPanel({
     <div className="panel">
       <div className="recommendation-result-heading">
         <div>
-          <h2>Latest import batch</h2>
+          <h2>最近导入批次</h2>
           {batch ? (
             <p className="recommendation-muted">
-              Batch #{batch.id} / {formatDateTime(batch.updated_at)}
+              批次 #{batch.id} / {formatDateTime(batch.updated_at)}
             </p>
           ) : null}
         </div>
@@ -585,19 +584,19 @@ function LatestBatchPanel({
           onClick={onRefresh}
           type="button"
         >
-          {isRefreshing ? "Refreshing..." : "Refresh import status"}
+          {isRefreshing ? "正在刷新..." : "刷新导入状态"}
         </button>
       </div>
       {!batch ? (
-        <div className="empty-state">No import batch has been recorded yet.</div>
+        <div className="empty-state">还没有导入批次记录。</div>
       ) : (
         <>
           <dl className="meta-grid">
-            <Meta label="Root" value={batch.root.label} />
-            <Meta label="Requested" value={batch.requested_count.toString()} />
-            <Meta label="Imported" value={batch.imported_count.toString()} />
-            <Meta label="Skipped" value={batch.skipped_count.toString()} />
-            <Meta label="Failed" value={batch.failed_count.toString()} />
+            <Meta label="根目录" value={batch.root.label} />
+            <Meta label="请求导入" value={batch.requested_count.toString()} />
+            <Meta label="已导入" value={batch.imported_count.toString()} />
+            <Meta label="已跳过" value={batch.skipped_count.toString()} />
+            <Meta label="失败" value={batch.failed_count.toString()} />
           </dl>
           <ul className="item-list import-batch-list">
             {batch.items.map((item) => (
@@ -629,7 +628,7 @@ function TrackImportSummary({ track }: { track: Track }) {
         className="track-title-link"
         to={`/tracks/${encodeURIComponent(track.id)}`}
       >
-        #{track.id} {track.title || "Untitled track"}
+        #{track.id} {track.title || "未命名音轨"}
       </RouteLink>
       <TrackStatusBadge status={track.status} />
       {track.processing_error_message ? (
@@ -650,7 +649,7 @@ function DuplicateWarningList({
 
   return (
     <div className="import-warning" role="status">
-      <strong>Possible duplicate</strong>
+      <strong>可能重复</strong>
       <ul>
         {warnings.map((warning) => (
           <li key={`${warning.match_type}-${warning.candidate_track_ids.join("-")}`}>
@@ -748,11 +747,11 @@ function formatBytes(value: number) {
 
 function formatImportStatus(status: string) {
   const labels: Record<string, string> = {
-    failed: "Failed",
-    imported: "Imported",
-    importing: "Importing",
-    skipped: "Skipped",
-    supported: "Supported",
+    failed: "失败",
+    imported: "已导入",
+    importing: "导入中",
+    skipped: "已跳过",
+    supported: "可导入",
   };
 
   return labels[status] ?? status.replace(/[_-]+/g, " ");
@@ -760,15 +759,15 @@ function formatImportStatus(status: string) {
 
 function formatImportReason(reason: string) {
   const labels: Record<string, string> = {
-    file_too_large: "File exceeds the configured size limit",
-    max_depth_exceeded: "Scan depth limit reached",
-    max_files_exceeded: "Scan file limit reached",
-    not_regular_file: "Not a regular file",
-    path_escapes_root: "Path escapes configured root",
-    permission_denied: "Permission denied",
-    read_error: "Unable to read path",
-    symlink_directory_skipped: "Symlink directory skipped",
-    unsupported_extension: "Unsupported extension",
+    file_too_large: "文件超过配置的大小限制",
+    max_depth_exceeded: "已达到扫描深度限制",
+    max_files_exceeded: "已达到扫描文件数量限制",
+    not_regular_file: "不是普通文件",
+    path_escapes_root: "路径超出配置的根目录",
+    permission_denied: "没有读取权限",
+    read_error: "无法读取路径",
+    symlink_directory_skipped: "已跳过符号链接目录",
+    unsupported_extension: "不支持的扩展名",
   };
 
   return labels[reason] ?? reason.replace(/[_-]+/g, " ");
@@ -776,7 +775,7 @@ function formatImportReason(reason: string) {
 
 function formatDuplicateMatchType(matchType: string) {
   if (matchType === "exact_file") {
-    return "Exact file match";
+    return "文件完全匹配";
   }
 
   return matchType.replace(/[_-]+/g, " ");
@@ -791,8 +790,8 @@ function delay(milliseconds: number) {
 }
 
 function formatMediaKind(kind: string) {
-  if (kind === "audio") return "Audio";
-  if (kind === "video") return "Video";
+  if (kind === "audio") return "音频";
+  if (kind === "video") return "视频";
   return kind;
 }
 
@@ -801,5 +800,5 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Import request failed.";
+  return "导入请求失败。";
 }
