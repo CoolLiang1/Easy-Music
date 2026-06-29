@@ -3,7 +3,7 @@
 #
 # Prerequisites:
 #   1. Copy .env.production.example to .env.production and fill in real values.
-#   2. Build the Web SPA once:  cd web && npm run build
+#   2. Build the Web SPA once with VITE_API_BASE_URL set to the HTTPS domain.
 #
 # Start the stack:
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
@@ -87,6 +87,12 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-}
       AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_TAG_SEARCH_ENABLED: ${AI_TAG_SEARCH_ENABLED:-false}
+      AI_TAG_SEARCH_PROVIDER: ${AI_TAG_SEARCH_PROVIDER:-tavily}
+      AI_TAG_SEARCH_API_KEY: ${AI_TAG_SEARCH_API_KEY:-}
+      AI_TAG_SEARCH_BASE_URL: ${AI_TAG_SEARCH_BASE_URL:-https://api.tavily.com}
+      AI_TAG_SEARCH_MAX_RESULTS: ${AI_TAG_SEARCH_MAX_RESULTS:-5}
+      AI_TAG_SEARCH_CACHE_DAYS: ${AI_TAG_SEARCH_CACHE_DAYS:-30}
     volumes:
       - ${MEDIA_HOST_ORIGINALS:-./media/originals}:/app/media/originals
       - ${MEDIA_HOST_PLAYBACK:-./media/playback}:/app/media/playback
@@ -155,6 +161,12 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-}
       AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_TAG_SEARCH_ENABLED: ${AI_TAG_SEARCH_ENABLED:-false}
+      AI_TAG_SEARCH_PROVIDER: ${AI_TAG_SEARCH_PROVIDER:-tavily}
+      AI_TAG_SEARCH_API_KEY: ${AI_TAG_SEARCH_API_KEY:-}
+      AI_TAG_SEARCH_BASE_URL: ${AI_TAG_SEARCH_BASE_URL:-https://api.tavily.com}
+      AI_TAG_SEARCH_MAX_RESULTS: ${AI_TAG_SEARCH_MAX_RESULTS:-5}
+      AI_TAG_SEARCH_CACHE_DAYS: ${AI_TAG_SEARCH_CACHE_DAYS:-30}
     volumes:
       - ${MEDIA_HOST_ORIGINALS:-./media/originals}:/app/media/originals
       - ${MEDIA_HOST_PLAYBACK:-./media/playback}:/app/media/playback
@@ -197,6 +209,7 @@ services:
       - "443:443"
     environment:
       CADDY_DOMAIN: ${CADDY_DOMAIN:?err}
+      CADDY_AUDIO_UPLOAD_LIMIT: ${CADDY_AUDIO_UPLOAD_LIMIT:-200MB}
       CADDY_VIDEO_UPLOAD_LIMIT: ${CADDY_VIDEO_UPLOAD_LIMIT:-1024MB}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

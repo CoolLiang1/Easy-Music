@@ -1,9 +1,14 @@
-# deploy/ — production deployment artifacts
-#
-# This directory holds production configuration files that are mounted into
-# containers or used during deployment.  Each file is added by the Phase 7
-# task that owns it:
-#
-#   Task 7.4 — Caddyfile         (Caddy HTTPS + reverse proxy config)
-#   Task 7.5 — setup-host.sh     (host directories and permissions)
-#   Task 7.6 — backup-db.sh      (database backup script)
+# deploy/ production deployment artifacts
+
+This directory contains the host and reverse-proxy helpers used by the Ubuntu
+production deployment flow documented in `docs/DEPLOYMENT.md`.
+
+- `Caddyfile`: HTTPS termination, reverse proxy, upload body limits, and static
+  Web SPA serving.
+- `setup-host.sh`: non-destructive host directory and ownership setup for media,
+  temporary video inputs, PostgreSQL data, and backups.
+- `backup-db.sh`: compressed PostgreSQL dump helper that writes backup files and
+  does not delete old backups.
+
+Keep real domains, passwords, API keys, and `.env.production` out of version
+control.
