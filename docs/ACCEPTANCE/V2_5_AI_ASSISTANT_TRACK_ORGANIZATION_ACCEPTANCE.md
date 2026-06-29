@@ -67,11 +67,11 @@ Required behavior:
 
 Acceptance checklist:
 
-- [x] Disabled search state tested.
-- [x] Unconfigured search state tested.
-- [x] Provider error state tested.
-- [x] Fake provider success state tested.
-- [x] Secrets are absent from committed files.
+- [ ] Disabled search state tested.
+- [ ] Unconfigured search state tested.
+- [ ] Provider error state tested.
+- [ ] Fake provider success state tested.
+- [ ] Secrets are absent from committed files.
 
 ### Gate 2: Research And Analysis Cache
 
@@ -89,12 +89,12 @@ Required behavior:
 
 Acceptance checklist:
 
-- [x] Alembic migration creates research cache table.
-- [x] Alembic migration creates analysis cache table.
-- [x] Owner isolation is tested.
-- [x] Cache reuse is tested.
-- [x] Cache expiry or forced refresh is tested.
-- [x] No apply-event audit table is added.
+- [ ] Alembic migration creates research cache table.
+- [ ] Alembic migration creates analysis cache table.
+- [ ] Owner isolation is tested.
+- [ ] Cache reuse is tested.
+- [ ] Cache expiry or forced refresh is tested.
+- [ ] No apply-event audit table is added.
 
 ### Gate 3: Organize Endpoint
 
@@ -116,15 +116,15 @@ Required behavior:
 
 Acceptance checklist:
 
-- [x] Track ownership failure tested.
-- [x] Search-disabled fallback tested.
-- [x] AI-disabled/unconfigured state tested.
-- [x] Valid fake search plus valid fake AI tested.
-- [x] `force_refresh_search` tested.
-- [x] `force_reanalyze` tested.
-- [x] Invalid tag ID output tested.
-- [x] Invalid playlist ID output tested.
-- [x] Invalid tag group output tested.
+- [ ] Track ownership failure tested.
+- [ ] Search-disabled fallback tested.
+- [ ] AI-disabled/unconfigured state tested.
+- [ ] Valid fake search plus valid fake AI tested.
+- [ ] `force_refresh_search` tested.
+- [ ] `force_reanalyze` tested.
+- [ ] Invalid tag ID output tested.
+- [ ] Invalid playlist ID output tested.
+- [ ] Invalid tag group output tested.
 
 ### Gate 4: Apply Endpoint
 
@@ -306,36 +306,7 @@ Required coverage:
 
 Result:
 
-- [x] 2026-06-28: Passed
-  `.\.venv\Scripts\python.exe -m pytest tests\test_ai_search_provider.py tests\test_ai_search_client.py tests\test_ai_provider.py tests\test_ai_client.py`
-  from `backend/` with 31 passed. Covered V2.5.1 disabled,
-  unconfigured, provider error, network retry, fake-provider success search
-  states, secret redaction, and existing AI provider/client regression without
-  live network access.
-- [x] 2026-06-28: Passed
-  `.\.venv\Scripts\python.exe -m alembic heads` from `backend/`; reported
-  `20260628_0012 (head)`.
-- [x] 2026-06-28: Passed
-  temporary SQLite `.\.venv\Scripts\python.exe -m alembic upgrade head` from
-  `backend/`; all migrations through `20260628_0012` applied and the temporary
-  database file was removed.
-- [x] 2026-06-28: Passed
-  `.\.venv\Scripts\python.exe -m pytest tests\test_ai_track_organization_cache.py tests\test_ai_search_provider.py tests\test_ai_search_client.py`
-  from `backend/` with 20 passed. Covered V2.5.2 cache table metadata,
-  owner/track-scoped lookup, latest usable research, expired/error research
-  exclusion, latest analysis lookup, normalized snippet storage, and absence
-  of an apply-event audit table.
-- [x] 2026-06-28: Passed
-  `.\.venv\Scripts\python.exe -m pytest tests\test_ai_track_organization_api.py tests\test_ai_track_organization_cache.py tests\test_ai_search_provider.py tests\test_ai_search_client.py`
-  from `backend/` with 32 passed. Covered V2.5.3 authenticated single-track
-  organize endpoint, track ownership failure, disabled/unconfigured search
-  fallback, disabled/unconfigured AI state, fake search plus fake AI success,
-  cache reuse, force refresh, force reanalysis, invalid tag id filtering,
-  invalid playlist id filtering, and invalid legacy tag group analysis error.
-- [x] 2026-06-28: Passed
-  `.\.venv\Scripts\python.exe -m pytest tests\test_ai_tag_suggestions.py tests\test_ai_intent.py tests\test_ai_recommend.py tests\test_ai_json.py tests\test_ai_provider.py tests\test_ai_client.py`
-  from `backend/` with 97 passed. Existing AI Assistant V1 endpoints and
-  provider/JSON helpers still pass after adding V2.5 organize schemas/routes.
+- [ ] Not run.
 
 ### Web
 
@@ -365,10 +336,6 @@ Status as of 2026-06-28:
 
 - Planning document created.
 - Acceptance gates defined.
-- V2.5.1 Search Provider Configuration And Abstraction implemented.
-- V2.5.2 Research And Analysis Cache Models implemented.
-- V2.5.3 Single-Track Organization Analysis Endpoint implemented.
-- Search settings are documented in env examples and `docs/ENVIRONMENT.md`.
-- Focused backend automated checks for V2.5.1, V2.5.2, and V2.5.3 are recorded above.
-- Apply endpoint and Web UI are not implemented yet.
-- Manual Web smoke flows have not been run because no V2.5 Web UI exists yet.
+- Implementation not started in this acceptance record.
+- No automated checks or manual smoke flows have been recorded for this slice.
+
