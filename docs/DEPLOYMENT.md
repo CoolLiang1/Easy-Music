@@ -19,7 +19,8 @@ Before starting a production deployment, confirm:
 - Ports 80 and 443 are reachable from the internet.
 - Host media, temp video, PostgreSQL, and backup directories have been created
   with `deploy/setup-host.sh`.
-- The Web production build has been generated.
+- The Web production build has been generated with `VITE_API_BASE_URL` set to
+  the deployed HTTPS origin.
 - AI and import features are either deliberately configured or left disabled by
   default.
 - A backup plan exists before real media/library data is added.
@@ -134,12 +135,17 @@ APP_SECRET_KEY=replace-with-openssl-rand-hex-32
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 CORS_ORIGINS=https://music.example.com
 CADDY_DOMAIN=music.example.com
+VITE_API_BASE_URL=https://music.example.com
+VITE_MAX_VIDEO_UPLOAD_MB=1024
 
 MEDIA_HOST_ORIGINALS=/srv/easy-music/media/originals
 MEDIA_HOST_PLAYBACK=/srv/easy-music/media/playback
 MEDIA_HOST_COVERS=/srv/easy-music/media/covers
 MEDIA_HOST_TEMP_VIDEOS=/srv/easy-music/media/temp-videos
 POSTGRES_DATA_DIR=/srv/easy-music/postgres
+BACKUP_DIR=/srv/easy-music/backups
+MAX_UPLOAD_MB=200
+CADDY_AUDIO_UPLOAD_LIMIT=200MB
 MAX_VIDEO_UPLOAD_MB=1024
 CADDY_VIDEO_UPLOAD_LIMIT=1024MB
 
@@ -151,6 +157,12 @@ AI_PROVIDER=openai-compatible
 AI_API_KEY=
 AI_MODEL=
 AI_BASE_URL=https://api.openai.com/v1
+AI_TAG_SEARCH_ENABLED=false
+AI_TAG_SEARCH_PROVIDER=tavily
+AI_TAG_SEARCH_API_KEY=
+AI_TAG_SEARCH_BASE_URL=https://api.tavily.com
+AI_TAG_SEARCH_MAX_RESULTS=5
+AI_TAG_SEARCH_CACHE_DAYS=30
 
 # Disabled by default. If import tools are enabled later, use container-visible
 # paths that are explicitly mounted read-only into api and worker containers.
@@ -164,6 +176,8 @@ Rules:
 
 - `CADDY_DOMAIN` is the bare domain, for example `music.example.com`.
 - `CORS_ORIGINS` includes the scheme, for example `https://music.example.com`.
+- `VITE_API_BASE_URL` also includes the scheme and must match the public HTTPS
+  origin before running `npm run build`.
 - `DATABASE_URL` must use the same password as `POSTGRES_PASSWORD`.
 - Use `AI_ENABLED=false` for the first deployment unless AI credentials are
   ready.
@@ -173,6 +187,8 @@ Rules:
 - Keep scan limits conservative for the first deployment. The scan endpoint is
   read-only and reports supported audio candidates plus skipped files; confirmed
   import remains a later V2 flow.
+- Keep `MAX_UPLOAD_MB` compatible with `CADDY_AUDIO_UPLOAD_LIMIT` for normal
+  audio uploads.
 - Keep `MAX_VIDEO_UPLOAD_MB` compatible with `CADDY_VIDEO_UPLOAD_LIMIT` if
   enabling user-provided video upload. Uploaded videos are temporary extraction
   inputs, not library originals.
@@ -209,8 +225,10 @@ ls -ld /srv/easy-music/backups
 
 Expected ownership:
 
-- Media and backup directories: UID/GID `1100:1100`.
+- Media directories: UID/GID `1100:1100`.
 - PostgreSQL data directory: UID/GID `70:70`.
+- Backup directory: the sudo-invoking operator user/group, so
+  `deploy/backup-db.sh` can write compressed dumps from the host.
 
 Optional import directories are not created by `deploy/setup-host.sh` and are
 not enabled by default. If a later V2 import task is enabled in production,
@@ -229,18 +247,26 @@ covers.
 
 ## Step 4 - Build the Web App
 
-Install Node.js and npm if missing:
+Install Node.js 20.19+ or 22.12+ and npm if missing. The Web app uses Vite 7,
+which will fail on older Node releases commonly available from Ubuntu's default
+APT repositories.
 
 ```bash
-node --version || sudo apt install -y nodejs npm
+node --version
 npm --version
 ```
+
+If `node --version` is older than the required range, install a supported Node
+release through your standard server package process or a Node version manager
+before continuing.
 
 Build the SPA:
 
 ```bash
 cd /srv/easy-music/repo/web
-npm install
+export VITE_API_BASE_URL="https://music.example.com"
+export VITE_MAX_VIDEO_UPLOAD_MB="1024"
+npm ci
 npm run build
 cd ..
 test -f web/dist/index.html
@@ -391,7 +417,9 @@ git switch main
 git pull --ff-only origin main
 
 cd web
-npm install
+export VITE_API_BASE_URL="https://music.example.com"
+export VITE_MAX_VIDEO_UPLOAD_MB="1024"
+npm ci
 npm run build
 cd ..
 

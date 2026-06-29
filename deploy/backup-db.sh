@@ -56,17 +56,6 @@ COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.production}"
 
 # ------------------------------------------------------------------
-# Backup destination
-# ------------------------------------------------------------------
-BACKUP_DIR="${1:-${BACKUP_DIR:-/srv/easy-music/backups}}"
-
-# ------------------------------------------------------------------
-# Construct the output filename
-# ------------------------------------------------------------------
-TIMESTAMP="$(date +%Y-%m-%d_%H%M%S)"
-BACKUP_FILE="${BACKUP_DIR}/easy_music_backup_${TIMESTAMP}.sql.gz"
-
-# ------------------------------------------------------------------
 # Pre-flight checks
 # ------------------------------------------------------------------
 if [ ! -f "$COMPOSE_FILE" ]; then
@@ -81,13 +70,16 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-# Read only the database identity variables from .env.production. Do not source
+# Read only the variables this script needs from .env.production. Do not source
 # the whole file, because it may contain secrets or characters with shell
 # meaning.
 # shellcheck disable=SC2046
-export $(grep -E '^(POSTGRES_DB|POSTGRES_USER)=' "$ENV_FILE" | xargs) 2>/dev/null || true
+export $(grep -E '^(POSTGRES_DB|POSTGRES_USER|BACKUP_DIR)=' "$ENV_FILE" | xargs) 2>/dev/null || true
 DB_NAME="${POSTGRES_DB:-easy_music}"
 DB_USER="${POSTGRES_USER:-easy_music}"
+BACKUP_DIR="${1:-${BACKUP_DIR:-/srv/easy-music/backups}}"
+TIMESTAMP="$(date +%Y-%m-%d_%H%M%S)"
+BACKUP_FILE="${BACKUP_DIR}/easy_music_backup_${TIMESTAMP}.sql.gz"
 
 if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps postgres 2>/dev/null | grep -q 'Up\|running'; then
     echo "[backup-db] ERROR: postgres container is not running." >&2

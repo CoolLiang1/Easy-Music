@@ -20,12 +20,14 @@ contain placeholders only, not production-ready secrets.
 | `DATABASE_URL` | Yes | Yes | Full backend database connection URL. It should match the database name, user, password, host, and port used by the runtime environment. |
 | `APP_SECRET_KEY` | Yes | Yes | Backend signing secret for authentication-related tokens. Development may use a throwaway placeholder; every deployment must use a strong unique secret. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Yes | Yes | Access token lifetime in minutes. The development example favors convenience and can be tightened for deployment. |
-| `MEDIA_ROOT` | Yes | Yes | Root directory for managed media files. Use a relative development path or a deployment-managed mounted path; do not commit private machine-specific absolute paths. |
+| `VITE_API_BASE_URL` | Yes for Web | Yes for Web build | Public API origin baked into the React build. For production, set it to the deployed HTTPS origin before `npm run build`. |
+| `VITE_MAX_VIDEO_UPLOAD_MB` | No | No | Web UI display/client-side limit for user-provided video uploads. Keep it aligned with `MAX_VIDEO_UPLOAD_MB`. |
+| `MEDIA_ROOT` | Yes | Yes | Root directory for managed media files inside the backend container. With `docker-compose.prod.yml`, keep this as `/app/media`; configure host storage through `MEDIA_HOST_*` variables instead. |
 | `ORIGINALS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for preserved original uploads. |
 | `PLAYBACK_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for generated playback files. |
 | `COVERS_DIR` | Yes | Yes | Directory name under `MEDIA_ROOT` for uploaded and extracted cover images. |
 | `TEMP_VIDEOS_DIR` | No | Yes | Directory name under `MEDIA_ROOT` for temporary user-provided video uploads before worker extraction. Defaults to `temp-videos`. |
-| `MAX_UPLOAD_MB` | Yes | Yes | Maximum accepted upload size in megabytes. Deployment should choose a value that fits storage and reverse proxy limits. |
+| `MAX_UPLOAD_MB` | Yes | Yes | Maximum accepted audio upload size in megabytes. Keep deployment values compatible with `CADDY_AUDIO_UPLOAD_LIMIT`. |
 | `MAX_VIDEO_UPLOAD_MB` | No | Yes | Maximum accepted user-provided video upload size in megabytes. Defaults to `1024`; keep deployment reverse proxy limits compatible. |
 | `MAX_COVER_MB` | Yes | Yes | Maximum accepted cover-image upload size in megabytes. |
 | `IMPORT_ALLOWED_ROOTS` | No | No | Optional semicolon- or comma-separated allowlist of server-side import roots. Empty disables import tools. Use explicit directories outside the repository, outside user home roots, and outside `MEDIA_ROOT`; never commit private machine-specific paths. |
@@ -54,7 +56,9 @@ contain placeholders only, not production-ready secrets.
 | `MEDIA_HOST_COVERS` | No | Yes | Production host directory bind-mounted to `/app/media/covers`. |
 | `MEDIA_HOST_TEMP_VIDEOS` | No | Yes | Production host directory bind-mounted to `/app/media/temp-videos` for temporary video extraction inputs. |
 | `POSTGRES_DATA_DIR` | No | Yes | Production host directory for PostgreSQL data. |
+| `CADDY_AUDIO_UPLOAD_LIMIT` | No | Yes | Caddy request-body limit for `/api/tracks/upload`, using a Caddy size string such as `200MB`. |
 | `CADDY_VIDEO_UPLOAD_LIMIT` | No | Yes | Caddy request-body limit for `/api/tracks/upload-video`, using a Caddy size string such as `1024MB`. |
+| `BACKUP_DIR` | No | No | Host directory used by deployment scripts for database backup files. Defaults to `/srv/easy-music/backups`. |
 | `BACKUP_RETENTION_DAYS` | No | No | Documentation value for operator-managed database backup retention. The bundled backup script does not delete files. |
 
 ## Development Defaults
@@ -102,9 +106,13 @@ Deployment configuration should provide the same variable names through
 Deployment values must:
 
 - Use strong unique values for `POSTGRES_PASSWORD` and `APP_SECRET_KEY`.
-- Use storage paths that point to the mounted persistent media location.
+- Build the Web app with `VITE_API_BASE_URL` set to the deployed HTTPS origin.
+- Keep `MEDIA_ROOT=/app/media` when using `docker-compose.prod.yml`, and use
+  `MEDIA_HOST_*` values for mounted persistent host storage.
 - Mount `MEDIA_HOST_TEMP_VIDEOS` read-write into the API and worker containers
   if video upload/extraction is enabled.
+- Keep `MAX_UPLOAD_MB` compatible with `CADDY_AUDIO_UPLOAD_LIMIT`, and
+  `MAX_VIDEO_UPLOAD_MB` compatible with `CADDY_VIDEO_UPLOAD_LIMIT`.
 - Leave `IMPORT_ALLOWED_ROOTS` empty unless import directories have been
   explicitly created and mounted read-only into the API container.
 - Restrict `CORS_ORIGINS` to trusted deployed origins.

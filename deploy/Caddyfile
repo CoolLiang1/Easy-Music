@@ -16,70 +16,71 @@
 # no custom plugins or external modules are needed.
 
 {$CADDY_DOMAIN:localhost} {
+	# -------------------------------------------------------------------
+	# Security headers  (applied to every response)
+	# -------------------------------------------------------------------
+	# -Server  strips the upstream Server header so no backend
+	# technology details leak to clients.
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
 
-    # -------------------------------------------------------------------
-    # Security headers  (applied to every response)
-    # -------------------------------------------------------------------
-    # -Server  strips the upstream Server header so no backend
-    # technology details leak to clients.
-    header {
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        Referrer-Policy "strict-origin-when-cross-origin"
-        -Server
-    }
+	# -------------------------------------------------------------------
+	# Track upload  — enforce body size limit at the proxy layer
+	# -------------------------------------------------------------------
+	# This handle must appear before the general /api/* block so the
+	# oversized-body check runs before the request is forwarded.
+	handle /api/tracks/upload {
+		request_body {
+			max_size {$CADDY_AUDIO_UPLOAD_LIMIT:200MB}
+		}
+		reverse_proxy api:8000
+	}
 
-    # -------------------------------------------------------------------
-    # Track upload  — enforce body size limit at the proxy layer
-    # -------------------------------------------------------------------
-    # This handle must appear before the general /api/* block so the
-    # oversized-body check runs before the request is forwarded.
-    handle /api/tracks/upload {
-        @oversized request_body > 200MB
-        respond @oversized 413
-        reverse_proxy api:8000
-    }
+	# -------------------------------------------------------------------
+	# Video upload  - separate request size limit for temporary video input
+	# -------------------------------------------------------------------
+	handle /api/tracks/upload-video {
+		request_body {
+			max_size {$CADDY_VIDEO_UPLOAD_LIMIT:1024MB}
+		}
+		reverse_proxy api:8000
+	}
 
-    # -------------------------------------------------------------------
-    # Video upload  - separate request size limit for temporary video input
-    # -------------------------------------------------------------------
-    handle /api/tracks/upload-video {
-        @oversized request_body > {$CADDY_VIDEO_UPLOAD_LIMIT:1024MB}
-        respond @oversized 413
-        reverse_proxy api:8000
-    }
+	# -------------------------------------------------------------------
+	# API routes  — reverse proxy to the FastAPI backend
+	# -------------------------------------------------------------------
+	# Every request whose path starts with /api/ is forwarded to the
+	# internal api service.  Caddy preserves the original path, query
+	# string, and request body.  Range requests for audio streaming
+	# pass through transparently.
+	handle /api/* {
+		reverse_proxy api:8000
+	}
 
-    # -------------------------------------------------------------------
-    # API routes  — reverse proxy to the FastAPI backend
-    # -------------------------------------------------------------------
-    # Every request whose path starts with /api/ is forwarded to the
-    # internal api service.  Caddy preserves the original path, query
-    # string, and request body.  Range requests for audio streaming
-    # pass through transparently.
-    handle /api/* {
-        reverse_proxy api:8000
-    }
+	# -------------------------------------------------------------------
+	# Health check  — proxied to the backend (no auth required)
+	# -------------------------------------------------------------------
+	# Separate from /api/* so it cannot be accidentally blocked or
+	# rate-limited by a future API middleware.
+	handle /health {
+		reverse_proxy api:8000
+	}
 
-    # -------------------------------------------------------------------
-    # Health check  — proxied to the backend (no auth required)
-    # -------------------------------------------------------------------
-    # Separate from /api/* so it cannot be accidentally blocked or
-    # rate-limited by a future API middleware.
-    handle /health {
-        reverse_proxy api:8000
-    }
-
-    # -------------------------------------------------------------------
-    # Web SPA  — static files with client-side routing fallback
-    # -------------------------------------------------------------------
-    # All remaining paths are served from /srv/web (the built web/dist/
-    # directory mounted read-only into the container).  If the requested
-    # path matches a real file it is served directly; otherwise it falls
-    # back to index.html so the React router can handle client-side
-    # navigation for routes like /recommendations or /tracks/42.
-    handle {
-        root * /srv/web
-        try_files {path} /index.html
-        file_server
-    }
+	# -------------------------------------------------------------------
+	# Web SPA  — static files with client-side routing fallback
+	# -------------------------------------------------------------------
+	# All remaining paths are served from /srv/web (the built web/dist/
+	# directory mounted read-only into the container).  If the requested
+	# path matches a real file it is served directly; otherwise it falls
+	# back to index.html so the React router can handle client-side
+	# navigation for routes like /recommendations or /tracks/42.
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
 }

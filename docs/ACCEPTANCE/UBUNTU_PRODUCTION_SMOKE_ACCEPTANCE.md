@@ -34,7 +34,8 @@ Status as of 2026-06-29:
 - [ ] `deploy/setup-host.sh` has prepared media, temp video, PostgreSQL, and
   backup directories with expected ownership.
 - [ ] Production Compose config validates with the production env file.
-- [ ] Web app production build exists before starting Caddy.
+- [ ] Web app production build exists before starting Caddy, and was built with
+  `VITE_API_BASE_URL` set to the public HTTPS origin.
 - [ ] Production services build and start.
 - [ ] Alembic migrations are applied to the production database.
 - [ ] Caddy obtains a valid HTTPS certificate for the configured domain.
@@ -69,6 +70,7 @@ Record the first production run here:
 - Server OS:
 - Deployment branch/commit:
 - Domain:
+- Web build API origin:
 - Compose services status:
 - Health check result:
 - Upload/playback smoke result:

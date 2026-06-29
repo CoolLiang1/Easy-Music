@@ -30,6 +30,7 @@ MEDIA_COVERS="${MEDIA_HOST_COVERS:-/srv/easy-music/media/covers}"
 MEDIA_TEMP_VIDEOS="${MEDIA_HOST_TEMP_VIDEOS:-/srv/easy-music/media/temp-videos}"
 POSTGRES_DATA="${POSTGRES_DATA_DIR:-/srv/easy-music/postgres}"
 BACKUP_DIR="${BACKUP_DIR:-/srv/easy-music/backups}"
+DEFAULT_BACKUP_DIR="$BACKUP_DIR"
 
 # UID:GID of the non-root user inside the api / worker containers.
 # This must match the --uid / --gid values in backend/Dockerfile.
@@ -39,6 +40,10 @@ APP_GID="${EASY_MUSIC_APP_GID:-1100}"
 # UID:GID used by the postgres:16-alpine image.
 POSTGRES_UID="${EASY_MUSIC_POSTGRES_UID:-70}"
 POSTGRES_GID="${EASY_MUSIC_POSTGRES_GID:-70}"
+
+# UID:GID of the human operator who will run backup-db.sh from the host.
+OPERATOR_UID="${EASY_MUSIC_OPERATOR_UID:-${SUDO_UID:-$(id -u)}}"
+OPERATOR_GID="${EASY_MUSIC_OPERATOR_GID:-${SUDO_GID:-$(id -g)}}"
 
 # ------------------------------------------------------------------
 # Source .env.production if present (values override the defaults)
@@ -56,7 +61,7 @@ if [ -f "$ENV_FILE" ]; then
     MEDIA_COVERS="${MEDIA_HOST_COVERS:-$MEDIA_COVERS}"
     MEDIA_TEMP_VIDEOS="${MEDIA_HOST_TEMP_VIDEOS:-$MEDIA_TEMP_VIDEOS}"
     POSTGRES_DATA="${POSTGRES_DATA_DIR:-$POSTGRES_DATA}"
-    BACKUP_DIR="${BACKUP_DIR:-$BACKUP_DIR}"
+    BACKUP_DIR="${BACKUP_DIR:-$DEFAULT_BACKUP_DIR}"
 fi
 
 echo ""
@@ -69,6 +74,7 @@ echo "PostgreSQL data : ${POSTGRES_DATA}"
 echo "Backups         : ${BACKUP_DIR}"
 echo "App UID:GID     : ${APP_UID}:${APP_GID}"
 echo "Postgres UID:GID: ${POSTGRES_UID}:${POSTGRES_GID}"
+echo "Backup UID:GID  : ${OPERATOR_UID}:${OPERATOR_GID}"
 echo ""
 
 # ------------------------------------------------------------------
@@ -101,8 +107,9 @@ if [ "$(id -u)" -eq 0 ]; then
     chown "${POSTGRES_UID}:${POSTGRES_GID}" "$POSTGRES_DATA"
     chmod 700 "$POSTGRES_DATA"
 
-    # Backup directory should be writable by the operator; 700 is safe.
-    chown "${APP_UID}:${APP_GID}" "$BACKUP_DIR"
+    # Backup directory should be writable by the host operator running
+    # deploy/backup-db.sh, not by the app container user.
+    chown "${OPERATOR_UID}:${OPERATOR_GID}" "$BACKUP_DIR"
     chmod 700 "$BACKUP_DIR"
 
     echo "[setup-host] Ownership set for media, postgres data, and backup dirs."
