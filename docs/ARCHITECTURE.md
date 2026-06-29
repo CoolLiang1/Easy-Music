@@ -18,10 +18,10 @@ The first version contains:
 
 ## 2. High-Level Architecture
 
-This document describes the current MVP architecture after the accepted
-Phase 7 Deployment Hardening work. Backend, Web, Android, recommendation,
-AI assistant, and deployment artifacts are now implemented in their
-corresponding top-level directories.
+This document describes the current architecture after the accepted MVP, V1.1,
+and implemented V2 slices. Backend, Web, Android, recommendation, AI assistant,
+import/video, playlist/queue, and deployment artifacts are now implemented in
+their corresponding top-level directories.
 
 ```mermaid
 flowchart LR

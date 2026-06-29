@@ -3,15 +3,24 @@
 Easy Music is a self-hosted personal cloud music system for scenario-based
 listening.
 
-The repository has completed the planned MVP implementation through Phase 7
-Deployment Hardening and has locally accepted the first V2 import/video
-workflow slice. It now contains a FastAPI backend, PostgreSQL migrations, media
-processing worker, React/Vite Web management console, Kotlin/Jetpack Compose
-Android listening client, and Docker Compose deployment artifacts.
+The initial usable product is now locally complete. The repository contains a
+FastAPI backend, PostgreSQL migrations, media processing worker, React/Vite Web
+management console, Kotlin/Jetpack Compose Android listening client, and Docker
+Compose deployment artifacts.
 
-Phase 7 acceptance is documented locally. A real production smoke test on an
-Ubuntu host with a real domain and HTTPS certificate is still an operator-side
-deployment step, not a completed repository verification step.
+Current status as of 2026-06-29:
+
+- MVP Phase 0 through Phase 7 are implemented and locally accepted.
+- V1.1 workflow improvements, duplicate detection, cover editing, advanced
+  recommendation explanations, revived tracks, reports, and Android shortcuts
+  are implemented and accepted.
+- V2 import/video, playlists, client playback queues, Recommendation V2
+  foundation, simplified tags, and AI Tag Suggestions V2 are implemented.
+- The remaining production caveat is a first real Ubuntu/domain/HTTPS smoke
+  test. Local deployment artifacts are ready, but that server-side verification
+  depends on operator infrastructure.
+- The next planned product work is UI optimization across Web and Android,
+  followed by the first Ubuntu production deployment smoke.
 
 ## Documentation
 
@@ -23,6 +32,8 @@ deployment step, not a completed repository verification step.
 - [Deployment](docs/DEPLOYMENT.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
 - [Playback Queue Design](docs/SPECS/PLAYBACK_QUEUE.md)
+- [Next UI Optimization Tasks](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
+- [Ubuntu Production Smoke Acceptance](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
 - [V2.2 Playback Queue Tasks](docs/TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md)
 - [Phase 7 Acceptance](docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md)
 - [V1.1 Duplicate Detection Acceptance](docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md)
@@ -107,5 +118,17 @@ Current documented progress:
   provider output compatibility, and documents DeepSeek as an OpenAI-compatible
   provider option.
 
+## Next Work
+
+Near-term work should stay focused on two tracks:
+
+1. UI optimization: improve the existing Web and Android screens without
+   changing backend contracts or adding new product features. Start from
+   [docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md).
+2. Ubuntu production deployment: run the first real server smoke test with a
+   real domain and HTTPS certificate. Use [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+   and record results in
+   [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md).
+
 See [docs/ROADMAP.md](docs/ROADMAP.md) and the per-phase acceptance documents
-under `docs/` for the detailed record.
+under `docs/` for the detailed historical record.

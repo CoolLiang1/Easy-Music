@@ -4,6 +4,26 @@ This guide deploys Easy Music on a fresh Ubuntu server with Docker Compose and
 HTTPS. Replace placeholder values such as `music.example.com` with your real
 domain and never commit production secrets.
 
+The repository has local/static deployment acceptance through Phase 7. The
+first real Ubuntu/domain/HTTPS production smoke is still an operator-run
+verification step. Record that result in
+`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
+
+## Deployment Readiness Summary
+
+Before starting a production deployment, confirm:
+
+- The target branch contains the latest migrations and deployment artifacts.
+- `.env.production` exists only on the server and contains no placeholders.
+- The domain resolves to the Ubuntu server public IP.
+- Ports 80 and 443 are reachable from the internet.
+- Host media, temp video, PostgreSQL, and backup directories have been created
+  with `deploy/setup-host.sh`.
+- The Web production build has been generated.
+- AI and import features are either deliberately configured or left disabled by
+  default.
+- A backup plan exists before real media/library data is added.
+
 ## Prerequisites
 
 - Ubuntu 22.04 LTS or 24.04 LTS.

@@ -101,11 +101,14 @@ Results:
 
 Manual checks:
 
-- Manual browser playlist queue smoke: not yet recorded.
-- Android emulator/device playlist queue and system controls smoke: not yet
-  recorded.
+- Manual browser playlist queue smoke: superseded by the accepted V2.2 playback
+  queue smoke record.
+- Android emulator/device playlist queue and system controls smoke: superseded
+  by the accepted V2.2 playback queue smoke record.
 
 Acceptance status:
 
 - V2.1 playback queue automated acceptance: accepted.
-- V2.1 playback queue full manual product acceptance: pending manual smoke.
+- V2.1 playback queue full manual product acceptance: superseded by
+  `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`, which records accepted
+  Web and Android manual smoke for the first-class playback queue model.

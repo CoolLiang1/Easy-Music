@@ -87,6 +87,17 @@ The remaining deployment caveat is a real production smoke test on an Ubuntu
 server with a real domain and HTTPS certificate. That requires operator
 infrastructure and is intentionally deferred to first deployment.
 
+## Next Planned Work
+
+1. UI optimization across the existing Web and Android product surfaces. This
+   is a polish and usability pass over existing flows, not a feature expansion.
+   Start from `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`.
+2. First real Ubuntu production smoke. Use `docs/DEPLOYMENT.md` and record the
+   result in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
+3. After production smoke, update `README.md`, this roadmap,
+   `docs/DEPLOYMENT.md`, and the production smoke acceptance record with any
+   deployment caveats or fixes discovered on the server.
+
 ## Phase 0: Project Foundation
 
 Status: Accepted.
