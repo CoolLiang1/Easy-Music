@@ -174,7 +174,13 @@ services:
       - ${MEDIA_HOST_TEMP_VIDEOS:-./media/temp-videos}:/app/media/temp-videos
     command: ["python", "-m", "app.worker", "--loop"]
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'app\\.worker'"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from pathlib import Path; cmd = Path('/proc/1/cmdline').read_bytes().replace(b'\\0', b' '); raise SystemExit(0 if b'app.worker' in cmd else 1)",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
