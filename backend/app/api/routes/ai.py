@@ -21,8 +21,6 @@ from app.schemas.ai import (
     ParseListeningIntentRequest,
     TagSuggestionRequest,
     TagSuggestionResponse,
-    TrackOrganizationApplyRequest,
-    TrackOrganizationApplyResponse,
     TrackOrganizationRequest,
     TrackOrganizationResponse,
 )
@@ -198,40 +196,6 @@ def organize_track(
     except ai_track_organization.TrackOrganizationNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-
-
-@router.post(
-    "/tracks/{track_id}/organize/apply",
-    response_model=TrackOrganizationApplyResponse,
-)
-def apply_track_organization(
-    track_id: int,
-    payload: TrackOrganizationApplyRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
-) -> TrackOrganizationApplyResponse:
-    """Apply only the user's selected organization suggestions.
-
-    The referenced analysis must belong to the current user and track. The
-    endpoint never applies unselected suggestions and never creates playlists.
-    """
-    try:
-        return ai_track_organization.apply_organization_suggestions(
-            db,
-            current_user,
-            track_id,
-            payload,
-        )
-    except ai_track_organization.TrackOrganizationNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except ai_track_organization.TrackOrganizationApplyValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
 
