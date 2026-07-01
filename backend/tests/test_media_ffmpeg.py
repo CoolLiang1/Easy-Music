@@ -129,7 +129,7 @@ def test_generate_mp3_playback_uses_ffmpeg_argument_array(tmp_path: Path) -> Non
             "-codec:a",
             "libmp3lame",
             "-b:a",
-            "192k",
+            "320k",
             str(output_path),
         ]
     ]
