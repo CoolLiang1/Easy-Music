@@ -726,8 +726,8 @@ The test suite covers:
 - Authenticated track list, detail, update, delete, batch delete, tag
   association, ownership, and streaming behavior.
 - Authenticated playlist CRUD, optional descriptions, ownership isolation,
-  add/remove, idempotent duplicate add, reorder validation, track-delete
-  relationship cleanup, and playlist signal isolation.
+  add/batch add/remove, idempotent duplicate add, reorder validation,
+  track-delete relationship cleanup, and playlist signal isolation.
 - Authenticated playback-event bulk sync, validation, ownership, and duplicate
   retry behavior.
 - Authenticated feedback-event sync, context tag validation, `like`, `dislike`,

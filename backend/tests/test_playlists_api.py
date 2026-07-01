@@ -246,6 +246,75 @@ def test_add_track_to_playlist_rejects_another_users_track(
     assert db_session.query(PlaylistTrack).filter_by(playlist_id=playlist.id).count() == 0
 
 
+def test_batch_add_tracks_to_playlist_appends_unique_selected_tracks(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    playlist = create_playlist(db_session, owner)
+    existing = create_track(db_session, owner, title="Existing")
+    first = create_track(db_session, owner, title="First")
+    second = create_track(db_session, owner, title="Second")
+    add_playlist_track(db_session, playlist, existing, position=1)
+
+    response = client.post(
+        f"/api/playlists/{playlist.id}/tracks/batch",
+        json={"track_ids": [first.id, second.id, first.id, existing.id]},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["track_count"] == 3
+    assert [
+        (item["track"]["id"], item["position"])
+        for item in body["tracks"]
+    ] == [
+        (existing.id, 1),
+        (first.id, 2),
+        (second.id, 3),
+    ]
+    assert db_session.query(PlaylistTrack).filter_by(playlist_id=playlist.id).count() == 3
+
+
+def test_batch_add_tracks_to_playlist_rejects_invalid_track_without_partial_insert(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    playlist = create_playlist(db_session, owner)
+    owner_track = create_track(db_session, owner)
+    hidden_track = create_track(db_session, other_user, title="Hidden")
+
+    response = client.post(
+        f"/api/playlists/{playlist.id}/tracks/batch",
+        json={"track_ids": [owner_track.id, hidden_track.id]},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Track not found."
+    assert db_session.query(PlaylistTrack).filter_by(playlist_id=playlist.id).count() == 0
+
+
+def test_batch_add_tracks_to_playlist_requires_selection(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    playlist = create_playlist(db_session, owner)
+
+    response = client.post(
+        f"/api/playlists/{playlist.id}/tracks/batch",
+        json={"track_ids": []},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Choose at least one track."
+
+
 def test_remove_track_from_playlist_compacts_order(
     client: TestClient,
     db_session: Session,

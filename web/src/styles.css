@@ -451,6 +451,21 @@ h3 {
   margin-top: 0;
 }
 
+.batch-playlist-picker {
+  align-items: center;
+  margin-top: 12px;
+}
+
+.batch-playlist-picker select {
+  min-height: 40px;
+  min-width: min(100%, 260px);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 9px 11px;
+}
+
 .button {
   display: inline-flex;
   min-height: 40px;

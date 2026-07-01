@@ -594,6 +594,7 @@ does not let AI select tracks.
 - `PATCH /api/playlists/{id}`
 - `DELETE /api/playlists/{id}`
 - `POST /api/playlists/{id}/tracks`
+- `POST /api/playlists/{id}/tracks/batch`
 - `DELETE /api/playlists/{id}/tracks/{track_id}`
 - `PUT /api/playlists/{id}/tracks/order`
 

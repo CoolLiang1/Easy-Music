@@ -641,6 +641,18 @@ Invoke-RestMethod `
   -Body (@{ track_id = $trackId } | ConvertTo-Json)
 ```
 
+Batch add selected owned tracks. Duplicates and tracks already in the playlist
+are idempotent and should not create duplicate playlist items:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)/tracks/batch" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ track_ids = @($trackId, $secondTrackId, $trackId) } | ConvertTo-Json)
+```
+
 Reorder tracks by sending exactly the current playlist track ids:
 
 ```powershell
@@ -674,6 +686,8 @@ Expected result:
 
 - List/detail/update/delete are current-user scoped.
 - Adding another user's track returns `404 Not Found`.
+- Batch adding another user's track returns `404 Not Found` without partially
+  adding valid tracks from the same request.
 - Accessing another user's playlist returns `404 Not Found`.
 - Reorder rejects duplicate ids or ids that are not exactly the current
   playlist membership.

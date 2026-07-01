@@ -5,6 +5,7 @@ import type {
   PlaylistReorder,
   PlaylistSummary,
   PlaylistTrackAdd,
+  PlaylistTracksAdd,
   PlaylistUpdate,
 } from "../types/playlist";
 
@@ -54,6 +55,21 @@ export function addPlaylistTrack(
 ) {
   return apiRequest<Playlist>(
     `/api/playlists/${encodeURIComponent(playlistId)}/tracks`,
+    {
+      method: "POST",
+      accessToken,
+      body: payload,
+    },
+  );
+}
+
+export function addPlaylistTracks(
+  accessToken: string,
+  playlistId: number | string,
+  payload: PlaylistTracksAdd,
+) {
+  return apiRequest<Playlist>(
+    `/api/playlists/${encodeURIComponent(playlistId)}/tracks/batch`,
     {
       method: "POST",
       accessToken,

@@ -14,6 +14,7 @@ from app.schemas.playlist import (
     PlaylistSummaryResponse,
     PlaylistTrackAdd,
     PlaylistTrackResponse,
+    PlaylistTracksAdd,
     PlaylistUpdate,
 )
 from app.services.tracks import build_track_response
@@ -130,6 +131,57 @@ def add_track_to_playlist(
     _touch_playlist(playlist)
     db.commit()
     db.refresh(playlist)
+    return playlist
+
+
+def add_tracks_to_playlist(
+    db: Session,
+    user: User,
+    playlist: Playlist,
+    payload: PlaylistTracksAdd,
+) -> Playlist | None:
+    unique_track_ids = list(dict.fromkeys(payload.track_ids))
+    if not unique_track_ids:
+        raise PlaylistValidationError("Choose at least one track.")
+
+    tracks = list(
+        db.scalars(
+            select(Track).where(Track.user_id == user.id, Track.id.in_(unique_track_ids)),
+        ),
+    )
+    tracks_by_id = {track.id: track for track in tracks}
+    if len(tracks_by_id) != len(unique_track_ids):
+        return None
+
+    existing_track_ids = set(
+        db.scalars(
+            select(PlaylistTrack.track_id).where(
+                PlaylistTrack.playlist_id == playlist.id,
+                PlaylistTrack.track_id.in_(unique_track_ids),
+            ),
+        ),
+    )
+
+    next_position = _next_position(db, playlist)
+    added_count = 0
+    for track_id in unique_track_ids:
+        if track_id in existing_track_ids:
+            continue
+
+        db.add(
+            PlaylistTrack(
+                playlist_id=playlist.id,
+                track_id=track_id,
+                position=next_position + added_count,
+            ),
+        )
+        added_count += 1
+
+    if added_count > 0:
+        _touch_playlist(playlist)
+        db.commit()
+        db.refresh(playlist)
+
     return playlist
 
 
