@@ -723,8 +723,8 @@ The test suite covers:
 
 - Auth login, invalid credentials, and current-user lookup.
 - Authenticated tag create, list, update, delete, validation, and ownership.
-- Authenticated track list, detail, update, delete, tag association, ownership,
-  and streaming behavior.
+- Authenticated track list, detail, update, delete, batch delete, tag
+  association, ownership, and streaming behavior.
 - Authenticated playlist CRUD, optional descriptions, ownership isolation,
   add/remove, idempotent duplicate add, reorder validation, track-delete
   relationship cleanup, and playlist signal isolation.

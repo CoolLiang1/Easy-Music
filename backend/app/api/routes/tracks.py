@@ -11,6 +11,8 @@ from app.media.responses import stream_file_response
 from app.media.storage import MediaStorage, get_media_storage
 from app.models.user import User
 from app.schemas.track import (
+    TrackBatchDelete,
+    TrackBatchDeleteResponse,
     TrackBatchTagUpdate,
     TrackBatchTagUpdateResponse,
     TrackResponse,
@@ -49,6 +51,22 @@ def batch_update_track_tags(
     try:
         return track_service.batch_update_track_tags(db, current_user, payload)
     except track_service.BatchTagValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/batch-delete", response_model=TrackBatchDeleteResponse)
+def batch_delete_tracks(
+    payload: TrackBatchDelete,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
+) -> TrackBatchDeleteResponse:
+    try:
+        return track_service.batch_delete_tracks(db, current_user, payload, storage)
+    except track_service.BatchDeleteValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),

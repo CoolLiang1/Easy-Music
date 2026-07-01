@@ -2,6 +2,8 @@ import { ApiClientError, apiRequest } from "./http";
 import { env } from "../config/env";
 import type {
   Track,
+  TrackBatchDelete,
+  TrackBatchDeleteResponse,
   TrackBatchTagUpdate,
   TrackBatchTagUpdateResponse,
   TrackUpdate,
@@ -41,6 +43,14 @@ export function deleteTrack(accessToken: string, trackId: number | string) {
   return apiRequest<void>(`/api/tracks/${encodeURIComponent(trackId)}`, {
     method: "DELETE",
     accessToken,
+  });
+}
+
+export function batchDeleteTracks(accessToken: string, payload: TrackBatchDelete) {
+  return apiRequest<TrackBatchDeleteResponse>("/api/tracks/batch-delete", {
+    method: "POST",
+    accessToken,
+    body: payload,
   });
 }
 

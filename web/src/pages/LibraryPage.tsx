@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { addPlaylistTrack, listPlaylists } from "../api/playlists";
 import { listTags } from "../api/tags";
-import { batchUpdateTrackTags, listTracks } from "../api/tracks";
+import { batchDeleteTracks, batchUpdateTrackTags, listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import {
   BatchTagEditor,
@@ -28,8 +28,11 @@ export function LibraryPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
   const [isApplyingTags, setIsApplyingTags] = useState(false);
+  const [isDeletingTracks, setIsDeletingTracks] = useState(false);
   const [batchTagError, setBatchTagError] = useState<string | null>(null);
   const [batchTagSuccess, setBatchTagSuccess] = useState<string | null>(null);
+  const [batchDeleteError, setBatchDeleteError] = useState<string | null>(null);
+  const [batchDeleteSuccess, setBatchDeleteSuccess] = useState<string | null>(null);
 
   const loadTracks = useCallback(async (showLoading: boolean) => {
     if (!accessToken) {
@@ -99,6 +102,8 @@ export function LibraryPage() {
     });
     setBatchTagError(null);
     setBatchTagSuccess(null);
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
   };
 
   const applyBatchTags = async (operation: BatchTagOperation) => {
@@ -113,6 +118,8 @@ export function LibraryPage() {
       return;
     }
 
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
     setIsApplyingTags(true);
     setBatchTagError(null);
     setBatchTagSuccess(null);
@@ -152,6 +159,76 @@ export function LibraryPage() {
       setBatchTagError(getErrorMessage(error));
     } finally {
       setIsApplyingTags(false);
+    }
+  };
+
+  const deleteSelectedTracks = async () => {
+    if (!accessToken) {
+      setBatchDeleteError("请重新登录后再删除音轨。");
+      return;
+    }
+
+    const trackIds = [...selectedTrackIds];
+    if (trackIds.length === 0) {
+      setBatchDeleteError("请至少选择一个音轨。");
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `确定删除所选 ${trackIds.length} 个音轨吗？这会删除服务器上的音轨记录和已保存媒体文件。`,
+    );
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsDeletingTracks(true);
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
+    setBatchTagError(null);
+    setBatchTagSuccess(null);
+
+    try {
+      const response = await batchDeleteTracks(accessToken, { track_ids: trackIds });
+      const deletedTrackIds = new Set(
+        response.results
+          .filter((result) => result.status === "deleted")
+          .map((result) => result.track_id),
+      );
+
+      if (deletedTrackIds.size > 0) {
+        setLibraryState((current) => {
+          if (current.name !== "ready") {
+            return current;
+          }
+
+          return {
+            ...current,
+            tracks: current.tracks.filter((track) => !deletedTrackIds.has(track.id)),
+          };
+        });
+        setSelectedTrackIds((current) => {
+          const next = new Set(current);
+          for (const trackId of deletedTrackIds) {
+            next.delete(trackId);
+          }
+          return next;
+        });
+      }
+
+      const failedResults = response.results.filter((result) => result.status === "failed");
+      if (failedResults.length > 0) {
+        setBatchDeleteError(
+          `${summarizeBatchDeleteResponse(response)} ${failedResults
+            .map((result) => `#${result.track_id}: ${result.error}`)
+            .join(" ")}`,
+        );
+      } else {
+        setBatchDeleteSuccess(summarizeBatchDeleteResponse(response));
+      }
+    } catch (error: unknown) {
+      setBatchDeleteError(getErrorMessage(error));
+    } finally {
+      setIsDeletingTracks(false);
     }
   };
 
@@ -218,7 +295,30 @@ export function LibraryPage() {
         <RouteLink className="button secondary" to="/duplicates">
           查看重复音轨
         </RouteLink>
+        <button
+          className="button danger"
+          disabled={
+            libraryState.name !== "ready" ||
+            selectedTrackIds.size === 0 ||
+            isApplyingTags ||
+            isDeletingTracks
+          }
+          onClick={() => void deleteSelectedTracks()}
+          type="button"
+        >
+          {isDeletingTracks ? "正在删除..." : "删除所选音轨"}
+        </button>
       </div>
+      {batchDeleteError ? (
+        <p className="status-message error" role="alert">
+          {batchDeleteError}
+        </p>
+      ) : null}
+      {batchDeleteSuccess ? (
+        <p aria-live="polite" className="status-message success">
+          {batchDeleteSuccess}
+        </p>
+      ) : null}
 
       {libraryState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
@@ -239,7 +339,7 @@ export function LibraryPage() {
       {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
         <>
           <BatchTagEditor
-            disabled={isApplyingTags}
+            disabled={isApplyingTags || isDeletingTracks}
             errorMessage={batchTagError}
             onApply={applyBatchTags}
             selectedCount={selectedTrackIds.size}
@@ -263,6 +363,18 @@ export function LibraryPage() {
 function isProcessingStatus(status: string) {
   const normalizedStatus = status.toLowerCase();
   return normalizedStatus === "processing" || normalizedStatus === "uploaded";
+}
+
+function summarizeBatchDeleteResponse(response: {
+  deleted_count: number;
+  results: { status: string }[];
+}) {
+  const failedCount = response.results.filter((result) => result.status === "failed").length;
+  if (failedCount > 0) {
+    return `已删除 ${response.deleted_count} 个音轨，${failedCount} 个删除失败。`;
+  }
+
+  return `已删除 ${response.deleted_count} 个音轨。`;
 }
 
 function getErrorMessage(error: unknown) {

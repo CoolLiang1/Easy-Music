@@ -16,6 +16,9 @@ from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
 from app.schemas.track import (
+    TrackBatchDelete,
+    TrackBatchDeleteResponse,
+    TrackBatchDeleteResult,
     TrackBatchTagResult,
     TrackBatchTagUpdate,
     TrackBatchTagUpdateResponse,
@@ -32,6 +35,10 @@ class TrackMediaDeletionError(RuntimeError):
 
 
 class BatchTagValidationError(ValueError):
+    pass
+
+
+class BatchDeleteValidationError(ValueError):
     pass
 
 
@@ -222,6 +229,54 @@ def batch_update_track_tags(
         updated_count=len(updated_tracks),
         results=results,
         tracks=[build_track_response(db, track) for track in updated_tracks],
+    )
+
+
+def batch_delete_tracks(
+    db: Session,
+    user: User,
+    payload: TrackBatchDelete,
+    storage: MediaStorage,
+) -> TrackBatchDeleteResponse:
+    unique_track_ids = list(dict.fromkeys(payload.track_ids))
+
+    if not unique_track_ids:
+        raise BatchDeleteValidationError("Choose at least one track.")
+
+    results: list[TrackBatchDeleteResult] = []
+    deleted_count = 0
+
+    for track_id in unique_track_ids:
+        track = get_track(db, user, track_id)
+        if track is None:
+            results.append(
+                TrackBatchDeleteResult(
+                    track_id=track_id,
+                    status="failed",
+                    error="Track not found for current user.",
+                ),
+            )
+            continue
+
+        try:
+            delete_track(db, track, storage)
+        except TrackMediaDeletionError as exc:
+            results.append(
+                TrackBatchDeleteResult(
+                    track_id=track_id,
+                    status="failed",
+                    error=str(exc),
+                ),
+            )
+            continue
+
+        deleted_count += 1
+        results.append(TrackBatchDeleteResult(track_id=track_id, status="deleted"))
+
+    return TrackBatchDeleteResponse(
+        requested_track_count=len(unique_track_ids),
+        deleted_count=deleted_count,
+        results=results,
     )
 
 

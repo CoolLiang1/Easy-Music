@@ -400,6 +400,141 @@ def test_batch_tag_update_requires_selection_and_tag_action(
     )
 
 
+def test_batch_delete_tracks_removes_selected_tracks_and_media_files(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    tag = create_tag(db_session, user)
+
+    for track in (first, second):
+        track.original_file_path = f"originals/user-{user.id}/track-{track.id}/track.mp3"
+        track.playback_file_path = f"playback/user-{user.id}/track-{track.id}/playback.mp3"
+        track.cover_path = f"covers/user-{user.id}/track-{track.id}/cover.jpg"
+        db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
+        db_session.add(ProcessingJob(track_id=track.id, status="pending"))
+    db_session.commit()
+    db_session.refresh(first)
+    db_session.refresh(second)
+    first_id = first.id
+    second_id = second.id
+
+    media_paths = [
+        tmp_path / track_path
+        for track in (first, second)
+        for track_path in (
+            track.original_file_path,
+            track.playback_file_path,
+            track.cover_path,
+        )
+        if track_path is not None
+    ]
+    media_dirs = [media_path.parent for media_path in media_paths]
+    for media_path in media_paths:
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        media_path.write_bytes(b"media")
+
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": [first_id, second_id, first_id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 2
+    assert body["deleted_count"] == 2
+    assert body["results"] == [
+        {"track_id": first_id, "status": "deleted", "error": None},
+        {"track_id": second_id, "status": "deleted", "error": None},
+    ]
+    assert db_session.get(Track, first_id) is None
+    assert db_session.get(Track, second_id) is None
+    assert (
+        db_session.query(TrackTag)
+        .filter(TrackTag.track_id.in_([first_id, second_id]))
+        .count()
+        == 0
+    )
+    assert (
+        db_session.query(ProcessingJob)
+        .filter(ProcessingJob.track_id.in_([first_id, second_id]))
+        .count()
+        == 0
+    )
+    for media_path in media_paths:
+        assert not media_path.exists()
+    for media_dir in media_dirs:
+        assert not media_dir.exists()
+
+
+def test_batch_delete_tracks_is_scoped_to_current_user(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    owner_track = create_track(db_session, owner, title="Owner")
+    other_track = create_track(db_session, other_user, title="Hidden")
+    owner_track_id = owner_track.id
+    other_track_id = other_track.id
+    missing_track_id = other_track_id + 100
+
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": [owner_track_id, other_track_id, missing_track_id]},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 3
+    assert body["deleted_count"] == 1
+    assert body["results"] == [
+        {"track_id": owner_track_id, "status": "deleted", "error": None},
+        {
+            "track_id": other_track_id,
+            "status": "failed",
+            "error": "Track not found for current user.",
+        },
+        {
+            "track_id": missing_track_id,
+            "status": "failed",
+            "error": "Track not found for current user.",
+        },
+    ]
+    assert db_session.get(Track, owner_track_id) is None
+    assert db_session.get(Track, other_track_id) is not None
+
+
+def test_batch_delete_tracks_requires_authentication(client: TestClient) -> None:
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": [1]},
+    )
+
+    assert response.status_code == 401
+
+
+def test_batch_delete_tracks_requires_selection(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": []},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Choose at least one track."
+
+
 def test_delete_track(client: TestClient, db_session: Session) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user)

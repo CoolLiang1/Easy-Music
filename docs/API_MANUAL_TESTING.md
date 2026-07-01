@@ -820,6 +820,44 @@ Expected result:
 - A missing token returns `401 Unauthorized`.
 - A track owned by another user returns `404 Not Found`.
 
+### Batch Delete Selected Tracks
+
+```powershell
+$batchDeleteFirst = curl.exe `
+  -s `
+  -X POST `
+  -H "Authorization: Bearer $token" `
+  -F "file=@test-tone.wav;type=audio/wav" `
+  "http://127.0.0.1:8000/api/tracks/upload" | ConvertFrom-Json
+
+$batchDeleteSecond = curl.exe `
+  -s `
+  -X POST `
+  -H "Authorization: Bearer $token" `
+  -F "file=@test-tone.wav;type=audio/wav" `
+  "http://127.0.0.1:8000/api/tracks/upload" | ConvertFrom-Json
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/tracks/batch-delete" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    track_ids = @($batchDeleteFirst.id, $batchDeleteSecond.id)
+  } | ConvertTo-Json)
+```
+
+Expected result:
+
+- The response reports `requested_track_count = 2`, `deleted_count = 2`, and
+  per-track `deleted` results.
+- Each deleted track returns `404 Not Found` from `GET /api/tracks/{id}`.
+- Stored media file deletion, empty `track-{id}` directory cleanup,
+  relationship cleanup, current-user scoping, and media deletion errors follow
+  the same behavior as single-track delete.
+- Empty `track_ids` returns `400 Bad Request`.
+- A missing token returns `401 Unauthorized`.
+
 ## Sync Playback Events
 
 Phase 4 adds one minimal authenticated endpoint for Android offline playback

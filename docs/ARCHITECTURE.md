@@ -580,6 +580,7 @@ does not let AI select tracks.
 - `PATCH /api/tracks/{id}`
 - `PUT /api/tracks/{id}/cover`
 - `GET /api/tracks/{id}/cover`
+- `POST /api/tracks/batch-delete`
 - `DELETE /api/tracks/{id}`
 - `GET /api/tracks/duplicates`
 - `GET /api/tracks/{id}/stream`
