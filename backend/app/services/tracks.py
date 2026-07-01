@@ -283,6 +283,7 @@ def delete_track(db: Session, track: Track, storage: MediaStorage | None = None)
             failed_media_path = display_path
             media_path.unlink(missing_ok=True)
 
+        _cleanup_empty_track_media_dirs(media_paths, track_id)
         db.commit()
     except OSError as exc:
         db.rollback()
@@ -330,3 +331,45 @@ def _track_media_paths(track: Track, storage: MediaStorage) -> list[tuple[Path, 
         paths.append((media_path, relative_path))
 
     return paths
+
+
+def _cleanup_empty_track_media_dirs(
+    media_paths: list[tuple[Path, str]],
+    track_id: int,
+) -> None:
+    expected_dir_name = f"track-{track_id}"
+    cleaned_dirs: set[str] = set()
+
+    for media_path, display_path in media_paths:
+        parent = media_path.parent
+        if parent.name != expected_dir_name:
+            continue
+
+        parent_key = parent.as_posix()
+        if parent_key in cleaned_dirs:
+            continue
+
+        cleaned_dirs.add(parent_key)
+        try:
+            parent.rmdir()
+        except FileNotFoundError:
+            logger.info(
+                "Skipped media directory cleanup for track %s at '%s': directory no longer exists.",
+                track_id,
+                parent,
+            )
+        except OSError as exc:
+            reason = str(exc)
+            try:
+                if parent.exists() and any(parent.iterdir()):
+                    reason = "directory is not empty"
+            except OSError as inspect_exc:
+                reason = str(inspect_exc)
+
+            logger.info(
+                "Skipped media directory cleanup for track %s at '%s' after deleting '%s': %s.",
+                track_id,
+                parent,
+                display_path,
+                reason,
+            )

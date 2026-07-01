@@ -811,7 +811,10 @@ Expected result:
 - Related track tags, playback events, feedback events, and processing jobs for
   the deleted track are removed.
 - Stored media files referenced by that track are deleted one explicit file at
-  a time after path validation; no directory or recursive cleanup is performed.
+  a time after path validation; no recursive cleanup is performed.
+- After referenced files are deleted, empty `track-{id}` media directories are
+  removed with non-recursive empty-directory cleanup. Non-empty directories are
+  kept and the backend logs the reason.
 - If a stored media file cannot be deleted, the endpoint returns an error with
   a clear `detail` message instead of reporting a successful delete.
 - A missing token returns `401 Unauthorized`.

@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 
 import pytest
@@ -474,6 +475,66 @@ def test_delete_track_removes_related_rows_and_media_files(
     assert db_session.query(ProcessingJob).filter_by(track_id=track_id).count() == 0
     for media_path in media_paths:
         assert not media_path.exists()
+
+
+def test_delete_track_removes_empty_track_media_directories(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.original_file_path = f"originals/user-{user.id}/track-{track.id}/track.mp3"
+    track.playback_file_path = f"playback/user-{user.id}/track-{track.id}/playback.mp3"
+    track.cover_path = f"covers/user-{user.id}/track-{track.id}/cover.jpg"
+    db_session.commit()
+    db_session.refresh(track)
+
+    media_paths = [
+        tmp_path / track.original_file_path,
+        tmp_path / track.playback_file_path,
+        tmp_path / track.cover_path,
+    ]
+    media_dirs = [media_path.parent for media_path in media_paths]
+    for media_path in media_paths:
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        media_path.write_bytes(b"media")
+
+    response = client.delete(f"/api/tracks/{track.id}", headers=auth_headers(user))
+
+    assert response.status_code == 204
+    for media_path in media_paths:
+        assert not media_path.exists()
+    for media_dir in media_dirs:
+        assert not media_dir.exists()
+
+
+def test_delete_track_keeps_non_empty_track_media_directory_and_logs_reason(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.original_file_path = f"originals/user-{user.id}/track-{track.id}/track.mp3"
+    db_session.commit()
+    db_session.refresh(track)
+
+    original_path = tmp_path / track.original_file_path
+    original_path.parent.mkdir(parents=True, exist_ok=True)
+    original_path.write_bytes(b"media")
+    sibling_path = original_path.parent / "keep.txt"
+    sibling_path.write_text("do not delete")
+
+    with caplog.at_level(logging.INFO, logger="app.services.tracks"):
+        response = client.delete(f"/api/tracks/{track.id}", headers=auth_headers(user))
+
+    assert response.status_code == 204
+    assert not original_path.exists()
+    assert sibling_path.read_text() == "do not delete"
+    assert original_path.parent.exists()
+    assert "directory is not empty" in caplog.text
 
 
 def test_delete_track_reports_media_file_failure(
