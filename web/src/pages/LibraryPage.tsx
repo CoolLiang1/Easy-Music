@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 
 import { addPlaylistTrack, addPlaylistTracks, listPlaylists } from "../api/playlists";
 import { listTags } from "../api/tags";
@@ -22,10 +22,13 @@ type LibraryState =
 
 export function LibraryPage() {
   const { accessToken } = useAuth();
+  const trackSearchInputId = useId();
   const [libraryState, setLibraryState] = useState<LibraryState>({
     name: "loading",
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  const [isTrackFilterEnabled, setIsTrackFilterEnabled] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
   const [isApplyingTags, setIsApplyingTags] = useState(false);
   const [isAddingSelectedToPlaylist, setIsAddingSelectedToPlaylist] = useState(false);
@@ -112,6 +115,17 @@ export function LibraryPage() {
     setBatchDeleteError(null);
     setBatchDeleteSuccess(null);
   };
+
+  const visibleTracks =
+    libraryState.name === "ready"
+      ? filterLibraryTracks(
+          libraryState.tracks,
+          isTrackFilterEnabled,
+          trackSearchQuery,
+        )
+      : [];
+  const isSearchFilterActive =
+    isTrackFilterEnabled && trackSearchQuery.trim().length > 0;
 
   const applyBatchTags = async (operation: BatchTagOperation) => {
     if (!accessToken) {
@@ -501,6 +515,36 @@ export function LibraryPage() {
 
       {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
         <>
+          <div className="library-filter-bar" aria-label="曲库搜索">
+            <label className="field library-search-field" htmlFor={trackSearchInputId}>
+              搜索音轨
+              <input
+                className="text-input"
+                id={trackSearchInputId}
+                onChange={(event) => setTrackSearchQuery(event.target.value)}
+                placeholder="输入音轨名称"
+                type="search"
+                value={trackSearchQuery}
+              />
+            </label>
+            <label className="switch-control">
+              <input
+                checked={isTrackFilterEnabled}
+                onChange={(event) => setIsTrackFilterEnabled(event.target.checked)}
+                role="switch"
+                type="checkbox"
+              />
+              <span className="switch-track" aria-hidden="true">
+                <span className="switch-thumb" />
+              </span>
+              <span>筛选模式</span>
+            </label>
+            <span className="filter-result-count" aria-live="polite">
+              {isSearchFilterActive
+                ? `显示 ${visibleTracks.length} / 共 ${libraryState.tracks.length}`
+                : `显示全部 ${libraryState.tracks.length}`}
+            </span>
+          </div>
           <BatchTagEditor
             disabled={isApplyingTags || isAddingSelectedToPlaylist || isDeletingTracks}
             errorMessage={batchTagError}
@@ -509,14 +553,18 @@ export function LibraryPage() {
             successMessage={batchTagSuccess}
             tags={libraryState.tags}
           />
-          <TrackTable
-            accessToken={accessToken}
-            onAddTrackToPlaylist={addTrackToPlaylist}
-            onToggleTrackSelection={toggleTrackSelection}
-            playlistOptions={libraryState.playlists}
-            selectedTrackIds={selectedTrackIds}
-            tracks={libraryState.tracks}
-          />
+          {visibleTracks.length === 0 ? (
+            <div className="empty-state">没有匹配的音轨。</div>
+          ) : (
+            <TrackTable
+              accessToken={accessToken}
+              onAddTrackToPlaylist={addTrackToPlaylist}
+              onToggleTrackSelection={toggleTrackSelection}
+              playlistOptions={libraryState.playlists}
+              selectedTrackIds={selectedTrackIds}
+              tracks={visibleTracks}
+            />
+          )}
         </>
       ) : null}
     </section>
@@ -538,6 +586,21 @@ function summarizeBatchDeleteResponse(response: {
   }
 
   return `已删除 ${response.deleted_count} 个音轨。`;
+}
+
+function filterLibraryTracks(
+  tracks: Track[],
+  isFilterModeEnabled: boolean,
+  searchQuery: string,
+) {
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+  if (!isFilterModeEnabled || normalizedQuery.length === 0) {
+    return tracks;
+  }
+
+  return tracks.filter((track) =>
+    track.title.toLocaleLowerCase().includes(normalizedQuery),
+  );
 }
 
 function getErrorMessage(error: unknown) {

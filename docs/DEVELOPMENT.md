@@ -641,22 +641,26 @@ backend:
    wait for lightweight polling while the track is processing, until the status
    becomes `ready`. Failed processing should show the backend processing error
    message when one is available.
-9. Select two or more tracks in Library, choose existing tags from the batch
+9. In Library, type part of a track title in the search field. With filter mode
+   off, confirm the full library remains visible; turn filter mode on and
+   confirm the visible rows update as the input changes, then turn it off again
+   and confirm the full library returns.
+10. Select two or more tracks in Library, choose existing tags from the batch
    tag panel, confirm adding and removing tags, and verify the affected rows
    update without changing unselected tracks.
-10. Open `Reports` and confirm the read-only organization sections load:
+11. Open `Reports` and confirm the read-only organization sections load:
     untagged ready tracks, missing metadata, processing attention, duplicate
     candidates, never played, rarely played, and expired cooldowns.
-11. Open the track detail page and edit title, artist, album, content type,
+12. Open the track detail page and edit title, artist, album, content type,
    source URL, liked state, cooldown date, cover image, and assigned tags as
    needed.
-12. Visit `Recommendations` and confirm the read-only Recently Revived section
+13. Visit `Recommendations` and confirm the read-only Recently Revived section
     loads quiet ready tracks, links to Track Detail, and does not auto-play,
     auto-cache, or modify feedback.
-13. Visit `Tags`, create a tag in one of the supported groups (`scene`,
+14. Visit `Tags`, create a tag in one of the supported groups (`scene`,
     `type`, `feature`), rename it, change its group, and delete one
     explicit tag.
-14. For a ready track, use the playback control from the library row or track
+15. For a ready track, use the playback control from the library row or track
     detail page and confirm audio loads through the authenticated stream
     endpoint.
 
@@ -839,14 +843,18 @@ Phase 1 backend:
    emulator host-loopback URL is usually `http://10.0.2.2:8000`.
 8. Log in with the local user and confirm Library loads tracks from
    `GET /api/tracks`.
-9. Open a track detail screen and confirm fresh metadata loads from
+9. In Library, type part of a track title in the search field. With filter mode
+   off, confirm the full library remains visible; turn filter mode on and
+   confirm the visible rows update as the input changes, then turn it off again
+   and confirm the full library returns.
+10. Open a track detail screen and confirm fresh metadata loads from
    `GET /api/tracks/{track_id}`.
-10. Play a `ready` track and confirm streaming uses
+11. Play a `ready` track and confirm streaming uses
     `GET /api/tracks/{track_id}/stream` with bearer authentication.
-11. Confirm foreground controls, mini player state, background playback,
+12. Confirm foreground controls, mini player state, background playback,
     notification controls, lock screen controls, and headset/media-button
     play-pause behavior.
-12. Record the emulator or device result in `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`.
+13. Record the emulator or device result in `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`.
 
 Phase 3 acceptance must not be marked complete without an actual emulator or
 device playback run. Offline cache, recommendation, AI Assistant, playback

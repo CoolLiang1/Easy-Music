@@ -154,6 +154,7 @@ queue state across devices.
 
 - Login
 - Recommendation home
+- Client-side Library title search with an explicit filter-mode toggle
 - Cloud playback
 - Playlist browsing and playback handoff
 - Local playback queue management with history/current/upcoming, playlist
@@ -188,7 +189,8 @@ Android should store:
 
 - Login
 - Audio upload
-- Library management
+- Library management, including client-side title search with an explicit
+  filter-mode toggle
 - Playlist management
 - Track editing
 - Tag management

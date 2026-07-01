@@ -49,7 +49,9 @@ fun LibraryRoute(
         modifier = modifier,
         uiState = viewModel.uiState,
         isNetworkAvailable = isNetworkAvailable,
+        onFilterModeChanged = viewModel::setFilterModeEnabled,
         onRefresh = { viewModel.refresh(isNetworkAvailable) },
+        onSearchQueryChanged = viewModel::updateSearchQuery,
         onTrackSelected = onOpenNowPlaying,
     )
 }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -23,6 +24,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,7 +56,9 @@ import kotlinx.coroutines.flow.map
 @Composable
 fun LibraryScreen(
     uiState: LibraryUiState,
+    onFilterModeChanged: (Boolean) -> Unit,
     onRefresh: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
@@ -66,6 +71,17 @@ fun LibraryScreen(
             .map { state -> state.toPlaybackUiSummary() }
             .distinctUntilChanged()
     }.collectAsState(initial = PlaybackUiSummary())
+    val visibleTracks = remember(
+        uiState.tracks,
+        uiState.searchQuery,
+        uiState.isFilterModeEnabled,
+    ) {
+        visibleLibraryTracks(
+            tracks = uiState.tracks,
+            searchQuery = uiState.searchQuery,
+            isFilterModeEnabled = uiState.isFilterModeEnabled,
+        )
+    }
 
     selectedTrackId?.let { trackId ->
         Column(modifier = modifier.fillMaxSize()) {
@@ -107,6 +123,19 @@ fun LibraryScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        if (uiState.tracks.isNotEmpty()) {
+            LibraryFilterControls(
+                searchQuery = uiState.searchQuery,
+                isFilterModeEnabled = uiState.isFilterModeEnabled,
+                visibleTrackCount = visibleTracks.size,
+                totalTrackCount = uiState.tracks.size,
+                onSearchQueryChanged = onSearchQueryChanged,
+                onFilterModeChanged = onFilterModeChanged,
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         Column(modifier = Modifier.weight(1f)) {
             when {
                 uiState.isLoading -> LibraryLoading()
@@ -116,8 +145,9 @@ fun LibraryScreen(
                 )
 
                 uiState.tracks.isEmpty() -> LibraryEmpty(onRefresh = onRefresh)
+                visibleTracks.isEmpty() -> LibrarySearchEmpty(searchQuery = uiState.searchQuery)
                 else -> TrackList(
-                    tracks = uiState.tracks,
+                    tracks = visibleTracks,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                     playbackSummary = playbackSummary,
                     errorMessage = uiState.errorMessage,
@@ -237,6 +267,85 @@ private fun LibraryStats(
         if (processingCount > 0) {
             AssistChip(onClick = {}, label = { Text("处理中 $processingCount") })
         }
+    }
+}
+
+@Composable
+private fun LibraryFilterControls(
+    searchQuery: String,
+    isFilterModeEnabled: Boolean,
+    visibleTrackCount: Int,
+    totalTrackCount: Int,
+    onSearchQueryChanged: (String) -> Unit,
+    onFilterModeChanged: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChanged,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("搜索音轨") },
+            placeholder = { Text("输入音轨名称") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                )
+            },
+            singleLine = true,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Switch(
+                    checked = isFilterModeEnabled,
+                    onCheckedChange = onFilterModeChanged,
+                )
+                Text(
+                    text = "筛选模式",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = if (isFilterModeEnabled && searchQuery.isNotBlank()) {
+                    "显示 $visibleTrackCount / 共 $totalTrackCount"
+                } else {
+                    "显示全部 $totalTrackCount"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibrarySearchEmpty(searchQuery: String) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "没有匹配的音轨",
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            modifier = Modifier.padding(top = 8.dp),
+            text = "当前关键词：${searchQuery.trim()}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

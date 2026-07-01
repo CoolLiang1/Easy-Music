@@ -1766,19 +1766,23 @@ Open the Vite URL in a browser, usually `http://127.0.0.1:8081/`, then verify:
 1. Log in with the local initial user.
 2. Open `Library` and confirm the track list loads, including empty, processing,
    failed, or ready states depending on local data.
-3. Open `Upload`, select an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
+3. In `Library`, type part of a track title in the search field. With filter
+   mode off, confirm the full library remains visible; turn filter mode on and
+   confirm the visible rows update as the input changes, then turn it off again
+   and confirm the full library returns.
+4. Open `Upload`, select an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
    page shows the created track and initial processing status.
-4. Run `docker compose run --rm worker` once, or run
+5. Run `docker compose run --rm worker` once, or run
    `docker compose up -d worker-loop`, to process pending tracks.
-5. Return to `Library` or the uploaded track detail page and confirm the status
+6. Return to `Library` or the uploaded track detail page and confirm the status
    becomes `ready` after refresh or polling.
-6. Open the track detail page, edit metadata, save it, refresh, and confirm the
+7. Open the track detail page, edit metadata, save it, refresh, and confirm the
    saved values are still shown.
-7. Open `Tags`, create a tag using only `scene`, `type`, or `feature`, rename
+8. Open `Tags`, create a tag using only `scene`, `type`, or `feature`, rename
    it, change its group, and delete one explicit tag.
-8. On the track detail page, assign and remove existing tags, save, refresh, and
+9. On the track detail page, assign and remove existing tags, save, refresh, and
    confirm the associations persist.
-9. On a ready track, use the browser playback control from the library or detail
+10. On a ready track, use the browser playback control from the library or detail
    page and confirm audio plays through the authenticated stream endpoint.
 
 Expected Web result:
