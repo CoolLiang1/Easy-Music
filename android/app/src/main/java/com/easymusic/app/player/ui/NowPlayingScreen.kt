@@ -63,6 +63,7 @@ import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
 import com.easymusic.app.player.domain.canSkipToNext
 import com.easymusic.app.player.domain.canSkipToPrevious
+import com.easymusic.app.recommendation.data.FeedbackType
 import com.easymusic.app.ui.theme.BannerTone
 import com.easymusic.app.ui.theme.SectionHeader
 import com.easymusic.app.ui.theme.StatusBanner
@@ -81,6 +82,8 @@ fun NowPlayingScreen(
     onClearQueue: () -> Unit,
     onMoveUpcomingItem: (String, Int) -> Unit,
     onSetRepeatPlaylist: (Boolean) -> Unit,
+    feedbackState: ActivePlaybackFeedbackUiState,
+    onFeedback: (FeedbackType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val track = uiState.track
@@ -191,6 +194,11 @@ fun NowPlayingScreen(
             onNext = onNext,
         )
 
+        ActivePlaybackFeedbackSection(
+            state = feedbackState,
+            onFeedback = onFeedback,
+        )
+
         QueueManagementSection(
             uiState = uiState,
             onClearQueueRequest = { showClearQueueConfirm = true },
@@ -232,6 +240,7 @@ fun NowPlayingRouteContent(
     isNetworkAvailable: Boolean = true,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val feedbackState by viewModel.feedbackState.collectAsState()
 
     DisposableEffect(viewModel) {
         onDispose {
@@ -253,7 +262,91 @@ fun NowPlayingRouteContent(
         onClearQueue = viewModel::clearQueue,
         onMoveUpcomingItem = viewModel::moveUpcomingItem,
         onSetRepeatPlaylist = viewModel::setRepeatPlaylist,
+        feedbackState = feedbackState,
+        onFeedback = { feedbackType ->
+            viewModel.sendFeedback(
+                feedbackType = feedbackType,
+                isNetworkAvailable = isNetworkAvailable,
+            )
+        },
     )
+}
+
+@Composable
+private fun ActivePlaybackFeedbackSection(
+    state: ActivePlaybackFeedbackUiState,
+    onFeedback: (FeedbackType) -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "快速反馈",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "反馈会影响后续推荐，但不会打断当前播放。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ActiveFeedbackButton(
+                    label = "喜欢",
+                    feedbackType = FeedbackType.Like,
+                    state = state,
+                    onFeedback = onFeedback,
+                )
+                ActiveFeedbackButton(
+                    label = "今天不听",
+                    feedbackType = FeedbackType.NotToday,
+                    state = state,
+                    onFeedback = onFeedback,
+                )
+                ActiveFeedbackButton(
+                    label = "听腻了",
+                    feedbackType = FeedbackType.Tired,
+                    state = state,
+                    onFeedback = onFeedback,
+                )
+            }
+            state.message?.let { message ->
+                StatusBanner(text = message, tone = BannerTone.Positive)
+            }
+            state.errorMessage?.let { message ->
+                StatusBanner(text = message, tone = BannerTone.Error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveFeedbackButton(
+    label: String,
+    feedbackType: FeedbackType,
+    state: ActivePlaybackFeedbackUiState,
+    onFeedback: (FeedbackType) -> Unit,
+) {
+    OutlinedButton(
+        enabled = !state.isSending,
+        onClick = { onFeedback(feedbackType) },
+    ) {
+        if (state.sendingType == feedbackType) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .width(18.dp)
+                    .height(18.dp),
+                strokeWidth = 2.dp,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(if (state.sendingType == feedbackType) "发送中" else label)
+    }
 }
 
 @Composable

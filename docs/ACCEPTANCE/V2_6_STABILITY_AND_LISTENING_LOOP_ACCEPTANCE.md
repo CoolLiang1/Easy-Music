@@ -133,12 +133,12 @@ Explicitly out of scope:
 - [x] Web active player supports like.
 - [x] Web active player supports tired.
 - [x] Web active player supports not-today.
-- [ ] Android Now Playing supports the same three actions.
+- [x] Android Now Playing supports the same three actions.
 - [x] Like updates backend track state.
 - [x] Tired sets cooldown.
 - [x] Not-today affects same-day recommendation exclusion.
-- [ ] Duplicate in-flight taps are prevented.
-- [ ] Feedback errors do not stop playback.
+- [x] Duplicate in-flight taps are prevented.
+- [x] Feedback errors do not stop playback.
 
 ## Gate 10: Sprint 1 Cross-Client Smoke
 
@@ -383,3 +383,37 @@ Manual checks still required:
 
 - Real browser confirmation that feedback status remains non-blocking while
   audio continues.
+
+### 2026-07-10 - Sprint 1 Android Active Playback Feedback
+
+Implemented:
+
+- Added like, not-today, and tired actions to Android Now Playing.
+- Added a dedicated feedback repository and controller so feedback state and
+  failures cannot mutate Media3 playback state.
+- Sent idempotent Android event ids with explicit empty global tag context.
+- Blocked duplicate in-flight taps, handled offline/error responses, and
+  ignored responses belonging to a previous track after queue movement.
+
+Automated checks:
+
+```powershell
+cd android
+.\gradlew.bat test build lint --no-daemon --console=plain
+.\gradlew.bat testDebugUnitTest `
+  --tests "com.easymusic.app.player.ui.ActivePlaybackFeedbackControllerTest" `
+  --tests "com.easymusic.app.recommendation.domain.FeedbackRepositoryTest" `
+  --no-daemon --console=plain
+```
+
+Results:
+
+- Full Android test/build/lint: `BUILD SUCCESSFUL`.
+- Active feedback controller and repository tests: `5 passed`.
+- Android lint: `0 errors, 13 warnings`; warnings remain the pre-existing
+  launcher-icon, typography, and dependency-version advisories.
+
+Manual checks still required:
+
+- Device/emulator verification that each action changes subsequent backend
+  recommendation behavior while playback continues.

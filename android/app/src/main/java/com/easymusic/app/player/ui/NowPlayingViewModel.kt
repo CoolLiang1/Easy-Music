@@ -11,9 +11,13 @@ import com.easymusic.app.player.domain.PlayerUiState
 import com.easymusic.app.player.domain.PlaybackSource
 import com.easymusic.app.player.domain.PlaybackSourceSelector
 import com.easymusic.app.player.domain.SelectedPlaybackSource
+import com.easymusic.app.recommendation.data.FeedbackType
+import com.easymusic.app.recommendation.domain.FeedbackRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -23,9 +27,15 @@ class NowPlayingViewModel(
     private val tokenStore: AuthTokenStore,
     private val trackCacheRepository: TrackCacheRepository,
     private val playerController: PlayerController,
+    feedbackRepository: FeedbackRepository,
     private val initialNetworkAvailable: Boolean = true,
 ) : ViewModel() {
     val uiState: StateFlow<PlayerUiState> = playerController.uiState
+    private val feedbackController = ActivePlaybackFeedbackController(
+        scope = viewModelScope,
+        sendEvent = feedbackRepository::sendFeedbackEvent,
+    )
+    val feedbackState: StateFlow<ActivePlaybackFeedbackUiState> = feedbackController.state
     private var positionJob: Job? = null
     private val playbackSourceSelector = PlaybackSourceSelector(
         trackCacheRepository = trackCacheRepository,
@@ -41,6 +51,7 @@ class NowPlayingViewModel(
             )
         }
         startPositionUpdates()
+        observeCurrentTrackForFeedback()
     }
 
     fun play(isNetworkAvailable: Boolean = true) {
@@ -98,6 +109,17 @@ class NowPlayingViewModel(
         playerController.setRepeatPlaylist(enabled)
     }
 
+    fun sendFeedback(
+        feedbackType: FeedbackType,
+        isNetworkAvailable: Boolean = true,
+    ) {
+        feedbackController.selectTrack(uiState.value.track?.id)
+        feedbackController.send(
+            feedbackType = feedbackType,
+            isNetworkAvailable = isNetworkAvailable,
+        )
+    }
+
     fun dispose() {
         positionJob?.cancel()
     }
@@ -139,6 +161,15 @@ class NowPlayingViewModel(
                 playerController.updatePosition()
                 delay(POSITION_UPDATE_MS)
             }
+        }
+    }
+
+    private fun observeCurrentTrackForFeedback() {
+        viewModelScope.launch {
+            uiState
+                .map { state -> state.track?.id }
+                .distinctUntilChanged()
+                .collect(feedbackController::selectTrack)
         }
     }
 
