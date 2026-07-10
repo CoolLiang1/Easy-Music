@@ -349,7 +349,7 @@ object MediaSessionConnector {
             }
 
         return MediaSession.Builder(appContext, createdPlayer)
-            .setCallback(MediaSessionCallback())
+            .setCallback(MediaSessionCallback(appContext.packageName))
             .setMediaButtonPreferences(PlaybackNotificationConfig.mediaButtonPreferences())
             .build()
             .also { session ->
