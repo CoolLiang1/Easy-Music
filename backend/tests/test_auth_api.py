@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth.password import hash_password
+from app.auth.tokens import create_track_stream_token
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import get_db
@@ -95,6 +96,21 @@ def test_me_returns_current_user(client: TestClient, db_session: Session) -> Non
         "username": user.username,
         "created_at": user.created_at.isoformat(),
     }
+
+
+def test_track_stream_token_cannot_authenticate_normal_api(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    stream_token, _expires_at = create_track_stream_token(user.id, track_id=123)
+
+    response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {stream_token}"},
+    )
+
+    assert response.status_code == 401
 
 
 def test_login_allows_web_cors_preflight(monkeypatch: pytest.MonkeyPatch) -> None:

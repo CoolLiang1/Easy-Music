@@ -12,6 +12,10 @@ class InvalidTokenError(ValueError):
     pass
 
 
+ACCESS_TOKEN_PURPOSE = "access"
+TRACK_STREAM_TOKEN_PURPOSE = "track_stream"
+
+
 def _encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
@@ -30,13 +34,22 @@ def _sign(payload: str, secret_key: str) -> str:
     return _encode(signature)
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(
+    user_id: int,
+    *,
+    expires_in_minutes: int | None = None,
+) -> str:
     settings = get_settings()
     expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.access_token_expire_minutes,
+        minutes=(
+            settings.access_token_expire_minutes
+            if expires_in_minutes is None
+            else expires_in_minutes
+        ),
     )
     payload = {
         "sub": str(user_id),
+        "purpose": ACCESS_TOKEN_PURPOSE,
         "exp": int(expires_at.timestamp()),
     }
     encoded_payload = _encode(
@@ -58,7 +71,7 @@ def create_track_stream_token(
     payload = {
         "sub": str(user_id),
         "track_id": track_id,
-        "purpose": "track_stream",
+        "purpose": TRACK_STREAM_TOKEN_PURPOSE,
         "exp": expires_at_timestamp,
     }
     encoded_payload = _encode(
@@ -83,9 +96,13 @@ def parse_access_token(token: str) -> int:
     try:
         payload: dict[str, Any] = json.loads(_decode(encoded_payload))
         user_id = int(payload["sub"])
+        purpose = str(payload["purpose"])
         expires_at = int(payload["exp"])
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise InvalidTokenError("Invalid token payload.") from exc
+
+    if purpose != ACCESS_TOKEN_PURPOSE:
+        raise InvalidTokenError("Invalid token scope.")
 
     if datetime.now(UTC).timestamp() >= expires_at:
         raise InvalidTokenError("Token expired.")
@@ -114,7 +131,7 @@ def parse_track_stream_token(token: str, *, expected_track_id: int) -> int:
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise InvalidTokenError("Invalid token payload.") from exc
 
-    if purpose != "track_stream" or token_track_id != expected_track_id:
+    if purpose != TRACK_STREAM_TOKEN_PURPOSE or token_track_id != expected_track_id:
         raise InvalidTokenError("Invalid token scope.")
 
     if datetime.now(UTC).timestamp() >= expires_at:

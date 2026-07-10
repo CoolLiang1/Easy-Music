@@ -889,6 +889,25 @@ def test_track_stream_token_cannot_stream_another_track(
     assert response.status_code == 401
 
 
+def test_access_token_cannot_be_used_as_stream_query_token(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True)
+    playback_path.write_bytes(b"audio")
+    access_token = auth_headers(user)["Authorization"].removeprefix("Bearer ")
+
+    response = client.get(
+        f"/api/tracks/{track.id}/stream?token={access_token}",
+    )
+
+    assert response.status_code == 401
+
+
 def test_stream_track_rejects_invalid_query_token(
     client: TestClient,
     db_session: Session,
