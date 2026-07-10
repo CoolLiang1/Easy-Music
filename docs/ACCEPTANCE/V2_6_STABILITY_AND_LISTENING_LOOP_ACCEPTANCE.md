@@ -120,11 +120,11 @@ Explicitly out of scope:
 
 ## Gate 8: Recent Playback
 
-- [ ] `GET /api/playback-events/recent` is authenticated.
-- [ ] Results are current-user scoped.
-- [ ] Results aggregate repeated events by track.
-- [ ] Results use deterministic latest-play ordering.
-- [ ] Limit validation and empty history are tested.
+- [x] `GET /api/playback-events/recent` is authenticated.
+- [x] Results are current-user scoped.
+- [x] Results aggregate repeated events by track.
+- [x] Results use deterministic latest-play ordering.
+- [x] Limit validation and empty history are tested.
 - [ ] Web `/history` renders loading, empty, success, and error states.
 - [ ] History rows support play and queue actions.
 
@@ -293,3 +293,28 @@ Manual checks still required:
 - Real browser/media smoke for event positions and queue transitions.
 - Queue previous/next, playlist repeat, and failed-track auto-advance remain
   open until that browser smoke runs.
+
+### 2026-07-10 - Sprint 1 Recent Playback API
+
+Implemented:
+
+- Added authenticated `GET /api/playback-events/recent` with a default limit of
+  50 and validated maximum of 100.
+- Aggregated one row per track using the latest `play`, `resume`, or `complete`
+  event; pause, seek, and skip events do not reorder listening history.
+- Counted only actual `play` events as playback starts and preserved the
+  existing owner-scoped track response contract.
+
+Automated checks:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest tests/test_playback_events_api.py -q
+```
+
+Result: `9 passed`.
+
+Manual checks still required:
+
+- Cross-client history ordering with real Web and Android playback will be
+  verified after the Web history surface is connected.

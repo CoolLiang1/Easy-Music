@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.track import TrackResponse
+
 
 PlaybackEventType = Literal["play", "pause", "resume", "seek", "skip", "complete"]
 
@@ -36,3 +38,9 @@ class PlaybackEventFailed(BaseModel):
 class PlaybackEventBulkSyncResponse(BaseModel):
     accepted: list[PlaybackEventAccepted]
     failed: list[PlaybackEventFailed]
+
+
+class RecentPlaybackItem(BaseModel):
+    track: TrackResponse
+    last_played_at: datetime
+    playback_count: int = Field(ge=0)

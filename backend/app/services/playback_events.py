@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.models.playback_event import PlaybackEvent
@@ -9,7 +9,59 @@ from app.schemas.playback_event import (
     PlaybackEventBulkSyncRequest,
     PlaybackEventBulkSyncResponse,
     PlaybackEventFailed,
+    RecentPlaybackItem,
 )
+from app.services.tracks import build_track_response
+
+
+MEANINGFUL_PLAYBACK_EVENT_TYPES = ("play", "resume", "complete")
+
+
+def list_recent_playback(
+    db: Session,
+    user: User,
+    limit: int,
+) -> list[RecentPlaybackItem]:
+    last_played_at = func.max(PlaybackEvent.occurred_at).label("last_played_at")
+    playback_count = func.sum(
+        case((PlaybackEvent.event_type == "play", 1), else_=0),
+    ).label("playback_count")
+    rows = db.execute(
+        select(
+            PlaybackEvent.track_id,
+            last_played_at,
+            playback_count,
+        )
+        .where(
+            PlaybackEvent.user_id == user.id,
+            PlaybackEvent.event_type.in_(MEANINGFUL_PLAYBACK_EVENT_TYPES),
+        )
+        .group_by(PlaybackEvent.track_id)
+        .order_by(last_played_at.desc(), PlaybackEvent.track_id.desc())
+        .limit(limit),
+    ).all()
+
+    if not rows:
+        return []
+
+    tracks_by_id = {
+        track.id: track
+        for track in db.scalars(
+            select(Track).where(
+                Track.user_id == user.id,
+                Track.id.in_([row.track_id for row in rows]),
+            ),
+        )
+    }
+    return [
+        RecentPlaybackItem(
+            track=build_track_response(db, tracks_by_id[row.track_id]),
+            last_played_at=row.last_played_at,
+            playback_count=int(row.playback_count or 0),
+        )
+        for row in rows
+        if row.track_id in tracks_by_id
+    ]
 
 
 def sync_playback_events(

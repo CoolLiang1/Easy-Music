@@ -90,6 +90,155 @@ def playback_event_payload(track_id: int, client_event_id: str = "android-event-
     }
 
 
+def add_playback_event(
+    db_session: Session,
+    user: User,
+    track: Track,
+    *,
+    client_event_id: str,
+    event_type: str,
+    occurred_at: datetime,
+) -> None:
+    db_session.add(
+        PlaybackEvent(
+            user_id=user.id,
+            track_id=track.id,
+            client_event_id=client_event_id,
+            event_type=event_type,
+            position_seconds=0,
+            duration_seconds=track.duration_seconds,
+            occurred_at=occurred_at,
+            client="web",
+        ),
+    )
+    db_session.commit()
+
+
+def test_list_recent_playback_requires_authentication(client: TestClient) -> None:
+    response = client.get("/api/playback-events/recent")
+
+    assert response.status_code == 401
+
+
+def test_list_recent_playback_is_empty_without_meaningful_events(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    add_playback_event(
+        db_session,
+        user,
+        track,
+        client_event_id="pause-only",
+        event_type="pause",
+        occurred_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+    )
+
+    response = client.get(
+        "/api/playback-events/recent",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_recent_playback_aggregates_orders_and_scopes_tracks(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    first_track = create_track(db_session, user, title="First")
+    second_track = create_track(db_session, user, title="Second")
+    other_user = create_user(db_session, username="other")
+    hidden_track = create_track(db_session, other_user, title="Hidden")
+
+    add_playback_event(
+        db_session,
+        user,
+        first_track,
+        client_event_id="first-play-1",
+        event_type="play",
+        occurred_at=datetime(2026, 7, 1, 8, tzinfo=timezone.utc),
+    )
+    add_playback_event(
+        db_session,
+        user,
+        first_track,
+        client_event_id="first-play-2",
+        event_type="play",
+        occurred_at=datetime(2026, 7, 3, 8, tzinfo=timezone.utc),
+    )
+    add_playback_event(
+        db_session,
+        user,
+        first_track,
+        client_event_id="first-pause-later",
+        event_type="pause",
+        occurred_at=datetime(2026, 7, 9, 8, tzinfo=timezone.utc),
+    )
+    add_playback_event(
+        db_session,
+        user,
+        second_track,
+        client_event_id="second-resume",
+        event_type="resume",
+        occurred_at=datetime(2026, 7, 4, 8, tzinfo=timezone.utc),
+    )
+    add_playback_event(
+        db_session,
+        other_user,
+        hidden_track,
+        client_event_id="hidden-play",
+        event_type="play",
+        occurred_at=datetime(2026, 7, 10, 8, tzinfo=timezone.utc),
+    )
+
+    response = client.get(
+        "/api/playback-events/recent",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["track"]["title"] for item in body] == ["Second", "First"]
+    assert [item["playback_count"] for item in body] == [0, 2]
+    assert body[0]["last_played_at"] == "2026-07-04T08:00:00"
+    assert body[1]["last_played_at"] == "2026-07-03T08:00:00"
+
+
+def test_list_recent_playback_applies_validated_limit(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    for index in range(2):
+        track = create_track(db_session, user, title=f"Track {index}")
+        add_playback_event(
+            db_session,
+            user,
+            track,
+            client_event_id=f"play-{index}",
+            event_type="play",
+            occurred_at=datetime(2026, 7, index + 1, tzinfo=timezone.utc),
+        )
+
+    response = client.get(
+        "/api/playback-events/recent?limit=1",
+        headers=auth_headers(user),
+    )
+    too_large_response = client.get(
+        "/api/playback-events/recent?limit=101",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["track"]["title"] == "Track 1"
+    assert too_large_response.status_code == 422
+
+
 def test_sync_playback_events_requires_authentication(client: TestClient) -> None:
     response = client.post("/api/playback-events", json={"events": []})
 
