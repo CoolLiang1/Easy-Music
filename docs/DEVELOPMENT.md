@@ -552,6 +552,12 @@ used as a stream query token. Deploying the V2.6 token change invalidates old
 browser and Android sessions once; sign in again to obtain a purpose-scoped
 access token.
 
+V2.6 Web playback records `play`, `pause`, `resume`, `seek`, `skip`, and
+`complete` through the same `POST /api/playback-events` contract used by
+Android. Pending Web events are bounded in browser local storage without auth
+or stream tokens, then retried after login and when the browser returns online.
+Event delivery failures remain visible but never stop audio playback.
+
 V2.2 acceptance is recorded in
 `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`. Web automated checks and
 browser smoke are recorded as passed. Android automated checks and

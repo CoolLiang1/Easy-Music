@@ -87,7 +87,8 @@ export async function flushPendingPlaybackEvents(
     ...response.accepted.map((item) => item.client_event_id),
     ...response.failed.map((item) => item.client_event_id),
   ]);
-  const next = current.filter((item) => !completedIds.has(item.client_event_id));
+  const latest = readPendingPlaybackEvents(storage);
+  const next = latest.filter((item) => !completedIds.has(item.client_event_id));
   writePendingPlaybackEvents(storage, next);
 
   return {

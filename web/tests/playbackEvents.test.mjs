@@ -109,6 +109,24 @@ test("flush keeps events when delivery throws", async () => {
   assert.equal(readPendingPlaybackEvents(storage).length, 1);
 });
 
+test("flush preserves an event enqueued while a request is in flight", async () => {
+  const storage = new MemoryStorage();
+  enqueuePendingPlaybackEvent(storage, event("first"));
+
+  await flushPendingPlaybackEvents(storage, async () => {
+    enqueuePendingPlaybackEvent(storage, event("during-request"));
+    return {
+      accepted: [{ client_event_id: "first", status: "accepted" }],
+      failed: [],
+    };
+  });
+
+  assert.deepEqual(
+    readPendingPlaybackEvents(storage).map((item) => item.client_event_id),
+    ["during-request"],
+  );
+});
+
 test("recorder emits one ordered lifecycle with normalized positions", () => {
   const recorded = [];
   let id = 0;

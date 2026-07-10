@@ -896,8 +896,9 @@ Expected result:
 
 ## Sync Playback Events
 
-Phase 4 adds one minimal authenticated endpoint for Android offline playback
-event retry:
+Phase 4 added one minimal authenticated endpoint for Android offline playback
+event retry. V2.6 also uses this contract for bounded, retryable Web playback
+events:
 
 ```powershell
 $eventId = [guid]::NewGuid().ToString()

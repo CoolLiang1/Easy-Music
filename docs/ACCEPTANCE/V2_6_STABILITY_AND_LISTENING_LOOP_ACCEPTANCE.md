@@ -97,21 +97,22 @@ Explicitly out of scope:
 
 ## Gate 6: Web Playback Event Client
 
-- [ ] Web models all backend playback-event types.
-- [ ] Web event IDs are stable and idempotent.
-- [ ] Pending events persist without tokens.
-- [ ] Accepted and duplicate results are removed from pending storage.
-- [ ] Failed/retryable events remain bounded and retryable.
-- [ ] Unauthorized state is surfaced without interrupting audio.
-- [ ] Focused Web tests pass.
+- [x] Web models all backend playback-event types.
+- [x] Web event IDs are stable and idempotent.
+- [x] Pending events persist without tokens.
+- [x] Accepted and duplicate results are removed from pending storage.
+- [x] Permanent server failures are removed while network/retryable failures
+  remain bounded and retryable.
+- [x] Unauthorized state is surfaced without interrupting audio.
+- [x] Focused Web tests pass.
 
 ## Gate 7: Web Player Event Recording
 
-- [ ] Play is recorded once when a track starts.
-- [ ] Pause and resume are recorded without effect-driven duplicates.
-- [ ] Seek records the resulting position.
-- [ ] Skip records an unfinished transition.
-- [ ] Complete records natural end.
+- [x] Play is recorded once when a track starts.
+- [x] Pause and resume are recorded without effect-driven duplicates.
+- [x] Seek records the resulting position.
+- [x] Skip records an unfinished transition.
+- [x] Complete records natural end.
 - [ ] Queue previous/next still works.
 - [ ] Playlist repeat still works.
 - [ ] Failed-track auto-advance still works.
@@ -257,3 +258,38 @@ Manual checks still required:
   smoke after the controller policy change.
 - GitHub-hosted CI execution after the branch is pushed.
 - Promotion to `develop`/`main` and release tagging remain intentionally open.
+
+### 2026-07-10 - Sprint 1 Web Playback Events
+
+Implemented:
+
+- Added typed Web playback-event API contracts.
+- Added a bounded local pending-event store that strips unknown fields and
+  never stores access or stream tokens.
+- Added idempotent event IDs, partial-response handling, retry preservation,
+  online/login flush triggers, and in-flight enqueue race protection.
+- Connected play, pause, resume, seek, skip, and complete transitions to the
+  shared Web queue player.
+- Added non-blocking sync status without making telemetry failure stop audio.
+- Added the Web test command to CI.
+
+Automated checks:
+
+```powershell
+cd web
+npm run test
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- Node/TypeScript playback event tests: 7 passed.
+- TypeScript check: passed.
+- Production build: passed.
+
+Manual checks still required:
+
+- Real browser/media smoke for event positions and queue transitions.
+- Queue previous/next, playlist repeat, and failed-track auto-advance remain
+  open until that browser smoke runs.

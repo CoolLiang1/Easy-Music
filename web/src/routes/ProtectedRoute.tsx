@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { PlaybackQueueProvider } from "../player/PlaybackQueueProvider";
+import { PlaybackEventSyncProvider } from "../player/PlaybackEventSyncProvider";
 import { navigateTo } from "./router";
 
 type ProtectedRouteProps = {
@@ -46,5 +47,9 @@ function ProtectedRouteContent({ children }: { children: ReactNode }) {
     return null;
   }
 
-  return <PlaybackQueueProvider>{children}</PlaybackQueueProvider>;
+  return (
+    <PlaybackEventSyncProvider>
+      <PlaybackQueueProvider>{children}</PlaybackQueueProvider>
+    </PlaybackEventSyncProvider>
+  );
 }

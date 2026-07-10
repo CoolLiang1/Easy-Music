@@ -199,6 +199,7 @@ Android should store:
 - AI tag confirmation
 - Recommendation testing
 - Web playback
+- Durable pending Web playback-event capture and reconnect retry
 - Client-side playback queue with history/current/upcoming, queue editing,
   playlist sequence/shuffle/reverse generation, upcoming reorder, and
   playlist-only repeat

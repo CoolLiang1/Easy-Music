@@ -7,6 +7,8 @@ import {
 import { createPortal } from "react-dom";
 
 import { getTrackStreamUrl } from "../api/tracks";
+import { WebPlaybackEventRecorder } from "../player/WebPlaybackEventRecorder";
+import { usePlaybackEventSync } from "../player/PlaybackEventSyncProvider";
 import {
   usePlaybackQueue,
   type PlaybackQueueGenerationMode,
@@ -89,6 +91,15 @@ export function WebPlaybackQueuePlayer({
   const suppressPauseEventRef = useRef(false);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const { recordEvent, syncMessage } = usePlaybackEventSync();
+  const eventSinkRef = useRef(recordEvent);
+  eventSinkRef.current = recordEvent;
+  const eventRecorderRef = useRef<WebPlaybackEventRecorder | null>(null);
+  if (!eventRecorderRef.current) {
+    eventRecorderRef.current = new WebPlaybackEventRecorder((event) => {
+      eventSinkRef.current(event);
+    });
+  }
 
   const [playerState, setPlayerState] = useState<PlayerState>({ name: "idle" });
   const [playing, setPlaying] = useState(false);
@@ -173,6 +184,9 @@ export function WebPlaybackQueuePlayer({
   );
 
   useEffect(() => {
+    if (currentItem) {
+      eventRecorderRef.current?.startTrack(currentItem.track.id);
+    }
     if (currentItem && autoStart) {
       playbackRequestedRef.current = true;
       void loadCurrentTrack();
@@ -181,6 +195,10 @@ export function WebPlaybackQueuePlayer({
     }
 
     return () => {
+      eventRecorderRef.current?.onSkip(
+        audioRef.current?.currentTime ?? currentTime,
+        currentPlaybackDuration(audioRef.current, currentTrack),
+      );
       resetAudio();
     };
   }, [currentItem?.queueItemId]);
@@ -240,15 +258,23 @@ export function WebPlaybackQueuePlayer({
 
   const playPrevious = useCallback(() => {
     if (!hasPrevious) return;
+    eventRecorderRef.current?.onSkip(
+      audioRef.current?.currentTime ?? currentTime,
+      currentPlaybackDuration(audioRef.current, currentTrack),
+    );
     playbackRequestedRef.current = true;
     previous();
-  }, [hasPrevious, previous]);
+  }, [currentTime, currentTrack, hasPrevious, previous]);
 
   const playNext = useCallback(() => {
     if (!hasNext) return;
+    eventRecorderRef.current?.onSkip(
+      audioRef.current?.currentTime ?? currentTime,
+      currentPlaybackDuration(audioRef.current, currentTrack),
+    );
     playbackRequestedRef.current = true;
     next();
-  }, [hasNext, next]);
+  }, [currentTime, currentTrack, hasNext, next]);
 
   const handlePlay = useCallback(() => {
     playbackRequestedRef.current = true;
@@ -256,7 +282,11 @@ export function WebPlaybackQueuePlayer({
       setActiveAudio(audioRef.current);
     }
     setPlaying(true);
-  }, []);
+    eventRecorderRef.current?.onPlay(
+      audioRef.current?.currentTime ?? currentTime,
+      currentPlaybackDuration(audioRef.current, currentTrack),
+    );
+  }, [currentTime, currentTrack]);
 
   const handlePause = useCallback(() => {
     if (suppressPauseEventRef.current) {
@@ -267,7 +297,11 @@ export function WebPlaybackQueuePlayer({
       clearActiveAudio(audioRef.current);
     }
     setPlaying(false);
-  }, []);
+    eventRecorderRef.current?.onPause(
+      audioRef.current?.currentTime ?? currentTime,
+      currentPlaybackDuration(audioRef.current, currentTrack),
+    );
+  }, [currentTime, currentTrack]);
 
   const handleEnded = useCallback(() => {
     if (audioRef.current) {
@@ -275,13 +309,17 @@ export function WebPlaybackQueuePlayer({
     }
     setPlaying(false);
     setCurrentTime(0);
+    eventRecorderRef.current?.onComplete(
+      audioRef.current?.duration ?? duration,
+      currentPlaybackDuration(audioRef.current, currentTrack),
+    );
     if (hasNext) {
       playbackRequestedRef.current = true;
       playNext();
     } else {
       playbackRequestedRef.current = false;
     }
-  }, [hasNext, playNext]);
+  }, [currentTrack, duration, hasNext, playNext]);
 
   const handleTimeUpdate = useCallback(() => {
     if (!audioRef.current || seeking) return;
@@ -328,8 +366,12 @@ export function WebPlaybackQueuePlayer({
     const bar = seekBarRef.current;
     if (el && bar) {
       el.currentTime = Number(bar.value);
+      eventRecorderRef.current?.onSeek(
+        el.currentTime,
+        currentPlaybackDuration(el, currentTrack),
+      );
     }
-  }, []);
+  }, [currentTrack]);
 
   const handleVolumeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const value = clampVolume(Number(event.target.value));
@@ -553,6 +595,11 @@ export function WebPlaybackQueuePlayer({
           {playerState.message}
         </span>
       ) : null}
+      {syncMessage ? (
+        <span className="status-message error compact" role="status">
+          {syncMessage}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -583,6 +630,17 @@ function getErrorMessage(error: unknown) {
 
 function isReadyTrack(track: Track): boolean {
   return track.status.toLowerCase() === "ready";
+}
+
+function currentPlaybackDuration(
+  audio: HTMLAudioElement | null,
+  track: Track | null,
+): number | null {
+  if (audio && Number.isFinite(audio.duration) && audio.duration >= 0) {
+    return audio.duration;
+  }
+
+  return track?.duration_seconds ?? null;
 }
 
 function canAdvanceToNext(state: PlaybackQueueState): boolean {
