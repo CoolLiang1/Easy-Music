@@ -10,6 +10,7 @@ import {
 } from "../.test-dist/player/pendingPlaybackEvents.js";
 import { WebPlaybackEventRecorder } from "../.test-dist/player/WebPlaybackEventRecorder.js";
 import { getRoute } from "../.test-dist/routes/router.js";
+import { buildActivePlaybackFeedbackEvent } from "../.test-dist/feedback/activePlaybackFeedback.js";
 
 class MemoryStorage {
   values = new Map();
@@ -185,4 +186,24 @@ test("recorder records skip before selecting a replacement track", () => {
 test("history route resolves with or without a trailing slash", () => {
   assert.deepEqual(getRoute("/history"), { name: "history" });
   assert.deepEqual(getRoute("/history/"), { name: "history" });
+});
+
+test("active playback feedback uses a stable id and empty global context", () => {
+  const event = buildActivePlaybackFeedbackEvent(
+    42,
+    "tired",
+    () => new Date("2026-07-10T08:30:00.000Z"),
+    () => "feedback-id-1",
+  );
+
+  assert.deepEqual(event, {
+    client: "web",
+    client_event_id: "feedback-id-1",
+    feedback_type: "tired",
+    occurred_at: "2026-07-10T08:30:00.000Z",
+    scene_tag_ids: [],
+    type_tag_ids: [],
+    feature_tag_ids: [],
+    track_id: 42,
+  });
 });

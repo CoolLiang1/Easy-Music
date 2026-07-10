@@ -227,9 +227,32 @@ h3 {
 
 .global-player-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
+}
+
+.active-playback-feedback {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.active-playback-feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.active-playback-feedback-message {
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.active-playback-feedback-message.error {
+  color: var(--red);
 }
 
 .queue-drawer-backdrop {
@@ -1813,6 +1836,14 @@ h3 {
 
   .global-player-row {
     grid-template-columns: 1fr;
+  }
+
+  .active-playback-feedback {
+    justify-items: start;
+  }
+
+  .active-playback-feedback-actions {
+    justify-content: flex-start;
   }
 
   .global-player-row > .button {

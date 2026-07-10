@@ -6,6 +6,7 @@
     "sourceMap": false
   },
   "include": [
+    "src/feedback/activePlaybackFeedback.ts",
     "src/player/pendingPlaybackEvents.ts",
     "src/player/WebPlaybackEventRecorder.ts",
     "src/routes/router.ts",

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import { useAuth } from "../auth/AuthProvider";
+import { ActivePlaybackFeedback } from "../components/ActivePlaybackFeedback";
 import { PlaybackQueueDrawer } from "../components/PlaybackQueueDrawer";
 import { WebPlaybackQueuePlayer } from "../components/WebAudioPlayer";
 import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
@@ -102,6 +103,10 @@ export function AppLayout({ children, onSignOut }: AppLayoutProps) {
           <div className="global-player-bar" aria-label="当前播放">
             <div className="global-player-row">
               <WebPlaybackQueuePlayer accessToken={accessToken} />
+              <ActivePlaybackFeedback
+                accessToken={accessToken}
+                track={queueState.current.track}
+              />
               <button
                 className="button secondary"
                 onClick={() => setIsQueueDrawerOpen(true)}

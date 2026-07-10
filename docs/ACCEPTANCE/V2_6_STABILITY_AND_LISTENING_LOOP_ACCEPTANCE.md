@@ -130,13 +130,13 @@ Explicitly out of scope:
 
 ## Gate 9: Active Playback Quick Feedback
 
-- [ ] Web active player supports like.
-- [ ] Web active player supports tired.
-- [ ] Web active player supports not-today.
+- [x] Web active player supports like.
+- [x] Web active player supports tired.
+- [x] Web active player supports not-today.
 - [ ] Android Now Playing supports the same three actions.
-- [ ] Like updates backend track state.
-- [ ] Tired sets cooldown.
-- [ ] Not-today affects same-day recommendation exclusion.
+- [x] Like updates backend track state.
+- [x] Tired sets cooldown.
+- [x] Not-today affects same-day recommendation exclusion.
 - [ ] Duplicate in-flight taps are prevented.
 - [ ] Feedback errors do not stop playback.
 
@@ -348,3 +348,38 @@ Manual checks still required:
 - Real authenticated browser playback appearing in `/history` after event
   delivery.
 - Visual and responsive smoke with populated production-like history data.
+
+### 2026-07-10 - Sprint 1 Web Active Playback Feedback
+
+Implemented:
+
+- Added like, not-today, and tired controls to the shared active-player bar.
+- Used idempotent event ids and explicit empty tag-context arrays for global
+  playback feedback.
+- Added a synchronous in-flight guard and ignored stale responses after the
+  current track changes.
+- Kept request success/failure state independent from audio playback state.
+
+Automated checks:
+
+```powershell
+cd web
+npm run test
+npm run typecheck
+npm run build
+
+cd ..\backend
+.\.venv\Scripts\python.exe -m pytest `
+  tests/test_feedback_events_api.py tests/test_recommendations_api.py -q
+```
+
+Results:
+
+- Node/TypeScript tests: `9 passed`.
+- TypeScript check and production build: passed.
+- Backend feedback/recommendation tests: `21 passed`.
+
+Manual checks still required:
+
+- Real browser confirmation that feedback status remains non-blocking while
+  audio continues.
