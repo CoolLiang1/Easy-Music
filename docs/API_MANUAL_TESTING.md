@@ -815,6 +815,9 @@ Expected result:
   expires, including Range requests.
 - Invalid or missing auth on bearer-only requests, or an invalid stream URL
   token, returns `401 Unauthorized`.
+- A stream URL token used as a Bearer token for `/api/auth/me` returns
+  `401 Unauthorized`; a normal access token used as the stream query token also
+  returns `401 Unauthorized`.
 
 ## Delete One Track
 

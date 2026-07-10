@@ -154,17 +154,18 @@ Keep docs concise and operational. Do not add long background stories.
 
 Update this section when you discover something surprising.
 
-- The repository has completed the MVP through Phase 7 locally, but the first
-  real Ubuntu/domain/HTTPS production smoke test is intentionally deferred to
-  operator deployment.
+- The repository completed the first real Ubuntu/domain/HTTPS production smoke
+  on 2026-06-30 using a DNS-validated certificate and public HTTPS port 25443.
+  Certificate renewal and broader operational closure remain V2.6 work.
 - Some older docs may describe historical phase boundaries. Prefer current
   `README.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, and acceptance docs
   when judging current status.
-- The initial usable product and current V2 slices are locally complete as of
-  2026-06-29. For the next planned work, start from
-  `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md` for UI polish and
-  `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md` for the first real
-  Ubuntu/domain/HTTPS deployment smoke record.
+- The initial usable product and earlier V2 slices are complete. The active
+  milestone is V2.6; start from
+  `docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md` and record results in
+  `docs/ACCEPTANCE/V2_6_STABILITY_AND_LISTENING_LOOP_ACCEPTANCE.md`.
+- V2.6 purpose-scopes access and track-stream tokens. Deploying that change
+  invalidates pre-V2.6 sessions once; clients should sign in again.
 - AI endpoints can return successful HTTP responses with provider status
   `disabled`, `unconfigured`, or `error`. This is often expected fallback
   behavior, not necessarily a transport failure.

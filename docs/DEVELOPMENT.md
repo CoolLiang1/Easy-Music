@@ -10,16 +10,17 @@ V1, and AI Tag Suggestions V2.
 
 Use `README.md` and `docs/ROADMAP.md` for the current progress record before
 starting work. Production deployment is covered separately in
-`docs/DEPLOYMENT.md`, and the first real Ubuntu/domain/HTTPS smoke should be
-recorded in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
+`docs/DEPLOYMENT.md`; the first real Ubuntu/domain/HTTPS smoke passed on
+2026-06-30 and is recorded in
+`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
 
 Production ML or training platforms, social features, automatic full-library
 offline sync, complex download queue management, and background caching of the
 entire library remain outside the current scope.
 
-The next planned work is UI optimization. Use
-`docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md` as the task entry point and keep UI
-changes scoped to existing flows unless a later task explicitly expands scope.
+The active milestone is V2.6 stability and listening-loop closure. Use
+`docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md` as the task entry point.
+The older UI optimization document remains historical input for V2.6 Sprint 4.
 
 ## Workflow
 
@@ -544,6 +545,12 @@ Web audio playback uses `POST /api/tracks/{track_id}/stream-url` to obtain a
 short-lived, track-scoped URL and then hands that URL directly to `<audio>`.
 This lets the browser issue normal streaming and Range requests instead of
 first reading the whole response into a Blob.
+
+Access tokens and track-stream tokens carry different purpose claims. A stream
+token cannot authenticate normal APIs, and a normal access token cannot be
+used as a stream query token. Deploying the V2.6 token change invalidates old
+browser and Android sessions once; sign in again to obtain a purpose-scoped
+access token.
 
 V2.2 acceptance is recorded in
 `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`. Web automated checks and

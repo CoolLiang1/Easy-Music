@@ -50,28 +50,28 @@ Explicitly out of scope:
 
 ## Gate 1: P0 Deterministic Baseline
 
-- [ ] Library-report time-boundary tests use an injected or dynamic clock.
-- [ ] Exact 30-day behavior is covered.
-- [ ] Full backend suite passes.
-- [ ] Alembic has one expected head.
-- [ ] Web typecheck/build pass.
-- [ ] Android test/build/lint pass.
-- [ ] Production Compose example config validates.
+- [x] Library-report time-boundary tests use an injected or dynamic clock.
+- [x] Exact 30-day behavior is covered.
+- [x] Full backend suite passes.
+- [x] Alembic has one expected head.
+- [x] Web typecheck/build pass.
+- [x] Android test/build/lint pass.
+- [x] Production Compose example config validates.
 
 ## Gate 2: Token Purpose Isolation
 
-- [ ] Access tokens carry and require an access purpose.
-- [ ] Stream tokens carry and require stream purpose plus exact track id.
-- [ ] Stream token is rejected as a normal API Bearer token.
-- [ ] Access token is rejected as a stream query token.
-- [ ] Expired, malformed, wrong-purpose, and wrong-track cases are tested.
-- [ ] Deployment notes warn that old sessions may need to sign in again.
+- [x] Access tokens carry and require an access purpose.
+- [x] Stream tokens carry and require stream purpose plus exact track id.
+- [x] Stream token is rejected as a normal API Bearer token.
+- [x] Access token is rejected as a stream query token.
+- [x] Expired, malformed, wrong-purpose, and wrong-track cases are tested.
+- [x] Deployment notes warn that old sessions may need to sign in again.
 
 ## Gate 3: Android Security
 
-- [ ] Auth DataStore and cached private data cannot enter Android backup.
-- [ ] Playback service export policy is explicit and least-privilege.
-- [ ] Android lint has no unresolved exported-service security warning.
+- [x] Auth DataStore and cached private data cannot enter Android backup.
+- [x] Playback service export policy is explicit and least-privilege.
+- [x] Android lint has no unresolved exported-service security warning.
 - [ ] App playback works.
 - [ ] Notification controls work.
 - [ ] Lock-screen controls work.
@@ -79,21 +79,21 @@ Explicitly out of scope:
 
 ## Gate 4: CI And Release Readiness
 
-- [ ] GitHub Actions backend job exists.
-- [ ] GitHub Actions Web job exists.
-- [ ] GitHub Actions Android job exists.
-- [ ] GitHub Actions production-config job exists.
-- [ ] Workflow commands match documented local commands.
+- [x] GitHub Actions backend job exists.
+- [x] GitHub Actions Web job exists.
+- [x] GitHub Actions Android job exists.
+- [x] GitHub Actions production-config job exists.
+- [x] Workflow commands match documented local commands.
 - [ ] `develop` is promoted to `main` only after acceptance.
 - [ ] A V2.6 release tag is created only after promotion.
 
 ## Gate 5: Documentation Truth
 
-- [ ] README current status is accurate.
-- [ ] Roadmap current and next work is accurate.
-- [ ] Architecture lists only implemented APIs and processing behavior.
-- [ ] Development and deployment docs agree with the production smoke record.
-- [ ] AGENTS guidance points future work to V2.6 while it is active.
+- [x] README current status is accurate.
+- [x] Roadmap current and next work is accurate.
+- [x] Architecture lists only implemented APIs and processing behavior.
+- [x] Development and deployment docs agree with the production smoke record.
+- [x] AGENTS guidance points future work to V2.6 while it is active.
 
 ## Gate 6: Web Playback Event Client
 
@@ -201,3 +201,59 @@ Remaining:
 
 - All P0 and Sprint 1 implementation gates remain open.
 
+### 2026-07-10 - P0 Automated Baseline And Security
+
+Implemented:
+
+- Made the library-report clock boundary deterministic and covered exactly 30
+  days plus one second beyond the threshold.
+- Added strict `access` and `track_stream` token purposes with negative scope,
+  expiry, malformed-token, and wrong-track coverage.
+- Disabled Android backup and excluded private data from cloud/device transfer.
+- Kept the Media3 service exported as required for discovery while rejecting
+  untrusted third-party controllers in the session callback.
+- Added GitHub Actions jobs for backend, Web, Android, and production Compose.
+- Synchronized README, roadmap, architecture, development, API smoke, and
+  agent guidance with the real production-smoke and V2.6 state.
+
+Automated checks:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m alembic heads
+```
+
+Results:
+
+- Backend: `372 passed, 2 skipped`.
+- Alembic: `20260629_0012 (head)`.
+
+```powershell
+cd web
+npm run typecheck
+npm run build
+```
+
+Result: passed.
+
+```powershell
+cd android
+.\gradlew.bat test build
+```
+
+Result: `BUILD SUCCESSFUL`; exported-service lint warning is no longer present.
+
+```powershell
+docker compose -f docker-compose.prod.yml `
+  --env-file .env.production.example config --quiet
+```
+
+Result: passed.
+
+Manual checks still required:
+
+- Android app playback, notification, lock-screen, and headset/media-button
+  smoke after the controller policy change.
+- GitHub-hosted CI execution after the branch is pushed.
+- Promotion to `develop`/`main` and release tagging remain intentionally open.

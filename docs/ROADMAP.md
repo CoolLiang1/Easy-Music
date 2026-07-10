@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-06-29:
+Status as of 2026-07-10:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -83,20 +83,20 @@ Status as of 2026-06-29:
   provider option without adding organization, playlist suggestions, or
   auto-apply.
 
-The remaining deployment caveat is a real production smoke test on an Ubuntu
-server with a real domain and HTTPS certificate. That requires operator
-infrastructure and is intentionally deferred to first deployment.
+The first real Ubuntu production smoke passed on 2026-06-30 using a
+DNS-validated certificate and public HTTPS port 25443 because the upstream
+network blocked inbound 80/443. Certificate renewal and broader operational
+closure remain V2.6 work.
 
 ## Next Planned Work
 
-1. UI optimization across the existing Web and Android product surfaces. This
-   is a polish and usability pass over existing flows, not a feature expansion.
-   Start from `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`.
-2. First real Ubuntu production smoke. Use `docs/DEPLOYMENT.md` and record the
-   result in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
-3. After production smoke, update `README.md`, this roadmap,
-   `docs/DEPLOYMENT.md`, and the production smoke acceptance record with any
-   deployment caveats or fixes discovered on the server.
+1. V2.6 P0 release baseline, token isolation, Android security, CI, and current
+   documentation truth pass.
+2. V2.6 Sprint 1 Web playback events, recent listening, and active playback
+   feedback across Web and Android.
+3. V2.6 Sprints 2 to 4 library scale, processing/storage recovery, production
+   operations closure, and testability-driven UI maintenance. Start from
+   `docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md`.
 
 ## Phase 0: Project Foundation
 
@@ -246,8 +246,8 @@ Deliverables:
 
 ## Phase 7: Deployment Hardening
 
-Status: Accepted by local automated/static verification. Real-server
-production smoke testing remains an operator deployment step.
+Status: Accepted. Local verification and the first real Ubuntu production
+smoke are recorded; V2.6 owns the remaining renewal/operations work.
 
 Goals:
 

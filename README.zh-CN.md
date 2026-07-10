@@ -8,21 +8,22 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 
 ## 项目状态
 
-截至 2026-06-30：
+截至 2026-07-10：
 
 - MVP Phase 0 到 Phase 7 已实现，并完成本地验收。
 - V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
 - V2 导入/视频、歌单、客户端播放队列、Recommendation V2 基础、标签简化和 AI Tag Suggestions V2 已实现。
 - 首次真实 Ubuntu/domain/HTTPS 生产 smoke 已记录通过，见 [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)。
-- 下一阶段计划是围绕现有 Web 和 Android 流程做 UI 优化。
+- V2.6 稳定性与收听闭环工作已经开始：先完成发布/安全门槛，再补齐 Web
+  播放事件、最近播放和播放中快捷反馈，之后推进曲库规模化和可维护性驱动的 UI 优化。
 
 ## 功能
 
 - 登录保护的个人音乐库。
-- 支持上传 MP3、FLAC、M4A、WAV、OGG 音频文件。
+- 支持上传 MP3、FLAC、M4A、WAV、OGG、AAC 音频文件。
 - 可选的用户上传视频转音频处理。
 - 安全的服务端导入预览，以及从配置好的导入根目录确认导入。
-- 后台 Worker 处理元数据提取、播放文件生成、封面提取、重复信号和处理状态更新。
+- 后台 Worker 处理元数据提取、播放文件生成、重复信号和处理状态更新；用户可显式上传和替换封面。
 - 曲目、标签、封面、歌单和播放队列管理。
 - Web 播放，以及 Android Media3 播放和后台控制。
 - Android 手动离线缓存和播放事件同步。
@@ -357,7 +358,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production config --qu
 - [API 手动测试](docs/API_MANUAL_TESTING.md)
 - [Git 工作流](docs/GIT_WORKFLOW.md)
 - [Ubuntu 生产 smoke 验收](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
-- [下一阶段 UI 优化任务](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
+- [V2.6 稳定性与收听闭环任务](docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md)
 
 历史验收记录在 `docs/ACCEPTANCE/`，任务记录在 `docs/TASKS/`。
 

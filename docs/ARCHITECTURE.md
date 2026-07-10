@@ -60,7 +60,8 @@ Top-level structure:
 
 The backend keeps these modules separated at a high level:
 
-- Auth: authentication, token/session handling, password hashing, and access control.
+- Auth: authentication, password hashing, access control, and strict purpose
+  separation between normal access tokens and short-lived track-stream tokens.
 - Users: user records, ownership boundaries, and single-user-to-future-multi-user compatibility.
 - Tracks: library metadata, playback file references, status, and track updates.
 - Playlists: owner-scoped manually curated playlists, optional descriptions,
@@ -73,7 +74,8 @@ The backend keeps these modules separated at a high level:
 - Imports: optional administrator-configured local import roots, path safety
   checks, read-only scan preview, explicit confirmed import, and small batch
   history for Web status display.
-- Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
+- Media processing: metadata extraction, playback MP3 generation, duplicate
+  signal collection, explicit owner cover replacement, and FFmpeg integration.
 - Playback events: online/offline playback event ingestion and duplicate-safe sync.
 - Feedback events: recommendation feedback ingestion and cooldown/avoidance inputs.
 - Recommendation: structured rule-based ranking and result explanation.
@@ -445,7 +447,7 @@ Supported user-provided video upload formats:
 3. Extract metadata.
 4. Generate normalized MP3 playback file.
 5. Store a normalized metadata key and playback SHA-256 hash when available.
-6. Extract or generate cover if available.
+6. Leave cover unset unless the owner uploads one explicitly.
 7. Create or update Track.
 8. Ask AI for tag suggestions.
 9. Mark track as ready or failed.
@@ -587,7 +589,6 @@ does not let AI select tracks.
 - `GET /api/tracks/duplicates`
 - `POST /api/tracks/{id}/stream-url`
 - `GET /api/tracks/{id}/stream`
-- `GET /api/tracks/{id}/download-cache`
 
 ### Playlists
 

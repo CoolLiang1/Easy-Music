@@ -14,7 +14,7 @@ optional AI-assisted tag suggestions.
 
 ## Status
 
-Current status as of 2026-06-30:
+Current status as of 2026-07-10:
 
 - MVP Phase 0 through Phase 7 are implemented and locally accepted.
 - V1.1 workflow improvements, duplicate detection, cover editing, advanced
@@ -25,17 +25,19 @@ Current status as of 2026-06-30:
 - The first real Ubuntu/domain/HTTPS production smoke test is recorded as
   passed in
   [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md).
-- The next planned product work is UI optimization across the existing Web and
-  Android flows.
+- V2.6 stability and listening-loop work is active. It starts with release and
+  security gates, then closes Web playback events, recent history, and active
+  playback feedback before later library-scale and UI-maintenance sprints.
 
 ## Features
 
 - Authenticated personal music library.
-- Audio upload for MP3, FLAC, M4A, WAV, and OGG files.
+- Audio upload for MP3, FLAC, M4A, WAV, OGG, and AAC files.
 - Optional user-provided video-to-audio extraction.
 - Safe server-side import preview and confirmed import from configured roots.
-- Background worker for metadata extraction, playback media generation, cover
-  extraction, duplicate signals, and processing status updates.
+- Background worker for metadata extraction, playback media generation,
+  duplicate signals, and processing status updates; owners can upload and
+  replace cover images explicitly.
 - Track, tag, cover, playlist, and queue management.
 - Web playback and Android Media3 playback with background controls.
 - Android manual offline cache and playback-event sync.
@@ -392,7 +394,7 @@ Start here:
 - [API Manual Testing](docs/API_MANUAL_TESTING.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
 - [Ubuntu Production Smoke Acceptance](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
-- [Next UI Optimization Tasks](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
+- [V2.6 Stability And Listening Loop Tasks](docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md)
 
 Historical acceptance records live under `docs/ACCEPTANCE/`, and task records
 live under `docs/TASKS/`.
