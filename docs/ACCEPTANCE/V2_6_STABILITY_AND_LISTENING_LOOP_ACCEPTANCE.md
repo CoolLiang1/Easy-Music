@@ -9,7 +9,9 @@ behaviors matter.
 
 ## Current Status
 
-Status: implementation in progress.
+Status: P0 and Sprint 1 implementation complete; manual browser, Android
+device, hosted CI, and cross-client acceptance remain open. Sprint 2 through
+Sprint 4 are planned.
 
 Baseline recorded on 2026-07-10 before V2.6 implementation:
 
@@ -44,9 +46,9 @@ Explicitly out of scope:
 
 - [x] Formal V2.6 task document exists.
 - [x] Formal V2.6 acceptance document exists.
-- [ ] Every implementation commit maps to one P0 or sprint task.
-- [ ] Verification results are appended with dates and exact commands.
-- [ ] Known limitations and unrun manual checks remain visible.
+- [x] Every implementation commit maps to one P0 or sprint task.
+- [x] Verification results are appended with dates and exact commands.
+- [x] Known limitations and unrun manual checks remain visible.
 
 ## Gate 1: P0 Deterministic Baseline
 
@@ -417,3 +419,48 @@ Manual checks still required:
 
 - Device/emulator verification that each action changes subsequent backend
   recommendation behavior while playback continues.
+
+### 2026-07-10 - P0 And Sprint 1 Final Automated Gate
+
+Automated checks:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m alembic heads
+
+cd ..\web
+npm run test
+npm run typecheck
+npm run build
+
+cd ..\android
+.\gradlew.bat test build lint --no-daemon --console=plain
+
+cd ..
+docker compose -f docker-compose.prod.yml `
+  --env-file .env.production.example config --quiet
+```
+
+Results:
+
+- Backend: `376 passed, 2 skipped`.
+- Alembic: `20260629_0012 (head)`.
+- Web: `9 passed`; typecheck and production build passed.
+- Android: `BUILD SUCCESSFUL`; lint reports `0 errors, 13 warnings`.
+- Production Compose example configuration: passed.
+- Final diff whitespace check: passed.
+- Automatic code review: no unresolved blocking finding.
+
+Browser automation limitation:
+
+- The `webapp-testing` workflow was attempted, but neither the system Python
+  nor the bundled workspace Python includes the required Playwright module.
+  No dependency was added solely for this smoke. Real browser/media and
+  responsive visual checks therefore remain unchecked above.
+
+Release limitations:
+
+- GitHub-hosted CI cannot run until the branch is pushed.
+- No push, merge, `develop`/`main` promotion, or release tag was requested or
+  performed.

@@ -28,6 +28,17 @@ single-owner product safe to update and operate.
 - The backend suite has one date-dependent library-report test that becomes
   incorrect as wall-clock time advances.
 
+## Delivery Status
+
+- P0 implementation is complete on 2026-07-10; Android device media-control
+  smoke and hosted GitHub Actions remain acceptance checks rather than code
+  work.
+- Sprint 1 implementation is complete on 2026-07-10; real Web/Android media
+  playback and cross-client recommendation behavior remain manual acceptance
+  checks.
+- Sprint 2, Sprint 3, and Sprint 4 remain planned and are not implemented by
+  this delivery.
+
 ## Global Boundaries
 
 In scope:
@@ -381,4 +392,3 @@ Acceptance:
   documented.
 - No current-status document claims an implemented feature is missing or an
   unimplemented feature exists.
-
