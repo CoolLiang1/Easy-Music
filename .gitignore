@@ -31,6 +31,7 @@ pnpm-debug.log*
 .vite/
 coverage/
 web/dist/
+web/.test-dist/
 web/.env.local
 web/.env.*.local
 
