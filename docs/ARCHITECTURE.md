@@ -585,6 +585,7 @@ does not let AI select tracks.
 - `POST /api/tracks/batch-delete`
 - `DELETE /api/tracks/{id}`
 - `GET /api/tracks/duplicates`
+- `POST /api/tracks/{id}/stream-url`
 - `GET /api/tracks/{id}/stream`
 - `GET /api/tracks/{id}/download-cache`
 

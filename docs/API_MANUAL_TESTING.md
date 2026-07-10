@@ -790,12 +790,31 @@ curl.exe `
   "http://127.0.0.1:8000/api/tracks/$trackId/stream"
 ```
 
+Verify the short-lived Web stream URL path:
+
+```powershell
+$streamUrlResponse = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/tracks/$trackId/stream-url" `
+  -Headers $headers
+
+curl.exe `
+  -i `
+  -H "Range: bytes=0-99" `
+  "http://127.0.0.1:8000$($streamUrlResponse.stream_url)"
+```
+
 Expected result:
 
 - Full stream returns `200 OK`.
 - Range stream returns `206 Partial Content`.
 - Response includes `Accept-Ranges: bytes`.
-- Invalid or missing auth returns `401 Unauthorized`.
+- `POST /api/tracks/{track_id}/stream-url` requires bearer auth and returns a
+  short-lived, track-scoped URL for browser `<audio>` playback.
+- The returned stream URL works without an `Authorization` header until it
+  expires, including Range requests.
+- Invalid or missing auth on bearer-only requests, or an invalid stream URL
+  token, returns `401 Unauthorized`.
 
 ## Delete One Track
 
@@ -1727,6 +1746,8 @@ docker compose up -d worker-loop
 7. Run `docker compose run --rm worker`, or keep `worker-loop` running.
 8. Fetch `GET /api/tracks/$trackId` until `status` is `ready`.
 9. Call `GET /api/tracks/$trackId/stream` with the bearer token.
+10. Call `POST /api/tracks/$trackId/stream-url` with the bearer token, then
+    request the returned URL with a `Range` header.
 
 Expected result:
 
@@ -1735,6 +1756,8 @@ Expected result:
 - Track becomes `ready`.
 - Stream endpoint returns `200 OK` for full playback and `206 Partial Content`
   for Range requests.
+- The short-lived stream URL path also returns `206 Partial Content` for Range
+  requests without requiring the browser audio element to send auth headers.
 
 ## Phase 2 Web Browser Smoke Test
 
@@ -1783,14 +1806,15 @@ Open the Vite URL in a browser, usually `http://127.0.0.1:8081/`, then verify:
 9. On the track detail page, assign and remove existing tags, save, refresh, and
    confirm the associations persist.
 10. On a ready track, use the browser playback control from the library or detail
-   page and confirm audio plays through the authenticated stream endpoint.
+   page and confirm Web obtains a short-lived stream URL and audio starts
+   playing through the stream endpoint.
 
 Expected Web result:
 
 - Protected pages redirect unauthenticated users to login.
 - Refreshing the browser preserves a valid session.
 - Upload, processing refresh, metadata edits, tag CRUD, track tag assignment,
-  and ready-track playback all work without adding any backend endpoints.
+  and ready-track playback all work through the documented backend endpoints.
 - Non-ready tracks remain visible but cannot be played.
 
 ## Automated Regression Check

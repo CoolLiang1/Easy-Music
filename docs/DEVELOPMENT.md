@@ -540,6 +540,11 @@ same local queue model through Media3 state and the Now Playing queue
 management surface. Queue remains process/page-local; there is no backend queue
 API and no cross-device queue sync.
 
+Web audio playback uses `POST /api/tracks/{track_id}/stream-url` to obtain a
+short-lived, track-scoped URL and then hands that URL directly to `<audio>`.
+This lets the browser issue normal streaming and Range requests instead of
+first reading the whole response into a Blob.
+
 V2.2 acceptance is recorded in
 `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`. Web automated checks and
 browser smoke are recorded as passed. Android automated checks and
@@ -661,8 +666,8 @@ backend:
     `type`, `feature`), rename it, change its group, and delete one
     explicit tag.
 15. For a ready track, use the playback control from the library row or track
-    detail page and confirm audio loads through the authenticated stream
-    endpoint.
+    detail page and confirm Web requests a short-lived stream URL and audio
+    loads through the stream endpoint.
 
 Expected result:
 

@@ -51,6 +51,11 @@ class TrackBatchDeleteResponse(BaseModel):
     results: list[TrackBatchDeleteResult]
 
 
+class TrackStreamUrlResponse(BaseModel):
+    stream_url: str
+    expires_at: int
+
+
 class TrackResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

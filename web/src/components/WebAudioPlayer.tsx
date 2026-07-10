@@ -3,11 +3,10 @@ import {
   useEffect,
   useRef,
   useState,
-  type MutableRefObject,
 } from "react";
 import { createPortal } from "react-dom";
 
-import { getTrackStreamBlob } from "../api/tracks";
+import { getTrackStreamUrl } from "../api/tracks";
 import {
   usePlaybackQueue,
   type PlaybackQueueGenerationMode,
@@ -55,7 +54,7 @@ type WebPlaybackQueuePlayerProps = {
 type PlayerState =
   | { name: "idle" }
   | { name: "loading" }
-  | { name: "ready"; objectUrl: string }
+  | { name: "ready"; streamUrl: string }
   | { name: "error"; message: string };
 
 export function WebAudioPlayer({
@@ -84,7 +83,6 @@ export function WebPlaybackQueuePlayer({
 }: WebPlaybackQueuePlayerProps) {
   const { next, previous, state } = usePlaybackQueue();
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
   const seekBarRef = useRef<HTMLInputElement | null>(null);
   const requestedQueueItemIdRef = useRef<string | null>(null);
   const playbackRequestedRef = useRef(false);
@@ -119,7 +117,6 @@ export function WebPlaybackQueuePlayer({
       suppressPauseEventRef.current = false;
       audioRef.current.removeAttribute("src");
     }
-    releaseObjectUrl(objectUrlRef);
     requestedQueueItemIdRef.current = null;
     setPlayerState({ name: "idle" });
     setPlaying(false);
@@ -142,7 +139,6 @@ export function WebPlaybackQueuePlayer({
         return;
       }
 
-      releaseObjectUrl(objectUrlRef);
       requestedQueueItemIdRef.current = currentItem.queueItemId;
       setPlayerState({ name: "loading" });
       setPlaying(false);
@@ -150,13 +146,11 @@ export function WebPlaybackQueuePlayer({
       setDuration(0);
 
       try {
-        const blob = await getTrackStreamBlob(accessToken, currentItem.track.id);
+        const streamUrl = await getTrackStreamUrl(accessToken, currentItem.track.id);
         if (requestedQueueItemIdRef.current !== currentItem.queueItemId) {
           return;
         }
-        const objectUrl = URL.createObjectURL(blob);
-        objectUrlRef.current = objectUrl;
-        setPlayerState({ name: "ready", objectUrl });
+        setPlayerState({ name: "ready", streamUrl });
       } catch (error: unknown) {
         if (hasNext) {
           setPlayerState({
@@ -191,20 +185,20 @@ export function WebPlaybackQueuePlayer({
     };
   }, [currentItem?.queueItemId]);
 
-  const readyObjectUrl =
-    playerState.name === "ready" ? playerState.objectUrl : null;
+  const readyStreamUrl =
+    playerState.name === "ready" ? playerState.streamUrl : null;
 
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || !readyObjectUrl) return;
+    if (!el || !readyStreamUrl) return;
 
     el.volume = volume;
     el.muted = muted || volume === 0;
-  }, [muted, readyObjectUrl, volume]);
+  }, [muted, readyStreamUrl, volume]);
 
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || !readyObjectUrl || !playbackRequestedRef.current) return;
+    if (!el || !readyStreamUrl || !playbackRequestedRef.current) return;
 
     setActiveAudio(el);
     el.play().catch(() => {
@@ -216,7 +210,7 @@ export function WebPlaybackQueuePlayer({
         message: "浏览器阻止了自动播放，请再点一次播放。",
       });
     });
-  }, [readyObjectUrl]);
+  }, [readyStreamUrl]);
 
   useEffect(() => {
     if (!showVolumePopup) return;
@@ -407,7 +401,7 @@ export function WebPlaybackQueuePlayer({
           <audio
             ref={audioRef}
             preload="metadata"
-            src={playerState.objectUrl}
+            src={playerState.streamUrl}
             onPlay={handlePlay}
             onPause={handlePause}
             onEnded={handleEnded}
@@ -640,13 +634,6 @@ function storeMuted(muted: boolean) {
 
 function clampVolume(volume: number): number {
   return Math.min(1, Math.max(0, volume));
-}
-
-function releaseObjectUrl(objectUrlRef: MutableRefObject<string | null>) {
-  if (objectUrlRef.current) {
-    URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = null;
-  }
 }
 
 function formatTime(seconds: number): string {

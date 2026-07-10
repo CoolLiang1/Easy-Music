@@ -806,6 +806,101 @@ def test_stream_track_supports_range_requests(
     assert response.content == b"2345"
 
 
+def test_create_stream_url_returns_track_bound_stream_url(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True)
+    playback_path.write_bytes(b"0123456789")
+
+    url_response = client.post(
+        f"/api/tracks/{track.id}/stream-url",
+        headers=auth_headers(user),
+    )
+
+    assert url_response.status_code == 200
+    body = url_response.json()
+    assert body["stream_url"].startswith(f"/api/tracks/{track.id}/stream?token=")
+    assert isinstance(body["expires_at"], int)
+
+    stream_response = client.get(
+        body["stream_url"],
+        headers={"Range": "bytes=2-5"},
+    )
+
+    assert stream_response.status_code == 206
+    assert stream_response.headers["content-range"] == "bytes 2-5/10"
+    assert stream_response.content == b"2345"
+
+
+def test_stream_url_requires_authentication(client: TestClient, db_session: Session) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.post(f"/api/tracks/{track.id}/stream-url")
+
+    assert response.status_code == 401
+
+
+def test_stream_url_rejects_non_ready_track(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.status = "processing"
+    db_session.commit()
+
+    response = client.post(
+        f"/api/tracks/{track.id}/stream-url",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 404
+
+
+def test_track_stream_token_cannot_stream_another_track(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    first_path = tmp_path / first.playback_file_path
+    second_path = tmp_path / second.playback_file_path
+    first_path.parent.mkdir(parents=True, exist_ok=True)
+    second_path.parent.mkdir(parents=True, exist_ok=True)
+    first_path.write_bytes(b"first")
+    second_path.write_bytes(b"second")
+
+    url_response = client.post(
+        f"/api/tracks/{first.id}/stream-url",
+        headers=auth_headers(user),
+    )
+    token = url_response.json()["stream_url"].split("token=", maxsplit=1)[1]
+
+    response = client.get(f"/api/tracks/{second.id}/stream?token={token}")
+
+    assert response.status_code == 401
+
+
+def test_stream_track_rejects_invalid_query_token(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.get(f"/api/tracks/{track.id}/stream?token=not-a-token")
+
+    assert response.status_code == 401
+
+
 def test_stream_track_rejects_invalid_range(
     client: TestClient,
     db_session: Session,
