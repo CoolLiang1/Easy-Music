@@ -6,6 +6,7 @@ export type AppRoute =
   | { name: "duplicates" }
   | { name: "imports" }
   | { name: "reports" }
+  | { name: "history" }
   | { name: "library" }
   | { name: "playlists" }
   | { name: "upload" }
@@ -48,6 +49,10 @@ export function getRoute(path: string): AppRoute {
 
   if (normalizedPath === "/reports") {
     return { name: "reports" };
+  }
+
+  if (normalizedPath === "/history") {
+    return { name: "history" };
   }
 
   if (normalizedPath === "/tags") {

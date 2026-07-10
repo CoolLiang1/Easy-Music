@@ -8,6 +8,7 @@
   "include": [
     "src/player/pendingPlaybackEvents.ts",
     "src/player/WebPlaybackEventRecorder.ts",
+    "src/routes/router.ts",
     "src/types/playbackEvent.ts"
   ]
 }

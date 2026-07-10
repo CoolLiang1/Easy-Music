@@ -1,3 +1,5 @@
+import type { Track } from "./track";
+
 export type PlaybackEventType =
   | "play"
   | "pause"
@@ -35,4 +37,10 @@ export type PlaybackEventFailed = {
 export type PlaybackEventsResponse = {
   accepted: PlaybackEventAccepted[];
   failed: PlaybackEventFailed[];
+};
+
+export type RecentPlaybackItem = {
+  track: Track;
+  last_played_at: string;
+  playback_count: number;
 };

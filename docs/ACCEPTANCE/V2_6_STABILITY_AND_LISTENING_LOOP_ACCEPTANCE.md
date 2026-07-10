@@ -125,8 +125,8 @@ Explicitly out of scope:
 - [x] Results aggregate repeated events by track.
 - [x] Results use deterministic latest-play ordering.
 - [x] Limit validation and empty history are tested.
-- [ ] Web `/history` renders loading, empty, success, and error states.
-- [ ] History rows support play and queue actions.
+- [x] Web `/history` renders loading, empty, success, and error states.
+- [x] History rows support play and queue actions.
 
 ## Gate 9: Active Playback Quick Feedback
 
@@ -318,3 +318,33 @@ Manual checks still required:
 
 - Cross-client history ordering with real Web and Android playback will be
   verified after the Web history surface is connected.
+
+### 2026-07-10 - Sprint 1 Web Recent Playback
+
+Implemented:
+
+- Added protected `/history` routing and a Recent Playback navigation entry.
+- Added loading, empty, retryable error, and populated history states.
+- Added track detail links plus direct play, play-next, and add-to-queue actions.
+- Added a focused route-resolution test.
+
+Automated checks:
+
+```powershell
+cd web
+npm run test
+npm run typecheck
+npm run build
+```
+
+Results:
+
+- Node/TypeScript tests: `8 passed`.
+- TypeScript check: passed.
+- Production build: passed.
+
+Manual checks still required:
+
+- Real authenticated browser playback appearing in `/history` after event
+  delivery.
+- Visual and responsive smoke with populated production-like history data.

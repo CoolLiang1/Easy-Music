@@ -32,6 +32,7 @@ const navGroups = [
   {
     label: "收听",
     items: [
+      { label: "最近播放", path: "/history" },
       { label: "推荐", path: "/recommendations" },
       { label: "AI 助手", path: "/ai-assistant" },
     ],

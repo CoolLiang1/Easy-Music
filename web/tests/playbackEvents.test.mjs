@@ -9,6 +9,7 @@ import {
   readPendingPlaybackEvents,
 } from "../.test-dist/player/pendingPlaybackEvents.js";
 import { WebPlaybackEventRecorder } from "../.test-dist/player/WebPlaybackEventRecorder.js";
+import { getRoute } from "../.test-dist/routes/router.js";
 
 class MemoryStorage {
   values = new Map();
@@ -179,4 +180,9 @@ test("recorder records skip before selecting a replacement track", () => {
       [2, "play"],
     ],
   );
+});
+
+test("history route resolves with or without a trailing slash", () => {
+  assert.deepEqual(getRoute("/history"), { name: "history" });
+  assert.deepEqual(getRoute("/history/"), { name: "history" });
 });
