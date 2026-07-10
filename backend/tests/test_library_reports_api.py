@@ -17,9 +17,10 @@ from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
+from app.services.library_reports import build_library_organization_report
 
 
-NOW = datetime(2026, 6, 4, 8, 0, tzinfo=timezone.utc)
+REFERENCE_NOW = datetime(2026, 6, 4, 8, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -144,6 +145,7 @@ def test_library_report_returns_read_only_cleanup_sections(
     client: TestClient,
     db_session: Session,
 ) -> None:
+    request_time = datetime.now(timezone.utc)
     user = create_user(db_session)
     tag = create_tag(db_session, user)
     tagged = create_track(db_session, user, "Tagged")
@@ -179,10 +181,20 @@ def test_library_report_returns_read_only_cleanup_sections(
         db_session,
         user,
         "Stale Cooldown",
-        cooldown_until=NOW - timedelta(days=1),
+        cooldown_until=request_time - timedelta(days=1),
     )
-    add_playback_event(db_session, user, rarely_played, NOW - timedelta(days=45))
-    add_playback_event(db_session, user, recently_played, NOW - timedelta(days=2))
+    add_playback_event(
+        db_session,
+        user,
+        rarely_played,
+        request_time - timedelta(days=45),
+    )
+    add_playback_event(
+        db_session,
+        user,
+        recently_played,
+        request_time - timedelta(days=2),
+    )
 
     response = client.get("/api/library/reports", headers=auth_headers(user))
 
@@ -224,6 +236,36 @@ def test_library_report_returns_read_only_cleanup_sections(
         track["title"] for track in body["rarely_played_ready_tracks"]
     }
     assert body["stale_cooldown_tracks"][0]["track"]["id"] == stale_cooldown.id
+
+
+def test_library_report_rarely_played_threshold_uses_injected_clock(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    at_threshold = create_track(db_session, user, "At Threshold")
+    older_than_threshold = create_track(db_session, user, "Older Than Threshold")
+    add_playback_event(
+        db_session,
+        user,
+        at_threshold,
+        REFERENCE_NOW - timedelta(days=30),
+    )
+    add_playback_event(
+        db_session,
+        user,
+        older_than_threshold,
+        REFERENCE_NOW - timedelta(days=30, seconds=1),
+    )
+
+    report = build_library_organization_report(
+        db_session,
+        user,
+        now=REFERENCE_NOW,
+    )
+
+    rarely_played_ids = {track.id for track in report.rarely_played_ready_tracks}
+    assert at_threshold.id not in rarely_played_ids
+    assert older_than_threshold.id in rarely_played_ids
 
 
 def test_library_report_is_scoped_to_current_user(
