@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { getLibraryOrganizationReport } from "../api/libraryReports";
+import {
+  getLibraryOrganizationReport,
+  getStorageConsistencyReport,
+} from "../api/libraryReports";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import { formatDateTime, formatDuration } from "../i18n/zh";
@@ -10,11 +13,17 @@ import type {
   LibraryOrganizationReport,
   LibraryReportTrack,
   LibraryReportTrackIssue,
+  MediaKind,
+  StorageConsistencyReport,
 } from "../types/libraryReport";
 
 type ReportState =
   | { name: "loading" }
-  | { name: "ready"; report: LibraryOrganizationReport }
+  | {
+      name: "ready";
+      report: LibraryOrganizationReport;
+      storageReport: StorageConsistencyReport;
+    }
   | { name: "error"; message: string };
 
 export function LibraryReportsPage() {
@@ -38,8 +47,11 @@ export function LibraryReportsPage() {
     }
 
     try {
-      const report = await getLibraryOrganizationReport(accessToken);
-      setReportState({ name: "ready", report });
+      const [report, storageReport] = await Promise.all([
+        getLibraryOrganizationReport(accessToken),
+        getStorageConsistencyReport(accessToken),
+      ]);
+      setReportState({ name: "ready", report, storageReport });
     } catch (error: unknown) {
       setReportState({
         name: "error",
@@ -91,12 +103,23 @@ export function LibraryReportsPage() {
         </div>
       ) : null}
 
-      {reportState.name === "ready" ? <ReportSections report={reportState.report} /> : null}
+      {reportState.name === "ready" ? (
+        <ReportSections
+          report={reportState.report}
+          storageReport={reportState.storageReport}
+        />
+      ) : null}
     </section>
   );
 }
 
-function ReportSections({ report }: { report: LibraryOrganizationReport }) {
+function ReportSections({
+  report,
+  storageReport,
+}: {
+  report: LibraryOrganizationReport;
+  storageReport: StorageConsistencyReport;
+}) {
   return (
     <div className="recommendation-results">
       <p className="page-copy" style={{ margin: 0 }}>
@@ -134,8 +157,59 @@ function ReportSections({ report }: { report: LibraryOrganizationReport }) {
         issues={report.stale_cooldown_tracks}
         title="已过期冷却"
       />
+      <StorageConsistencySection report={storageReport} />
     </div>
   );
+}
+
+function StorageConsistencySection({ report }: { report: StorageConsistencyReport }) {
+  const issueCount =
+    report.missing_references.length +
+    report.unsafe_references.length +
+    report.orphan_files.length +
+    report.scan_errors.length;
+  return (
+    <ReportPanel count={issueCount} title="媒体存储一致性（只读）">
+      <p style={emptyTextStyle}>
+        扫描 {report.scanned_file_count} 个文件，核对 {report.referenced_file_count} 个当前引用。
+        此报告不会删除、移动或修改任何文件。
+      </p>
+      {issueCount === 0 ? (
+        <p style={{ ...emptyTextStyle, marginTop: "12px" }}>没有发现存储一致性问题。</p>
+      ) : (
+        <ul style={{ ...listStyle, marginTop: "14px" }}>
+          {report.missing_references.map((issue) => (
+            <li key={`missing-${issue.track_id}-${issue.media_kind}`} style={itemStyle}>
+              缺失引用：音轨 #{issue.track_id} / {mediaKindLabel(issue.media_kind)} /{" "}
+              {issue.path}
+            </li>
+          ))}
+          {report.unsafe_references.map((issue) => (
+            <li key={`unsafe-${issue.track_id}-${issue.media_kind}`} style={itemStyle}>
+              不安全引用：音轨 #{issue.track_id} / {mediaKindLabel(issue.media_kind)}；路径已隐藏。
+            </li>
+          ))}
+          {report.orphan_files.map((item) => (
+            <li key={`orphan-${item.path}`} style={itemStyle}>
+              孤儿文件：{mediaKindLabel(item.media_kind)} / {item.path}
+            </li>
+          ))}
+          {report.scan_errors.map((message) => (
+            <li key={message} style={itemStyle}>扫描警告：{message}</li>
+          ))}
+        </ul>
+      )}
+    </ReportPanel>
+  );
+}
+
+function mediaKindLabel(kind: MediaKind): string {
+  return {
+    original: "原始音频",
+    playback: "播放文件",
+    cover: "封面",
+    temporary_video: "临时视频",
+  }[kind];
 }
 
 function TrackSection({

@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,9 +10,12 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth.password import hash_password
 from app.auth.tokens import create_access_token
+from app.core.config import Settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
+from app.media.storage import MediaStorage, get_media_storage
+from app.models.processing_job import ProcessingJob
 from app.models.playback_event import PlaybackEvent
 from app.models.tag import Tag
 from app.models.track import Track
@@ -38,13 +42,15 @@ def db_session() -> Generator[Session]:
 
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient]:
+def client(db_session: Session, tmp_path: Path) -> Generator[TestClient]:
     app = create_app()
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
 
     def override_get_db() -> Generator[Session]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_media_storage] = lambda: storage
     with TestClient(app) as test_client:
         yield test_client
 
@@ -286,3 +292,90 @@ def test_library_report_is_scoped_to_current_user(
     assert visible.title in serialized
     assert hidden.title not in serialized
     assert body["duplicate_groups"] == []
+
+
+def test_storage_consistency_report_is_read_only_and_owner_scoped(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    owner = create_user(db_session)
+    other = create_user(db_session, username="other")
+    track = create_track(db_session, owner, "Owned", cover_path=None)
+    track.original_file_path = f"originals/user-{owner.id}/track-{track.id}/source.mp3"
+    track.playback_file_path = f"playback/user-{owner.id}/track-{track.id}/playback.mp3"
+    unsafe_track = create_track(db_session, owner, "Unsafe", cover_path=None)
+    unsafe_track.original_file_path = "../private/secret.mp3"
+    unsafe_track.playback_file_path = None
+    video_track = create_track(db_session, owner, "Video", cover_path=None)
+    video_track.original_file_path = None
+    video_track.playback_file_path = None
+    video_track.status = "processing"
+    video_source = f"temp-videos/user-{owner.id}/track-{video_track.id}/source.mp4"
+    db_session.add(
+        ProcessingJob(
+            track_id=video_track.id,
+            status="pending",
+            job_type="video_extraction",
+            source_path=video_source,
+        ),
+    )
+    db_session.commit()
+
+    referenced_original = tmp_path / track.original_file_path
+    referenced_original.parent.mkdir(parents=True)
+    referenced_original.write_bytes(b"audio")
+    retained_video = tmp_path / video_source
+    retained_video.parent.mkdir(parents=True)
+    retained_video.write_bytes(b"video")
+    orphan = tmp_path / f"covers/user-{owner.id}/track-{track.id}/old-cover.jpg"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_bytes(b"orphan")
+    hidden_orphan = tmp_path / f"covers/user-{other.id}/track-999/hidden.jpg"
+    hidden_orphan.parent.mkdir(parents=True)
+    hidden_orphan.write_bytes(b"hidden")
+    before_track_count = db_session.query(Track).count()
+    before_job_count = db_session.query(ProcessingJob).count()
+
+    response = client.get(
+        "/api/library/storage-consistency",
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["referenced_file_count"] == 3
+    assert body["scanned_file_count"] == 3
+    assert body["missing_references"] == [
+        {
+            "track_id": track.id,
+            "media_kind": "playback",
+            "path": track.playback_file_path,
+        },
+    ]
+    assert body["unsafe_references"] == [
+        {
+            "track_id": unsafe_track.id,
+            "media_kind": "original",
+            "path": None,
+        },
+    ]
+    assert body["orphan_files"] == [
+        {
+            "media_kind": "cover",
+            "path": orphan.relative_to(tmp_path).as_posix(),
+        },
+    ]
+    assert body["scan_errors"] == []
+    assert hidden_orphan.relative_to(tmp_path).as_posix() not in str(body)
+    assert db_session.query(Track).count() == before_track_count
+    assert db_session.query(ProcessingJob).count() == before_job_count
+    assert referenced_original.read_bytes() == b"audio"
+    assert retained_video.read_bytes() == b"video"
+    assert orphan.read_bytes() == b"orphan"
+
+
+def test_storage_consistency_report_requires_authentication(client: TestClient) -> None:
+    response = client.get("/api/library/storage-consistency")
+
+    assert response.status_code == 401

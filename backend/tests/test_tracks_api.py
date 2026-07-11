@@ -988,7 +988,7 @@ def test_delete_track_keeps_non_empty_track_media_directory_and_logs_reason(
     assert "directory is not empty" in caplog.text
 
 
-def test_delete_track_reports_media_file_failure(
+def test_delete_track_keeps_logical_deletion_when_tombstone_cleanup_fails(
     client: TestClient,
     db_session: Session,
     tmp_path: Path,
@@ -1016,15 +1016,50 @@ def test_delete_track_reports_media_file_failure(
 
     response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
 
+    assert response.status_code == 204
+    assert db_session.get(Track, track_id) is None
+    assert db_session.get(TrackTag, (track_id, tag_id)) is None
+    assert not original_path.exists()
+    assert not playback_path.exists()
+    assert len(list(tmp_path.rglob("*.deleting-*"))) == 2
+
+
+def test_delete_track_restores_staged_media_when_staging_fails(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    tag = create_tag(db_session, user)
+    db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
+    db_session.commit()
+    original_path = tmp_path / track.original_file_path
+    playback_path = tmp_path / track.playback_file_path
+    for path in (original_path, playback_path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"media")
+    real_replace = Path.replace
+
+    def fail_second_stage(self: Path, target: Path) -> Path:
+        if self == playback_path:
+            raise PermissionError("permission denied")
+        return real_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", fail_second_stage)
+    track_id = track.id
+    tag_id = tag.id
+
+    response = client.delete(f"/api/tracks/{track_id}", headers=auth_headers(user))
+
     assert response.status_code == 500
-    assert response.json()["detail"] == (
-        "Unable to delete stored media file 'originals/track.mp3'. "
-        "Check backend media volume permissions and try again."
-    )
+    assert "Unable to stage stored media file" in response.json()["detail"]
     assert db_session.get(Track, track_id) is not None
     assert db_session.get(TrackTag, (track_id, tag_id)) is not None
-    assert original_path.exists()
-    assert playback_path.exists()
+    assert original_path.read_bytes() == b"media"
+    assert playback_path.read_bytes() == b"media"
+    assert list(tmp_path.rglob("*.deleting-*")) == []
 
 
 def test_delete_track_rejects_unsafe_media_path(
@@ -1333,6 +1368,69 @@ def test_update_track_cover_saves_valid_image(
     db_session.refresh(track)
     assert track.cover_path == body["cover_path"]
     assert (tmp_path / track.cover_path).read_bytes() == b"\x89PNG\r\n\x1a\ncover bytes"
+
+
+def test_update_track_cover_deletes_superseded_file_after_commit(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    old_relative_path = f"covers/user-{user.id}/track-{track.id}/old-cover.jpg"
+    track.cover_path = old_relative_path
+    old_cover = tmp_path / old_relative_path
+    old_cover.parent.mkdir(parents=True)
+    old_cover.write_bytes(b"old")
+    db_session.commit()
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.png", b"\x89PNG\r\n\x1a\nnew", "image/png")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["cover_path"] != old_relative_path
+    assert not old_cover.exists()
+    assert (tmp_path / response.json()["cover_path"]).is_file()
+
+
+def test_update_track_cover_keeps_new_reference_when_old_cleanup_fails(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    old_relative_path = f"covers/user-{user.id}/track-{track.id}/old-cover.jpg"
+    track.cover_path = old_relative_path
+    old_cover = tmp_path / old_relative_path
+    old_cover.parent.mkdir(parents=True)
+    old_cover.write_bytes(b"old")
+    db_session.commit()
+    real_unlink = Path.unlink
+
+    def fail_old_cover(self: Path, missing_ok: bool = False) -> None:
+        if self == old_cover:
+            raise PermissionError("permission denied")
+        real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", fail_old_cover)
+
+    response = client.put(
+        f"/api/tracks/{track.id}/cover",
+        files={"file": ("cover.png", b"\x89PNG\r\n\x1a\nnew", "image/png")},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    db_session.refresh(track)
+    assert track.cover_path == response.json()["cover_path"]
+    assert track.cover_path != old_relative_path
+    assert old_cover.exists()
+    assert (tmp_path / track.cover_path).is_file()
 
 
 def test_update_track_cover_requires_authentication(client: TestClient) -> None:

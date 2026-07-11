@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import case, delete, func, or_, select
@@ -237,6 +238,7 @@ def update_track_cover(
     file: UploadFile,
     storage: MediaStorage,
 ) -> Track:
+    previous_cover_path = track.cover_path
     suffix = _validate_cover_upload(file)
     destination = storage.cover_image_path(track.user_id, track.id, suffix)
     max_bytes = storage.settings.max_cover_mb * 1024 * 1024
@@ -244,15 +246,36 @@ def update_track_cover(
     try:
         _save_cover_upload(file, destination, max_bytes)
         _validate_saved_cover_signature(destination, file.content_type or "")
+        next_cover_path = storage.relative_media_path(destination)
+        track.cover_path = next_cover_path
+        db.commit()
+        db.refresh(track)
     except Exception:
+        db.rollback()
         if destination.exists():
             destination.unlink()
         raise
 
-    track.cover_path = storage.relative_media_path(destination)
-    db.commit()
-    db.refresh(track)
+    if previous_cover_path and previous_cover_path != next_cover_path:
+        _delete_superseded_cover(previous_cover_path, storage, track.id)
     return track
+
+
+def _delete_superseded_cover(
+    relative_path: str,
+    storage: MediaStorage,
+    track_id: int,
+) -> None:
+    try:
+        previous_cover = storage.stored_media_path(relative_path)
+        previous_cover.unlink(missing_ok=True)
+        _cleanup_empty_track_media_dirs([(previous_cover, relative_path)], track_id)
+    except (OSError, UnsafeMediaPathError):
+        logger.warning(
+            "Unable to remove superseded cover for track %s; consistency report will retain it.",
+            track_id,
+            exc_info=True,
+        )
 
 
 def cover_media_type(track: Track) -> str:
@@ -429,7 +452,7 @@ def _validate_saved_cover_signature(path: Path, content_type: str) -> None:
 def delete_track(db: Session, track: Track, storage: MediaStorage | None = None) -> None:
     track_id = track.id
     media_paths = _track_media_paths(track, storage) if storage is not None else []
-    failed_media_path = "unknown"
+    staged_paths = _stage_track_media_paths(media_paths, track_id)
 
     try:
         db.execute(delete(FeedbackEvent).where(FeedbackEvent.track_id == track_id))
@@ -440,25 +463,13 @@ def delete_track(db: Session, track: Track, storage: MediaStorage | None = None)
         db.delete(track)
         db.flush()
 
-        for media_path, display_path in media_paths:
-            failed_media_path = display_path
-            media_path.unlink(missing_ok=True)
-
-        _cleanup_empty_track_media_dirs(media_paths, track_id)
         db.commit()
-    except OSError as exc:
+    except Exception:
         db.rollback()
-        logger.warning(
-            "Unable to delete media file for track %s.",
-            track_id,
-            exc_info=True,
-        )
-        raise TrackMediaDeletionError(
-            (
-                f"Unable to delete stored media file '{failed_media_path}'. "
-                "Check backend media volume permissions and try again."
-            )
-        ) from exc
+        _restore_staged_media_paths(staged_paths, track_id)
+        raise
+
+    _delete_staged_media_paths(staged_paths, track_id)
 
 
 def _track_media_paths(track: Track, storage: MediaStorage) -> list[tuple[Path, str]]:
@@ -492,6 +503,68 @@ def _track_media_paths(track: Track, storage: MediaStorage) -> list[tuple[Path, 
         paths.append((media_path, relative_path))
 
     return paths
+
+
+def _stage_track_media_paths(
+    media_paths: list[tuple[Path, str]],
+    track_id: int,
+) -> list[tuple[Path, Path, str]]:
+    staged: list[tuple[Path, Path, str]] = []
+    for media_path, display_path in media_paths:
+        if not media_path.exists():
+            continue
+        tombstone = media_path.with_name(
+            f".{media_path.name}.deleting-{uuid4().hex}",
+        )
+        try:
+            media_path.replace(tombstone)
+        except OSError as exc:
+            _restore_staged_media_paths(staged, track_id)
+            logger.warning("Unable to stage media deletion for track %s.", track_id, exc_info=True)
+            raise TrackMediaDeletionError(
+                (
+                    f"Unable to stage stored media file '{display_path}' for deletion. "
+                    "Check backend media volume permissions and try again."
+                ),
+            ) from exc
+        staged.append((media_path, tombstone, display_path))
+    return staged
+
+
+def _restore_staged_media_paths(
+    staged_paths: list[tuple[Path, Path, str]],
+    track_id: int,
+) -> None:
+    for original, tombstone, _ in reversed(staged_paths):
+        if not tombstone.exists():
+            continue
+        try:
+            tombstone.replace(original)
+        except OSError:
+            logger.critical(
+                "Unable to restore staged media for track %s.",
+                track_id,
+                exc_info=True,
+            )
+
+
+def _delete_staged_media_paths(
+    staged_paths: list[tuple[Path, Path, str]],
+    track_id: int,
+) -> None:
+    for _, tombstone, _ in staged_paths:
+        try:
+            tombstone.unlink(missing_ok=True)
+            _cleanup_empty_track_media_dirs(
+                [(tombstone, tombstone.name)],
+                track_id,
+            )
+        except OSError:
+            logger.warning(
+                "Unable to remove staged media for deleted track %s; consistency report will retain it.",
+                track_id,
+                exc_info=True,
+            )
 
 
 def _cleanup_empty_track_media_dirs(
