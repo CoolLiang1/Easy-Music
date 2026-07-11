@@ -15,6 +15,15 @@ class TrackApi(
             bearerToken = bearerToken,
         ).parseJsonArray(TrackResponse::fromJson)
 
+    fun queryTracks(
+        bearerToken: String,
+        query: TrackQuery,
+    ): ApiResult<TrackQueryResult> =
+        apiClient.get(
+            path = query.toPath(),
+            bearerToken = bearerToken,
+        ).parseJsonArray(TrackResponse::fromJson).mapTrackQueryResult(query.pageSize)
+
     fun getTrack(
         trackId: Int,
         bearerToken: String,
@@ -31,6 +40,23 @@ class TrackApi(
 
     fun streamUrl(trackId: Int): String = apiClient.buildUrl("/api/tracks/$trackId/stream")
 }
+
+private fun ApiResult<List<TrackResponse>>.mapTrackQueryResult(
+    pageSize: Int,
+): ApiResult<TrackQueryResult> =
+    when (this) {
+        is ApiResult.Success -> ApiResult.Success(
+            TrackQueryResult(
+                tracks = value.take(pageSize),
+                hasNextPage = value.size > pageSize,
+            ),
+        )
+
+        is ApiResult.Unauthorized -> this
+        is ApiResult.HttpError -> this
+        is ApiResult.NetworkError -> this
+        is ApiResult.SerializationError -> this
+    }
 
 private inline fun <T> ApiResult<String>.parseJsonObject(
     parser: (JSONObject) -> T,

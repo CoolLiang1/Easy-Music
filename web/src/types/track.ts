@@ -83,3 +83,30 @@ export type TrackBatchDeleteResponse = {
   deleted_count: number;
   results: TrackBatchDeleteResult[];
 };
+
+export type TrackSortField =
+  | "created_at"
+  | "updated_at"
+  | "title"
+  | "artist"
+  | "album"
+  | "duration_seconds";
+
+export type TrackSortOrder = "asc" | "desc";
+
+export type TrackQuery = {
+  q?: string;
+  statuses?: string[];
+  liked?: boolean;
+  contentTypes?: string[];
+  tagIds?: number[];
+  sort?: TrackSortField;
+  order?: TrackSortOrder;
+  limit?: number;
+  offset?: number;
+};
+
+export type TrackQueryResult = {
+  tracks: Track[];
+  total: number;
+};

@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -21,11 +23,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,7 +42,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.cache.domain.CacheStatus
+import com.easymusic.app.library.data.LIBRARY_PAGE_SIZE
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.library.data.TrackSortField
+import com.easymusic.app.library.data.TrackSortOrder
 import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlaybackUiSummary
@@ -56,9 +61,17 @@ import kotlinx.coroutines.flow.map
 @Composable
 fun LibraryScreen(
     uiState: LibraryUiState,
-    onFilterModeChanged: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
+    onStatusFilterChanged: (String) -> Unit,
+    onLikedFilterChanged: (Boolean?) -> Unit,
+    onContentTypeFilterChanged: (String) -> Unit,
+    onTagFilterChanged: (Int?) -> Unit,
+    onSortChanged: (TrackSortField) -> Unit,
+    onToggleSortOrder: () -> Unit,
+    onClearQuery: () -> Unit,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
     onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
@@ -71,18 +84,6 @@ fun LibraryScreen(
             .map { state -> state.toPlaybackUiSummary() }
             .distinctUntilChanged()
     }.collectAsState(initial = PlaybackUiSummary())
-    val visibleTracks = remember(
-        uiState.tracks,
-        uiState.searchQuery,
-        uiState.isFilterModeEnabled,
-    ) {
-        visibleLibraryTracks(
-            tracks = uiState.tracks,
-            searchQuery = uiState.searchQuery,
-            isFilterModeEnabled = uiState.isFilterModeEnabled,
-        )
-    }
-
     selectedTrackId?.let { trackId ->
         Column(modifier = modifier.fillMaxSize()) {
             TrackDetailRoute(
@@ -123,14 +124,19 @@ fun LibraryScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (uiState.tracks.isNotEmpty()) {
+        if (!uiState.isLoading) {
             LibraryFilterControls(
-                searchQuery = uiState.searchQuery,
-                isFilterModeEnabled = uiState.isFilterModeEnabled,
-                visibleTrackCount = visibleTracks.size,
-                totalTrackCount = uiState.tracks.size,
+                uiState = uiState,
                 onSearchQueryChanged = onSearchQueryChanged,
-                onFilterModeChanged = onFilterModeChanged,
+                onStatusFilterChanged = onStatusFilterChanged,
+                onLikedFilterChanged = onLikedFilterChanged,
+                onContentTypeFilterChanged = onContentTypeFilterChanged,
+                onTagFilterChanged = onTagFilterChanged,
+                onSortChanged = onSortChanged,
+                onToggleSortOrder = onToggleSortOrder,
+                onClearQuery = onClearQuery,
+                onPreviousPage = onPreviousPage,
+                onNextPage = onNextPage,
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -144,10 +150,11 @@ fun LibraryScreen(
                     onRefresh = onRefresh,
                 )
 
-                uiState.tracks.isEmpty() -> LibraryEmpty(onRefresh = onRefresh)
-                visibleTracks.isEmpty() -> LibrarySearchEmpty(searchQuery = uiState.searchQuery)
+                uiState.tracks.isEmpty() && uiState.activeFilterCount == 0 ->
+                    LibraryEmpty(onRefresh = onRefresh)
+                uiState.tracks.isEmpty() -> LibrarySearchEmpty(searchQuery = uiState.searchQuery)
                 else -> TrackList(
-                    tracks = visibleTracks,
+                    tracks = uiState.tracks,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                     playbackSummary = playbackSummary,
                     errorMessage = uiState.errorMessage,
@@ -257,7 +264,7 @@ private fun LibraryStats(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        AssistChip(onClick = {}, label = { Text("全部 ${tracks.size}") })
+        AssistChip(onClick = {}, label = { Text("本页 ${tracks.size}") })
         AssistChip(onClick = {}, label = { Text("可播放 $readyCount") })
         AssistChip(
             onClick = {},
@@ -272,23 +279,28 @@ private fun LibraryStats(
 
 @Composable
 private fun LibraryFilterControls(
-    searchQuery: String,
-    isFilterModeEnabled: Boolean,
-    visibleTrackCount: Int,
-    totalTrackCount: Int,
+    uiState: LibraryUiState,
     onSearchQueryChanged: (String) -> Unit,
-    onFilterModeChanged: (Boolean) -> Unit,
+    onStatusFilterChanged: (String) -> Unit,
+    onLikedFilterChanged: (Boolean?) -> Unit,
+    onContentTypeFilterChanged: (String) -> Unit,
+    onTagFilterChanged: (Int?) -> Unit,
+    onSortChanged: (TrackSortField) -> Unit,
+    onToggleSortOrder: () -> Unit,
+    onClearQuery: () -> Unit,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         OutlinedTextField(
-            value = searchQuery,
+            value = uiState.searchQuery,
             onValueChange = onSearchQueryChanged,
             modifier = Modifier.fillMaxWidth(),
             label = { Text("搜索音轨") },
-            placeholder = { Text("输入音轨名称") },
+            placeholder = { Text("标题、艺人、专辑或标签") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -297,34 +309,124 @@ private fun LibraryFilterControls(
             },
             singleLine = true,
         )
+        LibraryFilterRow(
+            label = "状态",
+            options = listOf("" to "全部", "ready" to "可播放", "processing" to "处理中", "failed" to "失败"),
+            selected = uiState.statusFilter,
+            onSelected = onStatusFilterChanged,
+        )
+        LibraryFilterRow(
+            label = "喜欢",
+            options = listOf(null to "全部", true to "已喜欢", false to "未喜欢"),
+            selected = uiState.likedFilter,
+            onSelected = onLikedFilterChanged,
+        )
+        LibraryFilterRow(
+            label = "类型",
+            options = listOf(
+                "" to "全部",
+                "song" to "歌曲",
+                "mix" to "混音/合集",
+                "long_audio" to "长音频",
+                "white_noise" to "白噪音",
+                "ost" to "OST",
+                "other" to "其他",
+            ),
+            selected = uiState.contentTypeFilter,
+            onSelected = onContentTypeFilterChanged,
+        )
+        if (uiState.tags.isNotEmpty()) {
+            LibraryFilterRow(
+                label = "标签",
+                options = listOf(null to "全部") + uiState.tags.map { tag -> tag.id to tag.name },
+                selected = uiState.tagIdFilter,
+                onSelected = onTagFilterChanged,
+            )
+        }
+        LibraryFilterRow(
+            label = "排序",
+            options = listOf(
+                TrackSortField.CreatedAt to "创建",
+                TrackSortField.UpdatedAt to "更新",
+                TrackSortField.Title to "标题",
+                TrackSortField.Artist to "艺人",
+                TrackSortField.Album to "专辑",
+                TrackSortField.Duration to "时长",
+            ),
+            selected = uiState.sort,
+            onSelected = onSortChanged,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Switch(
-                    checked = isFilterModeEnabled,
-                    onCheckedChange = onFilterModeChanged,
-                )
-                Text(
-                    text = "筛选模式",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
             Text(
-                text = if (isFilterModeEnabled && searchQuery.isNotBlank()) {
-                    "显示 $visibleTrackCount / 共 $totalTrackCount"
-                } else {
-                    "显示全部 $totalTrackCount"
-                },
+                text = "第 ${uiState.offset / LIBRARY_PAGE_SIZE + 1} 页 · 本页 ${uiState.tracks.size} 首 · ${uiState.activeFilterCount} 个筛选",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onToggleSortOrder) {
+                    Text(if (uiState.sortOrder == TrackSortOrder.Ascending) "升序" else "降序")
+                }
+                OutlinedButton(
+                    enabled = uiState.activeFilterCount > 0 ||
+                        uiState.offset > 0 ||
+                        uiState.sort != TrackSortField.CreatedAt ||
+                        uiState.sortOrder != TrackSortOrder.Ascending,
+                    onClick = onClearQuery,
+                ) {
+                    Text("清除")
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            OutlinedButton(
+                enabled = uiState.offset > 0 && !uiState.isRefreshing,
+                onClick = onPreviousPage,
+            ) {
+                Text("上一页")
+            }
+            OutlinedButton(
+                enabled = uiState.hasNextPage && !uiState.isRefreshing,
+                onClick = onNextPage,
+            ) {
+                Text("下一页")
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> LibraryFilterRow(
+    label: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelected: (T) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { (value, optionLabel) ->
+                FilterChip(
+                    selected = selected == value,
+                    onClick = { onSelected(value) },
+                    label = { Text(optionLabel) },
+                )
+            }
         }
     }
 }

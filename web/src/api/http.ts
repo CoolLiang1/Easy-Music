@@ -24,10 +24,23 @@ export class ApiClientError extends Error {
   }
 }
 
+export type ApiResponse<T> = {
+  data: T;
+  headers: Headers;
+};
+
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
+  const response = await apiRequestWithMetadata<T>(path, options);
+  return response.data;
+}
+
+export async function apiRequestWithMetadata<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<ApiResponse<T>> {
   const headers = new Headers(options.headers);
   const body = buildBody(options.body, headers);
 
@@ -51,10 +64,13 @@ export async function apiRequest<T>(
   }
 
   if (response.status === 204) {
-    return undefined as T;
+    return { data: undefined as T, headers: response.headers };
   }
 
-  return (await parseResponseBody(response)) as T;
+  return {
+    data: (await parseResponseBody(response)) as T,
+    headers: response.headers,
+  };
 }
 
 function buildBody(

@@ -677,6 +677,7 @@ h3 {
 
 .library-filter-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: 14px;
   margin-top: 20px;
@@ -684,6 +685,10 @@ h3 {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-muted);
+}
+
+.library-filter-bar > .field:not(.library-search-field) {
+  flex: 1 1 150px;
 }
 
 .library-search-field {
@@ -755,6 +760,11 @@ h3 {
   color: var(--muted);
   font-size: 0.9rem;
   font-weight: 800;
+}
+
+.library-pagination {
+  justify-content: center;
+  margin-top: 18px;
 }
 
 .table-wrap {

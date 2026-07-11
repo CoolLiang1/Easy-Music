@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { addPlaylistTrack, addPlaylistTracks, listPlaylists } from "../api/playlists";
 import { listTags } from "../api/tags";
-import { batchDeleteTracks, batchUpdateTrackTags, listTracks } from "../api/tracks";
+import { batchDeleteTracks, batchUpdateTrackTags, queryTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import {
   BatchTagEditor,
@@ -10,6 +10,13 @@ import {
   type BatchTagOperation,
 } from "../components/BatchTagEditor";
 import { TrackTable } from "../components/TrackTable";
+import {
+  DEFAULT_LIBRARY_QUERY,
+  LIBRARY_PAGE_SIZE,
+  activeLibraryFilterCount,
+  normalizeLibraryOffset,
+  toTrackQuery,
+} from "../library/trackQuery";
 import { RouteLink } from "../routes/RouteLink";
 import type { PlaylistSummary } from "../types/playlist";
 import type { Tag } from "../types/tag";
@@ -17,7 +24,13 @@ import type { Track } from "../types/track";
 
 type LibraryState =
   | { name: "loading" }
-  | { name: "ready"; playlists: PlaylistSummary[]; tags: Tag[]; tracks: Track[] }
+  | {
+      name: "ready";
+      playlists: PlaylistSummary[];
+      tags: Tag[];
+      total: number;
+      tracks: Track[];
+    }
   | { name: "error"; message: string };
 
 export function LibraryPage() {
@@ -28,7 +41,21 @@ export function LibraryPage() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
-  const [isTrackFilterEnabled, setIsTrackFilterEnabled] = useState(false);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [trackStatusFilter, setTrackStatusFilter] = useState("");
+  const [trackLikedFilter, setTrackLikedFilter] = useState<"" | "true" | "false">("");
+  const [trackContentTypeFilter, setTrackContentTypeFilter] = useState("");
+  const [trackTagFilter, setTrackTagFilter] = useState<number | null>(null);
+  const [trackSort, setTrackSort] = useState(DEFAULT_LIBRARY_QUERY.sort);
+  const [trackSortOrder, setTrackSortOrder] = useState(DEFAULT_LIBRARY_QUERY.order);
+  const [trackOffset, setTrackOffset] = useState(0);
+  const referenceDataRef = useRef<{
+    accessToken: string;
+    playlists: PlaylistSummary[];
+    tags: Tag[];
+  } | null>(null);
+  const requestSequenceRef = useRef(0);
+  const hasLoadedRef = useRef(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
   const [isApplyingTags, setIsApplyingTags] = useState(false);
   const [isAddingSelectedToPlaylist, setIsAddingSelectedToPlaylist] = useState(false);
@@ -42,7 +69,33 @@ export function LibraryPage() {
   const [batchDeleteError, setBatchDeleteError] = useState<string | null>(null);
   const [batchDeleteSuccess, setBatchDeleteSuccess] = useState<string | null>(null);
 
-  const loadTracks = useCallback(async (showLoading: boolean) => {
+  const libraryQuery = useMemo(
+    () => ({
+      search: debouncedSearchQuery,
+      status: trackStatusFilter,
+      liked: trackLikedFilter,
+      contentType: trackContentTypeFilter,
+      tagId: trackTagFilter,
+      sort: trackSort,
+      order: trackSortOrder,
+      offset: trackOffset,
+    }),
+    [
+      debouncedSearchQuery,
+      trackContentTypeFilter,
+      trackLikedFilter,
+      trackOffset,
+      trackSort,
+      trackSortOrder,
+      trackStatusFilter,
+      trackTagFilter,
+    ],
+  );
+
+  const loadTracks = useCallback(async (
+    showLoading: boolean,
+    refreshReferenceData = false,
+  ) => {
     if (!accessToken) {
       setLibraryState({
         name: "error",
@@ -57,29 +110,63 @@ export function LibraryPage() {
       setIsRefreshing(true);
     }
 
+    const requestSequence = ++requestSequenceRef.current;
+    const cachedReferenceData = referenceDataRef.current;
+    const shouldLoadReferenceData =
+      refreshReferenceData ||
+      cachedReferenceData === null ||
+      cachedReferenceData.accessToken !== accessToken;
+
     try {
-      const [tracks, tags, playlists] = await Promise.all([
-        listTracks(accessToken),
-        listTags(accessToken),
-        listPlaylists(accessToken),
+      const [page, referenceData] = await Promise.all([
+        queryTracks(accessToken, toTrackQuery(libraryQuery)),
+        shouldLoadReferenceData
+          ? Promise.all([listTags(accessToken), listPlaylists(accessToken)]).then(
+              ([tags, playlists]) => ({ accessToken, playlists, tags }),
+            )
+          : Promise.resolve(cachedReferenceData),
       ]);
-      setLibraryState({ name: "ready", playlists, tags, tracks });
-      setSelectedTrackIds((current) => {
-        const availableTrackIds = new Set(tracks.map((track) => track.id));
-        return new Set([...current].filter((trackId) => availableTrackIds.has(trackId)));
+      if (requestSequence !== requestSequenceRef.current) {
+        return;
+      }
+      referenceDataRef.current = referenceData;
+      setLibraryState({
+        name: "ready",
+        playlists: referenceData.playlists,
+        tags: referenceData.tags,
+        total: page.total,
+        tracks: page.tracks,
       });
+      const normalizedOffset = normalizeLibraryOffset(page.total, libraryQuery.offset);
+      if (normalizedOffset !== libraryQuery.offset) {
+        setTrackOffset(normalizedOffset);
+      }
     } catch (error: unknown) {
+      if (requestSequence !== requestSequenceRef.current) {
+        return;
+      }
       setLibraryState({
         name: "error",
         message: getErrorMessage(error),
       });
     } finally {
-      setIsRefreshing(false);
+      if (requestSequence === requestSequenceRef.current) {
+        setIsRefreshing(false);
+      }
     }
-  }, [accessToken]);
+  }, [accessToken, libraryQuery]);
 
   useEffect(() => {
-    void loadTracks(true);
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchQuery(trackSearchQuery);
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [trackSearchQuery]);
+
+  useEffect(() => {
+    const showLoading = !hasLoadedRef.current;
+    hasLoadedRef.current = true;
+    void loadTracks(showLoading);
   }, [loadTracks]);
 
   useEffect(() => {
@@ -116,16 +203,19 @@ export function LibraryPage() {
     setBatchDeleteSuccess(null);
   };
 
-  const visibleTracks =
-    libraryState.name === "ready"
-      ? filterLibraryTracks(
-          libraryState.tracks,
-          isTrackFilterEnabled,
-          trackSearchQuery,
-        )
-      : [];
-  const isSearchFilterActive =
-    isTrackFilterEnabled && trackSearchQuery.trim().length > 0;
+  const activeFilterCount = activeLibraryFilterCount(libraryQuery);
+
+  const resetTrackQuery = () => {
+    setTrackSearchQuery("");
+    setDebouncedSearchQuery("");
+    setTrackStatusFilter("");
+    setTrackLikedFilter("");
+    setTrackContentTypeFilter("");
+    setTrackTagFilter(null);
+    setTrackSort(DEFAULT_LIBRARY_QUERY.sort);
+    setTrackSortOrder(DEFAULT_LIBRARY_QUERY.order);
+    setTrackOffset(0);
+  };
 
   const applyBatchTags = async (operation: BatchTagOperation) => {
     if (!accessToken) {
@@ -316,16 +406,6 @@ export function LibraryPage() {
       );
 
       if (deletedTrackIds.size > 0) {
-        setLibraryState((current) => {
-          if (current.name !== "ready") {
-            return current;
-          }
-
-          return {
-            ...current,
-            tracks: current.tracks.filter((track) => !deletedTrackIds.has(track.id)),
-          };
-        });
         setSelectedTrackIds((current) => {
           const next = new Set(current);
           for (const trackId of deletedTrackIds) {
@@ -333,6 +413,7 @@ export function LibraryPage() {
           }
           return next;
         });
+        await loadTracks(false);
       }
 
       const failedResults = response.results.filter((result) => result.status === "failed");
@@ -394,14 +475,14 @@ export function LibraryPage() {
           </p>
         </div>
         {libraryState.name === "ready" ? (
-          <span className="score-pill">{libraryState.tracks.length} 个音轨</span>
+          <span className="score-pill">{libraryState.total} 个音轨</span>
         ) : null}
       </div>
       <div className="toolbar">
         <button
           className="button secondary"
           disabled={libraryState.name === "loading" || isRefreshing}
-          onClick={() => void loadTracks(false)}
+          onClick={() => void loadTracks(false, true)}
           type="button"
         >
           {isRefreshing ? "正在刷新..." : "刷新状态"}
@@ -509,11 +590,7 @@ export function LibraryPage() {
         </div>
       ) : null}
 
-      {libraryState.name === "ready" && libraryState.tracks.length === 0 ? (
-        <div className="empty-state">还没有上传任何音轨。</div>
-      ) : null}
-
-      {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
+      {libraryState.name === "ready" ? (
         <>
           <div className="library-filter-bar" aria-label="曲库搜索">
             <label className="field library-search-field" htmlFor={trackSearchInputId}>
@@ -521,29 +598,131 @@ export function LibraryPage() {
               <input
                 className="text-input"
                 id={trackSearchInputId}
-                onChange={(event) => setTrackSearchQuery(event.target.value)}
-                placeholder="输入音轨名称"
+                onChange={(event) => {
+                  setTrackSearchQuery(event.target.value);
+                  setTrackOffset(0);
+                }}
+                placeholder="标题、艺人、专辑或标签"
                 type="search"
                 value={trackSearchQuery}
               />
             </label>
-            <label className="switch-control">
-              <input
-                checked={isTrackFilterEnabled}
-                onChange={(event) => setIsTrackFilterEnabled(event.target.checked)}
-                role="switch"
-                type="checkbox"
-              />
-              <span className="switch-track" aria-hidden="true">
-                <span className="switch-thumb" />
-              </span>
-              <span>筛选模式</span>
+            <label className="field">
+              状态
+              <select
+                onChange={(event) => {
+                  setTrackStatusFilter(event.target.value);
+                  setTrackOffset(0);
+                }}
+                value={trackStatusFilter}
+              >
+                <option value="">全部</option>
+                <option value="ready">可播放</option>
+                <option value="uploaded">已上传</option>
+                <option value="processing">处理中</option>
+                <option value="failed">处理失败</option>
+              </select>
+            </label>
+            <label className="field">
+              喜欢状态
+              <select
+                onChange={(event) => {
+                  setTrackLikedFilter(event.target.value as "" | "true" | "false");
+                  setTrackOffset(0);
+                }}
+                value={trackLikedFilter}
+              >
+                <option value="">全部</option>
+                <option value="true">已喜欢</option>
+                <option value="false">未喜欢</option>
+              </select>
+            </label>
+            <label className="field">
+              内容类型
+              <select
+                onChange={(event) => {
+                  setTrackContentTypeFilter(event.target.value);
+                  setTrackOffset(0);
+                }}
+                value={trackContentTypeFilter}
+              >
+                <option value="">全部</option>
+                <option value="song">歌曲</option>
+                <option value="mix">混音/合集</option>
+                <option value="long_audio">长音频</option>
+                <option value="white_noise">白噪音</option>
+                <option value="ost">OST</option>
+                <option value="other">其他</option>
+              </select>
+            </label>
+            <label className="field">
+              标签
+              <select
+                onChange={(event) => {
+                  setTrackTagFilter(event.target.value ? Number(event.target.value) : null);
+                  setTrackOffset(0);
+                }}
+                value={trackTagFilter ?? ""}
+              >
+                <option value="">全部</option>
+                {libraryState.tags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              排序
+              <select
+                onChange={(event) => {
+                  setTrackSort(event.target.value as typeof trackSort);
+                  setTrackOffset(0);
+                }}
+                value={trackSort}
+              >
+                <option value="created_at">创建时间</option>
+                <option value="updated_at">更新时间</option>
+                <option value="title">标题</option>
+                <option value="artist">艺人</option>
+                <option value="album">专辑</option>
+                <option value="duration_seconds">时长</option>
+              </select>
+            </label>
+            <label className="field">
+              方向
+              <select
+                onChange={(event) => {
+                  setTrackSortOrder(event.target.value as "asc" | "desc");
+                  setTrackOffset(0);
+                }}
+                value={trackSortOrder}
+              >
+                <option value="asc">升序</option>
+                <option value="desc">降序</option>
+              </select>
             </label>
             <span className="filter-result-count" aria-live="polite">
-              {isSearchFilterActive
-                ? `显示 ${visibleTracks.length} / 共 ${libraryState.tracks.length}`
-                : `显示全部 ${libraryState.tracks.length}`}
+              {libraryState.total === 0
+                ? `没有结果 · ${activeFilterCount} 个筛选条件`
+                : `显示 ${trackOffset + 1}–${Math.min(
+                    trackOffset + libraryState.tracks.length,
+                    libraryState.total,
+                  )} / 共 ${libraryState.total} · ${activeFilterCount} 个筛选条件`}
             </span>
+            <button
+              className="button secondary"
+              disabled={
+                activeFilterCount === 0 &&
+                trackOffset === 0 &&
+                trackSort === DEFAULT_LIBRARY_QUERY.sort &&
+                trackSortOrder === DEFAULT_LIBRARY_QUERY.order
+              }
+              onClick={resetTrackQuery}
+              type="button"
+            >
+              清除筛选
+            </button>
           </div>
           <BatchTagEditor
             disabled={isApplyingTags || isAddingSelectedToPlaylist || isDeletingTracks}
@@ -553,8 +732,10 @@ export function LibraryPage() {
             successMessage={batchTagSuccess}
             tags={libraryState.tags}
           />
-          {visibleTracks.length === 0 ? (
-            <div className="empty-state">没有匹配的音轨。</div>
+          {libraryState.tracks.length === 0 ? (
+            <div className="empty-state">
+              {activeFilterCount > 0 ? "没有匹配的音轨。" : "还没有上传任何音轨。"}
+            </div>
           ) : (
             <TrackTable
               accessToken={accessToken}
@@ -562,9 +743,35 @@ export function LibraryPage() {
               onToggleTrackSelection={toggleTrackSelection}
               playlistOptions={libraryState.playlists}
               selectedTrackIds={selectedTrackIds}
-              tracks={visibleTracks}
+              tracks={libraryState.tracks}
             />
           )}
+          <div className="toolbar compact library-pagination" aria-label="曲库分页">
+            <button
+              className="button secondary"
+              disabled={trackOffset === 0 || isRefreshing}
+              onClick={() => setTrackOffset((current) => Math.max(0, current - LIBRARY_PAGE_SIZE))}
+              type="button"
+            >
+              上一页
+            </button>
+            <span className="filter-result-count">
+              第 {Math.floor(trackOffset / LIBRARY_PAGE_SIZE) + 1} / {Math.max(
+                1,
+                Math.ceil(libraryState.total / LIBRARY_PAGE_SIZE),
+              )} 页
+            </span>
+            <button
+              className="button secondary"
+              disabled={
+                trackOffset + LIBRARY_PAGE_SIZE >= libraryState.total || isRefreshing
+              }
+              onClick={() => setTrackOffset((current) => current + LIBRARY_PAGE_SIZE)}
+              type="button"
+            >
+              下一页
+            </button>
+          </div>
         </>
       ) : null}
     </section>
@@ -586,21 +793,6 @@ function summarizeBatchDeleteResponse(response: {
   }
 
   return `已删除 ${response.deleted_count} 个音轨。`;
-}
-
-function filterLibraryTracks(
-  tracks: Track[],
-  isFilterModeEnabled: boolean,
-  searchQuery: string,
-) {
-  const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
-  if (!isFilterModeEnabled || normalizedQuery.length === 0) {
-    return tracks;
-  }
-
-  return tracks.filter((track) =>
-    track.title.toLocaleLowerCase().includes(normalizedQuery),
-  );
 }
 
 function getErrorMessage(error: unknown) {

@@ -11,6 +11,12 @@ import {
 import { WebPlaybackEventRecorder } from "../.test-dist/player/WebPlaybackEventRecorder.js";
 import { getRoute } from "../.test-dist/routes/router.js";
 import { buildActivePlaybackFeedbackEvent } from "../.test-dist/feedback/activePlaybackFeedback.js";
+import {
+  DEFAULT_LIBRARY_QUERY,
+  activeLibraryFilterCount,
+  normalizeLibraryOffset,
+  toTrackQuery,
+} from "../.test-dist/library/trackQuery.js";
 
 class MemoryStorage {
   values = new Map();
@@ -206,4 +212,33 @@ test("active playback feedback uses a stable id and empty global context", () =>
     feature_tag_ids: [],
     track_id: 42,
   });
+});
+
+test("library query converts filters and keeps pagination bounded", () => {
+  const state = {
+    ...DEFAULT_LIBRARY_QUERY,
+    search: "  quiet  ",
+    status: "ready",
+    liked: "true",
+    contentType: "song",
+    tagId: 9,
+    sort: "title",
+    order: "desc",
+    offset: 50,
+  };
+
+  assert.deepEqual(toTrackQuery(state), {
+    q: "quiet",
+    statuses: ["ready"],
+    liked: true,
+    contentTypes: ["song"],
+    tagIds: [9],
+    sort: "title",
+    order: "desc",
+    limit: 25,
+    offset: 50,
+  });
+  assert.equal(activeLibraryFilterCount(state), 5);
+  assert.equal(normalizeLibraryOffset(51, 100), 50);
+  assert.equal(normalizeLibraryOffset(0, 25), 0);
 });

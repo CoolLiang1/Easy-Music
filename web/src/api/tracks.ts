@@ -1,4 +1,4 @@
-import { ApiClientError, apiRequest } from "./http";
+import { ApiClientError, apiRequest, apiRequestWithMetadata } from "./http";
 import { env } from "../config/env";
 import type {
   Track,
@@ -6,6 +6,8 @@ import type {
   TrackBatchDeleteResponse,
   TrackBatchTagUpdate,
   TrackBatchTagUpdateResponse,
+  TrackQuery,
+  TrackQueryResult,
   TrackUpdate,
 } from "../types/track";
 
@@ -24,6 +26,35 @@ export function listTracks(accessToken: string) {
   return apiRequest<Track[]>("/api/tracks", {
     accessToken,
   });
+}
+
+export async function queryTracks(
+  accessToken: string,
+  query: TrackQuery,
+): Promise<TrackQueryResult> {
+  const searchParams = new URLSearchParams();
+  const search = query.q?.trim();
+  if (search) searchParams.set("q", search);
+  query.statuses?.forEach((status) => searchParams.append("status", status));
+  if (query.liked !== undefined) searchParams.set("liked", String(query.liked));
+  query.contentTypes?.forEach((type) => searchParams.append("content_type", type));
+  query.tagIds?.forEach((tagId) => searchParams.append("tag_id", String(tagId)));
+  if (query.sort) searchParams.set("sort", query.sort);
+  if (query.order) searchParams.set("order", query.order);
+  if (query.limit !== undefined) searchParams.set("limit", String(query.limit));
+  if (query.offset !== undefined) searchParams.set("offset", String(query.offset));
+
+  const response = await apiRequestWithMetadata<Track[]>(
+    `/api/tracks?${searchParams.toString()}`,
+    { accessToken },
+  );
+  const totalHeader = response.headers.get("X-Total-Count");
+  const total = totalHeader === null ? response.data.length : Number(totalHeader);
+  if (!Number.isSafeInteger(total) || total < 0) {
+    throw new Error("曲库总数响应无效。");
+  }
+
+  return { tracks: response.data, total };
 }
 
 export function getTrack(accessToken: string, trackId: number | string) {
