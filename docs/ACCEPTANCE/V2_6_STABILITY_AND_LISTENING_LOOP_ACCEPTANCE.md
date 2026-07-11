@@ -1,6 +1,7 @@
 # V2.6 Stability And Listening Loop Acceptance
 
 Date: 2026-07-10
+P0 and Sprint 1 accepted: 2026-07-11
 
 This document records implementation and verification for V2.6. It must remain
 honest while work is in progress: unchecked items are not accepted, and local
@@ -9,9 +10,8 @@ behaviors matter.
 
 ## Current Status
 
-Status: P0 and Sprint 1 implementation complete; manual browser, Android
-device, hosted CI, and cross-client acceptance remain open. Sprint 2 through
-Sprint 4 are planned.
+Status: P0 and Sprint 1 accepted. Hosted CI, branch promotion, and release
+tagging remain release-governance work. Sprint 2 through Sprint 4 are planned.
 
 Baseline recorded on 2026-07-10 before V2.6 implementation:
 
@@ -25,7 +25,7 @@ Baseline recorded on 2026-07-10 before V2.6 implementation:
 - Production Compose example config: passed.
 - Worktree: clean.
 
-## Accepted Scope
+## Milestone Scope
 
 - P0 release-baseline, token-scope, Android security, CI, and documentation
   truth work.
@@ -74,10 +74,10 @@ Explicitly out of scope:
 - [x] Auth DataStore and cached private data cannot enter Android backup.
 - [x] Playback service export policy is explicit and least-privilege.
 - [x] Android lint has no unresolved exported-service security warning.
-- [ ] App playback works.
-- [ ] Notification controls work.
-- [ ] Lock-screen controls work.
-- [ ] Headset/media-button controls work.
+- [x] App playback works.
+- [x] Notification controls work.
+- [x] Lock-screen controls work.
+- [x] Headset/media-button controls work.
 
 ## Gate 4: CI And Release Readiness
 
@@ -115,10 +115,10 @@ Explicitly out of scope:
 - [x] Seek records the resulting position.
 - [x] Skip records an unfinished transition.
 - [x] Complete records natural end.
-- [ ] Queue previous/next still works.
-- [ ] Playlist repeat still works.
-- [ ] Failed-track auto-advance still works.
-- [ ] Playback continues when event delivery fails.
+- [x] Queue previous/next still works.
+- [x] Playlist repeat still works.
+- [x] Failed-track auto-advance still works.
+- [x] Playback continues when event delivery fails.
 
 ## Gate 8: Recent Playback
 
@@ -144,12 +144,12 @@ Explicitly out of scope:
 
 ## Gate 10: Sprint 1 Cross-Client Smoke
 
-- [ ] Web play appears in recent history.
-- [ ] Android play appears in the same recent history.
-- [ ] Web quick feedback changes subsequent recommendation behavior.
-- [ ] Android quick feedback changes subsequent recommendation behavior.
-- [ ] Web browser playback smoke passes with real media.
-- [ ] Android device/emulator Media3 smoke passes.
+- [x] Web play appears in recent history.
+- [x] Android play appears in the same recent history.
+- [x] Web quick feedback changes subsequent recommendation behavior.
+- [x] Android quick feedback changes subsequent recommendation behavior.
+- [x] Web browser playback smoke passes with real media.
+- [x] Android device/emulator Media3 smoke passes.
 
 ## Gate 11: Sprint 2 Library And Recovery
 
@@ -464,3 +464,30 @@ Release limitations:
 - GitHub-hosted CI cannot run until the branch is pushed.
 - No push, merge, `develop`/`main` promotion, or release tag was requested or
   performed.
+
+### 2026-07-11 - P0 And Sprint 1 Manual Acceptance
+
+Confirmed by the operator:
+
+- Web playback with real media passes, including previous/next, playlist
+  repeat, failed-track auto-advance, and non-blocking event-delivery failure.
+- Web and Android plays appear together in recent history.
+- Web and Android like, not-today, and tired feedback affect subsequent
+  recommendation behavior as designed.
+- Android app playback, notification, lock-screen, headset/media-button, and
+  Media3 device/emulator smoke pass after the controller security change.
+
+Result:
+
+- P0 and Sprint 1 are accepted.
+- The earlier missing-Python-Playwright limitation affected only automated
+  browser execution; the required browser behavior was subsequently verified
+  manually.
+
+Remaining release governance:
+
+- Run GitHub-hosted CI after pushing the branch.
+- Promote through `develop` and `main` only when the intended release scope is
+  ready.
+- Create the V2.6 tag only after promotion and the remaining V2.6 sprints are
+  accepted.

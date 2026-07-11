@@ -14,7 +14,7 @@ optional AI-assisted tag suggestions.
 
 ## Status
 
-Current status as of 2026-07-10:
+Current status as of 2026-07-11:
 
 - MVP Phase 0 through Phase 7 are implemented and locally accepted.
 - V1.1 workflow improvements, duplicate detection, cover editing, advanced
@@ -25,9 +25,10 @@ Current status as of 2026-07-10:
 - The first real Ubuntu/domain/HTTPS production smoke test is recorded as
   passed in
   [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md).
-- V2.6 stability and listening-loop work is active. It starts with release and
-  security gates, then closes Web playback events, recent history, and active
-  playback feedback before later library-scale and UI-maintenance sprints.
+- V2.6 P0 and Sprint 1 are accepted. Release/security gates, Web playback-event
+  sync, shared recent history, and active Web/Android feedback passed automated
+  checks plus real browser/device smoke. Sprint 2 library scale and processing
+  recovery are next.
 
 ## Features
 

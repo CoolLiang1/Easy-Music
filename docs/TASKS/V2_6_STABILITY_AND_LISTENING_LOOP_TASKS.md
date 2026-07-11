@@ -13,7 +13,9 @@ Make playback from Web and Android produce one trustworthy listening history,
 make recommendation fatigue rules react to that history, and make the deployed
 single-owner product safe to update and operate.
 
-## Current Baseline
+## Planning Baseline
+
+State recorded before V2.6 implementation began:
 
 - MVP, V1.1, and the implemented V2 slices are locally accepted.
 - The first Ubuntu production smoke passed on 2026-06-30 using a DNS-validated
@@ -30,12 +32,11 @@ single-owner product safe to update and operate.
 
 ## Delivery Status
 
-- P0 implementation is complete on 2026-07-10; Android device media-control
-  smoke and hosted GitHub Actions remain acceptance checks rather than code
-  work.
-- Sprint 1 implementation is complete on 2026-07-10; real Web/Android media
-  playback and cross-client recommendation behavior remain manual acceptance
-  checks.
+- P0 and Sprint 1 were accepted on 2026-07-11 after automated gates plus real
+  Web/Android playback, media-control, recent-history, and recommendation
+  feedback smoke.
+- Hosted GitHub Actions, branch promotion, and release tagging remain release
+  governance rather than P0/Sprint 1 behavior gaps.
 - Sprint 2, Sprint 3, and Sprint 4 remain planned and are not implemented by
   this delivery.
 

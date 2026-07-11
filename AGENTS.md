@@ -160,8 +160,8 @@ Update this section when you discover something surprising.
 - Some older docs may describe historical phase boundaries. Prefer current
   `README.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, and acceptance docs
   when judging current status.
-- The initial usable product and earlier V2 slices are complete. The active
-  milestone is V2.6; start from
+- The initial usable product, earlier V2 slices, and V2.6 P0/Sprint 1 are
+  accepted. The next work is V2.6 Sprint 2; start from
   `docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md` and record results in
   `docs/ACCEPTANCE/V2_6_STABILITY_AND_LISTENING_LOOP_ACCEPTANCE.md`.
 - V2.6 purpose-scopes access and track-stream tokens. Deploying that change

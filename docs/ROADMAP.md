@@ -19,7 +19,7 @@ It must include:
 
 ## Current Progress
 
-Status as of 2026-07-10:
+Status as of 2026-07-11:
 
 - Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
   track/tag/upload APIs, media processing, worker flow, migrations, streaming,
@@ -82,6 +82,11 @@ Status as of 2026-07-10:
   provider output compatibility, and documents DeepSeek as an OpenAI-compatible
   provider option without adding organization, playlist suggestions, or
   auto-apply.
+- V2.6 P0 and Sprint 1: Accepted. Release baseline, token-purpose isolation,
+  Android backup/controller security, CI definitions, Web playback-event sync,
+  cross-client recent history, and active Web/Android feedback are implemented.
+  Automated gates and real browser/device smoke are recorded in
+  `docs/ACCEPTANCE/V2_6_STABILITY_AND_LISTENING_LOOP_ACCEPTANCE.md`.
 
 The first real Ubuntu production smoke passed on 2026-06-30 using a
 DNS-validated certificate and public HTTPS port 25443 because the upstream
@@ -90,13 +95,12 @@ closure remain V2.6 work.
 
 ## Next Planned Work
 
-1. V2.6 P0 release baseline, token isolation, Android security, CI, and current
-   documentation truth pass.
-2. V2.6 Sprint 1 Web playback events, recent listening, and active playback
-   feedback across Web and Android.
-3. V2.6 Sprints 2 to 4 library scale, processing/storage recovery, production
-   operations closure, and testability-driven UI maintenance. Start from
-   `docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md`.
+1. V2.6 Sprint 2 server-side library query, Web/Android library discovery,
+   processing recovery, and media-storage consistency.
+2. V2.6 Sprint 3 certificate renewal, backup/restore drills, and minimal
+   operational alerts.
+3. V2.6 Sprint 4 testability-driven Web/Android maintenance and UI polish.
+   Start from `docs/TASKS/V2_6_STABILITY_AND_LISTENING_LOOP_TASKS.md`.
 
 ## Phase 0: Project Foundation
 
