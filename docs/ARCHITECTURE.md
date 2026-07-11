@@ -156,7 +156,7 @@ queue state across devices.
 
 - Login
 - Recommendation home
-- Client-side Library title search with an explicit filter-mode toggle
+- Server-backed Library search, filters, stable sorting, and bounded pagination
 - Cloud playback
 - Playlist browsing and playback handoff
 - Local playback queue management with history/current/upcoming, playlist
@@ -191,8 +191,8 @@ Android should store:
 
 - Login
 - Audio upload
-- Library management, including client-side title search with an explicit
-  filter-mode toggle
+- Library management using server-backed search, filters, stable sorting, and
+  bounded pagination
 - Playlist management
 - Track editing
 - Tag management
@@ -456,7 +456,9 @@ Supported user-provided video upload formats:
 V1.1 also allows the owner to replace a track cover image from the Web Track
 Detail page. Replacement covers are stored under the configured cover media
 directory and update only `tracks.cover_path`; they do not regenerate playback
-audio or modify the preserved original audio file.
+audio or modify the preserved original audio file. V2.6 commits the new cover
+reference before deleting the superseded file, so a failed database update
+cannot leave the track pointing at a deleted cover.
 
 ### 9.3 Playback Format
 
@@ -519,9 +521,17 @@ Video uploads create a normal `Track` with `processing` status and a pending
 `ProcessingJob` with `job_type="video_extraction"` and a safe relative
 `source_path` to the temporary video. The track response does not expose the
 temporary path, and the video is not stored as `tracks.original_file_path`,
-playback media, or cover media. Worker extraction is handled separately by the
-V2 worker task; until then, the existing audio worker only claims
-`audio_processing` jobs and leaves video extraction jobs pending.
+playback media, or cover media. The worker claims both audio-processing and
+video-extraction jobs, preserves extracted audio as the track original, and
+removes the temporary video after successful extraction.
+
+V2.6 permits the owner to retry a failed job only when its retained source is
+still safe and present. It prevents concurrent active jobs for one track and
+marks `running` jobs failed when they exceed the bounded
+`PROCESSING_JOB_STALE_MINUTES` threshold. Track deletion stages managed files
+as reversible same-directory tombstones before committing database deletion.
+The owner-scoped storage-consistency report is read-only and reports missing or
+orphaned managed media without deleting it.
 
 ## 10. Recommendation System
 
@@ -578,18 +588,24 @@ does not let AI select tracks.
 
 ### Tracks
 
-- `GET /api/tracks`
+- `GET /api/tracks` (optional search/filter/sort/offset pagination; total in
+  `X-Total-Count`)
 - `POST /api/tracks/upload`
 - `POST /api/tracks/upload-video`
 - `GET /api/tracks/{id}`
 - `PATCH /api/tracks/{id}`
 - `PUT /api/tracks/{id}/cover`
 - `GET /api/tracks/{id}/cover`
+- `POST /api/tracks/{id}/retry-processing`
 - `POST /api/tracks/batch-delete`
 - `DELETE /api/tracks/{id}`
 - `GET /api/tracks/duplicates`
 - `POST /api/tracks/{id}/stream-url`
 - `GET /api/tracks/{id}/stream`
+
+### Library Reports
+
+- `GET /api/library/storage-consistency`
 
 ### Playlists
 

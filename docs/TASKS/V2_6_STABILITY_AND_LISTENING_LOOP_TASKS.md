@@ -37,8 +37,11 @@ State recorded before V2.6 implementation began:
   feedback smoke.
 - Hosted GitHub Actions, branch promotion, and release tagging remain release
   governance rather than P0/Sprint 1 behavior gaps.
-- Sprint 2, Sprint 3, and Sprint 4 remain planned and are not implemented by
-  this delivery.
+- Sprint 2 was implemented on 2026-07-11 and passes the backend, Web, Android,
+  migration, production Compose, and diff-quality automated gates. Real
+  browser/device/worker smoke remains before manual acceptance.
+- Sprint 3 and Sprint 4 remain planned and are not implemented by this
+  delivery.
 
 ## Global Boundaries
 

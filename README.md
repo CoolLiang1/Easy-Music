@@ -25,10 +25,10 @@ Current status as of 2026-07-11:
 - The first real Ubuntu/domain/HTTPS production smoke test is recorded as
   passed in
   [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md).
-- V2.6 P0 and Sprint 1 are accepted. Release/security gates, Web playback-event
-  sync, shared recent history, and active Web/Android feedback passed automated
-  checks plus real browser/device smoke. Sprint 2 library scale and processing
-  recovery are next.
+- V2.6 P0 and Sprint 1 are accepted. Sprint 2 library scale, cross-client
+  discovery, processing recovery, and media consistency are implemented and
+  pass automated gates; real browser/device/worker smoke remains before Sprint
+  2 manual acceptance. Sprint 3 production-operations closure is next.
 
 ## Features
 

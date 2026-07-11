@@ -14,9 +14,9 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 - V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
 - V2 导入/视频、歌单、客户端播放队列、Recommendation V2 基础、标签简化和 AI Tag Suggestions V2 已实现。
 - 首次真实 Ubuntu/domain/HTTPS 生产 smoke 已记录通过，见 [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)。
-- V2.6 P0 与 Sprint 1 已验收：发布/安全门槛、Web 播放事件同步、Web/Android
-  共享最近播放和播放中快捷反馈均已通过自动检查与真实浏览器/设备 smoke。下一步进入
-  Sprint 2 曲库规模化和处理恢复。
+- V2.6 P0 与 Sprint 1 已验收。Sprint 2 曲库规模化、跨端检索、处理恢复和媒体一致性
+  已实现并通过自动门禁；真实浏览器/设备/Worker smoke 完成后再做 Sprint 2 人工验收。
+  下一开发阶段是 Sprint 3 生产运维闭环。
 
 ## 功能
 

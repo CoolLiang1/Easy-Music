@@ -87,6 +87,10 @@ Status as of 2026-07-11:
   cross-client recent history, and active Web/Android feedback are implemented.
   Automated gates and real browser/device smoke are recorded in
   `docs/ACCEPTANCE/V2_6_STABILITY_AND_LISTENING_LOOP_ACCEPTANCE.md`.
+- V2.6 Sprint 2: Implemented. Owner-scoped server library query, Web/Android
+  discovery, failed/stale processing recovery, safe cover/track deletion, and
+  read-only storage-consistency reporting pass automated gates. Real
+  browser/device/worker smoke remains before manual acceptance.
 
 The first real Ubuntu production smoke passed on 2026-06-30 using a
 DNS-validated certificate and public HTTPS port 25443 because the upstream
@@ -95,8 +99,7 @@ closure remain V2.6 work.
 
 ## Next Planned Work
 
-1. V2.6 Sprint 2 server-side library query, Web/Android library discovery,
-   processing recovery, and media-storage consistency.
+1. Complete V2.6 Sprint 2 real browser/device/worker acceptance smoke.
 2. V2.6 Sprint 3 certificate renewal, backup/restore drills, and minimal
    operational alerts.
 3. V2.6 Sprint 4 testability-driven Web/Android maintenance and UI polish.

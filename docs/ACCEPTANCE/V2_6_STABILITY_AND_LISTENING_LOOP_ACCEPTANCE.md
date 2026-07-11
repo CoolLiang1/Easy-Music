@@ -2,6 +2,7 @@
 
 Date: 2026-07-10
 P0 and Sprint 1 accepted: 2026-07-11
+Sprint 2 implementation completed: 2026-07-11
 
 This document records implementation and verification for V2.6. It must remain
 honest while work is in progress: unchecked items are not accepted, and local
@@ -10,8 +11,10 @@ behaviors matter.
 
 ## Current Status
 
-Status: P0 and Sprint 1 accepted. Hosted CI, branch promotion, and release
-tagging remain release-governance work. Sprint 2 through Sprint 4 are planned.
+Status: P0 and Sprint 1 accepted. Sprint 2 is implemented and passes automated
+gates; real browser/device/worker smoke remains before manual acceptance.
+Hosted CI, branch promotion, and release tagging remain release-governance
+work. Sprint 3 and Sprint 4 are planned.
 
 Baseline recorded on 2026-07-10 before V2.6 implementation:
 
@@ -153,14 +156,14 @@ Explicitly out of scope:
 
 ## Gate 11: Sprint 2 Library And Recovery
 
-- [ ] Server-side search/filter/sort/pagination is owner-scoped and tested.
-- [ ] Web library discovery uses the server query contract.
-- [ ] Android library discovery uses the server query contract.
-- [ ] Failed audio and video processing can be safely retried.
-- [ ] Stale running jobs have a documented recovery rule.
-- [ ] Superseded covers do not remain orphaned.
-- [ ] Track deletion cannot silently leave records pointing to deleted media.
-- [ ] Storage consistency reporting is read-only.
+- [x] Server-side search/filter/sort/pagination is owner-scoped and tested.
+- [x] Web library discovery uses the server query contract.
+- [x] Android library discovery uses the server query contract.
+- [x] Failed audio and video processing can be safely retried.
+- [x] Stale running jobs have a documented recovery rule.
+- [x] Superseded covers do not remain orphaned.
+- [x] Track deletion cannot silently leave records pointing to deleted media.
+- [x] Storage consistency reporting is read-only.
 
 ## Gate 12: Sprint 3 Operations
 
@@ -491,3 +494,57 @@ Remaining release governance:
   ready.
 - Create the V2.6 tag only after promotion and the remaining V2.6 sprints are
   accepted.
+
+### 2026-07-11 - Sprint 2 Automated Gate
+
+Implemented:
+
+- Added backward-compatible, owner-scoped server search, filters, stable sort,
+  offset pagination, and `X-Total-Count` metadata to `GET /api/tracks`.
+- Replaced title-only local filtering in Web and Android with the shared server
+  query contract, explicit summaries/reset actions, and bounded pagination.
+- Added owner-scoped failed audio/video retry, active-job exclusion, and
+  configurable stale-running recovery with a default 60-minute threshold.
+- Made cover replacement clean up only after commit and track deletion stage
+  media as reversible tombstones before deleting database state.
+- Added an owner-safe, read-only storage consistency report; V2.6 performs no
+  automatic orphan cleanup.
+
+Automated checks:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\alembic.exe heads
+
+cd ..\web
+npm test -- --run
+npm run typecheck
+npm run build
+
+cd ..\android
+.\gradlew.bat test build lint --no-daemon --console=plain
+
+cd ..
+docker compose -f docker-compose.prod.yml `
+  --env-file .env.production.example config --quiet
+git diff 83662f8..HEAD --check
+```
+
+Results:
+
+- Backend: `395 passed, 2 skipped`.
+- Alembic: `20260629_0012 (head)`.
+- Web: `10 passed`; typecheck and production build passed.
+- Android: `BUILD SUCCESSFUL`.
+- Production Compose example configuration and diff whitespace check: passed.
+- Automatic code review: no unresolved blocking finding.
+
+Manual checks still required before Sprint 2 acceptance:
+
+- Exercise search/filter/sort/reset/pagination against a real large library on
+  Web desktop/mobile and an Android device at typical phone width.
+- Retry real failed audio and video tracks while the worker is running, and
+  confirm safe error presentation when retained source media is missing.
+- Inspect the consistency report against production-like storage and confirm
+  requesting it does not mutate any database row or media file.

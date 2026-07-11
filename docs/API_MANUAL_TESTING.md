@@ -1793,10 +1793,9 @@ Open the Vite URL in a browser, usually `http://127.0.0.1:8081/`, then verify:
 1. Log in with the local initial user.
 2. Open `Library` and confirm the track list loads, including empty, processing,
    failed, or ready states depending on local data.
-3. In `Library`, type part of a track title in the search field. With filter
-   mode off, confirm the full library remains visible; turn filter mode on and
-   confirm the visible rows update as the input changes, then turn it off again
-   and confirm the full library returns.
+3. In `Library`, search by title, artist, album, and tag name. Combine status,
+   liked, content-type, and tag filters; change sort and page; then clear all
+   filters and confirm the full library returns.
 4. Open `Upload`, select an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
    page shows the created track and initial processing status.
 5. Run `docker compose run --rm worker` once, or run
@@ -1820,6 +1819,48 @@ Expected Web result:
 - Upload, processing refresh, metadata edits, tag CRUD, track tag assignment,
   and ready-track playback all work through the documented backend endpoints.
 - Non-ready tracks remain visible but cannot be played.
+
+## V2.6 Sprint 2 Library And Recovery Smoke
+
+The same `$headers` from login can exercise the server query contract. Repeated
+filter keys are allowed, tag filters use AND semantics, and `X-Total-Count`
+describes the full filtered result before pagination.
+
+```powershell
+$query = Invoke-WebRequest `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/tracks?q=live&status=ready&content_type=audio&sort=title&order=asc&limit=25&offset=0" `
+  -Headers $headers
+
+$query.Headers["X-Total-Count"]
+$query.Content | ConvertFrom-Json
+```
+
+For a failed audio or video track whose retained source still exists, retry it
+and run the worker. A track with an active job, an unsafe path, or missing
+retained source must return a safe conflict response without exposing an
+absolute server path.
+
+```powershell
+$trackId = 1
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/tracks/$trackId/retry-processing" `
+  -Headers $headers
+
+docker compose up -d worker-loop
+```
+
+Request the read-only consistency report before and after recording filesystem
+and database state. The request must not change either state, and the response
+must contain only safe owner-scoped relative paths.
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:8000/api/library/storage-consistency" `
+  -Headers $headers
+```
 
 ## Automated Regression Check
 
