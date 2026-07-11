@@ -149,6 +149,12 @@ Run the worker for a specific track ID:
 .\.venv\Scripts\python.exe -m app.worker --track-id 1
 ```
 
+The continuous worker recovers jobs left in `running` beyond
+`PROCESSING_JOB_STALE_MINUTES` (default 60) by marking the job and track failed
+with a UI-safe error. The owner can then retry from Web Track Detail, Upload,
+or Import. Retry creates one new pending job only when no active job exists and
+the required preserved original or retained temporary video is still present.
+
 Sync Android playback events after applying Phase 4 migrations:
 
 ```powershell

@@ -3,6 +3,7 @@ import type { DuplicateCandidateGroup, DuplicateCandidateTrack } from "../types/
 import type { Track } from "../types/track";
 import { formatDuration, formatTrackStatusLabel } from "../i18n/zh";
 import { TrackStatusBadge } from "./TrackStatusBadge";
+import { ProcessingRetryButton } from "./ProcessingRetryButton";
 
 export type UploadResult = {
   id: string;
@@ -25,10 +26,16 @@ type DuplicateCheckState =
   | { state: "error"; message: string };
 
 type UploadResultListProps = {
+  accessToken: string | null;
+  onTrackRetried: (resultId: string, track: Track) => void;
   results: UploadResult[];
 };
 
-export function UploadResultList({ results }: UploadResultListProps) {
+export function UploadResultList({
+  accessToken,
+  onTrackRetried,
+  results,
+}: UploadResultListProps) {
   if (results.length === 0) {
     return null;
   }
@@ -68,6 +75,13 @@ export function UploadResultList({ results }: UploadResultListProps) {
               </p>
             ) : null}
             {result.state === "success" ? <DuplicateWarning result={result} /> : null}
+            {result.track ? (
+              <ProcessingRetryButton
+                accessToken={accessToken}
+                onRetried={(track) => onTrackRetried(result.id, track)}
+                track={result.track}
+              />
+            ) : null}
           </li>
         ))}
       </ul>

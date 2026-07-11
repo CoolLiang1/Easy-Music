@@ -147,7 +147,16 @@ export function UploadPage() {
           正在上传选中文件...
         </div>
       ) : null}
-      <UploadResultList results={results} />
+      <UploadResultList
+        accessToken={accessToken}
+        onTrackRetried={(resultId, track) => {
+          updateUploadResult(setResults, resultId, { statusMessage: undefined, track });
+          if (accessToken) {
+            void pollTrackStatus(accessToken, track.id, resultId, setResults);
+          }
+        }}
+        results={results}
+      />
       {hasSuccessfulUpload ? (
         <div className="login-actions">
           <button

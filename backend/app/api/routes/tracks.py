@@ -37,6 +37,7 @@ from app.schemas.track import (
     TrackStreamUrlResponse,
     TrackUpdate,
 )
+from app.services import jobs as job_service
 from app.services import tracks as track_service
 
 
@@ -177,6 +178,32 @@ def create_stream_url(
     token, expires_at = create_track_stream_token(current_user.id, track.id)
     stream_url = f"/api/tracks/{track.id}/stream?token={token}"
     return TrackStreamUrlResponse(stream_url=stream_url, expires_at=expires_at)
+
+
+@router.post("/{track_id}/retry-processing", response_model=TrackResponse)
+def retry_track_processing(
+    track_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
+) -> TrackResponse:
+    track = track_service.get_track(db, current_user, track_id)
+    if track is None:
+        raise track_not_found_error()
+    try:
+        job_service.retry_failed_processing_job(
+            db,
+            track,
+            storage,
+            stale_minutes=storage.settings.processing_job_stale_minutes,
+        )
+    except job_service.ProcessingRetryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    db.refresh(track)
+    return track_service.build_track_response(db, track)
 
 
 @router.get("/{track_id}/stream")

@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -129,6 +130,49 @@ def test_process_next_job_marks_job_failed_with_error_message(
 
 def test_process_next_job_returns_none_when_no_pending_jobs(db_session: Session) -> None:
     assert worker_jobs.process_next_job(db_session, MediaStorage()) is None
+
+
+def test_process_next_job_recovers_stale_running_job_before_claim(
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(db_session)
+    stale_track, stale_job = create_track_with_job(
+        db_session,
+        user,
+        "originals/stale.mp3",
+    )
+    stale_job.status = "running"
+    stale_job.started_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    pending_track, pending_job = create_track_with_job(
+        db_session,
+        user,
+        "originals/pending.mp3",
+    )
+    db_session.commit()
+    storage = MediaStorage(
+        Settings(media_root=str(tmp_path), processing_job_stale_minutes=60),
+    )
+
+    def process_track_stub(db: Session, track_id: int, storage: MediaStorage) -> Track:
+        track = db.get(Track, track_id)
+        assert track is not None
+        track.status = "ready"
+        db.commit()
+        return track
+
+    monkeypatch.setattr(worker_jobs, "process_track", process_track_stub)
+
+    processed_job = worker_jobs.process_next_job(db_session, storage)
+
+    assert processed_job is not None
+    assert processed_job.id == pending_job.id
+    db_session.refresh(stale_job)
+    db_session.refresh(stale_track)
+    assert stale_job.status == "failed"
+    assert stale_track.status == "failed"
+    assert "configured running timeout" in (stale_job.error_message or "")
 
 
 def test_process_next_job_claims_and_processes_video_extraction_jobs(

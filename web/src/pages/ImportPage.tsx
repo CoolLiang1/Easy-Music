@@ -8,6 +8,7 @@ import {
   scanImportDirectory,
 } from "../api/imports";
 import { useAuth } from "../auth/AuthProvider";
+import { ProcessingRetryButton } from "../components/ProcessingRetryButton";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import { formatDateTime } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
@@ -197,6 +198,29 @@ export function ImportPage() {
     setActionError(null);
   };
 
+  const handleRetriedTrack = (track: Track) => {
+    setConfirmResult((current) =>
+      current
+        ? {
+            ...current,
+            results: current.results.map((item) =>
+              item.track?.id === track.id ? { ...item, track } : item,
+            ),
+          }
+        : current,
+    );
+    setLatestBatch((current) =>
+      current
+        ? {
+            ...current,
+            items: current.items.map((item) =>
+              item.track?.id === track.id ? { ...item, track } : item,
+            ),
+          }
+        : current,
+    );
+  };
+
   return (
     <section className="page-panel" aria-labelledby="import-title">
       <div className="page-header-row">
@@ -261,12 +285,20 @@ export function ImportPage() {
             />
           ) : null}
 
-          {confirmResult ? <ConfirmResultPanel result={confirmResult} /> : null}
+          {confirmResult ? (
+            <ConfirmResultPanel
+              accessToken={accessToken}
+              onTrackRetried={handleRetriedTrack}
+              result={confirmResult}
+            />
+          ) : null}
 
           <LatestBatchPanel
             batch={latestBatch}
             isRefreshing={isRefreshingBatch}
+            accessToken={accessToken}
             onRefresh={() => void refreshLatestBatch()}
+            onTrackRetried={handleRetriedTrack}
           />
         </>
       ) : null}
@@ -519,7 +551,15 @@ function ScanSkippedList({ skipped }: { skipped: ImportScanSkippedItem[] }) {
   );
 }
 
-function ConfirmResultPanel({ result }: { result: ImportConfirmResponse }) {
+function ConfirmResultPanel({
+  accessToken,
+  onTrackRetried,
+  result,
+}: {
+  accessToken: string | null;
+  onTrackRetried: (track: Track) => void;
+  result: ImportConfirmResponse;
+}) {
   return (
     <div className="panel">
       <div className="recommendation-result-heading">
@@ -546,7 +586,13 @@ function ConfirmResultPanel({ result }: { result: ImportConfirmResponse }) {
             <p className={item.status === "failed" ? "status-message error" : "status-message"}>
               {item.error ?? item.relative_path}
             </p>
-            {item.track ? <TrackImportSummary track={item.track} /> : null}
+            {item.track ? (
+              <TrackImportSummary
+                accessToken={accessToken}
+                onTrackRetried={onTrackRetried}
+                track={item.track}
+              />
+            ) : null}
             <DuplicateWarningList warnings={item.duplicate_warnings} />
           </li>
         ))}
@@ -557,12 +603,16 @@ function ConfirmResultPanel({ result }: { result: ImportConfirmResponse }) {
 
 function LatestBatchPanel({
   batch,
+  accessToken,
   isRefreshing,
   onRefresh,
+  onTrackRetried,
 }: {
   batch: ImportBatchResponse | null;
+  accessToken: string | null;
   isRefreshing: boolean;
   onRefresh: () => void;
+  onTrackRetried: (track: Track) => void;
 }) {
   return (
     <div className="panel">
@@ -611,7 +661,13 @@ function LatestBatchPanel({
                 <p className={item.status === "failed" ? "status-message error" : "status-message"}>
                   {item.error ?? item.relative_path}
                 </p>
-                {item.track ? <TrackImportSummary track={item.track} /> : null}
+                {item.track ? (
+                  <TrackImportSummary
+                    accessToken={accessToken}
+                    onTrackRetried={onTrackRetried}
+                    track={item.track}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -621,7 +677,15 @@ function LatestBatchPanel({
   );
 }
 
-function TrackImportSummary({ track }: { track: Track }) {
+function TrackImportSummary({
+  accessToken,
+  onTrackRetried,
+  track,
+}: {
+  accessToken: string | null;
+  onTrackRetried: (track: Track) => void;
+  track: Track;
+}) {
   return (
     <div className="import-track-summary">
       <RouteLink
@@ -634,6 +698,11 @@ function TrackImportSummary({ track }: { track: Track }) {
       {track.processing_error_message ? (
         <span className="status-message error">{track.processing_error_message}</span>
       ) : null}
+      <ProcessingRetryButton
+        accessToken={accessToken}
+        onRetried={onTrackRetried}
+        track={track}
+      />
     </div>
   );
 }

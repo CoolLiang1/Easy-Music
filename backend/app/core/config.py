@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=200, validation_alias="MAX_UPLOAD_MB")
     max_video_upload_mb: int = Field(default=1024, validation_alias="MAX_VIDEO_UPLOAD_MB")
     max_cover_mb: int = Field(default=10, validation_alias="MAX_COVER_MB")
+    processing_job_stale_minutes: int = Field(
+        default=60,
+        ge=5,
+        le=1440,
+        validation_alias="PROCESSING_JOB_STALE_MINUTES",
+    )
     import_allowed_roots: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
         validation_alias="IMPORT_ALLOWED_ROOTS",

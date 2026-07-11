@@ -1,11 +1,11 @@
 from collections.abc import Generator
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -279,6 +279,198 @@ def test_get_track_detail_includes_latest_processing_failure(
     assert body["status"] == "failed"
     assert body["processing_job_status"] == "failed"
     assert body["processing_error_message"] == "ffmpeg could not decode the uploaded file"
+
+
+def test_retry_failed_audio_processing_creates_one_pending_job(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    original = tmp_path / "originals" / "track.mp3"
+    original.parent.mkdir(parents=True)
+    original.write_bytes(b"audio")
+    track.status = "failed"
+    failed_job = ProcessingJob(
+        track_id=track.id,
+        status="failed",
+        job_type="audio_processing",
+        error_message="ffmpeg failed",
+    )
+    db_session.add(failed_job)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/tracks/{track.id}/retry-processing",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "processing"
+    assert response.json()["processing_job_status"] == "pending"
+    jobs = list(
+        db_session.scalars(
+            select(ProcessingJob)
+            .where(ProcessingJob.track_id == track.id)
+            .order_by(ProcessingJob.id),
+        ),
+    )
+    assert [(job.status, job.job_type) for job in jobs] == [
+        ("failed", "audio_processing"),
+        ("pending", "audio_processing"),
+    ]
+
+
+def test_retry_failed_video_uses_retained_video_or_extracted_original(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    retained_track = create_track(db_session, user, title="Retained video")
+    retained_track.original_file_path = None
+    retained_track.status = "failed"
+    retained_source = "temp-videos/retained.mp4"
+    retained_file = tmp_path / retained_source
+    retained_file.parent.mkdir(parents=True)
+    retained_file.write_bytes(b"video")
+    extracted_track = create_track(db_session, user, title="Extracted audio")
+    extracted_track.status = "failed"
+    original = tmp_path / "originals" / "track.mp3"
+    original.parent.mkdir(parents=True, exist_ok=True)
+    original.write_bytes(b"audio")
+    db_session.add_all(
+        [
+            ProcessingJob(
+                track_id=retained_track.id,
+                status="failed",
+                job_type="video_extraction",
+                source_path=retained_source,
+            ),
+            ProcessingJob(
+                track_id=extracted_track.id,
+                status="failed",
+                job_type="video_extraction",
+                source_path="temp-videos/already-consumed.mp4",
+            ),
+        ],
+    )
+    db_session.commit()
+
+    retained_response = client.post(
+        f"/api/tracks/{retained_track.id}/retry-processing",
+        headers=auth_headers(user),
+    )
+    extracted_response = client.post(
+        f"/api/tracks/{extracted_track.id}/retry-processing",
+        headers=auth_headers(user),
+    )
+
+    assert retained_response.status_code == 200
+    assert extracted_response.status_code == 200
+    newest_jobs = {
+        track_id: db_session.scalar(
+            select(ProcessingJob)
+            .where(ProcessingJob.track_id == track_id)
+            .order_by(ProcessingJob.id.desc()),
+        )
+        for track_id in (retained_track.id, extracted_track.id)
+    }
+    assert newest_jobs[retained_track.id].job_type == "video_extraction"
+    assert newest_jobs[retained_track.id].source_path == retained_source
+    assert newest_jobs[extracted_track.id].job_type == "audio_processing"
+    assert newest_jobs[extracted_track.id].source_path is None
+
+
+def test_retry_processing_recovers_stale_running_job(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    original = tmp_path / "originals" / "track.mp3"
+    original.parent.mkdir(parents=True)
+    original.write_bytes(b"audio")
+    track.status = "processing"
+    stale_job = ProcessingJob(
+        track_id=track.id,
+        status="running",
+        job_type="audio_processing",
+        started_at=datetime.now(timezone.utc) - timedelta(hours=2),
+    )
+    db_session.add(stale_job)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/tracks/{track.id}/retry-processing",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    db_session.refresh(stale_job)
+    assert stale_job.status == "failed"
+    assert "configured running timeout" in (stale_job.error_message or "")
+    assert response.json()["processing_job_status"] == "pending"
+
+
+def test_retry_processing_rejects_active_missing_and_unowned_sources(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    owner = create_user(db_session)
+    other = create_user(db_session, username="other")
+    active_track = create_track(db_session, owner, title="Active")
+    active_track.status = "processing"
+    missing_track = create_track(db_session, owner, title="Missing")
+    missing_track.status = "failed"
+    hidden_track = create_track(db_session, other, title="Hidden")
+    hidden_track.status = "failed"
+    unsafe_video_track = create_track(db_session, owner, title="Wrong video location")
+    unsafe_video_track.original_file_path = None
+    unsafe_video_track.status = "failed"
+    wrong_location = tmp_path / "originals" / "retained.mp4"
+    wrong_location.parent.mkdir(parents=True)
+    wrong_location.write_bytes(b"video")
+    db_session.add_all(
+        [
+            ProcessingJob(track_id=active_track.id, status="pending"),
+            ProcessingJob(track_id=missing_track.id, status="failed"),
+            ProcessingJob(track_id=hidden_track.id, status="failed"),
+            ProcessingJob(
+                track_id=unsafe_video_track.id,
+                status="failed",
+                job_type="video_extraction",
+                source_path="originals/retained.mp4",
+            ),
+        ],
+    )
+    db_session.commit()
+
+    active_response = client.post(
+        f"/api/tracks/{active_track.id}/retry-processing",
+        headers=auth_headers(owner),
+    )
+    missing_response = client.post(
+        f"/api/tracks/{missing_track.id}/retry-processing",
+        headers=auth_headers(owner),
+    )
+    hidden_response = client.post(
+        f"/api/tracks/{hidden_track.id}/retry-processing",
+        headers=auth_headers(owner),
+    )
+    unsafe_video_response = client.post(
+        f"/api/tracks/{unsafe_video_track.id}/retry-processing",
+        headers=auth_headers(owner),
+    )
+
+    assert active_response.status_code == 409
+    assert missing_response.status_code == 409
+    assert "source media is missing" in missing_response.json()["detail"]
+    assert hidden_response.status_code == 404
+    assert unsafe_video_response.status_code == 409
 
 
 def test_update_track_metadata(client: TestClient, db_session: Session) -> None:

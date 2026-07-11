@@ -4,6 +4,7 @@ import { listTags } from "../api/tags";
 import { deleteTrack, getTrack, updateTrack, updateTrackCover } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import { PlaybackQueueActions } from "../components/PlaybackQueueActions";
+import { ProcessingRetryButton } from "../components/ProcessingRetryButton";
 import { TrackCoverEditor } from "../components/TrackCoverEditor";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
@@ -285,6 +286,15 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
             <p className="recommendation-muted">
               {getStatusSummary(detailState.track.status)}
             </p>
+            <ProcessingRetryButton
+              accessToken={accessToken}
+              onRetried={(track) =>
+                setDetailState((current) =>
+                  current.name === "ready" ? { ...current, track } : current,
+                )
+              }
+              track={detailState.track}
+            />
             <WebAudioPlayer accessToken={accessToken} track={detailState.track} />
             <PlaybackQueueActions track={detailState.track} />
           </section>

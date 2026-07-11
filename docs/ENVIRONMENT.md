@@ -31,6 +31,7 @@ contain placeholders only, not production-ready secrets.
 | `MAX_UPLOAD_MB` | Yes | Yes | Maximum accepted audio upload size in megabytes. Keep deployment values compatible with `CADDY_AUDIO_UPLOAD_LIMIT`. |
 | `MAX_VIDEO_UPLOAD_MB` | No | Yes | Maximum accepted user-provided video upload size in megabytes. Defaults to `1024`; keep deployment reverse proxy limits compatible. |
 | `MAX_COVER_MB` | Yes | Yes | Maximum accepted cover-image upload size in megabytes. |
+| `PROCESSING_JOB_STALE_MINUTES` | No | No | Minutes a processing job may remain `running` before the worker marks it failed and exposes safe retry. Defaults to `60`; supported range is 5 to 1440. Configure the same value for API and worker. |
 | `IMPORT_ALLOWED_ROOTS` | No | No | Optional semicolon- or comma-separated allowlist of server-side import roots. Empty disables import tools. Use explicit directories outside the repository, outside user home roots, and outside `MEDIA_ROOT`; never commit private machine-specific paths. |
 | `IMPORT_SCAN_MAX_FILES` | No | No | Maximum supported audio candidates returned by one import scan. Defaults to `1000`. |
 | `IMPORT_SCAN_MAX_DEPTH` | No | No | Maximum recursive directory depth for import scan preview. Defaults to `5`. |

@@ -33,11 +33,14 @@ def process_next_job(
     db: Session,
     storage: MediaStorage | None = None,
 ) -> ProcessingJob | None:
-    job = claim_next_pending_job(db)
+    storage = storage or MediaStorage()
+    job = claim_next_pending_job(
+        db,
+        stale_minutes=storage.settings.processing_job_stale_minutes,
+    )
     if job is None:
         return None
 
-    storage = storage or MediaStorage()
     job_id = job.id
     try:
         if job.job_type == VIDEO_EXTRACTION_JOB_TYPE:

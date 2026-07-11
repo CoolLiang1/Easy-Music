@@ -82,6 +82,16 @@ export function deleteTrack(accessToken: string, trackId: number | string) {
   });
 }
 
+export function retryTrackProcessing(
+  accessToken: string,
+  trackId: number | string,
+) {
+  return apiRequest<Track>(
+    `/api/tracks/${encodeURIComponent(trackId)}/retry-processing`,
+    { method: "POST", accessToken },
+  );
+}
+
 export function batchDeleteTracks(accessToken: string, payload: TrackBatchDelete) {
   return apiRequest<TrackBatchDeleteResponse>("/api/tracks/batch-delete", {
     method: "POST",
