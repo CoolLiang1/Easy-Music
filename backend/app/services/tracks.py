@@ -1,8 +1,10 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import delete, select
+from sqlalchemy import case, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.media.paths import UnsafeMediaPathError
@@ -49,15 +51,119 @@ ALLOWED_COVER_TYPES = {
 }
 COVER_CHUNK_SIZE = 1024 * 1024
 
+TrackSortField = Literal[
+    "created_at",
+    "updated_at",
+    "title",
+    "artist",
+    "album",
+    "duration_seconds",
+]
+TrackSortOrder = Literal["asc", "desc"]
+
+
+@dataclass(frozen=True)
+class TrackQuery:
+    search: str | None = None
+    statuses: tuple[str, ...] = ()
+    liked: bool | None = None
+    content_types: tuple[str, ...] = ()
+    tag_ids: tuple[int, ...] = ()
+    sort: TrackSortField = "created_at"
+    order: TrackSortOrder = "asc"
+    limit: int | None = None
+    offset: int = 0
+
+
+@dataclass(frozen=True)
+class TrackQueryResult:
+    tracks: list[Track]
+    total: int
+
 
 def list_tracks(db: Session, user: User) -> list[Track]:
-    return list(
-        db.scalars(
-            select(Track)
-            .where(Track.user_id == user.id)
-            .order_by(Track.created_at, Track.id),
-        ),
+    return query_tracks(db, user, TrackQuery()).tracks
+
+
+def query_tracks(
+    db: Session,
+    user: User,
+    query: TrackQuery,
+) -> TrackQueryResult:
+    filters = _track_query_filters(user, query)
+    total = db.scalar(
+        select(func.count()).select_from(Track).where(*filters),
+    ) or 0
+
+    statement = (
+        select(Track)
+        .where(*filters)
+        .order_by(*_track_query_order(query))
+        .offset(query.offset)
     )
+    if query.limit is not None:
+        statement = statement.limit(query.limit)
+
+    return TrackQueryResult(
+        tracks=list(db.scalars(statement)),
+        total=total,
+    )
+
+
+def _track_query_filters(user: User, query: TrackQuery) -> list[object]:
+    filters: list[object] = [Track.user_id == user.id]
+    search = (query.search or "").strip()
+    if search:
+        tag_name_match = (
+            select(TrackTag.track_id)
+            .join(Tag, Tag.id == TrackTag.tag_id)
+            .where(
+                TrackTag.track_id == Track.id,
+                Tag.user_id == user.id,
+                Tag.name.icontains(search, autoescape=True),
+            )
+            .exists()
+        )
+        filters.append(
+            or_(
+                Track.title.icontains(search, autoescape=True),
+                Track.artist.icontains(search, autoescape=True),
+                Track.album.icontains(search, autoescape=True),
+                tag_name_match,
+            ),
+        )
+    if query.statuses:
+        filters.append(Track.status.in_(query.statuses))
+    if query.liked is not None:
+        filters.append(Track.liked == query.liked)
+    if query.content_types:
+        filters.append(Track.content_type.in_(query.content_types))
+    for tag_id in dict.fromkeys(query.tag_ids):
+        filters.append(
+            select(TrackTag.track_id)
+            .join(Tag, Tag.id == TrackTag.tag_id)
+            .where(
+                TrackTag.track_id == Track.id,
+                TrackTag.tag_id == tag_id,
+                Tag.user_id == user.id,
+            )
+            .exists(),
+        )
+    return filters
+
+
+def _track_query_order(query: TrackQuery) -> tuple[object, ...]:
+    sort_column = getattr(Track, query.sort)
+    null_rank = case((sort_column.is_(None), 1), else_=0)
+    normalized_column = (
+        func.lower(sort_column)
+        if query.sort in {"title", "artist", "album"}
+        else sort_column
+    )
+    ordered_column = (
+        normalized_column.desc() if query.order == "desc" else normalized_column.asc()
+    )
+    return null_rank.asc(), ordered_column, Track.id.asc()
 
 
 def get_track(db: Session, user: User, track_id: int) -> Track | None:

@@ -1,10 +1,11 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import (
     APIRouter,
     Depends,
     File,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -12,6 +13,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials
+from pydantic import PositiveInt
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import authentication_error, bearer_scheme, get_current_user
@@ -80,10 +82,39 @@ def get_stream_user(
 def list_tracks(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    response: Response,
+    q: Annotated[str | None, Query(max_length=255)] = None,
+    statuses: Annotated[list[str] | None, Query(alias="status")] = None,
+    liked: Annotated[bool | None, Query()] = None,
+    content_types: Annotated[list[str] | None, Query(alias="content_type")] = None,
+    tag_ids: Annotated[list[PositiveInt] | None, Query(alias="tag_id")] = None,
+    sort: Annotated[
+        Literal["created_at", "updated_at", "title", "artist", "album", "duration_seconds"],
+        Query(),
+    ] = "created_at",
+    order: Annotated[Literal["asc", "desc"], Query()] = "asc",
+    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[TrackResponse]:
+    result = track_service.query_tracks(
+        db,
+        current_user,
+        track_service.TrackQuery(
+            search=q,
+            statuses=tuple(statuses or ()),
+            liked=liked,
+            content_types=tuple(content_types or ()),
+            tag_ids=tuple(tag_ids or ()),
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    response.headers["X-Total-Count"] = str(result.total)
     return [
         track_service.build_track_response(db, track)
-        for track in track_service.list_tracks(db, current_user)
+        for track in result.tracks
     ]
 
 

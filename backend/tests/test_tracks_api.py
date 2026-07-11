@@ -112,6 +112,130 @@ def test_list_tracks_returns_only_current_users_tracks(
 
     assert response.status_code == 200
     assert [track["title"] for track in response.json()] == ["Visible"]
+    assert response.headers["X-Total-Count"] == "1"
+
+
+def test_list_tracks_searches_metadata_and_owned_tag_names(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    title_match = create_track(db_session, owner, title="Midnight Focus")
+    artist_match = create_track(db_session, owner, title="Artist Match")
+    artist_match.artist = "Quiet Ensemble"
+    album_match = create_track(db_session, owner, title="Album Match")
+    album_match.album = "Quiet Hours"
+    tag_match = create_track(db_session, owner, title="Tag Match")
+    quiet_tag = create_tag(db_session, owner, name="Quiet Room")
+    db_session.add(TrackTag(track_id=tag_match.id, tag_id=quiet_tag.id))
+    hidden_track = create_track(db_session, other_user, title="Hidden Quiet")
+    hidden_tag = create_tag(db_session, other_user, name="Quiet Secret")
+    db_session.add(TrackTag(track_id=hidden_track.id, tag_id=hidden_tag.id))
+    db_session.commit()
+
+    response = client.get(
+        "/api/tracks?q=quiet&sort=title",
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 200
+    assert [track["title"] for track in response.json()] == [
+        "Album Match",
+        "Artist Match",
+        "Tag Match",
+    ]
+    assert response.headers["X-Total-Count"] == "3"
+    assert title_match.id not in {track["id"] for track in response.json()}
+
+
+def test_list_tracks_filters_by_status_liked_content_type_and_all_tags(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, name="Focus")
+    calm = create_tag(db_session, user, name="Calm", group="feature")
+    matching = create_track(db_session, user, title="Matching")
+    matching.status = "ready"
+    matching.liked = True
+    matching.content_type = "song"
+    partial = create_track(db_session, user, title="Partial")
+    partial.status = "ready"
+    partial.liked = True
+    partial.content_type = "song"
+    wrong_status = create_track(db_session, user, title="Wrong Status")
+    wrong_status.status = "failed"
+    wrong_status.liked = True
+    wrong_status.content_type = "song"
+    db_session.add_all(
+        [
+            TrackTag(track_id=matching.id, tag_id=focus.id),
+            TrackTag(track_id=matching.id, tag_id=calm.id),
+            TrackTag(track_id=partial.id, tag_id=focus.id),
+            TrackTag(track_id=wrong_status.id, tag_id=focus.id),
+            TrackTag(track_id=wrong_status.id, tag_id=calm.id),
+        ],
+    )
+    db_session.commit()
+
+    response = client.get(
+        (
+            "/api/tracks?status=ready&liked=true&content_type=song"
+            f"&tag_id={focus.id}&tag_id={calm.id}"
+        ),
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert [track["title"] for track in response.json()] == ["Matching"]
+    assert response.headers["X-Total-Count"] == "1"
+
+
+def test_list_tracks_paginates_with_stable_sort_and_total_count(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    create_track(db_session, user, title="Charlie")
+    first_bravo = create_track(db_session, user, title="Bravo")
+    second_bravo = create_track(db_session, user, title="Bravo")
+    create_track(db_session, user, title="Alpha")
+
+    response = client.get(
+        "/api/tracks?sort=title&order=asc&limit=2&offset=1",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert [track["id"] for track in response.json()] == [
+        first_bravo.id,
+        second_bravo.id,
+    ]
+    assert response.headers["X-Total-Count"] == "4"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "sort=unknown",
+        "order=sideways",
+        "limit=0",
+        "limit=101",
+        "offset=-1",
+        "tag_id=0",
+    ],
+)
+def test_list_tracks_rejects_invalid_query_parameters(
+    client: TestClient,
+    db_session: Session,
+    query: str,
+) -> None:
+    user = create_user(db_session)
+
+    response = client.get(f"/api/tracks?{query}", headers=auth_headers(user))
+
+    assert response.status_code == 422
 
 
 def test_get_track_detail(client: TestClient, db_session: Session) -> None:
