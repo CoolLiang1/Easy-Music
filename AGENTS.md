@@ -68,6 +68,15 @@ Useful mental map:
 
 - Work on only the currently requested task or optimization. Do not implement
   later roadmap items early.
+- Treat Easy Music as a private, single-owner application, not a commercial
+  product. Optimize for owner control, daily usefulness, and maintainability.
+- The former complete V2.6 Stability And Listening Loop plan is superseded and
+  is not authorization to resume its historical branch, stash, tasks, or
+  acceptance work. Reuse only a narrowly selected change explicitly authorized
+  through the current roadmap.
+- Do not add release governance, generalized observability, speculative
+  scaling, or broad product infrastructure solely to make the project resemble
+  a commercial service.
 - Keep changes scoped. Avoid broad rewrites, framework swaps, or large
   refactors unless the task explicitly asks for them.
 - Preserve existing architecture boundaries: thin FastAPI routes, backend

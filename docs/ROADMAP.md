@@ -42,18 +42,42 @@ Last verified: 2026-07-27 on `develop`.
 | First Ubuntu/domain/HTTPS production smoke | Implemented | [Production smoke record](ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md) | Functional smoke passed from `develop`; exact Ubuntu release was not captured, so acceptance evidence is incomplete and `main` is not verified. |
 | UI optimization round 1 | Implemented | [UI task](TASKS/NEXT_UI_OPTIMIZATION_TASKS.md) / [acceptance](ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md) | Web and Android automated gates passed; complete manual visual/flow acceptance before marking it accepted. |
 
+## Development Direction
+
+Easy Music is a private, single-owner application, not a commercial product.
+The goal is a stable app that the owner can understand, operate, and change
+without adopting product-development machinery that does not improve personal
+use.
+
+The former plan to implement a complete "V2.6 Stability And Listening Loop"
+milestone is superseded by this direction and is not authorized work. Its
+historical branch or stash may be consulted for a narrowly selected fix, but
+must not be merged or resumed as a milestone.
+
+Future development is driven by concrete friction observed during the owner's
+real use:
+
+- Prefer a small bug fix, security fix, or data-safety improvement over a new
+  subsystem.
+- Add a feature only after the owner identifies the specific problem it solves.
+- Keep the smallest maintainable implementation that solves that problem.
+- Do not add commercial release governance, generalized observability,
+  speculative scaling, or broad architectural refactors without explicit
+  authorization.
+
 ## Active And Next Work
 
-1. Finish and record manual visual/flow acceptance for UI optimization round 1.
-   A later UI slice requires a newly selected target and is not authorization
-   for a broad redesign.
-2. Run and record the targeted V2.2 Web playback regression checks listed in
-   its acceptance record.
-3. Close the production smoke evidence gap by recording a run on a confirmed
-   supported Ubuntu release. Also document certificate renewal and decide
-   whether high-port HTTPS remains the intended access pattern.
-4. No later product feature is currently authorized. Create or update a task
-   document and register it in this section before implementation.
+1. No new product feature or milestone is currently authorized.
+2. Use the app normally and select one concrete owner-reported pain point
+   before starting product work.
+3. Maintenance work may address a reproducible bug, a security issue, data
+   safety, backup recovery, or certificate continuity with the smallest
+   reviewable change.
+4. The outstanding V2.2, UI round 1, and production-smoke evidence gaps remain
+   recorded in their existing acceptance documents. They are not mandatory
+   roadmap work unless the owner chooses to revisit the affected flow.
+5. Register any selected product slice here and link its task and acceptance
+   records before implementation.
 
 ## Phase 0: Project Foundation
 

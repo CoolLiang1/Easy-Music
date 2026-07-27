@@ -37,6 +37,11 @@ it on 2026-07-27.
   gates; manual visual/flow acceptance is still unrecorded. No later focused
   slice has been selected.
 
+Easy Music now follows a private stable-edition direction. The former complete
+V2.6 milestone is not planned work. Future changes are selected one at a time
+from concrete problems observed by the owner, with maintenance, security, and
+data safety preferred over product expansion.
+
 ## Features
 
 - Authenticated personal music library.
