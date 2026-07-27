@@ -23,6 +23,8 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
   [生产 smoke 记录](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)。
 - Web 和 Android 的第一轮 UI 优化已实现并通过自动检查，但尚未记录手动视觉/流程验收；后续聚焦切片也尚未选定。
 
+Easy Music 现在采用“私人稳定版”方向，不再计划完整实现 V2.6。后续开发只从所有者真实使用中遇到的具体问题逐项选择，优先维护、安全和数据保护，而不是扩张产品范围。
+
 ## 功能
 
 - 登录保护的个人音乐库。

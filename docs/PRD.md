@@ -4,6 +4,12 @@
 
 Easy Music is a personal cloud music system for scenario-based listening.
 
+It is a private, single-owner application rather than a commercial product.
+Development optimizes for the owner's daily use, control, and ability to
+understand and maintain the system. A broader roadmap, release program, or
+platform capability is not valuable unless it solves a concrete problem the
+owner has actually experienced.
+
 It is not just a music player. Its core job is to help the user answer:
 
 > What should I listen to right now?
@@ -121,6 +127,9 @@ Build a usable personal cloud music app that supports:
 - Full offline library sync
 - Complex machine-learning recommendation model
 - Public music discovery service
+- Commercial or SaaS product development
+- Enterprise release governance and generalized observability
+- Speculative scaling work or broad refactors without an owner-reported need
 
 ## 6. Main Concepts
 
