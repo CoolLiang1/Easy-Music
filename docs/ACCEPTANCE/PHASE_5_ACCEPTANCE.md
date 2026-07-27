@@ -1,5 +1,12 @@
 # Phase 5 Recommendation V1 Acceptance
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: acceptance
+Related: `docs/TASKS/PHASE_5_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/PHASE_5_TASKS.md`
+Decision: Accepted
+
 This document records the Phase 5 Recommendation V1 verification flow for Easy
 Music. Phase 5 builds on the accepted Phase 3 Android Media3 playback
 architecture and the accepted Phase 4 manual offline cache architecture. The

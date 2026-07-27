@@ -8,18 +8,22 @@ Media3 playback and offline cache, Recommendation V2 foundation, playlists,
 client playback queues, import/video processing, simplified tags, AI Assistant
 V1, and AI Tag Suggestions V2.
 
-Use `README.md` and `docs/ROADMAP.md` for the current progress record before
-starting work. Production deployment is covered separately in
-`docs/DEPLOYMENT.md`, and the first real Ubuntu/domain/HTTPS smoke should be
+Use `docs/ROADMAP.md` as the current progress and authorized-work source before
+starting. Use `docs/README.md` to determine which documentation owners a
+change must update. Production deployment is covered separately in
+`docs/DEPLOYMENT.md`; the first real Ubuntu/domain/HTTPS smoke is already
 recorded in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
 
 Production ML or training platforms, social features, automatic full-library
 offline sync, complex download queue management, and background caching of the
 entire library remain outside the current scope.
 
-The next planned work is UI optimization. Use
-`docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md` as the task entry point and keep UI
-changes scoped to existing flows unless a later task explicitly expands scope.
+The UI optimization work record is
+`docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`. Round 1 is `Implemented` and still
+needs the manual checks in
+`docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`. Any next slice must
+first be selected and registered in the roadmap; the general UI program is not
+authorization for a broad redesign.
 
 ## Workflow
 
@@ -27,8 +31,9 @@ changes scoped to existing flows unless a later task explicitly expands scope.
 2. Work on one documented task at a time.
 3. Keep changes inside the files and directories named by the current task.
 4. Do not implement later tasks early.
-5. Inspect `git diff` before committing.
-6. Commit completed tasks separately with a concise Conventional Commits
+5. Apply the documentation completion gate in `docs/README.md`.
+6. Run `pwsh -File scripts/check-docs.ps1` and inspect `git diff`.
+7. Commit completed tasks separately with a concise Conventional Commits
    message.
 
 ## Backend Setup

@@ -1,5 +1,11 @@
 # Phase 2 Development Tasks
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: task
+Related: `docs/ACCEPTANCE/PHASE_2_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/PHASE_2_ACCEPTANCE.md`
+
 ## Scope
 
 Phase 2 builds the Web Management Console on top of the completed Phase 1

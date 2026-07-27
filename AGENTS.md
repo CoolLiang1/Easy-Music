@@ -33,15 +33,17 @@ models, Web types, and deployment configuration.
 
 ## How To Understand The Codebase
 
-Before implementing, read the relevant docs first:
+Before implementing, read the documentation map and the relevant owners first:
 
-- Product intent and boundaries: `docs/PRD.md`, `docs/ROADMAP.md`.
+- Documentation ownership and completion rules: `docs/README.md`.
+- Current status and authorized next work: `docs/ROADMAP.md`.
+- Product intent and boundaries: `docs/PRD.md`.
 - System shape and module boundaries: `docs/ARCHITECTURE.md`.
 - Local workflow and verification expectations: `docs/DEVELOPMENT.md`.
 - API smoke flows: `docs/API_MANUAL_TESTING.md`.
 - Deployment and production behavior: `docs/DEPLOYMENT.md`.
-- Current phase/task context: the relevant `docs/TASKS/PHASE_*_TASKS.md` and
-  `docs/ACCEPTANCE/PHASE_*_ACCEPTANCE.md`.
+- Work-item context and evidence: the relevant file under `docs/TASKS/` and
+  `docs/ACCEPTANCE/`.
 
 Then inspect the narrow code path for the task. Prefer existing service,
 repository, schema, route, UI, and test patterns over inventing new structures.
@@ -115,25 +117,28 @@ area rather than running unrelated suites blindly.
 Do not mark acceptance complete unless the documented acceptance criteria for
 that area are genuinely satisfied.
 
-## Documentation Updates
+## Documentation Completion Gate
 
-When project progress changes, update documentation so future agents do not
-mistake stale docs for reality.
+Documentation is part of the feature or fix, not a later cleanup. Follow
+`docs/README.md`, including its "One Fact, One Owner" rule, status vocabulary,
+change matrix, and completion sequence.
 
-Consider updating:
+Before reporting any work item complete:
 
-- `README.md` for top-level status and implemented areas.
-- `docs/ROADMAP.md` for phase progress and remaining caveats.
-- `docs/ARCHITECTURE.md` for durable architecture or module-boundary changes.
-- `docs/DEVELOPMENT.md` for local workflow, verification, or tooling changes.
-- `docs/ENVIRONMENT.md` and env examples for configuration contract changes.
-- `docs/DEPLOYMENT.md`, `docker-compose.prod.yml`, and deploy scripts for
-  production workflow changes.
-- Relevant `docs/TASKS/PHASE_*_TASKS.md` and `docs/ACCEPTANCE/PHASE_*_ACCEPTANCE.md` when a
-  phase task or acceptance status changes.
-- This `AGENTS.md` when an unexpected pitfall or stable agent rule emerges.
+- Apply the exact change matrix and completion sequence in `docs/README.md`.
+- Record actual verification before promoting a task from `Implemented` to
+  `Accepted`.
+- Include a `Documentation Impact` record with an explanation for every
+  relevant `N/A`.
+- Run `pwsh -File scripts/check-docs.ps1` and inspect the final diff.
 
-Keep docs concise and operational. Do not add long background stories.
+For a matrix row that appears relevant but needs no edit, state `N/A` and the
+reason in the task's `Documentation Impact` section or the final change
+summary. An agent must not claim documentation is complete after updating only
+one convenient file without checking the matrix.
+
+Keep documentation concise and operational. Prefer links to the canonical
+owner over copied status paragraphs.
 
 ## Git Rules
 
@@ -154,17 +159,11 @@ Keep docs concise and operational. Do not add long background stories.
 
 Update this section when you discover something surprising.
 
-- The repository has completed the MVP through Phase 7 locally, but the first
-  real Ubuntu/domain/HTTPS production smoke test is intentionally deferred to
-  operator deployment.
-- Some older docs may describe historical phase boundaries. Prefer current
-  `README.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, and acceptance docs
-  when judging current status.
-- The initial usable product and current V2 slices are locally complete as of
-  2026-06-29. For the next planned work, start from
-  `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md` for UI polish and
-  `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md` for the first real
-  Ubuntu/domain/HTTPS deployment smoke record.
+- Do not infer current progress or next work from this file. Use
+  `docs/ROADMAP.md`, then inspect the linked task and acceptance records.
+- Older task documents describe historical scope and are not authorization to
+  restart or extend that work. Only the active work registered in the roadmap
+  is current.
 - AI endpoints can return successful HTTP responses with provider status
   `disabled`, `unconfigured`, or `error`. This is often expected fallback
   behavior, not necessarily a transport failure.

@@ -1,5 +1,11 @@
 # V2.5 AI Tag Suggestions V2 Tasks
 
+Status: Accepted
+Last updated: 2026-06-29
+Canonical role: task
+Related: `docs/ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md`
+
 Date: 2026-06-29
 
 This slice keeps V2.5 on the existing AI tag suggestion flow. It improves

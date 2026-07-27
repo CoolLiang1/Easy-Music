@@ -1,5 +1,11 @@
 # V2 Recommendation Foundation Tasks
 
+Status: Accepted
+Last updated: 2026-06-28
+Canonical role: task
+Related: `docs/ACCEPTANCE/V2_RECOMMENDATION_FOUNDATION_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/V2_RECOMMENDATION_FOUNDATION_ACCEPTANCE.md`
+
 This slice updates the accepted Recommendation V1 rule engine without adding
 embeddings, ML ranking, networked AI, automatic playlist generation, or tag
 taxonomy migration.

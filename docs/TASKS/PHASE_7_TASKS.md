@@ -1,5 +1,17 @@
 # Phase 7 Deployment Hardening Tasks
 
+Status: Accepted
+Last updated: 2026-07-27
+Canonical role: task
+Related: `docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md`, `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/PHASE_7_ACCEPTANCE.md`
+
+Historical task note: Phase 7 local/static acceptance is complete. The
+real-server smoke that was deferred when this task was written was later
+completed functionally, but its evidence remains `Implemented` because the
+exact Ubuntu release was not captured. See
+`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
+
 This document splits Phase 7 into executable Deployment Hardening tasks.
 Phase 7 starts from the accepted Phase 6 AI Assistant V1 backend, Web, and
 Android flows.

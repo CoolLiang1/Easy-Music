@@ -1,5 +1,11 @@
 # V2 Remaining Import And Video Construction Orders
 
+Status: Superseded
+Last updated: 2026-06-11
+Canonical role: task
+Related: `docs/TASKS/V2_IMPORT_AND_VIDEO_TASKS.md`, `docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md`
+Pair: None
+
 This document converts the remaining V2 import and video tasks into executable
 work orders for coding agents. Tasks V2.1 through V2.6 are already implemented
 locally as of 2026-06-10 and must not be reimplemented here.

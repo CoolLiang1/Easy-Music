@@ -1,5 +1,16 @@
 # V2.1 Playback Queue Acceptance
 
+Status: Accepted
+Last updated: 2026-06-29
+Canonical role: acceptance
+Related: `docs/ACCEPTANCE/V2_1_PLAYLISTS_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: None
+Decision: Accepted
+
+Legacy record note: this acceptance predates the task/acceptance-pair rule and
+has no dedicated task file. Its acceptance-to-acceptance link is historical,
+not a format to copy for new work.
+
 This document records acceptance for client-side playback queues built on top
 of ordinary V2.1 playlists.
 

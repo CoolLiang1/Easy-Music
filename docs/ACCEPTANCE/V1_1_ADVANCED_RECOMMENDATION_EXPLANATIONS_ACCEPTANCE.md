@@ -1,5 +1,12 @@
 # V1.1 Advanced Recommendation Explanations Acceptance
 
+Status: Accepted
+Last updated: 2026-06-28
+Canonical role: acceptance
+Related: `docs/TASKS/V1_1_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V1_1_TASKS.md`
+Decision: Accepted
+
 This document records the V1.1 advanced recommendation explanation verification
 flow for Easy Music. Structured explanations expose why rule-based
 recommendations ranked the way they did, while preserving the existing concise

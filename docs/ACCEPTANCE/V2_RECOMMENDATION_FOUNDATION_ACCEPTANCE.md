@@ -1,5 +1,12 @@
 # V2 Recommendation Foundation Acceptance
 
+Status: Accepted
+Last updated: 2026-06-28
+Canonical role: acceptance
+Related: `docs/TASKS/V2_RECOMMENDATION_FOUNDATION_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V2_RECOMMENDATION_FOUNDATION_TASKS.md`
+Decision: Accepted
+
 This document records the Recommendation V2 foundation slice. It changes the
 rule-based scoring foundation while preserving the existing recommendation API
 shape for Web, Android, and AI-assisted recommendation flows.

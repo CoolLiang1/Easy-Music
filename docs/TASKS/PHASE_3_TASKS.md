@@ -1,5 +1,11 @@
 # Phase 3 Android Player Tasks
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: task
+Related: `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`
+
 This document splits Phase 3 into executable Android Player development tasks.
 Phase 3 starts from the accepted Phase 0/1 backend and accepted Phase 2 Web
 management console.
@@ -632,4 +638,3 @@ Phase 3 is complete when:
    work.
 10. `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md` records the automated and manual verification
     result.
-

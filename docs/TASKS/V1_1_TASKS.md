@@ -1,5 +1,11 @@
 # V1.1 Small Enhancement Tasks
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: task
+Related: `docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md`, `docs/ACCEPTANCE/V1_1_COVER_EDITING_ACCEPTANCE.md`, `docs/ACCEPTANCE/V1_1_ADVANCED_RECOMMENDATION_EXPLANATIONS_ACCEPTANCE.md`, `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/V1_1_DUPLICATE_DETECTION_ACCEPTANCE.md`, `docs/ACCEPTANCE/V1_1_COVER_EDITING_ACCEPTANCE.md`, `docs/ACCEPTANCE/V1_1_ADVANCED_RECOMMENDATION_EXPLANATIONS_ACCEPTANCE.md`, `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`
+
 This document splits V1.1 into executable small enhancement tasks. V1.1 starts
 from the accepted MVP through Phase 7: backend, Web, Android, deployment
 artifacts, Recommendation V1, and AI Assistant V1 are already implemented.

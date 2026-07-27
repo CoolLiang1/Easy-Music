@@ -92,9 +92,9 @@ Build a usable personal cloud music app that supports:
 - Track editing
 - Tag editing
 - Source link field, such as a Bilibili URL
-- Scenario tags
-- Mood/state tags
-- Genre/type tags
+- Scene tags
+- Type tags
+- Feature tags
 - AI tag suggestion
 - Natural-language recommendation request
 - Rule-based ranking combined with LLM intent parsing
@@ -152,12 +152,17 @@ Example content types:
 
 The app uses multi-dimensional tags instead of folder-like categories.
 
-Tag groups:
+Current tag groups:
 
-- Scenario: study, work, exercise, relax, sleep
-- State: focus, energetic, calm, healing, exciting
-- Type: Japanese, anime, game OST, instrumental, electronic, white noise, Chinese, English
-- Attribute: vocal, instrumental, loopable, distracting, noisy
+- Scene: study, work, exercise, relax, sleep
+- Type: Japanese, anime, game OST, instrumental, electronic, white noise,
+  Chinese, English
+- Feature: focus, energetic, calm, healing, exciting, vocal, instrumental,
+  loopable, distracting, noisy
+
+The V2.4 taxonomy replaced the original `scenario`, `state`, and `attribute`
+groups. `scenario` migrated to `scene`, `state` migrated to `feature`, and
+legacy `attribute` tags were removed rather than retained as a fourth group.
 
 Tracks can have many tags across different groups.
 
@@ -269,4 +274,3 @@ Version 1 is successful if:
 - The app recommends three useful tracks for a scenario.
 - The app avoids recently overplayed or cooled-down tracks.
 - The user can manage tags without feeling like every track requires tedious manual work.
-

@@ -1,5 +1,12 @@
 # V1.1 Cover Editing Acceptance
 
+Status: Accepted
+Last updated: 2026-06-09
+Canonical role: acceptance
+Related: `docs/TASKS/V1_1_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V1_1_TASKS.md`
+Decision: Accepted
+
 This document records the V1.1 cover-editing verification flow for Easy Music.
 Cover editing is an explicit owner-managed Web action: it replaces the stored
 track cover image, but does not regenerate playback audio or modify the

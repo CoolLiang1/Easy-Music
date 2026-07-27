@@ -1,5 +1,12 @@
 # V2 Import And Video Processing Acceptance
 
+Status: Accepted
+Last updated: 2026-07-01
+Canonical role: acceptance
+Related: `docs/TASKS/V2_IMPORT_AND_VIDEO_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V2_IMPORT_AND_VIDEO_TASKS.md`
+Decision: Accepted
+
 This document defines the acceptance path for two V2 Easy Music features:
 
 1. Automatic import tools.

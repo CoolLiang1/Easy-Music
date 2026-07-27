@@ -1,10 +1,23 @@
 # Phase 7 Deployment Hardening Acceptance
 
+Status: Accepted
+Last updated: 2026-07-27
+Canonical role: acceptance
+Related: `docs/TASKS/PHASE_7_TASKS.md`, `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/PHASE_7_TASKS.md`
+Decision: Accepted
+
 This document records the Phase 7 Deployment Hardening verification flow for
 Easy Music.  Phase 7 adds production deployment artifacts — Docker Compose,
 Caddy HTTPS configuration, host storage layout, database backups, structured
 logging, and health checks — on top of the accepted Phase 6 AI Assistant V1
 backend, Web, and Android flows.
+
+Historical scope note: the real-server smoke was outside this Phase 7
+acceptance and was deferred at the time. A later functional smoke is recorded
+as `Implemented`; its acceptance remains open because the exact Ubuntu release
+was not captured. See
+`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
 
 Do not mark Phase 7 accepted until the automated checks in Task 7.9 and the
 manual reviews of all production configuration artifacts below have been

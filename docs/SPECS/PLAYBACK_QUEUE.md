@@ -1,5 +1,10 @@
 # Playback Queue Design
 
+Status: Active
+Last updated: 2026-06-27
+Canonical role: specification
+Related: `docs/TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md`, `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`, `docs/ARCHITECTURE.md`
+
 This document records the intended Easy Music playback queue model. It is a
 product and architecture spec for future queue work, not a statement that all
 behavior below is already implemented.

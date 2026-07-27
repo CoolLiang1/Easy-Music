@@ -1,5 +1,12 @@
 # V2.5 AI Tag Suggestions V2 Acceptance
 
+Status: Accepted
+Last updated: 2026-06-29
+Canonical role: acceptance
+Related: `docs/TASKS/V2_5_AI_TAG_SUGGESTIONS_V2_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V2_5_AI_TAG_SUGGESTIONS_V2_TASKS.md`
+Decision: Accepted
+
 Date: 2026-06-29
 
 This document records acceptance for V2.5 AI Tag Suggestions V2: quality

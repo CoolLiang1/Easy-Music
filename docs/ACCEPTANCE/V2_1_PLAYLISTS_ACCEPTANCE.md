@@ -1,5 +1,16 @@
 # V2.1 Playlist Management Acceptance
 
+Status: Accepted
+Last updated: 2026-06-26
+Canonical role: acceptance
+Related: `docs/ACCEPTANCE/V2_1_PLAYBACK_QUEUE_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: None
+Decision: Accepted
+
+Legacy record note: this acceptance predates the task/acceptance-pair rule and
+has no dedicated task file. Its acceptance-to-acceptance link is historical,
+not a format to copy for new work.
+
 This document records acceptance for ordinary user-built playlists in Easy
 Music V2.1.
 

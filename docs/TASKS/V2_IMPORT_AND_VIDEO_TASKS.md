@@ -1,5 +1,11 @@
 # V2 Import And Video Processing Tasks
 
+Status: Accepted
+Last updated: 2026-06-11
+Canonical role: task
+Related: `docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md`
+
 This document plans two V2 priority features for Easy Music:
 
 1. Automatic import tools.

@@ -1,5 +1,11 @@
 # Phase 5 Recommendation V1 Tasks
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: task
+Related: `docs/ACCEPTANCE/PHASE_5_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/PHASE_5_ACCEPTANCE.md`
+
 This document splits Phase 5 into executable Recommendation V1 development
 tasks. Phase 5 starts from the accepted Phase 0/1 backend, accepted Phase 2 Web
 management console, accepted Phase 3 Android Media3 player, and accepted Phase
