@@ -154,6 +154,7 @@ queue state across devices.
 
 - Login
 - Recommendation home
+- Client-side Library title search with an explicit filter-mode toggle
 - Cloud playback
 - Playlist browsing and playback handoff
 - Local playback queue management with history/current/upcoming, playlist
@@ -188,7 +189,8 @@ Android should store:
 
 - Login
 - Audio upload
-- Library management
+- Library management, including client-side title search with an explicit
+  filter-mode toggle
 - Playlist management
 - Track editing
 - Tag management
@@ -580,8 +582,10 @@ does not let AI select tracks.
 - `PATCH /api/tracks/{id}`
 - `PUT /api/tracks/{id}/cover`
 - `GET /api/tracks/{id}/cover`
+- `POST /api/tracks/batch-delete`
 - `DELETE /api/tracks/{id}`
 - `GET /api/tracks/duplicates`
+- `POST /api/tracks/{id}/stream-url`
 - `GET /api/tracks/{id}/stream`
 - `GET /api/tracks/{id}/download-cache`
 
@@ -593,6 +597,7 @@ does not let AI select tracks.
 - `PATCH /api/playlists/{id}`
 - `DELETE /api/playlists/{id}`
 - `POST /api/playlists/{id}/tracks`
+- `POST /api/playlists/{id}/tracks/batch`
 - `DELETE /api/playlists/{id}/tracks/{track_id}`
 - `PUT /api/playlists/{id}/tracks/order`
 

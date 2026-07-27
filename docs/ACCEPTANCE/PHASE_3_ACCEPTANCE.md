@@ -1,5 +1,12 @@
 # Phase 3 Android Acceptance
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: acceptance
+Related: `docs/TASKS/PHASE_3_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/PHASE_3_TASKS.md`
+Decision: Accepted
+
 This document records the Phase 3 Android verification flow for Easy Music.
 Phase 3 uses only the accepted Phase 1 backend API:
 

@@ -116,7 +116,7 @@ def extract_audio_from_video(
     *,
     settings: Settings | None = None,
     runner: SubprocessRunner | None = None,
-    audio_bitrate: str = "192k",
+    audio_bitrate: str = "320k",
 ) -> None:
     active_settings = settings or get_settings()
     destination = Path(destination_path)
@@ -160,7 +160,7 @@ def generate_mp3_playback(
     *,
     settings: Settings | None = None,
     runner: SubprocessRunner | None = None,
-    audio_bitrate: str = "192k",
+    audio_bitrate: str = "320k",
 ) -> None:
     active_settings = settings or get_settings()
     destination = Path(destination_path)

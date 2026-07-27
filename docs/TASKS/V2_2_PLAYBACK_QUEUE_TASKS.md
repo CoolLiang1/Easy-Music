@@ -1,5 +1,11 @@
 # V2.2 Playback Queue Tasks
 
+Status: Implemented
+Last updated: 2026-07-27
+Canonical role: task
+Related: `docs/SPECS/PLAYBACK_QUEUE.md`, `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`
+
 This document turns `docs/SPECS/PLAYBACK_QUEUE.md` into executable work slices.
 
 V2.2 focuses on a first-class local playback queue module. It should not add a
@@ -512,3 +518,19 @@ Requirements:
   that could not be run.
 - Inspect the diff before finishing.
 ```
+
+## Documentation Impact
+
+- [x] Task status and completion notes reflect the pending regression smoke.
+- [x] Acceptance evidence and decision are synchronized.
+- [x] Roadmap status and next work are synchronized.
+- [x] English and Chinese README summaries are synchronized.
+- [ ] PRD / architecture / specification.
+- [ ] Development / environment / deployment / API testing.
+- [ ] `AGENTS.md` stable rules.
+
+N/A reasons:
+
+- The pending work verifies an existing Web playback regression fix; it does
+  not change product scope, architecture, API contracts, configuration,
+  deployment, or stable agent rules.

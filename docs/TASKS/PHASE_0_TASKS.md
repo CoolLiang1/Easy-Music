@@ -1,5 +1,11 @@
 # Phase 0 Development Tasks
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: task
+Related: `docs/ACCEPTANCE/PHASE_0_1_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/PHASE_0_1_ACCEPTANCE.md`
+
 ## Execution Principles
 
 - One Codex session should complete exactly one task.

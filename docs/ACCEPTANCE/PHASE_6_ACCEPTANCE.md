@@ -1,5 +1,12 @@
 # Phase 6 AI Assistant V1 Acceptance
 
+Status: Accepted
+Last updated: 2026-06-28
+Canonical role: acceptance
+Related: `docs/TASKS/PHASE_6_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/PHASE_6_TASKS.md`
+Decision: Accepted
+
 This document records the Phase 6 AI Assistant V1 verification flow for Easy
 Music. Phase 6 builds on the accepted Phase 5 structured recommendation request
 and rule-based ranking service. The LLM may parse intent, suggest tags, provide

@@ -1,5 +1,11 @@
 # Phase 4 Android Offline Cache Tasks
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: task
+Related: `docs/ACCEPTANCE/PHASE_4_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/PHASE_4_ACCEPTANCE.md`
+
 This document splits Phase 4 into executable Android Offline Cache development
 tasks. Phase 4 starts from the accepted Phase 0/1 backend, accepted Phase 2 Web
 management console, and accepted Phase 3 Android Player.

@@ -8,18 +8,22 @@ Media3 playback and offline cache, Recommendation V2 foundation, playlists,
 client playback queues, import/video processing, simplified tags, AI Assistant
 V1, and AI Tag Suggestions V2.
 
-Use `README.md` and `docs/ROADMAP.md` for the current progress record before
-starting work. Production deployment is covered separately in
-`docs/DEPLOYMENT.md`, and the first real Ubuntu/domain/HTTPS smoke should be
+Use `docs/ROADMAP.md` as the current progress and authorized-work source before
+starting. Use `docs/README.md` to determine which documentation owners a
+change must update. Production deployment is covered separately in
+`docs/DEPLOYMENT.md`; the first real Ubuntu/domain/HTTPS smoke is already
 recorded in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
 
 Production ML or training platforms, social features, automatic full-library
 offline sync, complex download queue management, and background caching of the
 entire library remain outside the current scope.
 
-The next planned work is UI optimization. Use
-`docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md` as the task entry point and keep UI
-changes scoped to existing flows unless a later task explicitly expands scope.
+The UI optimization work record is
+`docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`. Round 1 is `Implemented` and still
+needs the manual checks in
+`docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`. Any next slice must
+first be selected and registered in the roadmap; the general UI program is not
+authorization for a broad redesign.
 
 ## Workflow
 
@@ -27,8 +31,9 @@ changes scoped to existing flows unless a later task explicitly expands scope.
 2. Work on one documented task at a time.
 3. Keep changes inside the files and directories named by the current task.
 4. Do not implement later tasks early.
-5. Inspect `git diff` before committing.
-6. Commit completed tasks separately with a concise Conventional Commits
+5. Apply the documentation completion gate in `docs/README.md`.
+6. Run `pwsh -File scripts/check-docs.ps1` and inspect `git diff`.
+7. Commit completed tasks separately with a concise Conventional Commits
    message.
 
 ## Backend Setup
@@ -540,6 +545,11 @@ same local queue model through Media3 state and the Now Playing queue
 management surface. Queue remains process/page-local; there is no backend queue
 API and no cross-device queue sync.
 
+Web audio playback uses `POST /api/tracks/{track_id}/stream-url` to obtain a
+short-lived, track-scoped URL and then hands that URL directly to `<audio>`.
+This lets the browser issue normal streaming and Range requests instead of
+first reading the whole response into a Blob.
+
 V2.2 acceptance is recorded in
 `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`. Web automated checks and
 browser smoke are recorded as passed. Android automated checks and
@@ -641,24 +651,28 @@ backend:
    wait for lightweight polling while the track is processing, until the status
    becomes `ready`. Failed processing should show the backend processing error
    message when one is available.
-9. Select two or more tracks in Library, choose existing tags from the batch
+9. In Library, type part of a track title in the search field. With filter mode
+   off, confirm the full library remains visible; turn filter mode on and
+   confirm the visible rows update as the input changes, then turn it off again
+   and confirm the full library returns.
+10. Select two or more tracks in Library, choose existing tags from the batch
    tag panel, confirm adding and removing tags, and verify the affected rows
    update without changing unselected tracks.
-10. Open `Reports` and confirm the read-only organization sections load:
+11. Open `Reports` and confirm the read-only organization sections load:
     untagged ready tracks, missing metadata, processing attention, duplicate
     candidates, never played, rarely played, and expired cooldowns.
-11. Open the track detail page and edit title, artist, album, content type,
+12. Open the track detail page and edit title, artist, album, content type,
    source URL, liked state, cooldown date, cover image, and assigned tags as
    needed.
-12. Visit `Recommendations` and confirm the read-only Recently Revived section
+13. Visit `Recommendations` and confirm the read-only Recently Revived section
     loads quiet ready tracks, links to Track Detail, and does not auto-play,
     auto-cache, or modify feedback.
-13. Visit `Tags`, create a tag in one of the supported groups (`scene`,
+14. Visit `Tags`, create a tag in one of the supported groups (`scene`,
     `type`, `feature`), rename it, change its group, and delete one
     explicit tag.
-14. For a ready track, use the playback control from the library row or track
-    detail page and confirm audio loads through the authenticated stream
-    endpoint.
+15. For a ready track, use the playback control from the library row or track
+    detail page and confirm Web requests a short-lived stream URL and audio
+    loads through the stream endpoint.
 
 Expected result:
 
@@ -723,11 +737,11 @@ The test suite covers:
 
 - Auth login, invalid credentials, and current-user lookup.
 - Authenticated tag create, list, update, delete, validation, and ownership.
-- Authenticated track list, detail, update, delete, tag association, ownership,
-  and streaming behavior.
+- Authenticated track list, detail, update, delete, batch delete, tag
+  association, ownership, and streaming behavior.
 - Authenticated playlist CRUD, optional descriptions, ownership isolation,
-  add/remove, idempotent duplicate add, reorder validation, track-delete
-  relationship cleanup, and playlist signal isolation.
+  add/batch add/remove, idempotent duplicate add, reorder validation,
+  track-delete relationship cleanup, and playlist signal isolation.
 - Authenticated playback-event bulk sync, validation, ownership, and duplicate
   retry behavior.
 - Authenticated feedback-event sync, context tag validation, `like`, `dislike`,
@@ -839,14 +853,18 @@ Phase 1 backend:
    emulator host-loopback URL is usually `http://10.0.2.2:8000`.
 8. Log in with the local user and confirm Library loads tracks from
    `GET /api/tracks`.
-9. Open a track detail screen and confirm fresh metadata loads from
+9. In Library, type part of a track title in the search field. With filter mode
+   off, confirm the full library remains visible; turn filter mode on and
+   confirm the visible rows update as the input changes, then turn it off again
+   and confirm the full library returns.
+10. Open a track detail screen and confirm fresh metadata loads from
    `GET /api/tracks/{track_id}`.
-10. Play a `ready` track and confirm streaming uses
+11. Play a `ready` track and confirm streaming uses
     `GET /api/tracks/{track_id}/stream` with bearer authentication.
-11. Confirm foreground controls, mini player state, background playback,
+12. Confirm foreground controls, mini player state, background playback,
     notification controls, lock screen controls, and headset/media-button
     play-pause behavior.
-12. Record the emulator or device result in `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`.
+13. Record the emulator or device result in `docs/ACCEPTANCE/PHASE_3_ACCEPTANCE.md`.
 
 Phase 3 acceptance must not be marked complete without an actual emulator or
 device playback run. Offline cache, recommendation, AI Assistant, playback

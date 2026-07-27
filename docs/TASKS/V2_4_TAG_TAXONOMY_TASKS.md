@@ -1,5 +1,11 @@
 # V2.4 Tag Taxonomy Simplification Tasks
 
+Status: Accepted
+Last updated: 2026-06-28
+Canonical role: task
+Related: `docs/ACCEPTANCE/V2_4_TAG_TAXONOMY_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/V2_4_TAG_TAXONOMY_ACCEPTANCE.md`
+
 Date: 2026-06-28
 
 ## Goal
@@ -46,4 +52,3 @@ Simplify Easy Music tag categories to three user-facing groups:
 - Playback queue, playlist behavior, upload flow, track deletion, or unrelated
   media processing changes.
 - Any cleanup beyond old `attribute` tags and their `track_tags` links.
-

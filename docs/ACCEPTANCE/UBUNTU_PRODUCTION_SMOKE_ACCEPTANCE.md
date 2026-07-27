@@ -1,6 +1,14 @@
-# Ubuntu Production Smoke Acceptance
+# Ubuntu Production Smoke Record
 
-Date: 2026-06-30
+Status: Implemented
+Last updated: 2026-07-27
+Canonical role: acceptance
+Related: `docs/DEPLOYMENT.md`, `docs/ROADMAP.md`
+Pair: None
+Decision: Implemented
+
+Operational record note: this infrastructure smoke has no implementation task
+pair. Its open status is registered directly in `docs/ROADMAP.md`.
 
 This document records the first real Ubuntu production deployment smoke test.
 It is intentionally separate from local Phase 7 acceptance because it requires
@@ -13,9 +21,13 @@ Status as of 2026-06-30:
 
 - Repository deployment artifacts exist.
 - Local/static Phase 7 deployment verification is accepted.
-- The first real Ubuntu production smoke has been recorded.
+- The first real Ubuntu production functional smoke has been recorded.
 - The deployment used a DNS-validated certificate and a non-standard HTTPS
   port because the operator's upstream campus network blocked inbound 80/443.
+- The run validates the recorded `develop` revision, not a later `main` build.
+- The exact Ubuntu release was not captured, so this record is `Implemented`,
+  not `Accepted`: it proves an Ubuntu deployment but not the documented
+  22.04/24.04 version constraint.
 
 ## Required Environment
 
@@ -31,6 +43,8 @@ Status as of 2026-06-30:
 ## Smoke Checklist
 
 - [x] Repository checkout is on the intended deployment branch.
+- [ ] The Ubuntu release is recorded and confirmed as 22.04 LTS or 24.04 LTS.
+  It was not captured for this run.
 - [x] `.env.production` is created from `.env.production.example` and all
   placeholders are replaced.
 - [x] `deploy/setup-host.sh` has prepared media, temp video, PostgreSQL, and
@@ -40,9 +54,9 @@ Status as of 2026-06-30:
   `VITE_API_BASE_URL` set to the public HTTPS origin.
 - [x] Production services build and start.
 - [x] Alembic migrations are applied to the production database.
-- [x] Caddy obtains a valid HTTPS certificate for the configured domain.
-- [x] If non-standard HTTPS is required, Caddy serves a DNS-validated
-  operator-provided certificate on the documented public port.
+- [x] The applicable certificate path works: standard-port Caddy issuance was
+  not exercised because inbound 80/443 were blocked; on the selected high-port
+  path, Caddy serves a DNS-validated operator-provided certificate.
 - [x] `/health` returns healthy status over HTTPS.
 - [x] Initial user creation succeeds, or an existing admin user is confirmed.
 - [x] Web login works over HTTPS.
@@ -96,3 +110,12 @@ First production run:
 - Follow-up tasks: document certificate renewal expectations for the chosen
   DNS validation flow and decide whether high-port HTTPS remains the intended
   production access pattern.
+
+## Acceptance Decision
+
+Current decision: `Implemented`, not `Accepted`.
+
+The functional deployment smoke passed, but the exact Ubuntu release was not
+captured and the run used `develop`. Repeat or verify the smoke on a recorded
+supported Ubuntu release before promoting the roadmap and public summaries to
+`Accepted`. A later `main` deployment requires its own smoke evidence.

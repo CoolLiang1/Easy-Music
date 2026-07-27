@@ -1,5 +1,12 @@
 # V1.1 Duplicate Detection Acceptance
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: acceptance
+Related: `docs/TASKS/V1_1_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V1_1_TASKS.md`
+Decision: Accepted
+
 This document records the V1.1 duplicate-detection verification flow for Easy
 Music. Duplicate detection is advisory only: it can show exact and likely
 duplicate candidates, but it must not delete, merge, overwrite, hide, or modify

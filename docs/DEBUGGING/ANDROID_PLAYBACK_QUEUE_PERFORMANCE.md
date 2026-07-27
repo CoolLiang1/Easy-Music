@@ -1,5 +1,10 @@
 # Android Playback Queue Performance Incident
 
+Status: Resolved
+Last updated: 2026-06-27
+Canonical role: incident
+Related: `docs/SPECS/PLAYBACK_QUEUE.md`, `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`
+
 Date: 2026-06-27
 
 This note records a real Android performance regression found after V2.2

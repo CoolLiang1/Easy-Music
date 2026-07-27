@@ -641,6 +641,18 @@ Invoke-RestMethod `
   -Body (@{ track_id = $trackId } | ConvertTo-Json)
 ```
 
+Batch add selected owned tracks. Duplicates and tracks already in the playlist
+are idempotent and should not create duplicate playlist items:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/playlists/$($playlist.id)/tracks/batch" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ track_ids = @($trackId, $secondTrackId, $trackId) } | ConvertTo-Json)
+```
+
 Reorder tracks by sending exactly the current playlist track ids:
 
 ```powershell
@@ -674,6 +686,8 @@ Expected result:
 
 - List/detail/update/delete are current-user scoped.
 - Adding another user's track returns `404 Not Found`.
+- Batch adding another user's track returns `404 Not Found` without partially
+  adding valid tracks from the same request.
 - Accessing another user's playlist returns `404 Not Found`.
 - Reorder rejects duplicate ids or ids that are not exactly the current
   playlist membership.
@@ -776,12 +790,31 @@ curl.exe `
   "http://127.0.0.1:8000/api/tracks/$trackId/stream"
 ```
 
+Verify the short-lived Web stream URL path:
+
+```powershell
+$streamUrlResponse = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/tracks/$trackId/stream-url" `
+  -Headers $headers
+
+curl.exe `
+  -i `
+  -H "Range: bytes=0-99" `
+  "http://127.0.0.1:8000$($streamUrlResponse.stream_url)"
+```
+
 Expected result:
 
 - Full stream returns `200 OK`.
 - Range stream returns `206 Partial Content`.
 - Response includes `Accept-Ranges: bytes`.
-- Invalid or missing auth returns `401 Unauthorized`.
+- `POST /api/tracks/{track_id}/stream-url` requires bearer auth and returns a
+  short-lived, track-scoped URL for browser `<audio>` playback.
+- The returned stream URL works without an `Authorization` header until it
+  expires, including Range requests.
+- Invalid or missing auth on bearer-only requests, or an invalid stream URL
+  token, returns `401 Unauthorized`.
 
 ## Delete One Track
 
@@ -811,11 +844,52 @@ Expected result:
 - Related track tags, playback events, feedback events, and processing jobs for
   the deleted track are removed.
 - Stored media files referenced by that track are deleted one explicit file at
-  a time after path validation; no directory or recursive cleanup is performed.
+  a time after path validation; no recursive cleanup is performed.
+- After referenced files are deleted, empty `track-{id}` media directories are
+  removed with non-recursive empty-directory cleanup. Non-empty directories are
+  kept and the backend logs the reason.
 - If a stored media file cannot be deleted, the endpoint returns an error with
   a clear `detail` message instead of reporting a successful delete.
 - A missing token returns `401 Unauthorized`.
 - A track owned by another user returns `404 Not Found`.
+
+### Batch Delete Selected Tracks
+
+```powershell
+$batchDeleteFirst = curl.exe `
+  -s `
+  -X POST `
+  -H "Authorization: Bearer $token" `
+  -F "file=@test-tone.wav;type=audio/wav" `
+  "http://127.0.0.1:8000/api/tracks/upload" | ConvertFrom-Json
+
+$batchDeleteSecond = curl.exe `
+  -s `
+  -X POST `
+  -H "Authorization: Bearer $token" `
+  -F "file=@test-tone.wav;type=audio/wav" `
+  "http://127.0.0.1:8000/api/tracks/upload" | ConvertFrom-Json
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/tracks/batch-delete" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{
+    track_ids = @($batchDeleteFirst.id, $batchDeleteSecond.id)
+  } | ConvertTo-Json)
+```
+
+Expected result:
+
+- The response reports `requested_track_count = 2`, `deleted_count = 2`, and
+  per-track `deleted` results.
+- Each deleted track returns `404 Not Found` from `GET /api/tracks/{id}`.
+- Stored media file deletion, empty `track-{id}` directory cleanup,
+  relationship cleanup, current-user scoping, and media deletion errors follow
+  the same behavior as single-track delete.
+- Empty `track_ids` returns `400 Bad Request`.
+- A missing token returns `401 Unauthorized`.
 
 ## Sync Playback Events
 
@@ -1672,6 +1746,8 @@ docker compose up -d worker-loop
 7. Run `docker compose run --rm worker`, or keep `worker-loop` running.
 8. Fetch `GET /api/tracks/$trackId` until `status` is `ready`.
 9. Call `GET /api/tracks/$trackId/stream` with the bearer token.
+10. Call `POST /api/tracks/$trackId/stream-url` with the bearer token, then
+    request the returned URL with a `Range` header.
 
 Expected result:
 
@@ -1680,6 +1756,8 @@ Expected result:
 - Track becomes `ready`.
 - Stream endpoint returns `200 OK` for full playback and `206 Partial Content`
   for Range requests.
+- The short-lived stream URL path also returns `206 Partial Content` for Range
+  requests without requiring the browser audio element to send auth headers.
 
 ## Phase 2 Web Browser Smoke Test
 
@@ -1711,27 +1789,32 @@ Open the Vite URL in a browser, usually `http://127.0.0.1:8081/`, then verify:
 1. Log in with the local initial user.
 2. Open `Library` and confirm the track list loads, including empty, processing,
    failed, or ready states depending on local data.
-3. Open `Upload`, select an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
+3. In `Library`, type part of a track title in the search field. With filter
+   mode off, confirm the full library remains visible; turn filter mode on and
+   confirm the visible rows update as the input changes, then turn it off again
+   and confirm the full library returns.
+4. Open `Upload`, select an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
    page shows the created track and initial processing status.
-4. Run `docker compose run --rm worker` once, or run
+5. Run `docker compose run --rm worker` once, or run
    `docker compose up -d worker-loop`, to process pending tracks.
-5. Return to `Library` or the uploaded track detail page and confirm the status
+6. Return to `Library` or the uploaded track detail page and confirm the status
    becomes `ready` after refresh or polling.
-6. Open the track detail page, edit metadata, save it, refresh, and confirm the
+7. Open the track detail page, edit metadata, save it, refresh, and confirm the
    saved values are still shown.
-7. Open `Tags`, create a tag using only `scene`, `type`, or `feature`, rename
+8. Open `Tags`, create a tag using only `scene`, `type`, or `feature`, rename
    it, change its group, and delete one explicit tag.
-8. On the track detail page, assign and remove existing tags, save, refresh, and
+9. On the track detail page, assign and remove existing tags, save, refresh, and
    confirm the associations persist.
-9. On a ready track, use the browser playback control from the library or detail
-   page and confirm audio plays through the authenticated stream endpoint.
+10. On a ready track, use the browser playback control from the library or detail
+   page and confirm Web obtains a short-lived stream URL and audio starts
+   playing through the stream endpoint.
 
 Expected Web result:
 
 - Protected pages redirect unauthenticated users to login.
 - Refreshing the browser preserves a valid session.
 - Upload, processing refresh, metadata edits, tag CRUD, track tag assignment,
-  and ready-track playback all work without adding any backend endpoints.
+  and ready-track playback all work through the documented backend endpoints.
 - Non-ready tracks remain visible but cannot be played.
 
 ## Automated Regression Check

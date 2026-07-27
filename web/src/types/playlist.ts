@@ -33,6 +33,10 @@ export type PlaylistTrackAdd = {
   track_id: number;
 };
 
+export type PlaylistTracksAdd = {
+  track_ids: number[];
+};
+
 export type PlaylistReorder = {
   track_ids: number[];
 };

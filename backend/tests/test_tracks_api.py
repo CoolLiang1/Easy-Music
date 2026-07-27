@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 
 import pytest
@@ -399,6 +400,141 @@ def test_batch_tag_update_requires_selection_and_tag_action(
     )
 
 
+def test_batch_delete_tracks_removes_selected_tracks_and_media_files(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    tag = create_tag(db_session, user)
+
+    for track in (first, second):
+        track.original_file_path = f"originals/user-{user.id}/track-{track.id}/track.mp3"
+        track.playback_file_path = f"playback/user-{user.id}/track-{track.id}/playback.mp3"
+        track.cover_path = f"covers/user-{user.id}/track-{track.id}/cover.jpg"
+        db_session.add(TrackTag(track_id=track.id, tag_id=tag.id))
+        db_session.add(ProcessingJob(track_id=track.id, status="pending"))
+    db_session.commit()
+    db_session.refresh(first)
+    db_session.refresh(second)
+    first_id = first.id
+    second_id = second.id
+
+    media_paths = [
+        tmp_path / track_path
+        for track in (first, second)
+        for track_path in (
+            track.original_file_path,
+            track.playback_file_path,
+            track.cover_path,
+        )
+        if track_path is not None
+    ]
+    media_dirs = [media_path.parent for media_path in media_paths]
+    for media_path in media_paths:
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        media_path.write_bytes(b"media")
+
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": [first_id, second_id, first_id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 2
+    assert body["deleted_count"] == 2
+    assert body["results"] == [
+        {"track_id": first_id, "status": "deleted", "error": None},
+        {"track_id": second_id, "status": "deleted", "error": None},
+    ]
+    assert db_session.get(Track, first_id) is None
+    assert db_session.get(Track, second_id) is None
+    assert (
+        db_session.query(TrackTag)
+        .filter(TrackTag.track_id.in_([first_id, second_id]))
+        .count()
+        == 0
+    )
+    assert (
+        db_session.query(ProcessingJob)
+        .filter(ProcessingJob.track_id.in_([first_id, second_id]))
+        .count()
+        == 0
+    )
+    for media_path in media_paths:
+        assert not media_path.exists()
+    for media_dir in media_dirs:
+        assert not media_dir.exists()
+
+
+def test_batch_delete_tracks_is_scoped_to_current_user(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    owner = create_user(db_session)
+    other_user = create_user(db_session, username="other")
+    owner_track = create_track(db_session, owner, title="Owner")
+    other_track = create_track(db_session, other_user, title="Hidden")
+    owner_track_id = owner_track.id
+    other_track_id = other_track.id
+    missing_track_id = other_track_id + 100
+
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": [owner_track_id, other_track_id, missing_track_id]},
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_track_count"] == 3
+    assert body["deleted_count"] == 1
+    assert body["results"] == [
+        {"track_id": owner_track_id, "status": "deleted", "error": None},
+        {
+            "track_id": other_track_id,
+            "status": "failed",
+            "error": "Track not found for current user.",
+        },
+        {
+            "track_id": missing_track_id,
+            "status": "failed",
+            "error": "Track not found for current user.",
+        },
+    ]
+    assert db_session.get(Track, owner_track_id) is None
+    assert db_session.get(Track, other_track_id) is not None
+
+
+def test_batch_delete_tracks_requires_authentication(client: TestClient) -> None:
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": [1]},
+    )
+
+    assert response.status_code == 401
+
+
+def test_batch_delete_tracks_requires_selection(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+
+    response = client.post(
+        "/api/tracks/batch-delete",
+        json={"track_ids": []},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Choose at least one track."
+
+
 def test_delete_track(client: TestClient, db_session: Session) -> None:
     user = create_user(db_session)
     track = create_track(db_session, user)
@@ -474,6 +610,66 @@ def test_delete_track_removes_related_rows_and_media_files(
     assert db_session.query(ProcessingJob).filter_by(track_id=track_id).count() == 0
     for media_path in media_paths:
         assert not media_path.exists()
+
+
+def test_delete_track_removes_empty_track_media_directories(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.original_file_path = f"originals/user-{user.id}/track-{track.id}/track.mp3"
+    track.playback_file_path = f"playback/user-{user.id}/track-{track.id}/playback.mp3"
+    track.cover_path = f"covers/user-{user.id}/track-{track.id}/cover.jpg"
+    db_session.commit()
+    db_session.refresh(track)
+
+    media_paths = [
+        tmp_path / track.original_file_path,
+        tmp_path / track.playback_file_path,
+        tmp_path / track.cover_path,
+    ]
+    media_dirs = [media_path.parent for media_path in media_paths]
+    for media_path in media_paths:
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        media_path.write_bytes(b"media")
+
+    response = client.delete(f"/api/tracks/{track.id}", headers=auth_headers(user))
+
+    assert response.status_code == 204
+    for media_path in media_paths:
+        assert not media_path.exists()
+    for media_dir in media_dirs:
+        assert not media_dir.exists()
+
+
+def test_delete_track_keeps_non_empty_track_media_directory_and_logs_reason(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.original_file_path = f"originals/user-{user.id}/track-{track.id}/track.mp3"
+    db_session.commit()
+    db_session.refresh(track)
+
+    original_path = tmp_path / track.original_file_path
+    original_path.parent.mkdir(parents=True, exist_ok=True)
+    original_path.write_bytes(b"media")
+    sibling_path = original_path.parent / "keep.txt"
+    sibling_path.write_text("do not delete")
+
+    with caplog.at_level(logging.INFO, logger="app.services.tracks"):
+        response = client.delete(f"/api/tracks/{track.id}", headers=auth_headers(user))
+
+    assert response.status_code == 204
+    assert not original_path.exists()
+    assert sibling_path.read_text() == "do not delete"
+    assert original_path.parent.exists()
+    assert "directory is not empty" in caplog.text
 
 
 def test_delete_track_reports_media_file_failure(
@@ -608,6 +804,101 @@ def test_stream_track_supports_range_requests(
     assert response.headers["content-range"] == "bytes 2-5/10"
     assert response.headers["content-length"] == "4"
     assert response.content == b"2345"
+
+
+def test_create_stream_url_returns_track_bound_stream_url(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    playback_path = tmp_path / track.playback_file_path
+    playback_path.parent.mkdir(parents=True)
+    playback_path.write_bytes(b"0123456789")
+
+    url_response = client.post(
+        f"/api/tracks/{track.id}/stream-url",
+        headers=auth_headers(user),
+    )
+
+    assert url_response.status_code == 200
+    body = url_response.json()
+    assert body["stream_url"].startswith(f"/api/tracks/{track.id}/stream?token=")
+    assert isinstance(body["expires_at"], int)
+
+    stream_response = client.get(
+        body["stream_url"],
+        headers={"Range": "bytes=2-5"},
+    )
+
+    assert stream_response.status_code == 206
+    assert stream_response.headers["content-range"] == "bytes 2-5/10"
+    assert stream_response.content == b"2345"
+
+
+def test_stream_url_requires_authentication(client: TestClient, db_session: Session) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.post(f"/api/tracks/{track.id}/stream-url")
+
+    assert response.status_code == 401
+
+
+def test_stream_url_rejects_non_ready_track(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    track.status = "processing"
+    db_session.commit()
+
+    response = client.post(
+        f"/api/tracks/{track.id}/stream-url",
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 404
+
+
+def test_track_stream_token_cannot_stream_another_track(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    first = create_track(db_session, user, title="First")
+    second = create_track(db_session, user, title="Second")
+    first_path = tmp_path / first.playback_file_path
+    second_path = tmp_path / second.playback_file_path
+    first_path.parent.mkdir(parents=True, exist_ok=True)
+    second_path.parent.mkdir(parents=True, exist_ok=True)
+    first_path.write_bytes(b"first")
+    second_path.write_bytes(b"second")
+
+    url_response = client.post(
+        f"/api/tracks/{first.id}/stream-url",
+        headers=auth_headers(user),
+    )
+    token = url_response.json()["stream_url"].split("token=", maxsplit=1)[1]
+
+    response = client.get(f"/api/tracks/{second.id}/stream?token={token}")
+
+    assert response.status_code == 401
+
+
+def test_stream_track_rejects_invalid_query_token(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+
+    response = client.get(f"/api/tracks/{track.id}/stream?token=not-a-token")
+
+    assert response.status_code == 401
 
 
 def test_stream_track_rejects_invalid_range(

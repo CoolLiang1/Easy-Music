@@ -14,24 +14,33 @@ optional AI-assisted tag suggestions.
 
 ## Status
 
-Current status as of 2026-06-30:
+The canonical status register is
+[docs/ROADMAP.md](docs/ROADMAP.md). This public summary was synchronized from
+it on 2026-07-27.
+
+<!-- status-snapshot: 2026-07-27 -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented -->
 
 - MVP Phase 0 through Phase 7 are implemented and locally accepted.
 - V1.1 workflow improvements, duplicate detection, cover editing, advanced
   recommendation explanations, revived tracks, reports, and Android shortcuts
   are implemented and accepted.
-- V2 import/video, playlists, client playback queues, Recommendation V2
-  foundation, simplified tags, and AI Tag Suggestions V2 are implemented.
-- The first real Ubuntu/domain/HTTPS production smoke test is recorded as
-  passed in
-  [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md).
-- The next planned product work is UI optimization across the existing Web and
-  Android flows.
+- V2 import/video, playlists, Recommendation V2 foundation, simplified tags,
+  and AI Tag Suggestions V2 are implemented and accepted.
+- V2.2 client playback queues are implemented; targeted Web manual regression
+  checks remain after later playback-control fixes.
+- The first real Ubuntu/domain/HTTPS functional smoke passed on `develop`, but
+  remains `Implemented` rather than `Accepted` because the exact Ubuntu release
+  was not recorded. See
+  [the production smoke record](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md).
+- Web and Android UI optimization round 1 is implemented and passed automated
+  gates; manual visual/flow acceptance is still unrecorded. No later focused
+  slice has been selected.
 
 ## Features
 
 - Authenticated personal music library.
-- Audio upload for MP3, FLAC, M4A, WAV, and OGG files.
+- Audio upload for MP3, FLAC, M4A, WAV, OGG, and AAC files.
 - Optional user-provided video-to-audio extraction.
 - Safe server-side import preview and confirmed import from configured roots.
 - Background worker for metadata extraction, playback media generation, cover
@@ -215,11 +224,9 @@ used by the server, browse the library, and play a `ready` track.
 
 ## Production Deployment Summary
 
-The full production guide is
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Use this README section only as a
-command overview.
-
-Production rules:
+The canonical production and operations procedure is
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Follow it rather than copying commands
+from this overview.
 
 - Never commit `.env.production`.
 - Never commit real domains, passwords, API keys, bearer tokens, or private
@@ -227,128 +234,11 @@ Production rules:
 - Build the Web app with `VITE_API_BASE_URL` set to the public HTTPS origin.
 - For Android production APKs, pass the public API origin through
   `-PeasyMusicApiBaseUrl=...`.
-- Use DNS-validated certificates and `deploy/Caddyfile.manual-cert` when
-  inbound 80/443 are blocked and a high HTTPS port is required.
-
-Typical Ubuntu deployment flow:
-
-```bash
-cd /srv/easy-music/repo
-if [ ! -f .env.production ]; then cp .env.production.example .env.production; fi
-nano .env.production
-
-chmod +x deploy/setup-host.sh deploy/backup-db.sh
-sudo ./deploy/setup-host.sh
-
-cd web
-export VITE_API_BASE_URL="https://music.example.com"
-export VITE_MAX_VIDEO_UPLOAD_MB="1024"
-npm ci
-npm run build
-cd ..
-
-docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
-docker compose -f docker-compose.prod.yml --env-file .env.production build
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic upgrade head
-docker compose -f docker-compose.prod.yml --env-file .env.production ps
-curl -sS https://music.example.com/health
-```
-
-Create the first production user only once:
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  exec -e EASY_MUSIC_INITIAL_PASSWORD='your-admin-password-at-least-12-chars' \
-  api python -m app.auth.initial_user --username admin
-```
-
-For a non-standard HTTPS port, configure `.env.production` with the matching
-origin and rebuild Web:
-
-```env
-CORS_ORIGINS=https://music.example.com:25443
-VITE_API_BASE_URL=https://music.example.com:25443
-CADDY_DOMAIN=music.example.com
-CADDY_HTTPS_PORT=25443
-CADDYFILE_PATH=./deploy/Caddyfile.manual-cert
-CADDY_CERT_DIR=/srv/easy-music/caddy-certs
-```
-
-## Operations Commands
-
-Run production commands from the repository root on the server:
-
-```bash
-cd /srv/easy-music/repo
-```
-
-Service status:
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production ps
-```
-
-Follow all logs or one service:
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production logs -f
-docker compose -f docker-compose.prod.yml --env-file .env.production logs -f api
-docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 worker
-docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 caddy
-```
-
-Restart services:
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production restart api
-docker compose -f docker-compose.prod.yml --env-file .env.production restart worker
-docker compose -f docker-compose.prod.yml --env-file .env.production restart caddy
-```
-
-Apply migrations:
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic upgrade head
-```
-
-Back up the database:
-
-```bash
-./deploy/backup-db.sh /srv/easy-music/backups
-ls -lh /srv/easy-music/backups
-```
-
-Update a production deployment:
-
-```bash
-cd /srv/easy-music/repo
-./deploy/backup-db.sh /srv/easy-music/backups
-git pull --ff-only origin main
-
-cd web
-export VITE_API_BASE_URL="https://music.example.com"
-export VITE_MAX_VIDEO_UPLOAD_MB="1024"
-npm ci
-npm run build
-cd ..
-
-docker compose -f docker-compose.prod.yml --env-file .env.production build
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic upgrade head
-docker compose -f docker-compose.prod.yml --env-file .env.production ps
-```
-
-If you deploy from `develop` for pre-production, replace `main` with `develop`
-in the pull command.
-
-Health and disk checks:
-
-```bash
-curl -sS https://music.example.com/health
-df -h /srv/easy-music
-du -sh /srv/easy-music/media /srv/easy-music/postgres /srv/easy-music/backups
-```
+- Use standard automatic HTTPS when public 80/443 are available. Otherwise
+  follow the documented high-port/DNS-certificate path.
+- Verify Compose configuration, migrations, HTTPS health, login,
+  upload/processing/playback, logs, and backup creation for every new
+  environment.
 
 ## Verification
 
@@ -383,6 +273,7 @@ host setup, backup scripts, and `docs/DEPLOYMENT.md`.
 
 Start here:
 
+- [Documentation Guide and Update Rules](docs/README.md)
 - [Product Requirements](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
@@ -391,11 +282,12 @@ Start here:
 - [Production Deployment](docs/DEPLOYMENT.md)
 - [API Manual Testing](docs/API_MANUAL_TESTING.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
-- [Ubuntu Production Smoke Acceptance](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
-- [Next UI Optimization Tasks](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
+- [Ubuntu Production Smoke Record](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
+- [UI Optimization Work Record](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
 
-Historical acceptance records live under `docs/ACCEPTANCE/`, and task records
-live under `docs/TASKS/`.
+Acceptance evidence lives under `docs/ACCEPTANCE/`, and task plans and
+completion notes live under `docs/TASKS/`. Neither directory replaces the
+roadmap as the current status source.
 
 ## Security and Secrets
 

@@ -1,5 +1,12 @@
 # Phase 4 Android Offline Cache Acceptance
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: acceptance
+Related: `docs/TASKS/PHASE_4_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/PHASE_4_TASKS.md`
+Decision: Accepted
+
 This document records the Phase 4 Android Offline Cache verification flow for
 Easy Music. Phase 4 builds on the accepted Phase 3 Android Media3 playback
 architecture and adds manual single-track offline cache behavior around the

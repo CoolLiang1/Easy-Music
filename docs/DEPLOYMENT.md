@@ -4,10 +4,13 @@ This guide deploys Easy Music on a fresh Ubuntu server with Docker Compose and
 HTTPS. Replace placeholder values such as `music.example.com` with your real
 domain and never commit production secrets.
 
-The repository has local/static deployment acceptance through Phase 7. The
-first real Ubuntu/domain/HTTPS production smoke is still an operator-run
-verification step. Record that result in
-`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
+The repository has local/static deployment acceptance through Phase 7. A first
+real Ubuntu/domain/HTTPS functional smoke is recorded in
+`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`. That run used
+`develop`, a DNS-validated certificate, and a non-standard HTTPS port, but did
+not capture the exact Ubuntu release; its status therefore remains
+`Implemented`, not `Accepted`. Each new production environment still requires
+its own smoke verification.
 
 ## Deployment Readiness Summary
 
@@ -16,7 +19,9 @@ Before starting a production deployment, confirm:
 - The target branch contains the latest migrations and deployment artifacts.
 - `.env.production` exists only on the server and contains no placeholders.
 - The domain resolves to the Ubuntu server public IP.
-- Ports 80 and 443 are reachable from the internet.
+- Either ports 80 and 443 are reachable for standard automatic HTTPS, or the
+  documented high-port path has a DNS-validated certificate and a reachable
+  public HTTPS port.
 - Host media, temp video, PostgreSQL, and backup directories have been created
   with `deploy/setup-host.sh`.
 - The Web production build has been generated with `VITE_API_BASE_URL` set to
@@ -31,11 +36,11 @@ Before starting a production deployment, confirm:
 - Docker Engine and the Docker Compose plugin installed.
 - Git, curl, ca-certificates, openssl, and dnsutils installed.
 - A public domain whose DNS A record points to the server public IP.
-- Inbound TCP ports 80 and 443 open in the host firewall and cloud security
-  group.
-- If the upstream network blocks inbound 80/443 but allows a high port, an
-  operator-provided certificate from DNS validation can be used with
-  `deploy/Caddyfile.manual-cert` and a public HTTPS URL such as
+- For standard automatic HTTPS, inbound TCP 80 and 443 are open in the host
+  firewall and cloud security group.
+- Alternatively, if the upstream network blocks inbound 80/443, a reachable
+  high port and an operator-provided DNS-validated certificate are available
+  for `deploy/Caddyfile.manual-cert`, using a public URL such as
   `https://music.example.com:25443`.
 - At least 2 GB free disk space for a small test deployment. Use much more for
   a real music library.
@@ -197,9 +202,9 @@ Rules:
 - Leave `IMPORT_ALLOWED_ROOTS` empty unless you have created dedicated import
   directories and mounted them into the containers. Do not point it at `/`,
   `/home`, the repository checkout, or `/app/media`.
-- Keep scan limits conservative for the first deployment. The scan endpoint is
-  read-only and reports supported audio candidates plus skipped files; confirmed
-  import remains a later V2 flow.
+- Keep scan limits conservative for the first deployment. Preview scanning is
+  read-only; confirmed import creates managed copies without moving, renaming,
+  deleting, or modifying source files.
 - Keep `MAX_UPLOAD_MB` compatible with `CADDY_AUDIO_UPLOAD_LIMIT` for normal
   audio uploads.
 - Keep `MAX_VIDEO_UPLOAD_MB` compatible with `CADDY_VIDEO_UPLOAD_LIMIT` if
@@ -244,9 +249,10 @@ Expected ownership:
   `deploy/backup-db.sh` can write compressed dumps from the host.
 
 Optional import directories are not created by `deploy/setup-host.sh` and are
-not enabled by default. If a later V2 import task is enabled in production,
-create dedicated host directories such as `/srv/easy-music/imports/library-a`,
-mount them read-only into both `api` and `worker`, and set
+not enabled by default. If the implemented import feature is enabled in
+production, create dedicated host directories such as
+`/srv/easy-music/imports/library-a`, mount them read-only into both `api` and
+`worker`, and set
 `IMPORT_ALLOWED_ROOTS` to the matching container paths such as
 `/app/imports/library-a`. Keep those directories separate from
 `/srv/easy-music/media`, the repository checkout, and user home roots.
@@ -345,8 +351,9 @@ dig +short music.example.com
 sudo ufw status
 ```
 
-The domain must resolve to the server public IP, and ports 80 and 443 must be
-reachable from the internet.
+For standard automatic HTTPS, the domain must resolve to the server public IP
+and ports 80 and 443 must be reachable. For the documented high-port mode,
+verify the selected public port and provided certificate instead.
 
 ### Alternative: Non-Standard HTTPS Port With DNS-Validated Certificate
 

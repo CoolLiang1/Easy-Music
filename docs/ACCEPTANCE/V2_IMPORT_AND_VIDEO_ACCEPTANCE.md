@@ -1,5 +1,12 @@
 # V2 Import And Video Processing Acceptance
 
+Status: Accepted
+Last updated: 2026-07-01
+Canonical role: acceptance
+Related: `docs/TASKS/V2_IMPORT_AND_VIDEO_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V2_IMPORT_AND_VIDEO_TASKS.md`
+Decision: Accepted
+
 This document defines the acceptance path for two V2 Easy Music features:
 
 1. Automatic import tools.
@@ -743,7 +750,7 @@ Implemented:
   types. FIFO ordering by `created_at` then `id` is preserved.
 - Added `extract_audio_from_video` helper in `backend/app/media/ffmpeg.py`.
   Uses `-vn` argument array (never shell string) to drop video streams and
-  extract audio via `libmp3lame` at a configurable bitrate defaulting to 192k.
+  extract audio via `libmp3lame` at a configurable bitrate defaulting to 320k.
 - Added `_process_video_extraction_job` in `backend/app/worker/jobs.py`:
   - Resolves `job.source_path` through `MediaStorage.stored_media_path` with
     path-safety enforcement.

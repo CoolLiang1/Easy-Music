@@ -1,5 +1,11 @@
 # Phase 6 AI Assistant V1 Tasks
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: task
+Related: `docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md`, `docs/ROADMAP.md`
+Pair: `docs/ACCEPTANCE/PHASE_6_ACCEPTANCE.md`
+
 This document splits Phase 6 into executable AI Assistant V1 development tasks.
 Phase 6 starts from the accepted Phase 5 Recommendation V1 backend, Web, and
 Android flows.

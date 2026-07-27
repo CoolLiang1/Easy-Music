@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 
-import { addPlaylistTrack, listPlaylists } from "../api/playlists";
+import { addPlaylistTrack, addPlaylistTracks, listPlaylists } from "../api/playlists";
 import { listTags } from "../api/tags";
-import { batchUpdateTrackTags, listTracks } from "../api/tracks";
+import { batchDeleteTracks, batchUpdateTrackTags, listTracks } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
 import {
   BatchTagEditor,
@@ -22,14 +22,25 @@ type LibraryState =
 
 export function LibraryPage() {
   const { accessToken } = useAuth();
+  const trackSearchInputId = useId();
   const [libraryState, setLibraryState] = useState<LibraryState>({
     name: "loading",
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  const [isTrackFilterEnabled, setIsTrackFilterEnabled] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
   const [isApplyingTags, setIsApplyingTags] = useState(false);
+  const [isAddingSelectedToPlaylist, setIsAddingSelectedToPlaylist] = useState(false);
+  const [isDeletingTracks, setIsDeletingTracks] = useState(false);
   const [batchTagError, setBatchTagError] = useState<string | null>(null);
   const [batchTagSuccess, setBatchTagSuccess] = useState<string | null>(null);
+  const [batchPlaylistError, setBatchPlaylistError] = useState<string | null>(null);
+  const [batchPlaylistSuccess, setBatchPlaylistSuccess] = useState<string | null>(null);
+  const [isBatchPlaylistPickerOpen, setIsBatchPlaylistPickerOpen] = useState(false);
+  const [selectedBatchPlaylistId, setSelectedBatchPlaylistId] = useState("");
+  const [batchDeleteError, setBatchDeleteError] = useState<string | null>(null);
+  const [batchDeleteSuccess, setBatchDeleteSuccess] = useState<string | null>(null);
 
   const loadTracks = useCallback(async (showLoading: boolean) => {
     if (!accessToken) {
@@ -99,7 +110,22 @@ export function LibraryPage() {
     });
     setBatchTagError(null);
     setBatchTagSuccess(null);
+    setBatchPlaylistError(null);
+    setBatchPlaylistSuccess(null);
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
   };
+
+  const visibleTracks =
+    libraryState.name === "ready"
+      ? filterLibraryTracks(
+          libraryState.tracks,
+          isTrackFilterEnabled,
+          trackSearchQuery,
+        )
+      : [];
+  const isSearchFilterActive =
+    isTrackFilterEnabled && trackSearchQuery.trim().length > 0;
 
   const applyBatchTags = async (operation: BatchTagOperation) => {
     if (!accessToken) {
@@ -113,6 +139,11 @@ export function LibraryPage() {
       return;
     }
 
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
+    setBatchPlaylistError(null);
+    setBatchPlaylistSuccess(null);
+    setIsBatchPlaylistPickerOpen(false);
     setIsApplyingTags(true);
     setBatchTagError(null);
     setBatchTagSuccess(null);
@@ -152,6 +183,172 @@ export function LibraryPage() {
       setBatchTagError(getErrorMessage(error));
     } finally {
       setIsApplyingTags(false);
+    }
+  };
+
+  const openBatchPlaylistPicker = () => {
+    const trackIds = [...selectedTrackIds];
+    if (trackIds.length === 0) {
+      setBatchPlaylistError("请至少选择一个音轨。");
+      return;
+    }
+
+    if (libraryState.name !== "ready" || libraryState.playlists.length === 0) {
+      setBatchPlaylistError("还没有可用歌单。");
+      return;
+    }
+
+    setBatchPlaylistError(null);
+    setBatchPlaylistSuccess(null);
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
+    setBatchTagError(null);
+    setBatchTagSuccess(null);
+    setSelectedBatchPlaylistId((current) => {
+      const currentPlaylistId = Number(current);
+      const currentStillExists = libraryState.playlists.some(
+        (playlist) => playlist.id === currentPlaylistId,
+      );
+      return currentStillExists ? current : String(libraryState.playlists[0]?.id ?? "");
+    });
+    setIsBatchPlaylistPickerOpen((current) => !current);
+  };
+
+  const addSelectedTracksToPlaylist = async () => {
+    if (!accessToken) {
+      setBatchPlaylistError("请重新登录后再添加到歌单。");
+      return;
+    }
+
+    if (libraryState.name !== "ready") {
+      setBatchPlaylistError("请等待曲库加载完成。");
+      return;
+    }
+
+    const trackIds = [...selectedTrackIds];
+    if (trackIds.length === 0) {
+      setBatchPlaylistError("请至少选择一个音轨。");
+      return;
+    }
+
+    const playlistId = Number(selectedBatchPlaylistId);
+    const playlist = libraryState.playlists.find((item) => item.id === playlistId);
+    if (!playlist) {
+      setBatchPlaylistError("请选择一个歌单。");
+      return;
+    }
+
+    setIsAddingSelectedToPlaylist(true);
+    setBatchPlaylistError(null);
+    setBatchPlaylistSuccess(null);
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
+    setBatchTagError(null);
+    setBatchTagSuccess(null);
+
+    try {
+      const updatedPlaylist = await addPlaylistTracks(accessToken, playlistId, {
+        track_ids: trackIds,
+      });
+      setLibraryState((current) => {
+        if (current.name !== "ready") {
+          return current;
+        }
+
+        return {
+          ...current,
+          playlists: current.playlists.map((item) =>
+            item.id === updatedPlaylist.id
+              ? {
+                  ...item,
+                  track_count: updatedPlaylist.track_count,
+                  updated_at: updatedPlaylist.updated_at,
+                }
+              : item,
+          ),
+        };
+      });
+      setBatchPlaylistSuccess(
+        `已将 ${trackIds.length} 个音轨加入「${updatedPlaylist.name}」。`,
+      );
+      setIsBatchPlaylistPickerOpen(false);
+    } catch (error: unknown) {
+      setBatchPlaylistError(getErrorMessage(error));
+    } finally {
+      setIsAddingSelectedToPlaylist(false);
+    }
+  };
+
+  const deleteSelectedTracks = async () => {
+    if (!accessToken) {
+      setBatchDeleteError("请重新登录后再删除音轨。");
+      return;
+    }
+
+    const trackIds = [...selectedTrackIds];
+    if (trackIds.length === 0) {
+      setBatchDeleteError("请至少选择一个音轨。");
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `确定删除所选 ${trackIds.length} 个音轨吗？这会删除服务器上的音轨记录和已保存媒体文件。`,
+    );
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsDeletingTracks(true);
+    setBatchDeleteError(null);
+    setBatchDeleteSuccess(null);
+    setBatchPlaylistError(null);
+    setBatchPlaylistSuccess(null);
+    setIsBatchPlaylistPickerOpen(false);
+    setBatchTagError(null);
+    setBatchTagSuccess(null);
+
+    try {
+      const response = await batchDeleteTracks(accessToken, { track_ids: trackIds });
+      const deletedTrackIds = new Set(
+        response.results
+          .filter((result) => result.status === "deleted")
+          .map((result) => result.track_id),
+      );
+
+      if (deletedTrackIds.size > 0) {
+        setLibraryState((current) => {
+          if (current.name !== "ready") {
+            return current;
+          }
+
+          return {
+            ...current,
+            tracks: current.tracks.filter((track) => !deletedTrackIds.has(track.id)),
+          };
+        });
+        setSelectedTrackIds((current) => {
+          const next = new Set(current);
+          for (const trackId of deletedTrackIds) {
+            next.delete(trackId);
+          }
+          return next;
+        });
+      }
+
+      const failedResults = response.results.filter((result) => result.status === "failed");
+      if (failedResults.length > 0) {
+        setBatchDeleteError(
+          `${summarizeBatchDeleteResponse(response)} ${failedResults
+            .map((result) => `#${result.track_id}: ${result.error}`)
+            .join(" ")}`,
+        );
+      } else {
+        setBatchDeleteSuccess(summarizeBatchDeleteResponse(response));
+      }
+    } catch (error: unknown) {
+      setBatchDeleteError(getErrorMessage(error));
+    } finally {
+      setIsDeletingTracks(false);
     }
   };
 
@@ -218,7 +415,87 @@ export function LibraryPage() {
         <RouteLink className="button secondary" to="/duplicates">
           查看重复音轨
         </RouteLink>
+        <button
+          className="button secondary"
+          disabled={
+            libraryState.name !== "ready" ||
+            selectedTrackIds.size === 0 ||
+            isApplyingTags ||
+            isAddingSelectedToPlaylist ||
+            isDeletingTracks
+          }
+          onClick={openBatchPlaylistPicker}
+          type="button"
+        >
+          {isAddingSelectedToPlaylist ? "正在添加..." : "添加到歌单"}
+        </button>
+        <button
+          className="button danger"
+          disabled={
+            libraryState.name !== "ready" ||
+            selectedTrackIds.size === 0 ||
+            isApplyingTags ||
+            isAddingSelectedToPlaylist ||
+            isDeletingTracks
+          }
+          onClick={() => void deleteSelectedTracks()}
+          type="button"
+        >
+          {isDeletingTracks ? "正在删除..." : "删除所选音轨"}
+        </button>
       </div>
+      {isBatchPlaylistPickerOpen && libraryState.name === "ready" ? (
+        <div className="toolbar compact batch-playlist-picker">
+          <select
+            aria-label="选择目标歌单"
+            disabled={isAddingSelectedToPlaylist}
+            onChange={(event) => setSelectedBatchPlaylistId(event.target.value)}
+            value={selectedBatchPlaylistId}
+          >
+            {libraryState.playlists.map((playlist) => (
+              <option key={playlist.id} value={playlist.id}>
+                {playlist.name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="button primary"
+            disabled={!selectedBatchPlaylistId || isAddingSelectedToPlaylist}
+            onClick={() => void addSelectedTracksToPlaylist()}
+            type="button"
+          >
+            {isAddingSelectedToPlaylist ? "正在添加..." : "确认添加"}
+          </button>
+          <button
+            className="button secondary"
+            disabled={isAddingSelectedToPlaylist}
+            onClick={() => setIsBatchPlaylistPickerOpen(false)}
+            type="button"
+          >
+            取消
+          </button>
+        </div>
+      ) : null}
+      {batchPlaylistError ? (
+        <p className="status-message error" role="alert">
+          {batchPlaylistError}
+        </p>
+      ) : null}
+      {batchPlaylistSuccess ? (
+        <p aria-live="polite" className="status-message success">
+          {batchPlaylistSuccess}
+        </p>
+      ) : null}
+      {batchDeleteError ? (
+        <p className="status-message error" role="alert">
+          {batchDeleteError}
+        </p>
+      ) : null}
+      {batchDeleteSuccess ? (
+        <p aria-live="polite" className="status-message success">
+          {batchDeleteSuccess}
+        </p>
+      ) : null}
 
       {libraryState.name === "loading" ? (
         <div className="empty-state" aria-live="polite">
@@ -238,22 +515,56 @@ export function LibraryPage() {
 
       {libraryState.name === "ready" && libraryState.tracks.length > 0 ? (
         <>
+          <div className="library-filter-bar" aria-label="曲库搜索">
+            <label className="field library-search-field" htmlFor={trackSearchInputId}>
+              搜索音轨
+              <input
+                className="text-input"
+                id={trackSearchInputId}
+                onChange={(event) => setTrackSearchQuery(event.target.value)}
+                placeholder="输入音轨名称"
+                type="search"
+                value={trackSearchQuery}
+              />
+            </label>
+            <label className="switch-control">
+              <input
+                checked={isTrackFilterEnabled}
+                onChange={(event) => setIsTrackFilterEnabled(event.target.checked)}
+                role="switch"
+                type="checkbox"
+              />
+              <span className="switch-track" aria-hidden="true">
+                <span className="switch-thumb" />
+              </span>
+              <span>筛选模式</span>
+            </label>
+            <span className="filter-result-count" aria-live="polite">
+              {isSearchFilterActive
+                ? `显示 ${visibleTracks.length} / 共 ${libraryState.tracks.length}`
+                : `显示全部 ${libraryState.tracks.length}`}
+            </span>
+          </div>
           <BatchTagEditor
-            disabled={isApplyingTags}
+            disabled={isApplyingTags || isAddingSelectedToPlaylist || isDeletingTracks}
             errorMessage={batchTagError}
             onApply={applyBatchTags}
             selectedCount={selectedTrackIds.size}
             successMessage={batchTagSuccess}
             tags={libraryState.tags}
           />
-          <TrackTable
-            accessToken={accessToken}
-            onAddTrackToPlaylist={addTrackToPlaylist}
-            onToggleTrackSelection={toggleTrackSelection}
-            playlistOptions={libraryState.playlists}
-            selectedTrackIds={selectedTrackIds}
-            tracks={libraryState.tracks}
-          />
+          {visibleTracks.length === 0 ? (
+            <div className="empty-state">没有匹配的音轨。</div>
+          ) : (
+            <TrackTable
+              accessToken={accessToken}
+              onAddTrackToPlaylist={addTrackToPlaylist}
+              onToggleTrackSelection={toggleTrackSelection}
+              playlistOptions={libraryState.playlists}
+              selectedTrackIds={selectedTrackIds}
+              tracks={visibleTracks}
+            />
+          )}
         </>
       ) : null}
     </section>
@@ -263,6 +574,33 @@ export function LibraryPage() {
 function isProcessingStatus(status: string) {
   const normalizedStatus = status.toLowerCase();
   return normalizedStatus === "processing" || normalizedStatus === "uploaded";
+}
+
+function summarizeBatchDeleteResponse(response: {
+  deleted_count: number;
+  results: { status: string }[];
+}) {
+  const failedCount = response.results.filter((result) => result.status === "failed").length;
+  if (failedCount > 0) {
+    return `已删除 ${response.deleted_count} 个音轨，${failedCount} 个删除失败。`;
+  }
+
+  return `已删除 ${response.deleted_count} 个音轨。`;
+}
+
+function filterLibraryTracks(
+  tracks: Track[],
+  isFilterModeEnabled: boolean,
+  searchQuery: string,
+) {
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+  if (!isFilterModeEnabled || normalizedQuery.length === 0) {
+    return tracks;
+  }
+
+  return tracks.filter((track) =>
+    track.title.toLocaleLowerCase().includes(normalizedQuery),
+  );
 }
 
 function getErrorMessage(error: unknown) {

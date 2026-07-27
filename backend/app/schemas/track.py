@@ -35,6 +35,27 @@ class TrackBatchTagUpdateResponse(BaseModel):
     tracks: list["TrackResponse"]
 
 
+class TrackBatchDelete(BaseModel):
+    track_ids: list[int]
+
+
+class TrackBatchDeleteResult(BaseModel):
+    track_id: int
+    status: str
+    error: str | None = None
+
+
+class TrackBatchDeleteResponse(BaseModel):
+    requested_track_count: int
+    deleted_count: int
+    results: list[TrackBatchDeleteResult]
+
+
+class TrackStreamUrlResponse(BaseModel):
+    stream_url: str
+    expires_at: int
+
+
 class TrackResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

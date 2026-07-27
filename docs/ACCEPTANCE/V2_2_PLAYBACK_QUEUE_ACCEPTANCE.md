@@ -1,5 +1,12 @@
 # V2.2 Playback Queue Acceptance
 
+Status: Implemented
+Last updated: 2026-07-27
+Canonical role: acceptance
+Related: `docs/TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md`, `docs/SPECS/PLAYBACK_QUEUE.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md`
+Decision: Implemented
+
 This document records acceptance for the first-class local playback queue work
 implemented in V2.2.
 
@@ -154,9 +161,23 @@ Android emulator/device smoke:
 - Covered Android notification, lock-screen, and headset next/previous controls
   against the active Media3 queue.
 
-Acceptance status:
+Acceptance status at the end of the 2026-06-27 pass:
 
-- V2.2 playback queue automated acceptance: accepted.
-- V2.2 Web manual product acceptance: accepted for the recorded browser smoke.
-- V2.2 Android full manual product acceptance: accepted.
-- V2.2 full manual product acceptance: accepted.
+- V2.2 playback queue automated acceptance: accepted for that revision.
+- V2.2 Web manual product acceptance: accepted for that revision.
+- V2.2 Android full manual product acceptance: accepted for that revision.
+
+## Acceptance Decision
+
+Current decision: `Implemented`, not `Accepted`.
+
+The later 2026-06-28 Web playback-controls regression fix passed typecheck and
+build, but its targeted manual browser smoke was not rerun. Record these checks
+before promoting the task, this record, the roadmap, and both README summaries
+back to `Accepted`:
+
+- [ ] Symbolic player controls are visible and accessible.
+- [ ] Single-track and playlist playback start after one user action.
+- [ ] Playlist track transitions continue playing automatically.
+- [ ] Playlist-repeat tail behavior generates the next round correctly.
+- [ ] Volume and mute persist across the next track and player reload.

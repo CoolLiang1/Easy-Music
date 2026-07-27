@@ -53,6 +53,10 @@ class PlaylistTrackAdd(BaseModel):
     track_id: int
 
 
+class PlaylistTracksAdd(BaseModel):
+    track_ids: list[int]
+
+
 class PlaylistReorder(BaseModel):
     track_ids: list[int]
 

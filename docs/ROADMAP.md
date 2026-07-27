@@ -17,86 +17,43 @@ It must include:
 - Login
 - Docker Compose deployment
 
-## Current Progress
+## Status Authority
 
-Status as of 2026-06-29:
+This file is the canonical source for current project status and next
+authorized work. `README.md` and `README.zh-CN.md` contain public summaries;
+task files contain plans; acceptance files contain evidence. See
+[Documentation Guide](README.md) for the ownership and update rules.
 
-- Phase 0 / Phase 1: Accepted. Repository foundation, backend core, auth,
-  track/tag/upload APIs, media processing, worker flow, migrations, streaming,
-  and development Docker Compose are implemented.
-- Phase 2: Accepted. The Web management console includes login, upload,
-  library, track editing, tag editing, and browser playback.
-- Phase 3: Accepted. The Android app includes login, library/detail screens,
-  authenticated streaming, Media3 background playback, notification controls,
-  lock-screen/media-button behavior, and shared playback UI.
-- Phase 4: Accepted. Android manual offline cache, cached playback, local
-  metadata store, queued playback events, and reconnect sync are implemented.
-- Phase 5: Accepted. Recommendation V1 includes structured recommendation
-  requests, rule-based ranking, feedback events, Android recommendation home,
-  and Web recommendation test panel.
-- Phase 6: Accepted. AI Assistant V1 includes provider abstraction,
-  intent parsing, AI-assisted recommendation composition through the existing
-  ranking service, tag suggestions, Web AI panel, and Android
-  natural-language recommendation input.
-- Phase 7: Accepted by local verification. Deployment hardening includes
-  production Docker Compose, Caddy HTTPS config, production env template, host
-  storage layout, database backup script, structured logging, health checks,
-  and deployment documentation.
-- V1.1: Duplicate Detection is accepted. Better upload progress, batch tag
-  editing, library organization reports, cover editing, advanced recommendation
-  explanations, recently revived tracks, and Android launcher shortcuts are
-  implemented. Automated checks and manual acceptance are recorded in
-  `docs/ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md`.
-- V2 import/video slice: Accepted for local closure. Automatic import tools
-  and optional user-provided video-to-audio processing are implemented through
-  safe configured import roots, scan/confirm flows, import batch history,
-  Web import UI, Web video upload, worker video extraction, mixed
-  audio/video imports, and documented automated plus browser smoke acceptance.
-- V2.1 playlist management: Implemented. Ordinary owner-scoped user playlists
-  now have backend CRUD/add/remove/reorder APIs, Web management UI, and Android
-  browse/play flows. Web and Android also support client-side playback queues
-  for playlist sequence, one-time shuffled, and reverse playback. Smart
-  playlists, sharing, collaboration, auto-generation, cross-device queue sync,
-  and server-side persistent queues remain out of scope. Playlist-based
-  recommendation scoring is covered separately by V2 Recommendation Foundation.
-- V2.2 playback queue: Implemented for local temporary client queues. Web and
-  Android now expose first-class queue state, queue management, upcoming
-  reorder, playlist-only repeat, and same-client source playlist sync.
-  Automated checks plus Web and Android manual smoke are recorded as accepted
-  in `docs/ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md`.
-- V2 Recommendation Foundation: Implemented. Recommendation cooldown now
-  defaults to soft scoring instead of hard exclusion, `cooldown_mode` supports
-  `off`, `soft`, and `strict`, `not_today` remains a same-day hard exclusion,
-  `like` and `dislike` feedback affect ranking, and owner-scoped playlist
-  membership plus playlist name/description relevance are recommendation
-  scoring signals.
-- V2.4 tag taxonomy simplification: Implemented. Supported tag groups are now
-  `scene`, `type`, and `feature`; old `scenario` maps to `scene`, old `state`
-  maps to `feature`, and old `attribute` tags plus track-tag links are removed
-  during migration.
-- V2.5 AI Tag Suggestions V2: Implemented as quality improvements to the
-  existing `POST /api/ai/tracks/{track_id}/suggest-tags` flow. It strengthens
-  `scene`/`type`/`feature` prompt guidance, supports richer existing-tag
-  suggestions with confidence and reasons, can optionally use
-  suggest-tags-only Tavily title/snippet/URL search context, keeps legacy
-  provider output compatibility, and documents DeepSeek as an OpenAI-compatible
-  provider option without adding organization, playlist suggestions, or
-  auto-apply.
+<!-- status-snapshot: 2026-07-27 -->
+Last verified: 2026-07-27 on `develop`.
 
-The remaining deployment caveat is a real production smoke test on an Ubuntu
-server with a real domain and HTTPS certificate. That requires operator
-infrastructure and is intentionally deferred to first deployment.
+## Current Status
 
-## Next Planned Work
+| Initiative | Status | Evidence or work record | Current note |
+| --- | --- | --- | --- |
+| MVP Phase 0-7 | Accepted | [Phase 7 acceptance](ACCEPTANCE/PHASE_7_ACCEPTANCE.md) | Backend, Web, Android, local deployment artifacts, and earlier phase acceptance are complete. |
+| V1.1 workflow enhancements | Accepted | [V1.1 acceptance](ACCEPTANCE/V1_1_WORKFLOW_ENHANCEMENTS_ACCEPTANCE.md) | Includes duplicate detection, cover editing, reports, recommendation explanations, revived tracks, and Android shortcuts. |
+| V2 import and video | Accepted | [Import/video acceptance](ACCEPTANCE/V2_IMPORT_AND_VIDEO_ACCEPTANCE.md) | Import roots remain allowlisted and source files remain read-only. |
+| V2.1 playlists | Accepted | [Playlist acceptance](ACCEPTANCE/V2_1_PLAYLISTS_ACCEPTANCE.md) | Owner-scoped manual playlists are implemented on backend, Web, and Android. |
+| V2.2 playback queue | Implemented | [Queue task](TASKS/V2_2_PLAYBACK_QUEUE_TASKS.md) / [acceptance](ACCEPTANCE/V2_2_PLAYBACK_QUEUE_ACCEPTANCE.md) | The original queue smoke passed; targeted Web manual regression checks remain after later playback-control fixes. |
+| V2 Recommendation Foundation | Accepted | [Recommendation acceptance](ACCEPTANCE/V2_RECOMMENDATION_FOUNDATION_ACCEPTANCE.md) | Cooldown modes, feedback scoring, and playlist signals are implemented. |
+| V2.4 tag taxonomy | Accepted | [Tag taxonomy acceptance](ACCEPTANCE/V2_4_TAG_TAXONOMY_ACCEPTANCE.md) | Current groups are `scene`, `type`, and `feature`. |
+| V2.5 AI Tag Suggestions | Accepted | [AI tag acceptance](ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md) | Provider fallback and optional search context remain constrained to tag suggestions. |
+| First Ubuntu/domain/HTTPS production smoke | Implemented | [Production smoke record](ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md) | Functional smoke passed from `develop`; exact Ubuntu release was not captured, so acceptance evidence is incomplete and `main` is not verified. |
+| UI optimization round 1 | Implemented | [UI task](TASKS/NEXT_UI_OPTIMIZATION_TASKS.md) / [acceptance](ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md) | Web and Android automated gates passed; complete manual visual/flow acceptance before marking it accepted. |
 
-1. UI optimization across the existing Web and Android product surfaces. This
-   is a polish and usability pass over existing flows, not a feature expansion.
-   Start from `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`.
-2. First real Ubuntu production smoke. Use `docs/DEPLOYMENT.md` and record the
-   result in `docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
-3. After production smoke, update `README.md`, this roadmap,
-   `docs/DEPLOYMENT.md`, and the production smoke acceptance record with any
-   deployment caveats or fixes discovered on the server.
+## Active And Next Work
+
+1. Finish and record manual visual/flow acceptance for UI optimization round 1.
+   A later UI slice requires a newly selected target and is not authorization
+   for a broad redesign.
+2. Run and record the targeted V2.2 Web playback regression checks listed in
+   its acceptance record.
+3. Close the production smoke evidence gap by recording a run on a confirmed
+   supported Ubuntu release. Also document certificate renewal and decide
+   whether high-port HTTPS remains the intended access pattern.
+4. No later product feature is currently authorized. Create or update a task
+   document and register it in this section before implementation.
 
 ## Phase 0: Project Foundation
 
@@ -246,13 +203,15 @@ Deliverables:
 
 ## Phase 7: Deployment Hardening
 
-Status: Accepted by local automated/static verification. Real-server
-production smoke testing remains an operator deployment step.
+Status: Accepted by local automated/static verification. A later real-server
+functional smoke is recorded separately as `Implemented`; its exact Ubuntu
+release was not captured. See
+`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`.
 
 Goals:
 
-- Deploy to Ubuntu server
-- Enable HTTPS
+- Prepare a production deployment for an Ubuntu server
+- Configure HTTPS
 - Configure persistent storage
 - Add backups
 - Add logging
@@ -265,7 +224,7 @@ Deliverables:
 - Database backup script or documented backup process
 - Basic health checks
 
-## V1.1 Ideas
+## V1.1 Delivered Scope
 
 - Batch tag editing
 - Duplicate detection
@@ -276,18 +235,8 @@ Deliverables:
 - Library organization reports
 - Android home screen shortcuts
 
-## V2 Ideas
+## Unscheduled Product Backlog
 
-- Completed local V2 slice:
-  - Automatic import tools.
-  - Optional user-provided video-to-audio processing.
-- V2.1 user-built playlist management and client-side playlist playback queue.
-- V2.2 first-class local playback queue module.
-- V2 recommendation foundation: soft/default cooldown, strict/off modes,
-  feedback scoring, and playlist membership/name/description boosts.
-- V2.5 AI tag suggestion quality pass for the existing suggest-tags endpoint,
-  including OpenAI-compatible DeepSeek provider guidance and optional Tavily
-  search context.
 - Automatic audio analysis
 - BPM detection
 - Vocal detection

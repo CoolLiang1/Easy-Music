@@ -1,5 +1,12 @@
 # V2.4 Tag Taxonomy Simplification Acceptance
 
+Status: Accepted
+Last updated: 2026-06-28
+Canonical role: acceptance
+Related: `docs/TASKS/V2_4_TAG_TAXONOMY_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V2_4_TAG_TAXONOMY_TASKS.md`
+Decision: Accepted
+
 Date: 2026-06-28
 
 ## Accepted Scope

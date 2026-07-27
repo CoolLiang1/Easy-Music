@@ -1,9 +1,19 @@
-# Next UI Optimization Tasks
+# UI Optimization Work Record
 
-Date: 2026-06-29
+Status: Implemented
+Last updated: 2026-07-27
+Canonical role: task
+Related: `docs/ROADMAP.md`, `docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`
+Pair: `docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`
 
-This document defines the next UI-focused work after the initial Easy Music
-product has reached local functional closure.
+This document records the bounded UI-focused program started after the initial
+Easy Music product reached local functional closure.
+
+Web and Android round 1 implementation and automated checks are complete.
+Required manual visual/flow acceptance is not recorded, so this work is not yet
+`Accepted`. Before another slice starts, name one target flow, define its
+acceptance checks, and register it in `docs/ROADMAP.md`; this file does not
+authorize a broad redesign.
 
 ## Current Baseline
 
@@ -117,8 +127,8 @@ Out of scope:
 - Upload, processing, import, and video extraction states remain visible.
 - Recommendation and AI provider fallback/error states remain understandable.
 - Relevant automated checks pass.
-- Manual smoke results are recorded in a relevant acceptance document or in the
-  task completion notes.
+- Manual visual/flow results are recorded in
+  `docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`.
 
 ## Progress Notes
 
@@ -146,3 +156,21 @@ Out of scope:
   recommendation flow.
 - Verification: `.\gradlew.bat test` and `.\gradlew.bat build` passed from
   `android/`.
+
+## Documentation Impact
+
+- [x] Task status and completion notes are recorded here.
+- [x] Roadmap status and next-work wording are synchronized.
+- [x] English and Chinese README summaries are synchronized.
+- [x] Acceptance record created; manual visual/flow checks remain pending there.
+- [ ] PRD / architecture / specification.
+- [ ] Development / environment / deployment / API testing.
+- [ ] `AGENTS.md` stable rules.
+
+N/A reasons:
+
+- Round 1 did not change product scope, architecture, configuration, deployment,
+  or API contracts.
+- Round 1 remains `Implemented` until its manual visual/flow checks are recorded.
+- A new task/acceptance entry is required when the next focused UI slice is
+  selected and completed.

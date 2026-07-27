@@ -1,5 +1,12 @@
 # Phase 2 Web Acceptance
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: acceptance
+Related: `docs/TASKS/PHASE_2_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/PHASE_2_TASKS.md`
+Decision: Accepted
+
 This document records the Phase 2 Web management console verification result.
 
 ## Automated Checks

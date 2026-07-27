@@ -1,5 +1,12 @@
 # V1.1 Workflow Enhancements Acceptance
 
+Status: Accepted
+Last updated: 2026-06-26
+Canonical role: acceptance
+Related: `docs/TASKS/V1_1_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/V1_1_TASKS.md`
+Decision: Accepted
+
 This document records verification status for V1.1 Tasks 7 through 13. These
 tasks are small owner-facing workflow improvements built on the accepted MVP and
 the accepted advisory duplicate-detection work.

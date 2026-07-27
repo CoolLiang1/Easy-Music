@@ -17,6 +17,8 @@ import kotlinx.coroutines.withContext
 
 data class LibraryUiState(
     val tracks: List<TrackResponse> = emptyList(),
+    val searchQuery: String = "",
+    val isFilterModeEnabled: Boolean = false,
     val cacheStatesByTrackId: Map<Int, LibraryCacheUiState> = emptyMap(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -53,11 +55,21 @@ class LibraryViewModel(
         )
     }
 
+    fun updateSearchQuery(query: String) {
+        uiState = uiState.copy(searchQuery = query)
+    }
+
+    fun setFilterModeEnabled(enabled: Boolean) {
+        uiState = uiState.copy(isFilterModeEnabled = enabled)
+    }
+
     private fun loadTracks(
         isRefresh: Boolean,
         isNetworkAvailable: Boolean,
     ) {
         val currentTracks = uiState.tracks
+        val currentSearchQuery = uiState.searchQuery
+        val currentFilterModeEnabled = uiState.isFilterModeEnabled
         val currentCacheStates = uiState.cacheStatesByTrackId
         if (!isNetworkAvailable) {
             uiState = uiState.copy(
@@ -83,6 +95,9 @@ class LibraryViewModel(
 
             if (token == null) {
                 uiState = LibraryUiState(
+                    tracks = currentTracks,
+                    searchQuery = currentSearchQuery,
+                    isFilterModeEnabled = currentFilterModeEnabled,
                     cacheStatesByTrackId = currentCacheStates,
                     errorMessage = "请重新登录后加载曲库。",
                     needsSignIn = true,
@@ -97,10 +112,14 @@ class LibraryViewModel(
             uiState = when (result) {
                 is ApiResult.Success -> LibraryUiState(
                     tracks = result.value,
+                    searchQuery = currentSearchQuery,
+                    isFilterModeEnabled = currentFilterModeEnabled,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                 )
                 is ApiResult.Unauthorized -> LibraryUiState(
                     tracks = currentTracks,
+                    searchQuery = currentSearchQuery,
+                    isFilterModeEnabled = currentFilterModeEnabled,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                     errorMessage = result.message,
                     needsSignIn = true,
@@ -108,18 +127,24 @@ class LibraryViewModel(
 
                 is ApiResult.HttpError -> LibraryUiState(
                     tracks = currentTracks,
+                    searchQuery = currentSearchQuery,
+                    isFilterModeEnabled = currentFilterModeEnabled,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                     errorMessage = result.message,
                 )
 
                 is ApiResult.NetworkError -> LibraryUiState(
                     tracks = currentTracks,
+                    searchQuery = currentSearchQuery,
+                    isFilterModeEnabled = currentFilterModeEnabled,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                     errorMessage = result.message,
                 )
 
                 is ApiResult.SerializationError -> LibraryUiState(
                     tracks = currentTracks,
+                    searchQuery = currentSearchQuery,
+                    isFilterModeEnabled = currentFilterModeEnabled,
                     cacheStatesByTrackId = uiState.cacheStatesByTrackId,
                     errorMessage = result.message,
                 )

@@ -8,18 +8,25 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 
 ## 项目状态
 
-截至 2026-06-30：
+当前状态的唯一权威记录是 [docs/ROADMAP.md](docs/ROADMAP.md)。以下公开摘要已于
+2026-07-27 从路线图同步。
+
+<!-- status-snapshot: 2026-07-27 -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented -->
 
 - MVP Phase 0 到 Phase 7 已实现，并完成本地验收。
 - V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
-- V2 导入/视频、歌单、客户端播放队列、Recommendation V2 基础、标签简化和 AI Tag Suggestions V2 已实现。
-- 首次真实 Ubuntu/domain/HTTPS 生产 smoke 已记录通过，见 [docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)。
-- 下一阶段计划是围绕现有 Web 和 Android 流程做 UI 优化。
+- V2 导入/视频、歌单、Recommendation V2 基础、标签简化和 AI Tag Suggestions V2 已实现并验收。
+- V2.2 客户端播放队列已实现；后续播放控制修复仍缺少针对性的 Web 手动回归检查。
+- 首次真实 Ubuntu/domain/HTTPS 功能 smoke 已在 `develop` 上通过，但因未记录 Ubuntu
+  具体版本，状态仍为 `Implemented` 而非 `Accepted`，见
+  [生产 smoke 记录](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)。
+- Web 和 Android 的第一轮 UI 优化已实现并通过自动检查，但尚未记录手动视觉/流程验收；后续聚焦切片也尚未选定。
 
 ## 功能
 
 - 登录保护的个人音乐库。
-- 支持上传 MP3、FLAC、M4A、WAV、OGG 音频文件。
+- 支持上传 MP3、FLAC、M4A、WAV、OGG、AAC 音频文件。
 - 可选的用户上传视频转音频处理。
 - 安全的服务端导入预览，以及从配置好的导入根目录确认导入。
 - 后台 Worker 处理元数据提取、播放文件生成、封面提取、重复信号和处理状态更新。
@@ -189,133 +196,17 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 生产部署摘要
 
-完整生产部署流程见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。本节只作为命令速览。
-
-生产规则：
+生产部署与运维流程的唯一权威文档是
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)，请按该文档操作，不要从本摘要复制命令。
 
 - 不要提交 `.env.production`。
 - 不要提交真实域名、密码、API key、Bearer token 或私有主机路径。
 - Web 构建前必须将 `VITE_API_BASE_URL` 设置为公开 HTTPS origin。
 - Android 生产 APK 通过 `-PeasyMusicApiBaseUrl=...` 传入公开 API origin。
-- 如果入站 80/443 被屏蔽，但高端口可访问，可以使用 DNS 验证证书和 `deploy/Caddyfile.manual-cert`。
-
-典型 Ubuntu 部署流程：
-
-```bash
-cd /srv/easy-music/repo
-if [ ! -f .env.production ]; then cp .env.production.example .env.production; fi
-nano .env.production
-
-chmod +x deploy/setup-host.sh deploy/backup-db.sh
-sudo ./deploy/setup-host.sh
-
-cd web
-export VITE_API_BASE_URL="https://music.example.com"
-export VITE_MAX_VIDEO_UPLOAD_MB="1024"
-npm ci
-npm run build
-cd ..
-
-docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
-docker compose -f docker-compose.prod.yml --env-file .env.production build
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic upgrade head
-docker compose -f docker-compose.prod.yml --env-file .env.production ps
-curl -sS https://music.example.com/health
-```
-
-只在首次部署时创建生产用户：
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  exec -e EASY_MUSIC_INITIAL_PASSWORD='your-admin-password-at-least-12-chars' \
-  api python -m app.auth.initial_user --username admin
-```
-
-如果使用非标准 HTTPS 端口，在 `.env.production` 中配置匹配的 origin，并重新构建 Web：
-
-```env
-CORS_ORIGINS=https://music.example.com:25443
-VITE_API_BASE_URL=https://music.example.com:25443
-CADDY_DOMAIN=music.example.com
-CADDY_HTTPS_PORT=25443
-CADDYFILE_PATH=./deploy/Caddyfile.manual-cert
-CADDY_CERT_DIR=/srv/easy-music/caddy-certs
-```
-
-## 运维命令
-
-生产命令默认在服务器仓库根目录执行：
-
-```bash
-cd /srv/easy-music/repo
-```
-
-查看服务状态：
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production ps
-```
-
-查看全部日志或单个服务日志：
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production logs -f
-docker compose -f docker-compose.prod.yml --env-file .env.production logs -f api
-docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 worker
-docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=200 caddy
-```
-
-重启服务：
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production restart api
-docker compose -f docker-compose.prod.yml --env-file .env.production restart worker
-docker compose -f docker-compose.prod.yml --env-file .env.production restart caddy
-```
-
-执行数据库迁移：
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic upgrade head
-```
-
-备份数据库：
-
-```bash
-./deploy/backup-db.sh /srv/easy-music/backups
-ls -lh /srv/easy-music/backups
-```
-
-更新生产部署：
-
-```bash
-cd /srv/easy-music/repo
-./deploy/backup-db.sh /srv/easy-music/backups
-git pull --ff-only origin main
-
-cd web
-export VITE_API_BASE_URL="https://music.example.com"
-export VITE_MAX_VIDEO_UPLOAD_MB="1024"
-npm ci
-npm run build
-cd ..
-
-docker compose -f docker-compose.prod.yml --env-file .env.production build
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api alembic upgrade head
-docker compose -f docker-compose.prod.yml --env-file .env.production ps
-```
-
-如果预生产环境部署的是 `develop`，把 pull 命令里的 `main` 换成 `develop`。
-
-健康检查和磁盘检查：
-
-```bash
-curl -sS https://music.example.com/health
-df -h /srv/easy-music
-du -sh /srv/easy-music/media /srv/easy-music/postgres /srv/easy-music/backups
-```
+- 公网 80/443 可用时采用标准自动 HTTPS；否则按部署文档使用高端口和 DNS
+  验证证书方案。
+- 每个新环境都要验证 Compose 配置、迁移、HTTPS 健康检查、登录、
+  上传/处理/播放、日志和备份。
 
 ## 验证
 
@@ -348,6 +239,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production config --qu
 
 建议从这些文档开始：
 
+- [文档导航与更新规则](docs/README.md)
 - [产品需求](docs/PRD.md)
 - [系统架构](docs/ARCHITECTURE.md)
 - [路线图](docs/ROADMAP.md)
@@ -356,10 +248,11 @@ docker compose -f docker-compose.prod.yml --env-file .env.production config --qu
 - [生产部署](docs/DEPLOYMENT.md)
 - [API 手动测试](docs/API_MANUAL_TESTING.md)
 - [Git 工作流](docs/GIT_WORKFLOW.md)
-- [Ubuntu 生产 smoke 验收](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
-- [下一阶段 UI 优化任务](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
+- [Ubuntu 生产 smoke 记录](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
+- [UI 优化工作记录](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
 
-历史验收记录在 `docs/ACCEPTANCE/`，任务记录在 `docs/TASKS/`。
+验收证据位于 `docs/ACCEPTANCE/`，任务计划和完成记录位于 `docs/TASKS/`；
+两者都不能替代路线图作为当前状态的唯一来源。
 
 ## 安全和密钥
 

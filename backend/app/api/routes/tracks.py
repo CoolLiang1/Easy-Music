@@ -1,19 +1,38 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import authentication_error, bearer_scheme, get_current_user
+from app.auth.tokens import (
+    InvalidTokenError,
+    create_track_stream_token,
+    parse_access_token,
+    parse_track_stream_token,
+)
 from app.db.session import get_db
 from app.media.paths import UnsafeMediaPathError
 from app.media.responses import stream_file_response
 from app.media.storage import MediaStorage, get_media_storage
 from app.models.user import User
 from app.schemas.track import (
+    TrackBatchDelete,
+    TrackBatchDeleteResponse,
     TrackBatchTagUpdate,
     TrackBatchTagUpdateResponse,
     TrackResponse,
+    TrackStreamUrlResponse,
     TrackUpdate,
 )
 from app.services import tracks as track_service
@@ -27,6 +46,34 @@ def track_not_found_error() -> HTTPException:
         status_code=status.HTTP_404_NOT_FOUND,
         detail="Track not found.",
     )
+
+
+def get_stream_user(
+    track_id: int,
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    db: Annotated[Session, Depends(get_db)],
+) -> User:
+    if credentials is not None:
+        try:
+            user_id = parse_access_token(credentials.credentials)
+        except InvalidTokenError as exc:
+            raise authentication_error() from exc
+    else:
+        token = request.query_params.get("token")
+        if token is None:
+            raise authentication_error()
+
+        try:
+            user_id = parse_track_stream_token(token, expected_track_id=track_id)
+        except InvalidTokenError as exc:
+            raise authentication_error() from exc
+
+    user = db.get(User, user_id)
+    if user is None:
+        raise authentication_error()
+
+    return user
 
 
 @router.get("", response_model=list[TrackResponse])
@@ -55,6 +102,22 @@ def batch_update_track_tags(
         ) from exc
 
 
+@router.post("/batch-delete", response_model=TrackBatchDeleteResponse)
+def batch_delete_tracks(
+    payload: TrackBatchDelete,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
+) -> TrackBatchDeleteResponse:
+    try:
+        return track_service.batch_delete_tracks(db, current_user, payload, storage)
+    except track_service.BatchDeleteValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/{track_id}", response_model=TrackResponse)
 def get_track(
     track_id: int,
@@ -68,11 +131,28 @@ def get_track(
     return track_service.build_track_response(db, track)
 
 
+@router.post("/{track_id}/stream-url", response_model=TrackStreamUrlResponse)
+def create_stream_url(
+    track_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TrackStreamUrlResponse:
+    track = track_service.get_track(db, current_user, track_id)
+    if track is None:
+        raise track_not_found_error()
+    if track.status != "ready" or not track.playback_file_path:
+        raise track_not_found_error()
+
+    token, expires_at = create_track_stream_token(current_user.id, track.id)
+    stream_url = f"/api/tracks/{track.id}/stream?token={token}"
+    return TrackStreamUrlResponse(stream_url=stream_url, expires_at=expires_at)
+
+
 @router.get("/{track_id}/stream")
 def stream_track(
     track_id: int,
     request: Request,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_stream_user)],
     db: Annotated[Session, Depends(get_db)],
     storage: Annotated[MediaStorage, Depends(get_media_storage)],
 ) -> StreamingResponse:

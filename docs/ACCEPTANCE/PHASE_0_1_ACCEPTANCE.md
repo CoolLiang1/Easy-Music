@@ -1,5 +1,12 @@
 # Phase 0 / Phase 1 Acceptance
 
+Status: Accepted
+Last updated: 2026-06-04
+Canonical role: acceptance
+Related: `docs/TASKS/PHASE_0_TASKS.md`, `docs/TASKS/PHASE_1_TASKS.md`, `docs/ROADMAP.md`
+Pair: `docs/TASKS/PHASE_0_TASKS.md`, `docs/TASKS/PHASE_1_TASKS.md`
+Decision: Accepted
+
 This document records the Phase 0 and Phase 1 acceptance result after backend
 runtime verification and the Phase 1 closing fixes.
 

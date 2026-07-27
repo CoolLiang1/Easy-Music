@@ -12,6 +12,7 @@ from app.schemas.playlist import (
     PlaylistResponse,
     PlaylistSummaryResponse,
     PlaylistTrackAdd,
+    PlaylistTracksAdd,
     PlaylistUpdate,
 )
 from app.services import playlists as playlist_service
@@ -111,6 +112,35 @@ def add_track_to_playlist(
         playlist,
         payload,
     )
+    if updated_playlist is None:
+        raise track_not_found_error()
+
+    return playlist_service.build_playlist_response(db, updated_playlist)
+
+
+@router.post("/{playlist_id}/tracks/batch", response_model=PlaylistResponse)
+def add_tracks_to_playlist(
+    playlist_id: int,
+    payload: PlaylistTracksAdd,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> PlaylistResponse:
+    playlist = playlist_service.get_playlist(db, current_user, playlist_id)
+    if playlist is None:
+        raise playlist_not_found_error()
+
+    try:
+        updated_playlist = playlist_service.add_tracks_to_playlist(
+            db,
+            current_user,
+            playlist,
+            payload,
+        )
+    except playlist_service.PlaylistValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     if updated_playlist is None:
         raise track_not_found_error()
 

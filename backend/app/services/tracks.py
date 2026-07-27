@@ -16,6 +16,9 @@ from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
 from app.schemas.track import (
+    TrackBatchDelete,
+    TrackBatchDeleteResponse,
+    TrackBatchDeleteResult,
     TrackBatchTagResult,
     TrackBatchTagUpdate,
     TrackBatchTagUpdateResponse,
@@ -32,6 +35,10 @@ class TrackMediaDeletionError(RuntimeError):
 
 
 class BatchTagValidationError(ValueError):
+    pass
+
+
+class BatchDeleteValidationError(ValueError):
     pass
 
 
@@ -225,6 +232,54 @@ def batch_update_track_tags(
     )
 
 
+def batch_delete_tracks(
+    db: Session,
+    user: User,
+    payload: TrackBatchDelete,
+    storage: MediaStorage,
+) -> TrackBatchDeleteResponse:
+    unique_track_ids = list(dict.fromkeys(payload.track_ids))
+
+    if not unique_track_ids:
+        raise BatchDeleteValidationError("Choose at least one track.")
+
+    results: list[TrackBatchDeleteResult] = []
+    deleted_count = 0
+
+    for track_id in unique_track_ids:
+        track = get_track(db, user, track_id)
+        if track is None:
+            results.append(
+                TrackBatchDeleteResult(
+                    track_id=track_id,
+                    status="failed",
+                    error="Track not found for current user.",
+                ),
+            )
+            continue
+
+        try:
+            delete_track(db, track, storage)
+        except TrackMediaDeletionError as exc:
+            results.append(
+                TrackBatchDeleteResult(
+                    track_id=track_id,
+                    status="failed",
+                    error=str(exc),
+                ),
+            )
+            continue
+
+        deleted_count += 1
+        results.append(TrackBatchDeleteResult(track_id=track_id, status="deleted"))
+
+    return TrackBatchDeleteResponse(
+        requested_track_count=len(unique_track_ids),
+        deleted_count=deleted_count,
+        results=results,
+    )
+
+
 def _validate_cover_upload(file: UploadFile) -> str:
     content_type = (file.content_type or "").lower()
     suffix = ALLOWED_COVER_TYPES.get(content_type)
@@ -283,6 +338,7 @@ def delete_track(db: Session, track: Track, storage: MediaStorage | None = None)
             failed_media_path = display_path
             media_path.unlink(missing_ok=True)
 
+        _cleanup_empty_track_media_dirs(media_paths, track_id)
         db.commit()
     except OSError as exc:
         db.rollback()
@@ -330,3 +386,45 @@ def _track_media_paths(track: Track, storage: MediaStorage) -> list[tuple[Path, 
         paths.append((media_path, relative_path))
 
     return paths
+
+
+def _cleanup_empty_track_media_dirs(
+    media_paths: list[tuple[Path, str]],
+    track_id: int,
+) -> None:
+    expected_dir_name = f"track-{track_id}"
+    cleaned_dirs: set[str] = set()
+
+    for media_path, display_path in media_paths:
+        parent = media_path.parent
+        if parent.name != expected_dir_name:
+            continue
+
+        parent_key = parent.as_posix()
+        if parent_key in cleaned_dirs:
+            continue
+
+        cleaned_dirs.add(parent_key)
+        try:
+            parent.rmdir()
+        except FileNotFoundError:
+            logger.info(
+                "Skipped media directory cleanup for track %s at '%s': directory no longer exists.",
+                track_id,
+                parent,
+            )
+        except OSError as exc:
+            reason = str(exc)
+            try:
+                if parent.exists() and any(parent.iterdir()):
+                    reason = "directory is not empty"
+            except OSError as inspect_exc:
+                reason = str(inspect_exc)
+
+            logger.info(
+                "Skipped media directory cleanup for track %s at '%s' after deleting '%s': %s.",
+                track_id,
+                parent,
+                display_path,
+                reason,
+            )

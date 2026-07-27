@@ -67,3 +67,19 @@ export type TrackBatchTagUpdateResponse = {
   results: TrackBatchTagResult[];
   tracks: Track[];
 };
+
+export type TrackBatchDelete = {
+  track_ids: number[];
+};
+
+export type TrackBatchDeleteResult = {
+  track_id: number;
+  status: "deleted" | "failed" | string;
+  error: string | null;
+};
+
+export type TrackBatchDeleteResponse = {
+  requested_track_count: number;
+  deleted_count: number;
+  results: TrackBatchDeleteResult[];
+};

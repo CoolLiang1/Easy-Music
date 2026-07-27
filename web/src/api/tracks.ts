@@ -2,6 +2,8 @@ import { ApiClientError, apiRequest } from "./http";
 import { env } from "../config/env";
 import type {
   Track,
+  TrackBatchDelete,
+  TrackBatchDeleteResponse,
   TrackBatchTagUpdate,
   TrackBatchTagUpdateResponse,
   TrackUpdate,
@@ -11,6 +13,11 @@ export type UploadProgress = {
   loaded: number;
   percent: number | null;
   total: number | null;
+};
+
+export type TrackStreamUrlResponse = {
+  stream_url: string;
+  expires_at: number;
 };
 
 export function listTracks(accessToken: string) {
@@ -41,6 +48,14 @@ export function deleteTrack(accessToken: string, trackId: number | string) {
   return apiRequest<void>(`/api/tracks/${encodeURIComponent(trackId)}`, {
     method: "DELETE",
     accessToken,
+  });
+}
+
+export function batchDeleteTracks(accessToken: string, payload: TrackBatchDelete) {
+  return apiRequest<TrackBatchDeleteResponse>("/api/tracks/batch-delete", {
+    method: "POST",
+    accessToken,
+    body: payload,
   });
 }
 
@@ -162,24 +177,19 @@ function uploadWithProgress<T>(
   });
 }
 
-export async function getTrackStreamBlob(
+export async function getTrackStreamUrl(
   accessToken: string,
   trackId: number | string,
 ) {
-  const response = await fetch(
-    `${env.apiBaseUrl}/api/tracks/${encodeURIComponent(trackId)}/stream`,
+  const response = await apiRequest<TrackStreamUrlResponse>(
+    `/api/tracks/${encodeURIComponent(trackId)}/stream-url`,
     {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      method: "POST",
+      accessToken,
     },
   );
 
-  if (!response.ok) {
-    throw new Error(await getStreamErrorMessage(response));
-  }
-
-  return response.blob();
+  return buildAbsoluteStreamUrl(response.stream_url);
 }
 
 export async function getTrackCoverBlob(
@@ -202,31 +212,6 @@ export async function getTrackCoverBlob(
   return response.blob();
 }
 
-async function getStreamErrorMessage(response: Response) {
-  if (response.status === 401 || response.status === 403) {
-    return "登录状态已过期，请重新登录后播放这个音轨。";
-  }
-
-  if (response.status === 404) {
-    return "播放文件不存在。请刷新音轨状态，或重新运行后端处理。";
-  }
-
-  const contentType = response.headers.get("Content-Type") ?? "";
-
-  if (contentType.includes("application/json")) {
-    const payload = (await response.json()) as { detail?: unknown; message?: unknown };
-    if (typeof payload.detail === "string") {
-      return payload.detail;
-    }
-
-    if (typeof payload.message === "string") {
-      return payload.message;
-    }
-  }
-
-  return response.statusText || "无法加载音频流。";
-}
-
 function getUploadErrorMessage(payload: unknown, fallback: string) {
   if (typeof payload === "object" && payload !== null) {
     const detail = "detail" in payload ? payload.detail : undefined;
@@ -241,6 +226,15 @@ function getUploadErrorMessage(payload: unknown, fallback: string) {
   }
 
   return fallback || "上传失败。";
+}
+
+function buildAbsoluteStreamUrl(streamUrl: string) {
+  if (/^https?:\/\//i.test(streamUrl)) {
+    return streamUrl;
+  }
+
+  const normalizedPath = streamUrl.startsWith("/") ? streamUrl : `/${streamUrl}`;
+  return `${env.apiBaseUrl}${normalizedPath}`;
 }
 
 async function getCoverErrorMessage(response: Response) {
