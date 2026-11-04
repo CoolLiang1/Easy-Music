@@ -12,7 +12,7 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 2026-11-04 从路线图同步。
 
 <!-- status-snapshot: 2026-11-04 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Auth session renewal=Implemented -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented -->
 
 - MVP Phase 0 到 Phase 7 已实现，并完成本地验收。
 - V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
@@ -26,6 +26,8 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
   [重设计验收记录](docs/ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md)。
 - 登录会话自动续期（轮换式刷新令牌，Web 和 Android 静默重新认证）已实现，并通过后端测试、本地 Web 冒烟测试和 Android 单元测试；仍需在 Android 真机上验证，见
   [登录续期验收记录](docs/ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md)。
+- 播放音量统一（服务端测量响度，并给每个播放 MP3 写入一个固定增益，附带老曲目回填命令）已实现，并通过后端测试和真实 ffmpeg 验证；仍需在生产环境回填并由所有者实际试听，见
+  [音量统一验收记录](docs/ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md)。
 
 Easy Music 现在采用“私人稳定版”方向，不再计划完整实现 V2.6。后续开发只从所有者真实使用中遇到的具体问题逐项选择，优先维护、安全和数据保护，而不是扩张产品范围。
 

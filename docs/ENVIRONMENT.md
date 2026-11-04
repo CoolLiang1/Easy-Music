@@ -38,6 +38,9 @@ contain placeholders only, not production-ready secrets.
 | `IMPORT_SCAN_MAX_FILE_MB` | No | No | Maximum per-file size included as a supported import scan candidate. Defaults to `200`; larger files are returned as skipped. |
 | `FFMPEG_PATH` | Yes | Yes | Executable name or configured path for `ffmpeg`. Development can use `ffmpeg` when it is available on `PATH`. |
 | `FFPROBE_PATH` | Yes | Yes | Executable name or configured path for `ffprobe`. Development can use `ffprobe` when it is available on `PATH`. |
+| `PLAYBACK_LOUDNESS_NORMALIZATION` | No | No | Measure each original with ffmpeg `loudnorm` and bake one static gain into the playback MP3. Defaults to `true`; `false` encodes without gain. |
+| `PLAYBACK_TARGET_LUFS` | No | No | Target integrated loudness for playback MP3s. Defaults to `-16`. Changing it affects new files only until `python -m app.worker.renormalize --all` is run. |
+| `PLAYBACK_MAX_TRUE_PEAK_DBTP` | No | No | True-peak ceiling. A boost is reduced so the measured peak stays at or below this value; no limiter or compression is applied. Defaults to `-1`. |
 | `CORS_ORIGINS` | Yes | Yes | Comma-separated list of allowed browser origins. Development should list local Web origins explicitly; deployment should list only deployed domains. |
 | `LOG_LEVEL` | No | No | Backend log level. Defaults to `INFO`. |
 | `LOG_FORMAT` | No | No | Backend log format: `text` for development-style logs or `json` for production-friendly structured logs. |

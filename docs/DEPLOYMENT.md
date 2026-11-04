@@ -539,6 +539,28 @@ docker compose -f docker-compose.prod.yml --env-file .env.production \
 docker compose -f docker-compose.prod.yml --env-file .env.production ps
 ```
 
+### Regenerate Playback Loudness
+
+New uploads are loudness-normalized automatically. After the first upgrade
+that adds normalization, or after changing `PLAYBACK_TARGET_LUFS` or
+`PLAYBACK_MAX_TRUE_PEAK_DBTP`, regenerate existing playback files. Only
+playback MP3s are rewritten; originals, metadata, tags, covers, and history
+are untouched, and a failed track keeps its previous playback file.
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec worker python -m app.worker.renormalize --dry-run
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec worker python -m app.worker.renormalize
+```
+
+Use `--all` after changing the target values, or `--track-id <id>` for one
+track. Each track is decoded twice, so expect roughly the original audio
+decode time per track. The command exits non-zero and lists failed track ids
+if any track fails; rerun it to retry only unfinished tracks. Android tracks
+cached before regeneration keep the old audio until they are removed from
+the cache and cached again.
+
 When an update introduces session renewal (refresh tokens), install the
 matching Android APK before lowering `ACCESS_TOKEN_EXPIRE_MINUTES` in
 `.env.production`; an older APK cannot renew and would ask for a login each

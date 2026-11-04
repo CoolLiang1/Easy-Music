@@ -196,6 +196,11 @@ Update this section when you discover something surprising.
   sites and must not move, rename, delete, or modify source files.
 - Backend upload status depends on both the API creating a processing job and
   the worker actually running with writable shared media volumes.
+- `process_track` re-applies title, artist, and album from file tags. Never use
+  it to rebuild playback for an existing track; use
+  `regenerate_track_playback`, which keeps owner edits. Bump
+  `LOUDNESS_VERSION` when the playback gain rule changes so the backfill
+  command picks up old files.
 
 ## Safety Rules
 

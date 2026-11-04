@@ -9,12 +9,18 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.config import Settings
 from app.db.base import Base
-from app.media.ffmpeg import FFmpegError
+from app.media.ffmpeg import FFmpegError, LoudnessMeasurement
 from app.media.metadata import MediaMetadata
 from app.media.storage import MediaStorage
 from app.models.track import Track
 from app.models.user import User
-from app.services.processing import TrackProcessingError, process_track
+from app.services.processing import (
+    LOUDNESS_VERSION,
+    TrackProcessingError,
+    list_tracks_needing_loudness_normalization,
+    process_track,
+    regenerate_track_playback,
+)
 
 
 @pytest.fixture
@@ -182,3 +188,206 @@ def test_process_track_raises_when_track_is_missing(
 
     with pytest.raises(TrackProcessingError, match="was not found"):
         process_track(db_session, 999, storage)
+
+
+def loud_measurer(*args: object, **kwargs: object) -> LoudnessMeasurement:
+    return LoudnessMeasurement(integrated_lufs=-9.0, true_peak_dbtp=0.5)
+
+
+def failing_measurer(*args: object, **kwargs: object) -> LoudnessMeasurement:
+    raise FFmpegError("measure failed", executable="ffmpeg", args=["ffmpeg"])
+
+
+def write_playback(gains: list[float | None]):
+    def generator(source_path: Path, destination_path: Path, **kwargs: object) -> None:
+        gain = kwargs.get("gain_db")
+        gains.append(gain)  # type: ignore[arg-type]
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        destination_path.write_bytes(f"mp3 gain={gain}".encode())
+
+    return generator
+
+
+def create_original(tmp_path: Path) -> Path:
+    original = tmp_path / "originals" / "user-1" / "track-1" / "source.flac"
+    original.parent.mkdir(parents=True, exist_ok=True)
+    original.write_bytes(b"audio")
+    return original
+
+
+def flac_metadata(*args: object, **kwargs: object) -> MediaMetadata:
+    return MediaMetadata(10, "flac", None, None, None, None)
+
+
+def test_process_track_applies_loudness_gain_and_records_measurement(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    original = create_original(tmp_path)
+    track = create_processing_track(db_session, user, original.relative_to(tmp_path).as_posix())
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
+    gains: list[float | None] = []
+
+    processed = process_track(
+        db_session,
+        track.id,
+        storage,
+        metadata_extractor=flac_metadata,
+        playback_generator=write_playback(gains),
+        loudness_measurer=loud_measurer,
+    )
+
+    # -16 LUFS target needs -7 dB; the -1 dBTP ceiling would allow -1.5 dB,
+    # so the stronger attenuation wins.
+    assert gains == [-7.0]
+    assert processed.status == "ready"
+    assert processed.loudness_lufs == -9.0
+    assert processed.true_peak_dbtp == 0.5
+    assert processed.playback_gain_db == -7.0
+    assert processed.loudness_version == LOUDNESS_VERSION
+    assert processed.playback_file_sha256 == hashlib.sha256(b"mp3 gain=-7.0").hexdigest()
+
+
+def test_process_track_falls_back_without_gain_when_measurement_fails(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    original = create_original(tmp_path)
+    track = create_processing_track(db_session, user, original.relative_to(tmp_path).as_posix())
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
+    gains: list[float | None] = []
+
+    processed = process_track(
+        db_session,
+        track.id,
+        storage,
+        metadata_extractor=flac_metadata,
+        playback_generator=write_playback(gains),
+        loudness_measurer=failing_measurer,
+    )
+
+    assert gains == [None]
+    assert processed.status == "ready"
+    assert processed.playback_gain_db is None
+    assert processed.loudness_version is None
+
+
+def test_process_track_skips_measurement_when_normalization_disabled(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    original = create_original(tmp_path)
+    track = create_processing_track(db_session, user, original.relative_to(tmp_path).as_posix())
+    storage = MediaStorage(
+        Settings(media_root=str(tmp_path), playback_loudness_normalization=False)
+    )
+    gains: list[float | None] = []
+
+    def must_not_measure(*args: object, **kwargs: object) -> LoudnessMeasurement:
+        raise AssertionError("measurement should be skipped")
+
+    processed = process_track(
+        db_session,
+        track.id,
+        storage,
+        metadata_extractor=flac_metadata,
+        playback_generator=write_playback(gains),
+        loudness_measurer=must_not_measure,
+    )
+
+    assert gains == [None]
+    assert processed.loudness_version is None
+
+
+def create_ready_track(db_session: Session, user: User, original_path: str) -> Track:
+    track = Track(
+        user_id=user.id,
+        title="Owner Edited Title",
+        artist="Owner Edited Artist",
+        content_type="song",
+        original_file_path=original_path,
+        playback_file_path="playback/user-1/track-1/playback.mp3",
+        status="ready",
+    )
+    db_session.add(track)
+    db_session.commit()
+    db_session.refresh(track)
+    return track
+
+
+def test_regenerate_track_playback_preserves_metadata_and_updates_loudness(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    original = create_original(tmp_path)
+    track = create_ready_track(db_session, user, original.relative_to(tmp_path).as_posix())
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
+    gains: list[float | None] = []
+
+    regenerated = regenerate_track_playback(
+        db_session,
+        track.id,
+        storage,
+        playback_generator=write_playback(gains),
+        loudness_measurer=loud_measurer,
+    )
+
+    assert gains == [-7.0]
+    assert regenerated.status == "ready"
+    assert regenerated.title == "Owner Edited Title"
+    assert regenerated.artist == "Owner Edited Artist"
+    assert regenerated.loudness_version == LOUDNESS_VERSION
+    assert (tmp_path / "playback/user-1/track-1/playback.mp3").read_bytes() == b"mp3 gain=-7.0"
+    assert list_tracks_needing_loudness_normalization(db_session) == []
+    assert list_tracks_needing_loudness_normalization(db_session, include_current=True) == [
+        track.id
+    ]
+
+
+def test_regenerate_track_playback_failure_keeps_track_ready(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    original = create_original(tmp_path)
+    track = create_ready_track(db_session, user, original.relative_to(tmp_path).as_posix())
+    storage = MediaStorage(Settings(media_root=str(tmp_path)))
+
+    def fail_playback(*args: object, **kwargs: object) -> None:
+        raise FFmpegError("failed", executable="ffmpeg", args=["ffmpeg"])
+
+    with pytest.raises(TrackProcessingError, match="regeneration failed"):
+        regenerate_track_playback(
+            db_session,
+            track.id,
+            storage,
+            playback_generator=fail_playback,
+            loudness_measurer=loud_measurer,
+        )
+
+    db_session.refresh(track)
+    assert track.status == "ready"
+    assert track.loudness_version is None
+    assert list_tracks_needing_loudness_normalization(db_session) == [track.id]
+
+
+def test_regenerate_track_playback_rejects_tracks_that_are_not_ready(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    user = create_user(db_session)
+    original = create_original(tmp_path)
+    track = create_processing_track(db_session, user, original.relative_to(tmp_path).as_posix())
+
+    with pytest.raises(TrackProcessingError, match="not ready"):
+        regenerate_track_playback(
+            db_session,
+            track.id,
+            MediaStorage(Settings(media_root=str(tmp_path))),
+        )
+
+    assert list_tracks_needing_loudness_normalization(db_session) == []

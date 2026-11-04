@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -24,6 +24,10 @@ class Track(Base):
     original_file_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
     playback_file_path: Mapped[str | None] = mapped_column(String(1024))
     playback_file_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
+    loudness_lufs: Mapped[float | None] = mapped_column(Float)
+    true_peak_dbtp: Mapped[float | None] = mapped_column(Float)
+    playback_gain_db: Mapped[float | None] = mapped_column(Float)
+    loudness_version: Mapped[int | None] = mapped_column(Integer)
     cover_path: Mapped[str | None] = mapped_column(String(1024))
     source_url: Mapped[str | None] = mapped_column(String(2048))
     format: Mapped[str | None] = mapped_column(String(50))
