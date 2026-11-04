@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 
 import { ApiClientError } from "../api/http";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
@@ -15,7 +15,7 @@ export function LoginPage() {
 }
 
 function LoginForm() {
-  const { login, logout, status } = useAuth();
+  const { login, status } = useAuth();
   const usernameId = useId();
   const passwordId = useId();
   const [username, setUsername] = useState("");
@@ -23,10 +23,6 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    void logout();
-  }, [logout]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

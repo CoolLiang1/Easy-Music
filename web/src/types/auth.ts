@@ -6,6 +6,9 @@ export type LoginRequest = {
 export type TokenResponse = {
   access_token: string;
   token_type: "bearer" | string;
+  expires_in: number;
+  refresh_token: string;
+  refresh_token_expires_at: string;
 };
 
 export type CurrentUser = {

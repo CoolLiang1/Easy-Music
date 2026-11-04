@@ -1,4 +1,4 @@
-import { ApiClientError, apiRequest } from "./http";
+import { ApiClientError, apiRequest, refreshExpiredAccessToken } from "./http";
 import { env } from "../config/env";
 import type {
   Track,
@@ -119,7 +119,30 @@ export function uploadVideoTrack(
   );
 }
 
-function uploadWithProgress<T>(
+async function uploadWithProgress<T>(
+  url: string,
+  accessToken: string,
+  formData: FormData,
+  fileSize: number,
+  onProgress?: (progress: UploadProgress) => void,
+) {
+  try {
+    return await sendUploadWithProgress<T>(url, accessToken, formData, fileSize, onProgress);
+  } catch (error) {
+    if (!(error instanceof ApiClientError) || error.status !== 401) {
+      throw error;
+    }
+
+    const renewedAccessToken = await refreshExpiredAccessToken(accessToken);
+    if (!renewedAccessToken) {
+      throw error;
+    }
+
+    return sendUploadWithProgress<T>(url, renewedAccessToken, formData, fileSize, onProgress);
+  }
+}
+
+function sendUploadWithProgress<T>(
   url: string,
   accessToken: string,
   formData: FormData,
@@ -196,14 +219,21 @@ export async function getTrackCoverBlob(
   accessToken: string,
   trackId: number | string,
 ) {
-  const response = await fetch(
-    `${env.apiBaseUrl}/api/tracks/${encodeURIComponent(trackId)}/cover`,
-    {
+  const coverUrl = `${env.apiBaseUrl}/api/tracks/${encodeURIComponent(trackId)}/cover`;
+  const fetchCover = (token: string) =>
+    fetch(coverUrl, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
-    },
-  );
+    });
+
+  let response = await fetchCover(accessToken);
+  if (response.status === 401) {
+    const renewedAccessToken = await refreshExpiredAccessToken(accessToken);
+    if (renewedAccessToken) {
+      response = await fetchCover(renewedAccessToken);
+    }
+  }
 
   if (!response.ok) {
     throw new Error(await getCoverErrorMessage(response));

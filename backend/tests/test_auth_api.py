@@ -1,16 +1,19 @@
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth.password import hash_password
+from app.auth.refresh_tokens import ROTATION_GRACE_SECONDS
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
 
@@ -120,3 +123,163 @@ def test_login_allows_web_cors_preflight(monkeypatch: pytest.MonkeyPatch) -> Non
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == web_origin
     assert "POST" in response.headers["access-control-allow-methods"]
+
+
+def login_tokens(client: TestClient) -> dict:
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "owner", "password": "correct-password"},
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_login_returns_refresh_token(client: TestClient, db_session: Session) -> None:
+    create_user(db_session)
+
+    body = login_tokens(client)
+
+    assert body["refresh_token"]
+    assert body["expires_in"] == get_settings().access_token_expire_minutes * 60
+    assert body["refresh_token_expires_at"]
+    stored = db_session.scalars(select(RefreshToken)).all()
+    assert len(stored) == 1
+    assert stored[0].token_hash != body["refresh_token"]
+
+
+def test_refresh_rotates_tokens(client: TestClient, db_session: Session) -> None:
+    create_user(db_session)
+    first = login_tokens(client)
+
+    response = client.post(
+        "/api/auth/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    )
+
+    assert response.status_code == 200
+    second = response.json()
+    assert second["refresh_token"] != first["refresh_token"]
+    me = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {second['access_token']}"},
+    )
+    assert me.status_code == 200
+
+    again = client.post(
+        "/api/auth/refresh",
+        json={"refresh_token": second["refresh_token"]},
+    )
+    assert again.status_code == 200
+
+
+def test_refresh_allows_concurrent_reuse_within_grace_window(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    create_user(db_session)
+    first = login_tokens(client)
+
+    a = client.post("/api/auth/refresh", json={"refresh_token": first["refresh_token"]})
+    b = client.post("/api/auth/refresh", json={"refresh_token": first["refresh_token"]})
+
+    assert a.status_code == 200
+    assert b.status_code == 200
+
+
+def test_refresh_rejects_token_revoked_outside_grace_window(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    create_user(db_session)
+    first = login_tokens(client)
+    assert client.post(
+        "/api/auth/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    ).status_code == 200
+
+    record = db_session.scalar(
+        select(RefreshToken).where(RefreshToken.revoked_at.is_not(None)),
+    )
+    assert record is not None
+    record.revoked_at = datetime.now(UTC) - timedelta(seconds=ROTATION_GRACE_SECONDS + 5)
+    db_session.commit()
+
+    response = client.post(
+        "/api/auth/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    )
+
+    assert response.status_code == 401
+
+
+def test_refresh_rejects_unknown_and_expired_tokens(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    create_user(db_session)
+    tokens = login_tokens(client)
+
+    unknown = client.post("/api/auth/refresh", json={"refresh_token": "not-a-token"})
+    assert unknown.status_code == 401
+
+    record = db_session.scalar(select(RefreshToken))
+    assert record is not None
+    record.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    db_session.commit()
+
+    expired = client.post(
+        "/api/auth/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert expired.status_code == 401
+
+
+def test_logout_revokes_refresh_token_without_access_token(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    create_user(db_session)
+    tokens = login_tokens(client)
+
+    logout = client.post(
+        "/api/auth/logout",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert logout.status_code == 200
+
+    response = client.post(
+        "/api/auth/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert response.status_code == 401
+
+
+def test_logout_without_refresh_token_still_requires_access_token(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    create_user(db_session)
+    tokens = login_tokens(client)
+
+    assert client.post("/api/auth/logout").status_code == 401
+    response = client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert response.status_code == 200
+
+
+def test_login_cleans_up_expired_refresh_tokens(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    create_user(db_session)
+    login_tokens(client)
+    record = db_session.scalar(select(RefreshToken))
+    assert record is not None
+    record.expires_at = datetime.now(UTC) - timedelta(days=1)
+    db_session.commit()
+
+    login_tokens(client)
+
+    assert len(db_session.scalars(select(RefreshToken)).all()) == 1

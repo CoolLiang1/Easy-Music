@@ -34,6 +34,22 @@ class AuthTokenStore(
         }
     }
 
+    suspend fun readRefreshToken(): String? =
+        dataStore.data.first()[REFRESH_TOKEN_KEY]?.takeIf { it.isNotBlank() }
+
+    suspend fun saveTokens(
+        accessToken: String,
+        refreshToken: String,
+    ) {
+        require(accessToken.isNotBlank()) { "Access token must not be blank." }
+        require(refreshToken.isNotBlank()) { "Refresh token must not be blank." }
+
+        dataStore.edit { preferences ->
+            preferences[ACCESS_TOKEN_KEY] = accessToken
+            preferences[REFRESH_TOKEN_KEY] = refreshToken
+        }
+    }
+
     suspend fun saveCurrentUser(currentUser: CurrentUserResponse) {
         dataStore.edit { preferences ->
             preferences[CURRENT_USER_ID_KEY] = currentUser.id
@@ -57,6 +73,7 @@ class AuthTokenStore(
     suspend fun clearToken() {
         dataStore.edit { preferences ->
             preferences.remove(ACCESS_TOKEN_KEY)
+            preferences.remove(REFRESH_TOKEN_KEY)
             preferences.remove(CURRENT_USER_ID_KEY)
             preferences.remove(CURRENT_USERNAME_KEY)
             preferences.remove(CURRENT_USER_CREATED_AT_KEY)
@@ -65,6 +82,7 @@ class AuthTokenStore(
 
     private companion object {
         val ACCESS_TOKEN_KEY = stringPreferencesKey("access_token")
+        val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
         val CURRENT_USER_ID_KEY = intPreferencesKey("current_user_id")
         val CURRENT_USERNAME_KEY = stringPreferencesKey("current_username")
         val CURRENT_USER_CREATED_AT_KEY = stringPreferencesKey("current_user_created_at")

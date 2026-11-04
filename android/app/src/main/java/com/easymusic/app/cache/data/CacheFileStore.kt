@@ -1,6 +1,7 @@
 package com.easymusic.app.cache.data
 
 import android.content.Context
+import com.easymusic.app.core.network.AccessTokenRenewal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
@@ -82,13 +83,15 @@ class CacheFileStore(
         val finalFile = finalFileForTrack(trackId)
         val temporaryFile = File(cacheDirectory, "${finalFile.name}.part")
         var connection: HttpURLConnection? = null
+        // Large downloads can outlive a nearly expired token; renew it up front.
+        val token = AccessTokenRenewal.renewer?.currentValidAccessToken() ?: bearerToken
 
         try {
             connection = (URL(streamUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
-                setRequestProperty("Authorization", "Bearer $bearerToken")
+                setRequestProperty("Authorization", "Bearer $token")
                 setRequestProperty("Accept", "audio/mpeg")
             }
 

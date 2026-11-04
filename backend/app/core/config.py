@@ -20,8 +20,12 @@ class Settings(BaseSettings):
         validation_alias="APP_SECRET_KEY",
     )
     access_token_expire_minutes: int = Field(
-        default=1440,
+        default=60,
         validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES",
+    )
+    refresh_token_expire_days: int = Field(
+        default=30,
+        validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
     media_root: str = Field(default="/app/media", validation_alias="MEDIA_ROOT")
     originals_dir: str = Field(default="originals", validation_alias="ORIGINALS_DIR")
