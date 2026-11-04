@@ -7,6 +7,7 @@ from app.models.import_batch import ImportBatch, ImportItem
 from app.models.playback_event import PlaybackEvent
 from app.models.playlist import Playlist, PlaylistTrack
 from app.models.processing_job import ProcessingJob
+from app.models.refresh_token import RefreshToken
 from app.models.track import Track
 from app.models.track_tag import TrackTag
 from app.models.user import User
@@ -20,6 +21,7 @@ __all__ = [
     "Playlist",
     "PlaylistTrack",
     "ProcessingJob",
+    "RefreshToken",
     "Tag",
     "Track",
     "TrackTag",

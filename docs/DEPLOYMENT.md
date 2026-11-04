@@ -141,7 +141,8 @@ POSTGRES_PASSWORD=replace-with-a-strong-database-password
 DATABASE_URL=postgresql+psycopg://easy_music:replace-with-the-same-database-password@postgres:5432/easy_music
 
 APP_SECRET_KEY=replace-with-openssl-rand-hex-32
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_DAYS=30
 CORS_ORIGINS=https://music.example.com
 CADDY_DOMAIN=music.example.com
 CADDY_HTTP_PORT=80
@@ -537,6 +538,11 @@ docker compose -f docker-compose.prod.yml --env-file .env.production \
   exec api alembic upgrade head
 docker compose -f docker-compose.prod.yml --env-file .env.production ps
 ```
+
+When an update introduces session renewal (refresh tokens), install the
+matching Android APK before lowering `ACCESS_TOKEN_EXPIRE_MINUTES` in
+`.env.production`; an older APK cannot renew and would ask for a login each
+time the access token expires.
 
 Restore from a backup only after taking a fresh backup and confirming you want
 to overwrite current data:

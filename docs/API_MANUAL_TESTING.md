@@ -84,6 +84,38 @@ Invoke-RestMethod `
   -Headers $headers
 ```
 
+Renew the session with the refresh token. Each call rotates the refresh token,
+so keep the new one:
+
+```powershell
+$refreshBody = @{ refresh_token = $login.refresh_token } | ConvertTo-Json
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/auth/refresh" `
+  -ContentType "application/json" `
+  -Body $refreshBody
+
+$token = $login.access_token
+$headers = @{ Authorization = "Bearer $token" }
+```
+
+Expected result: a new `access_token` and a different `refresh_token`. Sending
+the previous refresh token again after 60 seconds returns `401`.
+
+Sign out by revoking the refresh token (no access token required):
+
+```powershell
+$logoutBody = @{ refresh_token = $login.refresh_token } | ConvertTo-Json
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/auth/logout" `
+  -ContentType "application/json" `
+  -Body $logoutBody
+```
+
+Run the logout step last, or log in again before continuing with the flows
+below.
+
 ## Upload A Test Audio File
 
 Create a tiny WAV file with FFmpeg:

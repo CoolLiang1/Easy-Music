@@ -19,7 +19,8 @@ contain placeholders only, not production-ready secrets.
 | `POSTGRES_PASSWORD` | Yes | Yes | PostgreSQL password for `POSTGRES_USER`. The example value is a placeholder and must be replaced outside version control. |
 | `DATABASE_URL` | Yes | Yes | Full backend database connection URL. It should match the database name, user, password, host, and port used by the runtime environment. |
 | `APP_SECRET_KEY` | Yes | Yes | Backend signing secret for authentication-related tokens. Development may use a throwaway placeholder; every deployment must use a strong unique secret. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Yes | Yes | Access token lifetime in minutes. The development example favors convenience and can be tightened for deployment. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Yes | Yes | Short-lived access token lifetime in minutes. Defaults to `60`; Web and Android renew it silently with the refresh token, so a short value does not force re-login. |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | No | No | Refresh token lifetime in days. Defaults to `30`. Each renewal rotates the token and restarts this window, so a client opened at least once per window stays signed in. |
 | `VITE_API_BASE_URL` | Yes for Web | Yes for Web build | Public API origin baked into the React build. For production, set it to the deployed HTTPS origin before `npm run build`. |
 | `VITE_MAX_VIDEO_UPLOAD_MB` | No | No | Web UI display/client-side limit for user-provided video uploads. Keep it aligned with `MAX_VIDEO_UPLOAD_MB`. |
 | `easyMusicApiBaseUrl` Gradle property | No | Yes for Android production APK | Public API origin baked into the Android APK at build time. Pass it with `-PeasyMusicApiBaseUrl=https://music.example.com`; omit it for emulator-local development. |

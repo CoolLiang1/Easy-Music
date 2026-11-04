@@ -15,10 +15,16 @@ class AuthApi(
             jsonBody = request.toJson(),
         ).parseJson(TokenResponse::fromJson)
 
-    fun logout(bearerToken: String): ApiResult<Unit> =
-        apiClient.post(
+    fun refresh(refreshToken: String): ApiResult<TokenResponse> =
+        apiClient.postJson(
+            path = "/api/auth/refresh",
+            jsonBody = RefreshTokenRequest(refreshToken).toJson(),
+        ).parseJson(TokenResponse::fromJson)
+
+    fun logout(refreshToken: String): ApiResult<Unit> =
+        apiClient.postJson(
             path = "/api/auth/logout",
-            bearerToken = bearerToken,
+            jsonBody = RefreshTokenRequest(refreshToken).toJson(),
         ).map { Unit }
 
     fun me(bearerToken: String): ApiResult<CurrentUserResponse> =

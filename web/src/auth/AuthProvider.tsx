@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -12,12 +13,15 @@ import {
   getCurrentUser,
   login as loginRequest,
   logout as logoutRequest,
+  refreshSession,
 } from "../api/auth";
+import { ApiClientError, setAccessTokenRefresher } from "../api/http";
 import type { CurrentUser, LoginRequest } from "../types/auth";
 import {
-  clearStoredAccessToken,
+  clearStoredTokens,
   readStoredAccessToken,
-  storeAccessToken,
+  readStoredRefreshToken,
+  storeTokens,
 } from "./storage";
 
 type AuthStatus = "checking" | "authenticated" | "unauthenticated";
@@ -38,6 +42,8 @@ type AuthProviderProps = {
   restoreStoredSession?: boolean;
 };
 
+const SESSION_EXPIRED_MESSAGE = "登录已过期，请重新登录。";
+
 export function AuthProvider({
   children,
   restoreStoredSession = true,
@@ -48,17 +54,74 @@ export function AuthProvider({
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<AuthStatus>(() =>
-    restoreStoredSession && readStoredAccessToken()
-      ? "checking"
-      : "unauthenticated",
+    restoreStoredSession && hasStoredSession() ? "checking" : "unauthenticated",
   );
+  const pendingRefreshRef = useRef<Promise<string | null> | null>(null);
 
   const clearSession = useCallback(() => {
-    clearStoredAccessToken();
+    clearStoredTokens();
     setAccessToken(null);
     setCurrentUser(null);
     setStatus("unauthenticated");
   }, []);
+
+  // Renews the access token with the stored refresh token. Concurrent callers
+  // share one request so a burst of 401s rotates the refresh token only once.
+  const refreshAccessToken = useCallback(
+    (expiredAccessToken: string | null): Promise<string | null> => {
+      const storedAccessToken = readStoredAccessToken();
+      if (
+        expiredAccessToken &&
+        storedAccessToken &&
+        storedAccessToken !== expiredAccessToken
+      ) {
+        // Another request or tab already renewed the session.
+        setAccessToken(storedAccessToken);
+        return Promise.resolve(storedAccessToken);
+      }
+
+      if (pendingRefreshRef.current) {
+        return pendingRefreshRef.current;
+      }
+
+      const refreshToken = readStoredRefreshToken();
+      if (!refreshToken) {
+        clearSession();
+        setError(SESSION_EXPIRED_MESSAGE);
+        return Promise.resolve(null);
+      }
+
+      const pending = refreshSession(refreshToken)
+        .then((tokens) => {
+          storeTokens(tokens.access_token, tokens.refresh_token);
+          setAccessToken(tokens.access_token);
+          return tokens.access_token;
+        })
+        .catch((requestError: unknown) => {
+          if (isUnauthorized(requestError)) {
+            clearSession();
+            setError(SESSION_EXPIRED_MESSAGE);
+          }
+          // Network or server errors keep the stored session for a later retry.
+          return null;
+        })
+        .finally(() => {
+          pendingRefreshRef.current = null;
+        });
+
+      pendingRefreshRef.current = pending;
+      return pending;
+    },
+    [clearSession],
+  );
+
+  useEffect(() => {
+    if (!restoreStoredSession) {
+      return;
+    }
+
+    return setAccessTokenRefresher(refreshAccessToken);
+  }, [refreshAccessToken, restoreStoredSession]);
 
   useEffect(() => {
     if (!restoreStoredSession) {
@@ -67,7 +130,7 @@ export function AuthProvider({
 
     const storedToken = readStoredAccessToken();
 
-    if (!storedToken) {
+    if (!hasStoredSession()) {
       clearSession();
       return;
     }
@@ -76,13 +139,25 @@ export function AuthProvider({
     setStatus("checking");
     setError(null);
 
-    getCurrentUser(storedToken)
+    const tokenPromise = storedToken
+      ? Promise.resolve<string | null>(storedToken)
+      : refreshAccessToken(null);
+
+    tokenPromise
+      .then((token) => {
+        if (!token) {
+          throw new Error(SESSION_EXPIRED_MESSAGE);
+        }
+
+        // A 401 here is renewed transparently by apiRequest.
+        return getCurrentUser(token);
+      })
       .then((user) => {
         if (!isActive) {
           return;
         }
 
-        setAccessToken(storedToken);
+        setAccessToken(readStoredAccessToken());
         setCurrentUser(user);
         setStatus("authenticated");
       })
@@ -91,24 +166,31 @@ export function AuthProvider({
           return;
         }
 
-        clearSession();
+        if (isUnauthorized(requestError) || !hasStoredSession()) {
+          clearSession();
+        } else {
+          // Server unreachable: keep the stored tokens so a reload can resume.
+          setAccessToken(null);
+          setCurrentUser(null);
+          setStatus("unauthenticated");
+        }
         setError(getErrorMessage(requestError));
       });
 
     return () => {
       isActive = false;
     };
-  }, [clearSession, restoreStoredSession]);
+  }, [clearSession, refreshAccessToken, restoreStoredSession]);
 
   const login = useCallback(async (credentials: LoginRequest) => {
     setError(null);
 
     try {
       const tokenResponse = await loginRequest(credentials);
-      storeAccessToken(tokenResponse.access_token);
+      storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
 
       const user = await getCurrentUser(tokenResponse.access_token);
-      setAccessToken(tokenResponse.access_token);
+      setAccessToken(readStoredAccessToken());
       setCurrentUser(user);
       setStatus("authenticated");
     } catch (requestError) {
@@ -118,18 +200,18 @@ export function AuthProvider({
   }, [clearSession]);
 
   const logout = useCallback(async () => {
-    const token = readStoredAccessToken();
+    const refreshToken = readStoredRefreshToken();
     clearSession();
     setError(null);
 
-    if (!token) {
+    if (!refreshToken) {
       return;
     }
 
     try {
-      await logoutRequest(token);
+      await logoutRequest(refreshToken);
     } catch {
-      // Local logout should still complete if the token is already expired.
+      // Local logout should still complete if the server is unreachable.
     }
   }, [clearSession]);
 
@@ -164,4 +246,12 @@ function getErrorMessage(error: unknown) {
   }
 
   return "请求失败。";
+}
+
+function hasStoredSession() {
+  return Boolean(readStoredAccessToken() || readStoredRefreshToken());
+}
+
+function isUnauthorized(error: unknown) {
+  return error instanceof ApiClientError && error.status === 401;
 }

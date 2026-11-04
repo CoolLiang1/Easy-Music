@@ -7,6 +7,7 @@ import java.net.URL
 
 class ApiClient(
     val config: AppConfig,
+    private val tokenRenewer: () -> AccessTokenRenewer? = { AccessTokenRenewal.renewer },
 ) {
     val baseUrl: String = config.apiBaseUrl.trimEnd('/')
 
@@ -46,6 +47,26 @@ class ApiClient(
         path: String,
         bearerToken: String? = null,
         jsonBody: String? = null,
+    ): ApiResult<String> {
+        val result = send(method, path, bearerToken, jsonBody)
+        if (result !is ApiResult.Unauthorized || bearerToken == null) {
+            return result
+        }
+
+        // The access token expired: renew it once with the refresh token and retry.
+        val renewedToken = tokenRenewer()?.renewAfterUnauthorized(bearerToken)
+        if (renewedToken == null || renewedToken == bearerToken) {
+            return result
+        }
+
+        return send(method, path, renewedToken, jsonBody)
+    }
+
+    private fun send(
+        method: String,
+        path: String,
+        bearerToken: String?,
+        jsonBody: String?,
     ): ApiResult<String> {
         val connection = try {
             (URL(buildUrl(path)).openConnection() as HttpURLConnection).apply {

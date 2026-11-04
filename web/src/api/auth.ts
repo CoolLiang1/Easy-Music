@@ -10,13 +10,23 @@ export function login(credentials: LoginRequest) {
   return apiRequest<TokenResponse>("/api/auth/login", {
     method: "POST",
     body: credentials,
+    skipAuthRefresh: true,
   });
 }
 
-export function logout(accessToken: string) {
+export function refreshSession(refreshToken: string) {
+  return apiRequest<TokenResponse>("/api/auth/refresh", {
+    method: "POST",
+    body: { refresh_token: refreshToken },
+    skipAuthRefresh: true,
+  });
+}
+
+export function logout(refreshToken: string) {
   return apiRequest<LogoutResponse>("/api/auth/logout", {
     method: "POST",
-    accessToken,
+    body: { refresh_token: refreshToken },
+    skipAuthRefresh: true,
   });
 }
 

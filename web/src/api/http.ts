@@ -2,6 +2,8 @@ import { env } from "../config/env";
 
 export type ApiRequestOptions = {
   accessToken?: string | null;
+  /** Set for auth endpoints so a 401 never triggers another refresh. */
+  skipAuthRefresh?: boolean;
   body?: BodyInit | Record<string, unknown> | null;
   headers?: HeadersInit;
   method?: string;
@@ -24,22 +26,50 @@ export class ApiClientError extends Error {
   }
 }
 
+/**
+ * Exchanges an expired access token for a new one. Installed by AuthProvider;
+ * resolves to null when the session cannot be renewed.
+ */
+export type AccessTokenRefresher = (expiredAccessToken: string) => Promise<string | null>;
+
+let accessTokenRefresher: AccessTokenRefresher | null = null;
+
+/** Installs the refresher and returns a function that uninstalls it. */
+export function setAccessTokenRefresher(refresher: AccessTokenRefresher) {
+  accessTokenRefresher = refresher;
+
+  return () => {
+    if (accessTokenRefresher === refresher) {
+      accessTokenRefresher = null;
+    }
+  };
+}
+
+/** Returns a renewed access token after a 401, or null if renewal failed. */
+export async function refreshExpiredAccessToken(expiredAccessToken: string) {
+  if (!accessTokenRefresher) {
+    return null;
+  }
+
+  return accessTokenRefresher(expiredAccessToken);
+}
+
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
-  const headers = new Headers(options.headers);
-  const body = buildBody(options.body, headers);
+  let response = await sendRequest(path, options, options.accessToken);
 
-  if (options.accessToken) {
-    headers.set("Authorization", `Bearer ${options.accessToken}`);
+  if (
+    response.status === 401 &&
+    options.accessToken &&
+    !options.skipAuthRefresh
+  ) {
+    const renewedAccessToken = await refreshExpiredAccessToken(options.accessToken);
+    if (renewedAccessToken) {
+      response = await sendRequest(path, options, renewedAccessToken);
+    }
   }
-
-  const response = await fetch(buildUrl(path), {
-    method: options.method ?? "GET",
-    headers,
-    body,
-  });
 
   if (!response.ok) {
     const payload = await parseResponseBody(response);
@@ -55,6 +85,25 @@ export async function apiRequest<T>(
   }
 
   return (await parseResponseBody(response)) as T;
+}
+
+function sendRequest(
+  path: string,
+  options: ApiRequestOptions,
+  accessToken: string | null | undefined,
+) {
+  const headers = new Headers(options.headers);
+  const body = buildBody(options.body, headers);
+
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  return fetch(buildUrl(path), {
+    method: options.method ?? "GET",
+    headers,
+    body,
+  });
 }
 
 function buildBody(

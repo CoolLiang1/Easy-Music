@@ -148,7 +148,7 @@ queue state across devices.
 - Android Media3
 - Room for local cache metadata
 - WorkManager for background sync
-- DataStore for settings and auth token
+- DataStore for settings and auth tokens (access and refresh)
 
 ### 6.2 Responsibilities
 
@@ -573,8 +573,26 @@ does not let AI select tracks.
 ### Auth
 
 - `POST /api/auth/login`
+- `POST /api/auth/refresh`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
+
+Login returns a short-lived signed access token (`expires_in` seconds,
+`ACCESS_TOKEN_EXPIRE_MINUTES`) and an opaque refresh token
+(`REFRESH_TOKEN_EXPIRE_DAYS`). The backend stores only a SHA-256 hash of each
+refresh token in `refresh_tokens`. `POST /api/auth/refresh` rotates it: the
+presented token is revoked and a new pair is returned with a full refresh
+lifetime. A token revoked by rotation remains usable for 60 seconds so
+simultaneous refreshes from one client do not sign the owner out; unknown,
+expired, or logged-out tokens return `401`. `POST /api/auth/logout` with a
+`refresh_token` body revokes it without requiring a valid access token.
+
+Clients keep the session alive without prompting: Web retries a request once
+after a `401` through a single shared refresh in `AuthProvider`; Android's
+`ApiClient` does the same through the process-wide `AuthTokenRefresher`, and
+Media3 stream and cache downloads renew a token that is about to expire before
+opening the connection. Only a rejected refresh token clears the stored
+session; network errors keep it for a later retry.
 
 ### Tracks
 

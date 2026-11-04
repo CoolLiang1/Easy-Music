@@ -15,13 +15,23 @@ data class LoginRequest(
 data class TokenResponse(
     val accessToken: String,
     val tokenType: String,
+    val refreshToken: String,
 ) {
     companion object {
         fun fromJson(json: JSONObject): TokenResponse = TokenResponse(
             accessToken = json.getString("access_token"),
             tokenType = json.optString("token_type", "bearer"),
+            refreshToken = json.getString("refresh_token"),
         )
     }
+}
+
+data class RefreshTokenRequest(
+    val refreshToken: String,
+) {
+    fun toJson(): String = JSONObject()
+        .put("refresh_token", refreshToken)
+        .toString()
 }
 
 data class CurrentUserResponse(

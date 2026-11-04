@@ -21,7 +21,8 @@ class AuthRepository(
             is ApiResult.Success -> {
                 tokenStore.saveCurrentUser(result.value)
                 AuthSession.Authenticated(
-                    bearerToken = token,
+                    // The request may have renewed an expired token.
+                    bearerToken = tokenStore.readToken() ?: token,
                     currentUser = result.value,
                 )
             }
@@ -50,7 +51,10 @@ class AuthRepository(
     }
 
     suspend fun saveToken(tokenResponse: TokenResponse) {
-        tokenStore.saveToken(tokenResponse.accessToken)
+        tokenStore.saveTokens(
+            accessToken = tokenResponse.accessToken,
+            refreshToken = tokenResponse.refreshToken,
+        )
     }
 
     suspend fun login(
@@ -63,7 +67,10 @@ class AuthRepository(
                 password = password,
             ),
         ).map { tokenResponse ->
-            tokenStore.saveToken(tokenResponse.accessToken)
+            tokenStore.saveTokens(
+                accessToken = tokenResponse.accessToken,
+                refreshToken = tokenResponse.refreshToken,
+            )
         }
     }
 
@@ -76,12 +83,12 @@ class AuthRepository(
     }
 
     suspend fun logout(): ApiResult<Unit> {
-        val token = tokenStore.readToken()
+        val refreshToken = tokenStore.readRefreshToken()
         var result: ApiResult<Unit> = ApiResult.Success(Unit)
 
         try {
-            if (token != null) {
-                result = authApi.logout(token)
+            if (refreshToken != null) {
+                result = authApi.logout(refreshToken)
             }
             return result
         } finally {
