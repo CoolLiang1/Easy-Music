@@ -24,8 +24,8 @@ authorized work. `README.md` and `README.zh-CN.md` contain public summaries;
 task files contain plans; acceptance files contain evidence. See
 [Documentation Guide](README.md) for the ownership and update rules.
 
-<!-- status-snapshot: 2026-07-27 -->
-Last verified: 2026-07-27 on `develop`.
+<!-- status-snapshot: 2026-11-04 -->
+Last verified: 2026-11-04 on `feature/web-ui-redesign`.
 
 ## Current Status
 
@@ -41,6 +41,7 @@ Last verified: 2026-07-27 on `develop`.
 | V2.5 AI Tag Suggestions | Accepted | [AI tag acceptance](ACCEPTANCE/V2_5_AI_TAG_SUGGESTIONS_V2_ACCEPTANCE.md) | Provider fallback and optional search context remain constrained to tag suggestions. |
 | First Ubuntu/domain/HTTPS production smoke | Implemented | [Production smoke record](ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md) | Functional smoke passed from `develop`; exact Ubuntu release was not captured, so acceptance evidence is incomplete and `main` is not verified. |
 | UI optimization round 1 | Implemented | [UI task](TASKS/NEXT_UI_OPTIMIZATION_TASKS.md) / [acceptance](ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md) | Web and Android automated gates passed; complete manual visual/flow acceptance before marking it accepted. |
+| Web UI redesign | Implemented | [Redesign task](TASKS/WEB_UI_REDESIGN_TASKS.md) / [acceptance](ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md) | Owner-reported Web usability problem; Web-only redesign with no API change. Typecheck, build, and local browser smoke passed; owner review on the real library remains. |
 
 ## Development Direction
 
@@ -68,8 +69,9 @@ real use:
 ## Active And Next Work
 
 1. No new product feature or milestone is currently authorized.
-2. Use the app normally and select one concrete owner-reported pain point
-   before starting product work.
+2. The owner-reported Web usability problem is addressed by the Web UI redesign
+   slice; review it against the real library and record the result in its
+   acceptance document. Select any further pain point one at a time.
 3. Maintenance work may address a reproducible bug, a security issue, data
    safety, backup recovery, or certificate continuity with the smallest
    reviewable change.

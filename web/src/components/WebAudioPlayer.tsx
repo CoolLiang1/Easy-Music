@@ -3,16 +3,30 @@ import {
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 
 import { getTrackStreamUrl } from "../api/tracks";
+import { useAuth } from "../auth/AuthProvider";
+import { trackSubtitle } from "../i18n/zh";
 import {
   usePlaybackQueue,
   type PlaybackQueueGenerationMode,
   type PlaybackQueueState,
 } from "../player/PlaybackQueueProvider";
+import {
+  registerPlayerController,
+  setPlayerStatus,
+  togglePlayerPlayback,
+  usePlayerStatus,
+} from "../player/playerStatus";
+import { RouteLink } from "../routes/RouteLink";
 import type { Track } from "../types/track";
+import { Icon } from "./ui/Icon";
+import { LevelMeter } from "./ui/common";
+import { TrackCover, useCoverUrl } from "./ui/TrackCover";
 
 let activeAudioElement: HTMLAudioElement | null = null;
 const GLOBAL_VOLUME_STORAGE_KEY = "easy-music.webPlayer.volume";
@@ -39,56 +53,101 @@ function clearActiveAudio(element: HTMLAudioElement) {
 
 export type PlaybackQueueMode = PlaybackQueueGenerationMode;
 
-type WebAudioPlayerProps = {
-  accessToken: string | null;
-  compact?: boolean;
-  track: Track;
-};
-
-type WebPlaybackQueuePlayerProps = {
-  accessToken: string | null;
-  autoStart?: boolean;
-  compact?: boolean;
-};
-
 type PlayerState =
   | { name: "idle" }
   | { name: "loading" }
   | { name: "ready"; streamUrl: string }
   | { name: "error"; message: string };
 
-export function WebAudioPlayer({
-  accessToken,
-  compact = false,
-  track,
-}: WebAudioPlayerProps) {
-  const { immediatePlay } = usePlaybackQueue();
+/* -------------------------------------------------------------------------- */
+/* Row play button                                                             */
+/* -------------------------------------------------------------------------- */
+
+type PlayButtonProps = {
+  className?: string;
+  large?: boolean;
+  onPlay?: () => void;
+  track: Track;
+};
+
+export function PlayButton({ className, large = false, onPlay, track }: PlayButtonProps) {
+  const { immediatePlay, state } = usePlaybackQueue();
+  const playerStatus = usePlayerStatus();
+  const ready = isReadyTrack(track);
+  const isCurrent = state.current?.track.id === track.id;
+  const isPlaying = isCurrent && playerStatus.isPlaying;
+  const title = track.title || "未命名音轨";
+  const label = !ready
+    ? "暂不可播放"
+    : isPlaying
+      ? `暂停「${title}」`
+      : isCurrent
+        ? `继续播放「${title}」`
+        : `播放「${title}」`;
+
+  const classes = ["play-btn", large ? "lg" : "", isCurrent ? "is-current" : "", className ?? ""]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <button
-      className={compact ? "button secondary small" : "button secondary"}
-      disabled={!isReadyTrack(track)}
-      onClick={() => immediatePlay(track)}
+      aria-label={label}
+      className={classes}
+      disabled={!ready}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (isCurrent) {
+          togglePlayerPlayback();
+          return;
+        }
+        if (onPlay) {
+          onPlay();
+        } else {
+          immediatePlay(track);
+        }
+      }}
+      title={label}
       type="button"
     >
-      {isReadyTrack(track) ? "播放" : "不可播放"}
+      <Icon name={isPlaying ? "pause" : "play"} size={large ? 22 : 15} />
     </button>
   );
 }
 
-export function WebPlaybackQueuePlayer({
-  accessToken,
-  autoStart = true,
-  compact = false,
-}: WebPlaybackQueuePlayerProps) {
+/** Shows the level meter when this track is current, otherwise the given fallback. */
+export function NowPlayingIndicator({
+  fallback,
+  trackId,
+}: {
+  fallback: ReactNode;
+  trackId: number;
+}) {
+  const { state } = usePlaybackQueue();
+  const playerStatus = usePlayerStatus();
+  if (state.current?.track.id !== trackId) {
+    return <>{fallback}</>;
+  }
+
+  return <LevelMeter paused={!playerStatus.isPlaying} />;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Global player deck                                                          */
+/* -------------------------------------------------------------------------- */
+
+type PlayerDeckProps = {
+  onOpenQueue: () => void;
+  queueCount: number;
+};
+
+export function PlayerDeck({ onOpenQueue, queueCount }: PlayerDeckProps) {
+  const { accessToken } = useAuth();
   const { next, previous, state } = usePlaybackQueue();
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const seekBarRef = useRef<HTMLInputElement | null>(null);
   const requestedQueueItemIdRef = useRef<string | null>(null);
   const playbackRequestedRef = useRef(false);
   const suppressPauseEventRef = useRef(false);
-  const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const volumeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const seekingRef = useRef(false);
 
   const [playerState, setPlayerState] = useState<PlayerState>({ name: "idle" });
   const [playing, setPlaying] = useState(false);
@@ -96,18 +155,12 @@ export function WebPlaybackQueuePlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(readStoredVolume);
   const [muted, setMuted] = useState(readStoredMuted);
-  const [seeking, setSeeking] = useState(false);
-  const [showVolumePopup, setShowVolumePopup] = useState(false);
-  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
 
   const currentItem = state.current;
   const currentTrack = currentItem?.track ?? null;
   const hasPrevious = state.history.length > 0;
   const hasNext = canAdvanceToNext(state);
-  const isQueue =
-    state.history.length > 0 ||
-    state.upcoming.length > 0 ||
-    state.source?.type === "playlist";
+  const coverUrl = useCoverUrl(currentTrack);
 
   const resetAudio = useCallback(() => {
     if (audioRef.current) {
@@ -124,56 +177,53 @@ export function WebPlaybackQueuePlayer({
     setDuration(0);
   }, []);
 
-  const loadCurrentTrack = useCallback(
-    async () => {
-      if (!currentItem) {
-        resetAudio();
+  const loadCurrentTrack = useCallback(async () => {
+    if (!currentItem) {
+      resetAudio();
+      return;
+    }
+
+    if (!accessToken) {
+      setPlayerState({
+        name: "error",
+        message: "登录已失效，请重新登录后播放。",
+      });
+      return;
+    }
+
+    requestedQueueItemIdRef.current = currentItem.queueItemId;
+    setPlayerState({ name: "loading" });
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+
+    try {
+      const streamUrl = await getTrackStreamUrl(accessToken, currentItem.track.id);
+      if (requestedQueueItemIdRef.current !== currentItem.queueItemId) {
+        return;
+      }
+      setPlayerState({ name: "ready", streamUrl });
+    } catch (error: unknown) {
+      if (hasNext) {
+        setPlayerState({
+          name: "error",
+          message: `无法播放「${currentItem.track.title || "未命名音轨"}」，正在跳到下一首。`,
+        });
+        window.setTimeout(() => {
+          next();
+        }, 400);
         return;
       }
 
-      if (!accessToken) {
-        setPlayerState({
-          name: "error",
-          message: "请重新登录后再播放音轨。",
-        });
-        return;
-      }
-
-      requestedQueueItemIdRef.current = currentItem.queueItemId;
-      setPlayerState({ name: "loading" });
-      setPlaying(false);
-      setCurrentTime(0);
-      setDuration(0);
-
-      try {
-        const streamUrl = await getTrackStreamUrl(accessToken, currentItem.track.id);
-        if (requestedQueueItemIdRef.current !== currentItem.queueItemId) {
-          return;
-        }
-        setPlayerState({ name: "ready", streamUrl });
-      } catch (error: unknown) {
-        if (hasNext) {
-          setPlayerState({
-            name: "error",
-            message: `无法播放「${currentItem.track.title || "未命名音轨"}」，正在跳到下一首。`,
-          });
-          window.setTimeout(() => {
-            next();
-          }, 400);
-          return;
-        }
-
-        setPlayerState({
-          name: "error",
-          message: getErrorMessage(error),
-        });
-      }
-    },
-    [accessToken, currentItem, hasNext, next, resetAudio],
-  );
+      setPlayerState({
+        name: "error",
+        message: getErrorMessage(error),
+      });
+    }
+  }, [accessToken, currentItem, hasNext, next, resetAudio]);
 
   useEffect(() => {
-    if (currentItem && autoStart) {
+    if (currentItem) {
       playbackRequestedRef.current = true;
       void loadCurrentTrack();
     } else {
@@ -183,10 +233,10 @@ export function WebPlaybackQueuePlayer({
     return () => {
       resetAudio();
     };
+    // Reload only when the queue item itself changes.
   }, [currentItem?.queueItemId]);
 
-  const readyStreamUrl =
-    playerState.name === "ready" ? playerState.streamUrl : null;
+  const readyStreamUrl = playerState.name === "ready" ? playerState.streamUrl : null;
 
   useEffect(() => {
     const el = audioRef.current;
@@ -207,36 +257,10 @@ export function WebPlaybackQueuePlayer({
       setPlaying(false);
       setPlayerState({
         name: "error",
-        message: "浏览器阻止了自动播放，请再点一次播放。",
+        message: "浏览器阻止了自动播放，请点击播放按钮。",
       });
     });
   }, [readyStreamUrl]);
-
-  useEffect(() => {
-    if (!showVolumePopup) return;
-
-    let rafId: number | null = null;
-    const onScroll = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        const btn = volumeBtnRef.current;
-        if (btn) {
-          const rect = btn.getBoundingClientRect();
-          setPopupPos({
-            top: rect.top - 8,
-            left: rect.left + rect.width / 2,
-          });
-        }
-      });
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, [showVolumePopup]);
 
   const playPrevious = useCallback(() => {
     if (!hasPrevious) return;
@@ -284,9 +308,9 @@ export function WebPlaybackQueuePlayer({
   }, [hasNext, playNext]);
 
   const handleTimeUpdate = useCallback(() => {
-    if (!audioRef.current || seeking) return;
+    if (!audioRef.current || seekingRef.current) return;
     setCurrentTime(audioRef.current.currentTime);
-  }, [seeking]);
+  }, []);
 
   const handleLoadedMetadata = useCallback(() => {
     if (audioRef.current) {
@@ -307,40 +331,43 @@ export function WebPlaybackQueuePlayer({
     if (el.paused) {
       playbackRequestedRef.current = true;
       setActiveAudio(el);
-      void el.play();
+      void el.play().catch(() => {
+        setPlayerState({
+          name: "error",
+          message: "浏览器阻止了播放，请再点一次播放按钮。",
+        });
+      });
     } else {
       playbackRequestedRef.current = false;
       el.pause();
     }
   }, [loadCurrentTrack]);
 
-  const handleSeekStart = useCallback(() => {
-    setSeeking(true);
-  }, []);
-
-  const handleSeekChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentTime(Number(event.target.value));
-  }, []);
-
-  const handleSeekEnd = useCallback(() => {
-    setSeeking(false);
-    const el = audioRef.current;
-    const bar = seekBarRef.current;
-    if (el && bar) {
-      el.currentTime = Number(bar.value);
+  const handleSeekChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const value = Number(event.target.value);
+    setCurrentTime(value);
+    if (!seekingRef.current && audioRef.current) {
+      audioRef.current.currentTime = value;
     }
   }, []);
 
-  const handleVolumeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = clampVolume(Number(event.target.value));
-    setVolume(value);
-    storeVolume(value);
+  const commitSeek = useCallback((value: number) => {
+    seekingRef.current = false;
     if (audioRef.current) {
-      audioRef.current.volume = value;
-      audioRef.current.muted = value === 0;
+      audioRef.current.currentTime = value;
     }
-    setMuted(value === 0);
-    storeMuted(value === 0);
+  }, []);
+
+  const applyVolume = useCallback((value: number) => {
+    const nextVolume = clampVolume(value);
+    setVolume(nextVolume);
+    storeVolume(nextVolume);
+    if (audioRef.current) {
+      audioRef.current.volume = nextVolume;
+      audioRef.current.muted = nextVolume === 0;
+    }
+    setMuted(nextVolume === 0);
+    storeMuted(nextVolume === 0);
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -363,214 +390,262 @@ export function WebPlaybackQueuePlayer({
     }
   }, [muted, volume]);
 
+  /* Share status with list play buttons, media keys, and the space bar. */
+  const handlersRef = useRef({ playNext, playPrevious, togglePlay });
+  handlersRef.current = { playNext, playPrevious, togglePlay };
+
+  useEffect(() => {
+    setPlayerStatus({
+      isLoading: playerState.name === "loading",
+      isPlaying: playing,
+      trackId: currentTrack?.id ?? null,
+    });
+  }, [currentTrack?.id, playerState.name, playing]);
+
+  useEffect(() => {
+    registerPlayerController({ toggle: () => handlersRef.current.togglePlay() });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, button, a, summary, [contenteditable='true'], [role='dialog'], [role='menu']",
+        )
+      ) {
+        return;
+      }
+      event.preventDefault();
+      handlersRef.current.togglePlay();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      registerPlayerController(null);
+      setPlayerStatus({ isLoading: false, isPlaying: false, trackId: null });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return undefined;
+    const session = navigator.mediaSession;
+    const handlers: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
+      ["play", () => handlersRef.current.togglePlay()],
+      ["pause", () => handlersRef.current.togglePlay()],
+      ["previoustrack", () => handlersRef.current.playPrevious()],
+      ["nexttrack", () => handlersRef.current.playNext()],
+    ];
+    for (const [action, handler] of handlers) {
+      try {
+        session.setActionHandler(action, handler);
+      } catch {
+        // Some browsers do not support every action.
+      }
+    }
+    return () => {
+      for (const [action] of handlers) {
+        try {
+          session.setActionHandler(action, null);
+        } catch {
+          // Ignore unsupported actions.
+        }
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+    if (!currentTrack) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        album: currentTrack.album ?? "",
+        artist: currentTrack.artist ?? "",
+        artwork: coverUrl ? [{ src: coverUrl, sizes: "512x512" }] : [],
+        title: currentTrack.title || "未命名音轨",
+      });
+    } catch {
+      // Metadata is a convenience only.
+    }
+  }, [coverUrl, currentTrack]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+  }, [playing]);
+
+  const effectiveDuration = duration || currentTrack?.duration_seconds || 0;
+  const progress = effectiveDuration > 0 ? Math.min(100, (currentTime / effectiveDuration) * 100) : 0;
+  const position = state.history.length + (currentTrack ? 1 : 0);
+  const total = position + state.upcoming.length;
+  const isLoading = playerState.name === "loading";
+  const subtitle = currentTrack ? trackSubtitle(currentTrack) : "";
+  const effectiveVolume = muted ? 0 : volume;
+
   return (
-    <div className={compact ? "audio-player compact" : "audio-player"}>
-      {isQueue ? (
-        <div className="queue-meta">
-          <span>{queueSourceLabel(state.source)}</span>
-          <strong>
-            {state.history.length + (currentTrack ? 1 : 0)} /{" "}
-            {state.history.length + (currentTrack ? 1 : 0) + state.upcoming.length}
-          </strong>
-          <span>{queueModeLabel(state.generationMode)}</span>
+    <div aria-label="播放器" className="deck" role="region">
+      <div aria-hidden="true" className="deck-mobile-progress">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="deck-track">
+        {currentTrack ? <TrackCover eager size={52} track={currentTrack} /> : null}
+        <div className="deck-meta">
+          <div className="deck-title">
+            {playing ? <LevelMeter /> : null}
+            {currentTrack ? (
+              <RouteLink
+                title={currentTrack.title}
+                to={`/tracks/${encodeURIComponent(currentTrack.id)}`}
+              >
+                {currentTrack.title || "未命名音轨"}
+              </RouteLink>
+            ) : (
+              <span>没有正在播放的音轨</span>
+            )}
+          </div>
+          {playerState.name === "error" ? (
+            <div className="deck-sub error" role="alert">
+              {playerState.message}
+            </div>
+          ) : (
+            <div className="deck-sub">
+              {isLoading ? "正在缓冲…" : subtitle || queueSourceLabel(state.source)}
+            </div>
+          )}
         </div>
-      ) : null}
+      </div>
 
-      {currentTrack ? (
-        <div className="queue-current-track" title={currentTrack.title}>
-          {currentTrack.title || "未命名音轨"}
-        </div>
-      ) : null}
-
-      {playerState.name !== "ready" ? (
-        <button
-          className={compact ? "button secondary small" : "button secondary"}
-          disabled={playerState.name === "loading" || !currentTrack}
-          onClick={() => {
-            playbackRequestedRef.current = true;
-            void loadCurrentTrack();
-          }}
-          type="button"
-        >
-          {getButtonLabel(playerState, Boolean(currentTrack))}
-        </button>
-      ) : null}
-
-      {playerState.name === "ready" ? (
-        <div className="audio-controls">
-          <audio
-            ref={audioRef}
-            preload="metadata"
-            src={playerState.streamUrl}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onEnded={handleEnded}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-          />
-
+      <div className="deck-center">
+        <div className="deck-controls">
           <button
             aria-label="上一首"
-            className="audio-btn"
+            className="deck-btn hide-mobile"
             disabled={!hasPrevious}
             onClick={playPrevious}
+            title="上一首"
             type="button"
           >
-            <span aria-hidden="true" className="audio-icon audio-icon-previous" />
+            <Icon name="prev" size={18} />
           </button>
           <button
             aria-label={playing ? "暂停" : "播放"}
-            className="audio-btn audio-play-btn"
+            className="deck-play"
+            disabled={!currentTrack || isLoading}
             onClick={togglePlay}
+            title={playing ? "暂停（空格）" : "播放（空格）"}
             type="button"
           >
-            <span
-              aria-hidden="true"
-              className={playing ? "audio-icon audio-icon-pause" : "audio-icon audio-icon-play"}
-            />
+            {isLoading ? (
+              <span aria-hidden="true" className="spinner" />
+            ) : (
+              <Icon name={playing ? "pause" : "play"} size={20} />
+            )}
           </button>
           <button
             aria-label="下一首"
-            className="audio-btn"
+            className="deck-btn"
             disabled={!hasNext}
             onClick={playNext}
+            title="下一首"
             type="button"
           >
-            <span aria-hidden="true" className="audio-icon audio-icon-next" />
+            <Icon name="next" size={18} />
           </button>
-
-          <span className="audio-time">{formatTime(currentTime)}</span>
-
+          <button
+            aria-label={`播放队列，共 ${queueCount} 首`}
+            className="deck-btn mobile-only"
+            onClick={onOpenQueue}
+            type="button"
+          >
+            <Icon name="queue" size={18} />
+          </button>
+        </div>
+        <div className="deck-seek">
+          <span className="deck-time">{formatTime(currentTime)}</span>
           <input
-            ref={seekBarRef}
             aria-label="播放进度"
-            className="audio-seek-bar"
-            max={duration || 0}
+            className="range"
+            disabled={!readyStreamUrl}
+            max={effectiveDuration || 0}
             min={0}
             onChange={handleSeekChange}
-            onMouseDown={handleSeekStart}
-            onMouseUp={handleSeekEnd}
-            onTouchEnd={handleSeekEnd}
-            onTouchStart={handleSeekStart}
-            step={0.1}
+            onKeyUp={(event) => commitSeek(Number(event.currentTarget.value))}
+            onPointerCancel={(event) => commitSeek(Number(event.currentTarget.value))}
+            onPointerDown={() => {
+              seekingRef.current = true;
+            }}
+            onPointerUp={(event) => commitSeek(Number(event.currentTarget.value))}
+            step={1}
+            style={{ "--progress": `${progress}%` } as CSSProperties}
             type="range"
-            value={currentTime}
+            value={Math.min(currentTime, effectiveDuration || currentTime)}
           />
-
-          <span className="audio-time audio-duration">{formatTime(duration)}</span>
-
-          <div
-            className="audio-volume-wrap"
-            onMouseEnter={() => {
-              if (volumeHideTimerRef.current) {
-                clearTimeout(volumeHideTimerRef.current);
-                volumeHideTimerRef.current = null;
-              }
-              const btn = volumeBtnRef.current;
-              if (btn) {
-                const rect = btn.getBoundingClientRect();
-                setPopupPos({
-                  top: rect.top - 8,
-                  left: rect.left + rect.width / 2,
-                });
-              }
-              setShowVolumePopup(true);
-            }}
-            onMouseLeave={() => {
-              volumeHideTimerRef.current = setTimeout(() => {
-                setShowVolumePopup(false);
-              }, 150);
-            }}
-          >
-            <button
-              ref={volumeBtnRef}
-              aria-label={muted || volume === 0 ? "取消静音" : "静音"}
-              className="audio-btn audio-volume-btn"
-              onClick={toggleMute}
-              type="button"
-            >
-              <span
-                aria-hidden="true"
-                className={
-                  muted || volume === 0
-                    ? "audio-icon audio-icon-volume muted"
-                    : "audio-icon audio-icon-volume"
-                }
-              />
-            </button>
-
-            {showVolumePopup
-              ? createPortal(
-                  <div
-                    className="audio-volume-popup visible"
-                    style={{
-                      position: "fixed",
-                      top: `${popupPos.top}px`,
-                      left: `${popupPos.left}px`,
-                      transform: "translate(-50%, -100%)",
-                      margin: 0,
-                    }}
-                    onMouseEnter={() => {
-                      if (volumeHideTimerRef.current) {
-                        clearTimeout(volumeHideTimerRef.current);
-                        volumeHideTimerRef.current = null;
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      volumeHideTimerRef.current = setTimeout(() => {
-                        setShowVolumePopup(false);
-                      }, 150);
-                    }}
-                  >
-                    <div className="audio-volume-slider-wrap">
-                      <input
-                        aria-label="音量"
-                        className="audio-volume-slider"
-                        max={1}
-                        min={0}
-                        onChange={handleVolumeChange}
-                        step={0.05}
-                        type="range"
-                        value={muted ? 0 : volume}
-                      />
-                    </div>
-                    <span className="audio-volume-value">
-                      {Math.round((muted ? 0 : volume) * 100)}
-                    </span>
-                  </div>,
-                  document.body,
-                )
-              : null}
-          </div>
+          <span className="deck-time">{formatTime(effectiveDuration)}</span>
         </div>
-      ) : null}
+      </div>
 
-      {playerState.name === "error" ? (
-        <span
-          className={compact ? "status-message error compact" : "status-message error"}
-          role="alert"
+      <div className="deck-right">
+        {total > 1 || state.source?.type === "playlist" ? (
+          <span className="deck-source" title={queueSourceLabel(state.source)}>
+            {queueSourceLabel(state.source)} · {position}/{total}
+            {state.generationMode !== "sequence" ? ` · ${queueModeLabel(state.generationMode)}` : ""}
+          </span>
+        ) : null}
+        <div className="deck-volume">
+          <button
+            aria-label={effectiveVolume === 0 ? "取消静音" : "静音"}
+            className="deck-btn"
+            onClick={toggleMute}
+            title={effectiveVolume === 0 ? "取消静音" : "静音"}
+            type="button"
+          >
+            <Icon name={effectiveVolume === 0 ? "volumeMute" : "volume"} size={18} />
+          </button>
+          <input
+            aria-label="音量"
+            aria-valuetext={`${Math.round(effectiveVolume * 100)}%`}
+            className="range"
+            max={1}
+            min={0}
+            onChange={(event) => applyVolume(Number(event.target.value))}
+            step={0.05}
+            style={{ "--progress": `${effectiveVolume * 100}%` } as CSSProperties}
+            type="range"
+            value={effectiveVolume}
+          />
+        </div>
+        <button
+          aria-label={`播放队列，共 ${queueCount} 首`}
+          className="deck-btn deck-queue-btn"
+          onClick={onOpenQueue}
+          title="播放队列"
+          type="button"
         >
-          {playerState.message}
-        </span>
+          <Icon name="queue" size={19} />
+          {queueCount > 0 ? <span className="deck-queue-count">{queueCount}</span> : null}
+        </button>
+      </div>
+
+      {readyStreamUrl ? (
+        <audio
+          onEnded={handleEnded}
+          onLoadedMetadata={handleLoadedMetadata}
+          onPause={handlePause}
+          onPlay={handlePlay}
+          onTimeUpdate={handleTimeUpdate}
+          preload="metadata"
+          ref={audioRef}
+          src={readyStreamUrl}
+        />
       ) : null}
     </div>
   );
-}
-
-function getButtonLabel(playerState: PlayerState, hasPlayableTrack: boolean) {
-  if (!hasPlayableTrack) {
-    return "暂无可播放音轨";
-  }
-
-  if (playerState.name === "loading") {
-    return "正在加载...";
-  }
-
-  if (playerState.name === "ready") {
-    return "重新加载音频";
-  }
-
-  return "播放";
 }
 
 function getErrorMessage(error: unknown) {
@@ -581,7 +656,7 @@ function getErrorMessage(error: unknown) {
   return "无法加载音频流。";
 }
 
-function isReadyTrack(track: Track): boolean {
+export function isReadyTrack(track: Track): boolean {
   return track.status.toLowerCase() === "ready";
 }
 
@@ -639,22 +714,30 @@ function clampVolume(volume: number): number {
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
 
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
+  const wholeSeconds = Math.floor(seconds);
+  const hours = Math.floor(wholeSeconds / 3600);
+  const minutes = Math.floor((wholeSeconds % 3600) / 60);
+  const remainingSeconds = wholeSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${remainingSeconds
+      .toString()
+      .padStart(2, "0")}`;
+  }
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-function queueModeLabel(mode: PlaybackQueueGenerationMode): string {
+export function queueModeLabel(mode: PlaybackQueueGenerationMode): string {
   if (mode === "shuffleOnce") return "随机";
   if (mode === "reverse") return "倒序";
   return "顺序";
 }
 
-function queueSourceLabel(
+export function queueSourceLabel(
   source: ReturnType<typeof usePlaybackQueue>["state"]["source"],
 ): string {
   if (source?.type === "playlist") return source.playlistName;
   if (source?.type === "singleTrack") return "单曲播放";
+  if (source?.type === "manual") return "手动队列";
   if (source?.type === "recommendation") return "推荐播放";
   return "播放队列";
 }

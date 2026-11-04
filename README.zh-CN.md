@@ -9,10 +9,10 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 ## 项目状态
 
 当前状态的唯一权威记录是 [docs/ROADMAP.md](docs/ROADMAP.md)。以下公开摘要已于
-2026-07-27 从路线图同步。
+2026-11-04 从路线图同步。
 
-<!-- status-snapshot: 2026-07-27 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented -->
+<!-- status-snapshot: 2026-11-04 -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented -->
 
 - MVP Phase 0 到 Phase 7 已实现，并完成本地验收。
 - V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
@@ -21,7 +21,9 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 - 首次真实 Ubuntu/domain/HTTPS 功能 smoke 已在 `develop` 上通过，但因未记录 Ubuntu
   具体版本，状态仍为 `Implemented` 而非 `Accepted`，见
   [生产 smoke 记录](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)。
-- Web 和 Android 的第一轮 UI 优化已实现并通过自动检查，但尚未记录手动视觉/流程验收；后续聚焦切片也尚未选定。
+- Web 和 Android 的第一轮 UI 优化已实现并通过自动检查，但尚未记录手动视觉/流程验收。
+- Web 界面重设计（新的视觉体系、统一底部播放栏、曲库多选工具栏、更简单的编辑与上传流程、移动端布局）已实现，并通过类型检查、构建和本地浏览器冒烟测试；仍需所有者在真实曲库上确认，见
+  [重设计验收记录](docs/ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md)。
 
 Easy Music 现在采用“私人稳定版”方向，不再计划完整实现 V2.6。后续开发只从所有者真实使用中遇到的具体问题逐项选择，优先维护、安全和数据保护，而不是扩张产品范围。
 

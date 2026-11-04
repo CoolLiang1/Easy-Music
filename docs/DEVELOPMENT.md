@@ -651,19 +651,20 @@ backend:
    wait for lightweight polling while the track is processing, until the status
    becomes `ready`. Failed processing should show the backend processing error
    message when one is available.
-9. In Library, type part of a track title in the search field. With filter mode
-   off, confirm the full library remains visible; turn filter mode on and
-   confirm the visible rows update as the input changes, then turn it off again
-   and confirm the full library returns.
-10. Select two or more tracks in Library, choose existing tags from the batch
-   tag panel, confirm adding and removing tags, and verify the affected rows
-   update without changing unselected tracks.
+9. In Library, type part of a track title, artist, or album in the search
+   field. With filter mode off, confirm the full library remains visible and
+   matching rows are highlighted; turn filter mode on and confirm only matching
+   rows remain as the input changes, then turn it off again and confirm the full
+   library returns.
+10. Select two or more tracks in Library, open `编辑标签` from the selection
+   toolbar, add and remove existing tags, and verify the affected rows update
+   without changing unselected tracks.
 11. Open `Reports` and confirm the read-only organization sections load:
     untagged ready tracks, missing metadata, processing attention, duplicate
     candidates, never played, rarely played, and expired cooldowns.
 12. Open the track detail page and edit title, artist, album, content type,
-   source URL, liked state, cooldown date, cover image, and assigned tags as
-   needed.
+   source URL, cooldown date, cover image, and assigned tags as needed; toggle
+   the liked state with the heart button in the page header.
 13. Visit `Recommendations` and confirm the read-only Recently Revived section
     loads quiet ready tracks, links to Track Detail, and does not auto-play,
     auto-cache, or modify feedback.

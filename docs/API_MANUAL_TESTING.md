@@ -1789,10 +1789,11 @@ Open the Vite URL in a browser, usually `http://127.0.0.1:8081/`, then verify:
 1. Log in with the local initial user.
 2. Open `Library` and confirm the track list loads, including empty, processing,
    failed, or ready states depending on local data.
-3. In `Library`, type part of a track title in the search field. With filter
-   mode off, confirm the full library remains visible; turn filter mode on and
-   confirm the visible rows update as the input changes, then turn it off again
-   and confirm the full library returns.
+3. In `Library`, type part of a track title, artist, or album in the search
+   field. With filter mode off, confirm the full library remains visible and
+   matching rows are highlighted; turn filter mode on and confirm only matching
+   rows remain as the input changes, then turn it off again and confirm the full
+   library returns.
 4. Open `Upload`, select an MP3, FLAC, M4A, WAV, or OGG file, and confirm the
    page shows the created track and initial processing status.
 5. Run `docker compose run --rm worker` once, or run

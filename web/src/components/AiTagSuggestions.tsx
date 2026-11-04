@@ -3,17 +3,10 @@ import { useCallback, useMemo, useState } from "react";
 import { suggestTrackTags } from "../api/ai";
 import { ApiClientError } from "../api/http";
 import { tagGroupLabels } from "../i18n/zh";
-import type {
-  AiProviderStatus,
-  ExistingTagSuggestion,
-  NewTagSuggestion,
-  TagSuggestionResponse,
-} from "../types/ai";
-import type { Tag, TagGroup } from "../types/tag";
-
-// ---------------------------------------------------------------------------
-// props
-// ---------------------------------------------------------------------------
+import { RouteLink } from "../routes/RouteLink";
+import type { AiProviderStatus, TagSuggestionResponse } from "../types/ai";
+import { Callout, tagGroupOrder } from "./ui/common";
+import { Icon } from "./ui/Icon";
 
 type AiTagSuggestionsProps = {
   accessToken: string | null;
@@ -22,25 +15,11 @@ type AiTagSuggestionsProps = {
   trackId: number;
 };
 
-// ---------------------------------------------------------------------------
-// state
-// ---------------------------------------------------------------------------
-
 type SuggestState =
   | { name: "idle" }
   | { name: "loading" }
   | { name: "ready"; response: TagSuggestionResponse }
   | { name: "error"; message: string };
-
-// ---------------------------------------------------------------------------
-// constants
-// ---------------------------------------------------------------------------
-
-const GROUP_ORDER: TagGroup[] = ["scene", "type", "feature"];
-
-// ---------------------------------------------------------------------------
-// component
-// ---------------------------------------------------------------------------
 
 export function AiTagSuggestions({
   accessToken,
@@ -48,21 +27,12 @@ export function AiTagSuggestions({
   selectedTagIds,
   trackId,
 }: AiTagSuggestionsProps) {
-  const [suggestState, setSuggestState] = useState<SuggestState>({
-    name: "idle",
-  });
-
-  const selectedSet = useMemo(
-    () => new Set(selectedTagIds),
-    [selectedTagIds],
-  );
+  const [suggestState, setSuggestState] = useState<SuggestState>({ name: "idle" });
+  const selectedSet = useMemo(() => new Set(selectedTagIds), [selectedTagIds]);
 
   const handleRequest = useCallback(async () => {
     if (!accessToken) {
-      setSuggestState({
-        name: "error",
-        message: "请重新登录后再请求标签建议。",
-      });
+      setSuggestState({ name: "error", message: "登录已失效，请重新登录后再试。" });
       return;
     }
 
@@ -74,249 +44,148 @@ export function AiTagSuggestions({
       });
       setSuggestState({ name: "ready", response });
     } catch (error: unknown) {
-      setSuggestState({
-        name: "error",
-        message: getSuggestionError(error),
-      });
+      setSuggestState({ name: "error", message: getSuggestionError(error) });
     }
   }, [accessToken, trackId]);
 
   const isLoading = suggestState.name === "loading";
+  const response = suggestState.name === "ready" ? suggestState.response : null;
+  const suggestions = response
+    ? tagGroupOrder.flatMap((group) => response.existing_tag_suggestions[group] ?? [])
+    : [];
+  const unaddedIds = suggestions
+    .map((suggestion) => suggestion.tag_id)
+    .filter((tagId) => !selectedSet.has(tagId));
 
   return (
-    <div className="ai-suggestions-panel">
-      <div className="ai-suggestions-header">
-        <h2>AI 标签建议</h2>
-        <button
-          className="button secondary"
-          disabled={isLoading}
-          onClick={() => void handleRequest()}
-          type="button"
-        >
-          {isLoading ? "正在询问 AI..." : "获取 AI 标签建议"}
-        </button>
+    <div className="ai-panel">
+      <div className="ai-panel-head">
+        <span className="ai-panel-title">
+          <Icon name="sparkle" size={17} />
+          AI 建议
+          <span className="faint" style={{ fontWeight: 400, fontSize: "0.84rem" }}>
+            根据元数据从已有标签中挑选，保存后才生效
+          </span>
+        </span>
+        <div className="row">
+          {unaddedIds.length > 1 ? (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => unaddedIds.forEach((tagId) => onToggleTag(tagId))}
+              type="button"
+            >
+              全部采纳
+            </button>
+          ) : null}
+          <button
+            className="btn btn-secondary btn-sm"
+            disabled={isLoading}
+            onClick={() => void handleRequest()}
+            type="button"
+          >
+            {isLoading ? (
+              <>
+                <span aria-hidden="true" className="spinner" />
+                正在分析…
+              </>
+            ) : response ? (
+              "重新获取"
+            ) : (
+              "获取建议"
+            )}
+          </button>
+        </div>
       </div>
 
-      <p className="page-copy" style={{ marginTop: "8px" }}>
-        让 AI 助手分析这个音轨的元数据，并从已有标签中给出建议。只有保存后，
-        标签才会真正应用。
-      </p>
-
-      {/* ---- states ---- */}
-      {suggestState.name === "idle" ? (
-        <p className="recommendation-muted" style={{ marginTop: "14px" }}>
-          点击上方按钮，为这个音轨请求 AI 标签建议。
-        </p>
-      ) : null}
-
-      {suggestState.name === "loading" ? (
-        <p className="recommendation-muted" style={{ marginTop: "14px" }}>
-          正在分析音轨元数据，并匹配你的标签库...
-        </p>
-      ) : null}
-
       {suggestState.name === "error" ? (
-        <div className="status-message error" role="alert">
-          {suggestState.message}
+        <div style={{ marginTop: 10 }}>
+          <Callout tone="danger">{suggestState.message}</Callout>
         </div>
       ) : null}
 
-      {suggestState.name === "ready" ? (
-        <AiSuggestionsReady
-          onToggleTag={onToggleTag}
-          response={suggestState.response}
-          selectedSet={selectedSet}
-        />
+      {response ? (
+        <div className="stack" style={{ marginTop: 12, gap: 12 }}>
+          <ProviderWarning status={response.provider_status} />
+          {response.explanation ? <p className="muted">{response.explanation}</p> : null}
+
+          {response.provider_status !== "ok" && suggestions.length === 0 ? null : suggestions.length === 0 ? (
+            <p className="faint">AI 没有从现有标签里找到合适的建议。</p>
+          ) : (
+            <div className="chip-list">
+              {suggestions.map((suggestion) => {
+                const isSelected = selectedSet.has(suggestion.tag_id);
+                return (
+                  <button
+                    aria-pressed={isSelected}
+                    className={`chip chip-toggle chip-${suggestion.group} ai-suggestion`}
+                    key={suggestion.tag_id}
+                    onClick={() => onToggleTag(suggestion.tag_id)}
+                    title={`${tagGroupLabels[suggestion.group]} · ${suggestion.reason}`}
+                    type="button"
+                  >
+                    <Icon name={isSelected ? "check" : "plus"} size={14} />
+                    {suggestion.name}
+                    <span className="conf">{Math.round(suggestion.confidence * 100)}%</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {response.new_tag_suggestions.length > 0 ? (
+            <div className="ai-new-tags">
+              <p>
+                这些标签还不存在，AI 不会自动创建。需要的话可以先到{" "}
+                <RouteLink className="inline-link" to="/tags">
+                  标签页面
+                </RouteLink>{" "}
+                新建：
+              </p>
+              <div className="chip-list">
+                {response.new_tag_suggestions.map((suggestion, index) => (
+                  <span
+                    className="chip chip-dashed"
+                    key={`${suggestion.name}-${index}`}
+                    title={suggestion.reason}
+                  >
+                    <span className={`group-dot ${suggestion.group}`} />
+                    {suggestion.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// ready content
-// ---------------------------------------------------------------------------
-
-type AiSuggestionsReadyProps = {
-  onToggleTag: (tagId: number) => void;
-  response: TagSuggestionResponse;
-  selectedSet: Set<number>;
-};
-
-function AiSuggestionsReady({
-  onToggleTag,
-  response,
-  selectedSet,
-}: AiSuggestionsReadyProps) {
-  const {
-    existing_tag_suggestions: existing,
-    new_tag_suggestions: newTags,
-    explanation,
-    provider_status: status,
-  } = response;
-
-  return (
-    <div style={{ marginTop: "14px" }}>
-      <ProviderWarning status={status} />
-
-      {/* AI explanation */}
-      {explanation ? (
-        <p className="recommendation-reason">{explanation}</p>
-      ) : null}
-
-      {/* existing tag suggestions grouped */}
-      {GROUP_ORDER.map((group) => {
-        const items = existing[group];
-        if (!items || items.length === 0) {
-          return null;
-        }
-        return (
-          <SuggestionGroup
-            group={group}
-            items={items}
-            key={group}
-            onToggleTag={onToggleTag}
-            selectedSet={selectedSet}
-          />
-        );
-      })}
-
-      {/* no existing suggestions */}
-      {Object.keys(existing).length === 0 ? (
-        <p className="recommendation-muted">
-          没有返回已有标签建议。
-        </p>
-      ) : null}
-
-      {/* new tag suggestions (info only) */}
-      {newTags.length > 0 ? (
-        <NewTagSuggestionsPanel items={newTags} />
-      ) : null}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// sub-components
-// ---------------------------------------------------------------------------
 
 function ProviderWarning({ status }: { status: AiProviderStatus }) {
   if (status === "ok") {
     return null;
   }
 
-  const messages: Record<AiProviderStatus, string> = {
-    ok: "",
-    disabled:
-      "AI provider 已禁用，建议可能不完整。",
-    unconfigured:
-      "AI provider 尚未配置。请检查 AI_API_KEY 和 AI_MODEL。",
-    error:
-      "AI provider 发生错误，建议可能不完整。",
+  const messages: Record<Exclude<AiProviderStatus, "ok">, string> = {
+    disabled: "服务器上的 AI 功能已关闭（AI_ENABLED），无法生成建议。可以直接在上方手动选择标签。",
+    error: "AI 服务调用出错，没有生成建议。请查看后端日志后重试。",
+    unconfigured: "AI 服务还没配置好（AI_API_KEY / AI_MODEL），无法生成建议。",
   };
 
-  return (
-    <div className="status-callout warning" role="alert">
-      {messages[status]}
-    </div>
-  );
+  return <Callout tone="warn">{messages[status]}</Callout>;
 }
-
-type SuggestionGroupProps = {
-  group: TagGroup;
-  items: ExistingTagSuggestion[];
-  onToggleTag: (tagId: number) => void;
-  selectedSet: Set<number>;
-};
-
-function SuggestionGroup({
-  group,
-  items,
-  onToggleTag,
-  selectedSet,
-}: SuggestionGroupProps) {
-  return (
-    <div className="ai-suggestion-group">
-      <h3>{tagGroupLabels[group]}</h3>
-      <div className="ai-suggestion-chip-list">
-        {items.map((suggestion) => {
-          const isSelected = selectedSet.has(suggestion.tag_id);
-          return (
-            <div
-              className={
-                isSelected ? "ai-suggestion-chip selected" : "ai-suggestion-chip"
-              }
-              key={suggestion.tag_id}
-              title={`${suggestion.reason}（置信度：${suggestion.confidence.toFixed(2)}）`}
-            >
-              <span className="ai-suggestion-chip-name">
-                {suggestion.name}
-              </span>
-              <span className="ai-suggestion-chip-confidence">
-                {Math.round(suggestion.confidence * 100)}%
-              </span>
-              {isSelected ? (
-                <span className="ai-suggestion-selected-label">
-                  &#10003; 已添加
-                </span>
-              ) : (
-                <button
-                  className="button secondary"
-                  onClick={() => onToggleTag(suggestion.tag_id)}
-                  style={{
-                    fontSize: "0.8rem",
-                    padding: "2px 10px",
-                  }}
-                  type="button"
-                >
-                  + 添加
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function NewTagSuggestionsPanel({ items }: { items: NewTagSuggestion[] }) {
-  return (
-    <div className="ai-new-tags-panel">
-      <h3>新标签想法（仅建议，不会自动创建）</h3>
-      <p className="recommendation-muted" style={{ marginBottom: "10px" }}>
-        这些标签名称尚不存在。请先在标签页面创建，再分配给这个音轨。
-      </p>
-      <div className="ai-suggestion-chip-list">
-        {items.map((suggestion, index) => (
-          <span
-            className="ai-new-tag-chip"
-            key={`${suggestion.name}-${index}`}
-            title={`${suggestion.reason}（置信度：${suggestion.confidence.toFixed(2)}）`}
-          >
-            {suggestion.name}{" "}
-            <span>({suggestion.group})</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
 
 function getSuggestionError(error: unknown) {
   if (error instanceof ApiClientError) {
     if (error.status === 401) {
-      return "当前会话未授权。请重新登录后重试。";
+      return "登录已失效，请重新登录后重试。";
     }
     if (error.status === 503) {
-      return "AI provider 不可用。请检查后端 AI 配置。";
+      return "AI 服务不可用，请检查后端 AI 配置。";
     }
   }
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "无法加载标签建议。";
+  return "无法获取标签建议。";
 }

@@ -7,8 +7,6 @@ import { navigateTo } from "./router";
 
 type ProtectedRouteProps = {
   children: ReactNode;
-  isAuthenticated: boolean;
-  onUsePlaceholderSession: () => void;
 };
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
@@ -30,14 +28,11 @@ function ProtectedRouteContent({ children }: { children: ReactNode }) {
 
   if (status === "checking") {
     return (
-      <main className="login-shell">
-        <section className="login-panel" aria-live="polite">
-          <p className="eyebrow">Easy Music</p>
-          <h1>Checking session</h1>
-          <p className="page-copy">
-            Your saved browser session is being verified.
-          </p>
-        </section>
+      <main aria-live="polite" className="center-screen">
+        <div className="row">
+          <span aria-hidden="true" className="spinner" />
+          <span>正在验证登录状态…</span>
+        </div>
       </main>
     );
   }

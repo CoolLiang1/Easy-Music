@@ -1,28 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { syncFeedbackEvents } from "../api/feedback";
-import { ApiClientError } from "../api/http";
-import {
-  getRecentlyRevivedTracks,
-  requestRecommendations,
-} from "../api/recommendations";
+import { getRecentlyRevivedTracks, requestRecommendations } from "../api/recommendations";
 import { listTags } from "../api/tags";
+import { ApiClientError } from "../api/http";
 import { useAuth } from "../auth/AuthProvider";
+import { RecommendationExclusionsNotice } from "../components/RecommendationExplanationDetails";
 import {
-  RecommendationExclusionsNotice,
-  RecommendationExplanationDetails,
-  formatRecommendationReasonForDisplay,
-} from "../components/RecommendationExplanationDetails";
-import { tagGroups } from "../components/TagForm";
-import { feedbackLabels, formatDateTime, tagGroupLabels } from "../i18n/zh";
+  RecommendationResultCard,
+  useRecommendationFeedback,
+} from "../components/RecommendationResultCard";
+import {
+  Callout,
+  EmptyState,
+  GroupHeading,
+  LoadingRows,
+  PageHeader,
+  tagGroupOrder,
+} from "../components/ui/common";
+import { Icon } from "../components/ui/Icon";
+import { TrackCover } from "../components/ui/TrackCover";
+import { PlayButton } from "../components/WebAudioPlayer";
+import { formatDateTime } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
-import type { FeedbackType } from "../types/feedback";
 import type {
   RecommendationCooldownMode,
   RecommendationRequest,
-  RecommendationResult,
   RecommendationResponse,
-  RevivedTrackCandidate,
   RevivedTracksResponse,
 } from "../types/recommendation";
 import type { Tag, TagGroup } from "../types/tag";
@@ -35,7 +38,7 @@ type TagsState =
 type RecommendationState =
   | { name: "idle" }
   | { name: "loading" }
-  | { name: "ready"; response: RecommendationResponse }
+  | { name: "ready"; request: RecommendationRequest; response: RecommendationResponse }
   | { name: "error"; message: string };
 
 type RevivedState =
@@ -45,699 +48,406 @@ type RevivedState =
 
 type SelectionState = Record<TagGroup, number[]>;
 
-type FeedbackState = {
-  key: string;
-  message: string;
-  status: "sending" | "success" | "error";
-} | null;
-
-const initialSelections: SelectionState = {
-  scene: [],
-  type: [],
-  feature: [],
-};
+const initialSelections: SelectionState = { scene: [], type: [], feature: [] };
 
 const cooldownModeOptions: Array<{
+  description: string;
   label: string;
   value: RecommendationCooldownMode;
 }> = [
-  { label: "柔性冷却（默认）", value: "soft" },
-  { label: "严格冷却（旧行为）", value: "strict" },
-  { label: "关闭冷却（探索）", value: "off" },
+  { description: "最近听过的仍可能出现，但排序靠后。", label: "柔性冷却", value: "soft" },
+  { description: "冷却期内的音轨不会出现。", label: "严格冷却", value: "strict" },
+  { description: "忽略冷却，适合重新探索整个曲库。", label: "不冷却", value: "off" },
 ];
 
 const cooldownModeValues = cooldownModeOptions.map((option) => option.value);
 const cooldownModeStorageKey = "easy-music-recommendation-cooldown-mode";
 
-const feedbackActions: Array<{
-  label: string;
-  type: Extract<
-    FeedbackType,
-    "like" | "not_today" | "tired" | "not_suitable_for_context"
-  >;
-}> = [
-  { label: feedbackLabels.like ?? "喜欢", type: "like" },
-  { label: feedbackLabels.not_today ?? "今天不听", type: "not_today" },
-  { label: feedbackLabels.tired ?? "听腻了", type: "tired" },
-  { label: feedbackLabels.not_suitable_for_context ?? "不适合", type: "not_suitable_for_context" },
-];
-
 export function RecommendationPage() {
   const { accessToken } = useAuth();
   const [tagsState, setTagsState] = useState<TagsState>({ name: "loading" });
-  const [selectedTagIds, setSelectedTagIds] =
-    useState<SelectionState>(initialSelections);
-  const [cooldownMode, setCooldownMode] = useState<RecommendationCooldownMode>(
-    () => readStoredCooldownMode(),
-  );
-  const [recommendationState, setRecommendationState] =
-    useState<RecommendationState>({ name: "idle" });
-  const [revivedState, setRevivedState] = useState<RevivedState>({
-    name: "loading",
+  const [selectedTagIds, setSelectedTagIds] = useState<SelectionState>(initialSelections);
+  const [cooldownMode, setCooldownMode] = useState<RecommendationCooldownMode>(readStoredCooldownMode);
+  const [recommendationState, setRecommendationState] = useState<RecommendationState>({
+    name: "idle",
   });
+  const [revivedState, setRevivedState] = useState<RevivedState>({ name: "loading" });
   const [isRefreshingRevived, setIsRefreshingRevived] = useState(false);
-  const [feedbackState, setFeedbackState] = useState<FeedbackState>(null);
+  const { feedbackStatus, resetFeedback, sendFeedback } = useRecommendationFeedback(accessToken);
 
   const loadTags = useCallback(async () => {
     if (!accessToken) {
-      setTagsState({
-        name: "error",
-        message: "请重新登录后再加载推荐标签。",
-      });
+      setTagsState({ name: "error", message: "登录已失效，请重新登录。" });
       return;
     }
 
     setTagsState({ name: "loading" });
-
     try {
-      const tags = await listTags(accessToken);
-      setTagsState({ name: "ready", tags });
+      setTagsState({ name: "ready", tags: await listTags(accessToken) });
     } catch (error: unknown) {
-      setTagsState({
-        name: "error",
-        message: getErrorMessage(error, "无法加载标签。"),
-      });
+      setTagsState({ name: "error", message: getErrorMessage(error, "无法加载标签。") });
     }
   }, [accessToken]);
+
+  const loadRevivedTracks = useCallback(
+    async (showLoading: boolean) => {
+      if (!accessToken) {
+        setRevivedState({ name: "error", message: "登录已失效，请重新登录。" });
+        return;
+      }
+
+      if (showLoading) {
+        setRevivedState({ name: "loading" });
+      } else {
+        setIsRefreshingRevived(true);
+      }
+
+      try {
+        setRevivedState({ name: "ready", response: await getRecentlyRevivedTracks(accessToken) });
+      } catch (error: unknown) {
+        setRevivedState({ name: "error", message: getErrorMessage(error, "无法加载复听推荐。") });
+      } finally {
+        setIsRefreshingRevived(false);
+      }
+    },
+    [accessToken],
+  );
 
   useEffect(() => {
     void loadTags();
-  }, [loadTags]);
-
-  const loadRevivedTracks = useCallback(async (showLoading: boolean) => {
-    if (!accessToken) {
-      setRevivedState({
-        name: "error",
-        message: "请重新登录后再加载复听音轨。",
-      });
-      return;
-    }
-
-    if (showLoading) {
-      setRevivedState({ name: "loading" });
-    } else {
-      setIsRefreshingRevived(true);
-    }
-
-    try {
-      const response = await getRecentlyRevivedTracks(accessToken);
-      setRevivedState({ name: "ready", response });
-    } catch (error: unknown) {
-      setRevivedState({
-        name: "error",
-        message: getErrorMessage(error, "无法加载复听音轨。"),
-      });
-    } finally {
-      setIsRefreshingRevived(false);
-    }
-  }, [accessToken]);
-
-  useEffect(() => {
     void loadRevivedTracks(true);
-  }, [loadRevivedTracks]);
+  }, [loadRevivedTracks, loadTags]);
 
   useEffect(() => {
-    writeStoredCooldownMode(cooldownMode);
+    try {
+      window.localStorage.setItem(cooldownModeStorageKey, cooldownMode);
+    } catch {
+      // Optional preference.
+    }
   }, [cooldownMode]);
 
   const groupedTags = useMemo(() => {
-    const groups: Record<TagGroup, Tag[]> = {
-      scene: [],
-      type: [],
-      feature: [],
-    };
-
-    if (tagsState.name !== "ready") {
-      return groups;
+    const groups: Record<TagGroup, Tag[]> = { scene: [], type: [], feature: [] };
+    if (tagsState.name === "ready") {
+      for (const tag of tagsState.tags) groups[tag.group].push(tag);
     }
-
-    for (const tag of tagsState.tags) {
-      groups[tag.group].push(tag);
-    }
-
     return groups;
   }, [tagsState]);
 
-  const currentRequest = useMemo<RecommendationRequest>(
-    () => ({
+  const selectedCount =
+    selectedTagIds.scene.length + selectedTagIds.type.length + selectedTagIds.feature.length;
+  const hasAnyTags = tagGroupOrder.some((group) => groupedTags[group].length > 0);
+
+  const handleRequest = async () => {
+    if (!accessToken) {
+      setRecommendationState({ name: "error", message: "登录已失效，请重新登录。" });
+      return;
+    }
+
+    const request: RecommendationRequest = {
       scene_tag_ids: selectedTagIds.scene,
       type_tag_ids: selectedTagIds.type,
       feature_tag_ids: selectedTagIds.feature,
       cooldown_mode: cooldownMode,
       limit: 3,
       client: "web",
-    }),
-    [cooldownMode, selectedTagIds],
-  );
+    };
 
-  const handleRequestRecommendations = async () => {
-    if (!accessToken) {
-      setRecommendationState({
-        name: "error",
-        message: "请重新登录后再请求推荐。",
-      });
-      return;
-    }
-
-    setFeedbackState(null);
+    resetFeedback();
     setRecommendationState({ name: "loading" });
-
     try {
-      const response = await requestRecommendations(accessToken, currentRequest);
-      setRecommendationState({ name: "ready", response });
+      const response = await requestRecommendations(accessToken, request);
+      setRecommendationState({ name: "ready", request, response });
     } catch (error: unknown) {
       setRecommendationState({
         name: "error",
-        message: getErrorMessage(
-          error,
-          "推荐请求失败。请确认后端正在运行。",
-        ),
+        message: getErrorMessage(error, "推荐请求失败，请确认后端正在运行。"),
       });
     }
   };
 
-  const handleFeedback = async (
-    result: RecommendationResult,
-    feedbackType: FeedbackType,
-  ) => {
-    if (!accessToken) {
-      setFeedbackState({
-        key: `${result.track.id}:${feedbackType}`,
-        message: "请重新登录后再发送反馈。",
-        status: "error",
-      });
-      return;
-    }
-
-    const key = `${result.track.id}:${feedbackType}`;
-    setFeedbackState({
-      key,
-      message: "正在发送反馈...",
-      status: "sending",
-    });
-
-    try {
-      const response = await syncFeedbackEvents(accessToken, {
-        events: [
-          {
-            client: "web",
-            client_event_id: createClientEventId(),
-            feedback_type: feedbackType,
-            occurred_at: new Date().toISOString(),
-            scene_tag_ids: currentRequest.scene_tag_ids,
-            type_tag_ids: currentRequest.type_tag_ids,
-            feature_tag_ids: currentRequest.feature_tag_ids,
-            track_id: result.track.id,
-          },
-        ],
-      });
-
-      const failed = response.failed[0];
-      if (failed) {
-        setFeedbackState({
-          key,
-          message: failed.error || "反馈未被接受。",
-          status: "error",
-        });
-        return;
-      }
-
-      const accepted = response.accepted[0];
-      setFeedbackState({
-        key,
-        message:
-          accepted?.status === "duplicate"
-            ? "反馈已记录过。"
-            : "反馈已记录。",
-        status: "success",
-      });
-    } catch (error: unknown) {
-      setFeedbackState({
-        key,
-        message: getErrorMessage(error, "反馈请求失败。"),
-        status: "error",
-      });
-    }
+  const toggleTag = (group: TagGroup, tagId: number) => {
+    setSelectedTagIds((current) => ({
+      ...current,
+      [group]: current[group].includes(tagId)
+        ? current[group].filter((id) => id !== tagId)
+        : [...current[group], tagId],
+    }));
   };
 
-  const hasAnyTags =
-    tagsState.name === "ready" && tagGroups.some((group) => groupedTags[group].length);
+  const activeCooldown = cooldownModeOptions.find((option) => option.value === cooldownMode);
+  const results =
+    recommendationState.name === "ready" ? recommendationState.response.results.slice(0, 3) : [];
 
   return (
-    <section className="page-panel" aria-labelledby="recommendation-title">
-      <div className="page-header-row">
-        <div>
-          <p className="eyebrow">推荐</p>
-          <h1 id="recommendation-title">结构化推荐</h1>
-          <p className="page-copy">
-            使用明确的场景、类型和特点标签测试规则推荐。
-          </p>
-        </div>
-        {recommendationState.name === "ready" ? (
-          <span className="score-pill">
-            {recommendationState.response.results.length} 个结果
-          </span>
-        ) : null}
-      </div>
-
-      <div className="recommendation-toolbar">
-        <button
-          className="button secondary"
-          disabled={tagsState.name === "loading"}
-          onClick={() => void loadTags()}
-          type="button"
-        >
-          {tagsState.name === "loading" ? "正在加载标签..." : "重新加载标签"}
-        </button>
-        <button
-          className="button secondary"
-          disabled={recommendationState.name === "loading"}
-          onClick={() => {
-            setSelectedTagIds(initialSelections);
-            setFeedbackState(null);
-            setRecommendationState({ name: "idle" });
-          }}
-          type="button"
-        >
-          清空选择
-        </button>
-      </div>
-
-      {tagsState.name === "loading" ? (
-        <div className="empty-state" aria-live="polite">
-          正在加载结构化标签...
-        </div>
-      ) : null}
-
-      {tagsState.name === "error" ? (
-        <div className="empty-state error" role="alert">
-          {tagsState.message}
-        </div>
-      ) : null}
-
-      {tagsState.name === "ready" && !hasAnyTags ? (
-        <div className="empty-state">
-          还没有可用的场景、类型或特点标签。请先创建标签，再测试结构化推荐。
-        </div>
-      ) : null}
-
-      {tagsState.name === "ready" && hasAnyTags ? (
-        <>
-          <div className="recommendation-grid">
-            {tagGroups.map((group) => (
-              <TagPicker
-                group={group}
-                key={group}
-                onToggle={(tagId) => {
-                  setSelectedTagIds((current) => ({
-                    ...current,
-                    [group]: toggleId(current[group], tagId),
-                  }));
-                }}
-                selectedIds={selectedTagIds[group]}
-                tags={groupedTags[group]}
-              />
-            ))}
-          </div>
-
-          <div className="recommendation-toolbar">
-            <label className="field">
-              冷却模式
-              <select
-                aria-label="冷却模式"
-                disabled={recommendationState.name === "loading"}
-                onChange={(event) =>
-                  setCooldownMode(
-                    event.target.value as RecommendationCooldownMode,
-                  )
-                }
-                value={cooldownMode}
-              >
-                {cooldownModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="button primary"
-              disabled={recommendationState.name === "loading"}
-              onClick={() => void handleRequestRecommendations()}
-              type="button"
-            >
-              {recommendationState.name === "loading"
-                ? "正在请求..."
-                : "请求推荐"}
-            </button>
-          </div>
-        </>
-      ) : null}
-
-      {recommendationState.name === "idle" ? (
-        <div className="empty-state">
-          选择任意结构化上下文后，即可请求推荐。
-        </div>
-      ) : null}
-
-      {recommendationState.name === "loading" ? (
-        <div className="empty-state" aria-live="polite">
-          正在请求结构化推荐...
-        </div>
-      ) : null}
-
-      {recommendationState.name === "error" ? (
-        <div className="empty-state error" role="alert">
-          {recommendationState.message}
-        </div>
-      ) : null}
-
-      {recommendationState.name === "ready" ? (
-        <RecommendationExclusionsNotice
-          exclusions={recommendationState.response.exclusions_considered}
-        />
-      ) : null}
-
-      {recommendationState.name === "ready" &&
-      recommendationState.response.results.length === 0 ? (
-        <div className="empty-state">
-          没有返回推荐。可能还没有可播放音轨，或所有可播放音轨都被冷却、
-          反馈等规则过滤了。
-        </div>
-      ) : null}
-
-      {recommendationState.name === "ready" &&
-      recommendationState.response.results.length > 0 ? (
-        <div className="recommendation-results">
-          {recommendationState.response.results.slice(0, 3).map((result, index) => (
-            <RecommendationResultCard
-              feedbackState={feedbackState}
-              isPrimary={index === 0}
-              key={`${result.rank}:${result.track.id}`}
-              onFeedback={handleFeedback}
-              result={result}
-            />
-          ))}
-        </div>
-      ) : null}
-
-      <RevivedTracksSection
-        isRefreshing={isRefreshingRevived}
-        onRefresh={() => void loadRevivedTracks(false)}
-        state={revivedState}
+    <div className="page">
+      <PageHeader
+        description={
+          <>
+            选几个标签描述此刻的状态，规则推荐会挑出最合适的三首。想直接用一句话描述？试试{" "}
+            <RouteLink className="inline-link" to="/ai-assistant">
+              AI 助手
+            </RouteLink>
+            。
+          </>
+        }
+        title="此刻想听什么"
       />
-    </section>
+
+      <div className="stack">
+        <section aria-label="推荐条件" className="card context-card">
+          {tagsState.name === "loading" ? <LoadingRows rows={3} /> : null}
+          {tagsState.name === "error" ? (
+            <div className="card-body">
+              <Callout tone="danger">{tagsState.message}</Callout>
+            </div>
+          ) : null}
+          {tagsState.name === "ready" && !hasAnyTags ? (
+            <EmptyState
+              action={
+                <RouteLink className="btn btn-primary" to="/tags">
+                  去创建标签
+                </RouteLink>
+              }
+              compact
+              description="推荐依靠场景、类型、特点三类标签。先创建一些标签，再给音轨打上。"
+              icon="tag"
+              title="还没有可用的标签"
+            />
+          ) : null}
+          {tagsState.name === "ready" && hasAnyTags ? (
+            <>
+              <div className="card-body tag-groups">
+                {tagGroupOrder.map((group) => (
+                  <div className="tag-group" key={group}>
+                    <GroupHeading count={selectedTagIds[group].length} group={group} />
+                    {groupedTags[group].length === 0 ? (
+                      <span className="faint">这个分组还没有标签。</span>
+                    ) : (
+                      <div className="chip-list">
+                        {groupedTags[group].map((tag) => {
+                          const isSelected = selectedTagIds[group].includes(tag.id);
+                          return (
+                            <button
+                              aria-pressed={isSelected}
+                              className={`chip chip-toggle chip-${group}`}
+                              key={tag.id}
+                              onClick={() => toggleTag(group, tag.id)}
+                              type="button"
+                            >
+                              {isSelected ? <Icon name="check" size={14} /> : null}
+                              {tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="context-foot">
+                <div className="row" style={{ gap: 10 }}>
+                  <div aria-label="冷却模式" className="segmented" role="radiogroup">
+                    {cooldownModeOptions.map((option) => (
+                      <button
+                        aria-checked={cooldownMode === option.value}
+                        className={cooldownMode === option.value ? "segmented-item active" : "segmented-item"}
+                        key={option.value}
+                        onClick={() => setCooldownMode(option.value)}
+                        role="radio"
+                        title={option.description}
+                        type="button"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="context-summary hide-sm">{activeCooldown?.description}</span>
+                </div>
+                <div className="row">
+                  {selectedCount > 0 ? (
+                    <button
+                      className="btn btn-ghost"
+                      disabled={recommendationState.name === "loading"}
+                      onClick={() => {
+                        setSelectedTagIds(initialSelections);
+                        resetFeedback();
+                        setRecommendationState({ name: "idle" });
+                      }}
+                      type="button"
+                    >
+                      清空
+                    </button>
+                  ) : null}
+                  <button
+                    className="btn btn-primary"
+                    disabled={recommendationState.name === "loading"}
+                    onClick={() => void handleRequest()}
+                    type="button"
+                  >
+                    {recommendationState.name === "loading" ? (
+                      <>
+                        <span aria-hidden="true" className="spinner" />
+                        正在挑选…
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="compass" size={16} />
+                        {selectedCount > 0 ? `按 ${selectedCount} 个标签推荐` : "随便推荐几首"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </section>
+
+        {recommendationState.name === "error" ? (
+          <Callout title="推荐失败" tone="danger">
+            {recommendationState.message}
+          </Callout>
+        ) : null}
+
+        {recommendationState.name === "ready" ? (
+          <section aria-label="推荐结果" className="rec-results">
+            <RecommendationExclusionsNotice
+              exclusions={recommendationState.response.exclusions_considered}
+            />
+            {results.length === 0 ? (
+              <div className="card">
+                <EmptyState
+                  compact
+                  description="可能还没有可播放的音轨，或者符合条件的都被冷却、「今天不听」等规则过滤了。换个条件或切到「不冷却」试试。"
+                  icon="search"
+                  title="这次没有找到合适的音轨"
+                />
+              </div>
+            ) : (
+              <>
+                <RecommendationResultCard
+                  feedbackStatus={feedbackStatus}
+                  isPrimary
+                  onFeedback={(result, type) => void sendFeedback(result, type, recommendationState.request)}
+                  result={results[0]}
+                />
+                {results.length > 1 ? (
+                  <div className="rec-alt-grid">
+                    {results.slice(1).map((result) => (
+                      <RecommendationResultCard
+                        feedbackStatus={feedbackStatus}
+                        isPrimary={false}
+                        key={`${result.rank}:${result.track.id}`}
+                        onFeedback={(item, type) =>
+                          void sendFeedback(item, type, recommendationState.request)
+                        }
+                        result={result}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </section>
+        ) : null}
+
+        <RevivedTracksSection
+          isRefreshing={isRefreshingRevived}
+          onRefresh={() => void loadRevivedTracks(false)}
+          state={revivedState}
+        />
+      </div>
+    </div>
   );
 }
-
-type RevivedTracksSectionProps = {
-  isRefreshing: boolean;
-  onRefresh: () => void;
-  state: RevivedState;
-};
 
 function RevivedTracksSection({
   isRefreshing,
   onRefresh,
   state,
-}: RevivedTracksSectionProps) {
+}: {
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  state: RevivedState;
+}) {
   return (
-    <section className="recommendation-card revived-tracks-panel">
-      <div className="recommendation-result-heading">
+    <section aria-labelledby="revived-title" className="card">
+      <div className="card-header">
         <div>
-          <p className="eyebrow">复听推荐</p>
-          <h2>值得重新听听的安静音轨</h2>
+          <h2 className="card-title" id="revived-title">
+            好久没听
+          </h2>
+          <p className="card-subtitle">
+            {state.name === "ready"
+              ? `超过 ${state.response.long_unplayed_threshold_days} 天没播放过的音轨，从未播放的排在后面 · 生成于 ${formatDateTime(state.response.generated_at)}`
+              : "值得重新听听的安静音轨"}
+          </p>
         </div>
         <button
-          className="button secondary"
+          className="btn btn-ghost btn-sm"
           disabled={state.name === "loading" || isRefreshing}
           onClick={onRefresh}
           type="button"
         >
-          {isRefreshing ? "正在刷新..." : "刷新"}
+          <Icon name="refresh" size={15} />
+          {isRefreshing ? "正在刷新…" : "换一批"}
         </button>
       </div>
-
-      {state.name === "loading" ? (
-        <div className="empty-state" aria-live="polite">
-          正在加载复听音轨...
-        </div>
-      ) : null}
-
-      {state.name === "error" ? (
-        <div className="empty-state" role="alert">
-          {state.message}
-        </div>
-      ) : null}
-
-      {state.name === "ready" && state.response.candidates.length === 0 ? (
-        <div className="empty-state">
-          当前没有适合复听的可播放音轨。仍在冷却、今天不听、近期强负反馈的音轨会被隐藏。
-        </div>
-      ) : null}
-
-      {state.name === "ready" && state.response.candidates.length > 0 ? (
-        <>
-          <p className="recommendation-muted">
-            生成于 {formatDateTime(state.response.generated_at)}。长期未播放阈值为{" "}
-            {state.response.long_unplayed_threshold_days} 天；从未播放的音轨会排在其后。
+      <div className="card-body">
+        {state.name === "loading" ? <LoadingRows rows={2} /> : null}
+        {state.name === "error" ? <Callout tone="danger">{state.message}</Callout> : null}
+        {state.name === "ready" && state.response.candidates.length === 0 ? (
+          <p className="faint">
+            暂时没有适合复听的音轨。仍在冷却、今天不听或近期反馈过不喜欢的会被隐藏。
           </p>
-          <div className="recommendation-results revived-track-list">
-            {state.response.candidates.slice(0, 6).map((candidate) => (
-              <RevivedTrackCard candidate={candidate} key={candidate.track.id} />
-            ))}
+        ) : null}
+        {state.name === "ready" && state.response.candidates.length > 0 ? (
+          <div className="revived-grid">
+            {state.response.candidates.slice(0, 6).map((candidate) => {
+              const track = candidate.track;
+              return (
+                <article className="revived-item" key={track.id}>
+                  <TrackCover size={48} track={track} />
+                  <div style={{ minWidth: 0 }}>
+                    <RouteLink className="track-cell-title" to={`/tracks/${encodeURIComponent(track.id)}`}>
+                      {track.title || "未命名音轨"}
+                    </RouteLink>
+                    <span className="track-cell-sub">
+                      {candidate.days_since_last_played === null
+                        ? "从未播放"
+                        : `${candidate.days_since_last_played} 天没听`}
+                      {" · "}
+                      {candidate.playback_count} 次播放
+                    </span>
+                    <p className="reason truncate" title={candidate.reason}>
+                      {candidate.reason}
+                    </p>
+                  </div>
+                  <PlayButton track={track} />
+                </article>
+              );
+            })}
           </div>
-        </>
-      ) : null}
+        ) : null}
+      </div>
     </section>
   );
-}
-
-function RevivedTrackCard({ candidate }: { candidate: RevivedTrackCandidate }) {
-  const track = candidate.track;
-  const tags =
-    candidate.tag_summary.length > 0
-      ? candidate.tag_summary
-      : track.tags.map((tag) => tag.name);
-
-  return (
-    <article className="recommendation-result-card">
-      <div className="recommendation-result-heading">
-        <div>
-          <p className="eyebrow">
-            {candidate.days_since_last_played === null
-              ? "从未播放"
-              : `${candidate.days_since_last_played} 天未播放`}
-          </p>
-          <h3>
-            <RouteLink to={`/tracks/${encodeURIComponent(track.id)}`}>
-              {track.title || "未命名音轨"}
-            </RouteLink>
-          </h3>
-        </div>
-        <span className="score-pill">{candidate.playback_count} 次播放</span>
-      </div>
-
-      <dl className="recommendation-meta">
-        <div>
-          <dt>艺人</dt>
-          <dd>{track.artist || "未设置"}</dd>
-        </div>
-        <div>
-          <dt>上次播放</dt>
-          <dd>{formatDateTime(candidate.last_played_at)}</dd>
-        </div>
-      </dl>
-
-      <p className="recommendation-reason">{candidate.reason}</p>
-
-      {tags.length > 0 ? (
-        <div className="tag-chip-list" aria-label="复听音轨标签">
-          {tags.slice(0, 6).map((tagName) => (
-            <span className="tag-chip readonly" key={tagName}>
-              {tagName}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="recommendation-muted">这个音轨没有分配标签。</p>
-      )}
-    </article>
-  );
-}
-
-type TagPickerProps = {
-  group: TagGroup;
-  onToggle: (tagId: number) => void;
-  selectedIds: number[];
-  tags: Tag[];
-};
-
-function TagPicker({
-  group,
-  onToggle,
-  selectedIds,
-  tags,
-}: TagPickerProps) {
-  const title = tagGroupLabels[group];
-
-  return (
-    <section className="recommendation-card" aria-labelledby={`picker-${title}`}>
-      <h2 id={`picker-${title}`}>{title}</h2>
-      {tags.length === 0 ? (
-        <p className="recommendation-muted">这个分组暂无标签。</p>
-      ) : (
-        <div className="tag-chip-list">
-          {tags.map((tag) => {
-            const isSelected = selectedIds.includes(tag.id);
-            return (
-              <button
-                aria-pressed={isSelected}
-                className={isSelected ? "tag-chip selected" : "tag-chip"}
-                key={tag.id}
-                onClick={() => onToggle(tag.id)}
-                type="button"
-              >
-                {tag.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-type RecommendationResultCardProps = {
-  feedbackState: FeedbackState;
-  isPrimary: boolean;
-  onFeedback: (
-    result: RecommendationResult,
-    feedbackType: FeedbackType,
-  ) => Promise<void>;
-  result: RecommendationResult;
-};
-
-function RecommendationResultCard({
-  feedbackState,
-  isPrimary,
-  onFeedback,
-  result,
-}: RecommendationResultCardProps) {
-  const track = result.track;
-
-  return (
-    <article className="recommendation-result-card">
-      <div className="recommendation-result-heading">
-        <div>
-          <p className="eyebrow">{isPrimary ? "首选" : "备选"}</p>
-          <h2>{track.title || "未命名音轨"}</h2>
-        </div>
-        <span className="score-pill">
-          排名 {result.rank} / {formatScore(result.score)}
-        </span>
-      </div>
-
-      <dl className="recommendation-meta">
-        <div>
-          <dt>艺人</dt>
-          <dd>{track.artist || "未设置"}</dd>
-        </div>
-        <div>
-          <dt>专辑</dt>
-          <dd>{track.album || "未设置"}</dd>
-        </div>
-      </dl>
-
-      <p className="recommendation-reason">
-        {formatRecommendationReasonForDisplay(result.reason)}
-      </p>
-      <RecommendationExplanationDetails explanation={result.explanation} />
-
-      {track.tags.length > 0 ? (
-        <div className="tag-chip-list" aria-label="音轨标签">
-          {track.tags.map((tag) => (
-            <span className="tag-chip readonly" key={tag.id}>
-              {tag.name}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="recommendation-muted">这个音轨没有分配标签。</p>
-      )}
-
-      <div className="recommendation-feedback-actions">
-        {feedbackActions.map((action) => {
-          const feedbackKey = `${track.id}:${action.type}`;
-          const isSending =
-            feedbackState?.key === feedbackKey && feedbackState.status === "sending";
-
-          return (
-            <button
-              className="button secondary"
-              disabled={isSending}
-              key={action.type}
-              onClick={() => void onFeedback(result, action.type)}
-              type="button"
-            >
-              {isSending ? "正在发送..." : action.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {feedbackState?.key.startsWith(`${track.id}:`) ? (
-        <p
-          className={`recommendation-feedback-message ${feedbackState.status}`}
-          role={feedbackState.status === "error" ? "alert" : undefined}
-        >
-          {feedbackState.message}
-        </p>
-      ) : null}
-    </article>
-  );
-}
-
-function toggleId(ids: number[], tagId: number) {
-  return ids.includes(tagId)
-    ? ids.filter((currentId) => currentId !== tagId)
-    : [...ids, tagId];
-}
-
-function createClientEventId() {
-  if ("crypto" in window && "randomUUID" in window.crypto) {
-    return window.crypto.randomUUID();
-  }
-
-  return `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function formatScore(score: number) {
-  return `评分 ${Number.isInteger(score) ? score : score.toFixed(2)}`;
 }
 
 function readStoredCooldownMode(): RecommendationCooldownMode {
-  if (typeof window === "undefined") {
+  try {
+    const storedValue = window.localStorage.getItem(cooldownModeStorageKey);
+    return cooldownModeValues.includes(storedValue as RecommendationCooldownMode)
+      ? (storedValue as RecommendationCooldownMode)
+      : "soft";
+  } catch {
     return "soft";
   }
-
-  const storedValue = window.localStorage.getItem(cooldownModeStorageKey);
-  return isRecommendationCooldownMode(storedValue) ? storedValue : "soft";
-}
-
-function writeStoredCooldownMode(mode: RecommendationCooldownMode) {
-  window.localStorage.setItem(cooldownModeStorageKey, mode);
-}
-
-function isRecommendationCooldownMode(
-  value: string | null,
-): value is RecommendationCooldownMode {
-  return cooldownModeValues.includes(value as RecommendationCooldownMode);
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiClientError && error.status === 401) {
-    return "当前会话未授权。请重新登录后重试。";
+    return "登录已失效，请重新登录后重试。";
   }
 
   if (error instanceof Error && error.message) {

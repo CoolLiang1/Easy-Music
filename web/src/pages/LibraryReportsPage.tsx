@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { getLibraryOrganizationReport } from "../api/libraryReports";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
-import { formatDateTime, formatDuration } from "../i18n/zh";
+import { Callout, LoadingRows, PageHeader, getErrorMessage } from "../components/ui/common";
+import { Icon } from "../components/ui/Icon";
+import { TrackCover } from "../components/ui/TrackCover";
+import { formatBackendReason, formatDateTime, formatDuration, formatRelativeDays } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
 import type {
   LibraryOrganizationReport,
@@ -17,288 +19,374 @@ type ReportState =
   | { name: "ready"; report: LibraryOrganizationReport }
   | { name: "error"; message: string };
 
+type SectionKey =
+  | "untagged"
+  | "metadata"
+  | "processing"
+  | "duplicates"
+  | "never"
+  | "rarely"
+  | "cooldown";
+
+type SectionDef = {
+  action: string;
+  attention: boolean;
+  clear: string;
+  key: SectionKey;
+  title: string;
+};
+
+const sections: SectionDef[] = [
+  {
+    action: "打上场景/类型/特点标签后，它们才会出现在推荐里。",
+    attention: true,
+    clear: "所有可播放音轨都有标签了。",
+    key: "untagged",
+    title: "还没打标签",
+  },
+  {
+    action: "补上艺人、专辑等信息，搜索和推荐说明会更准确。",
+    attention: true,
+    clear: "可播放音轨的核心信息都填好了。",
+    key: "metadata",
+    title: "信息不完整",
+  },
+  {
+    action: "处理中的会自动完成；失败的可以查看详情里的错误。",
+    attention: true,
+    clear: "没有处理中或失败的上传。",
+    key: "processing",
+    title: "处理状态",
+  },
+  {
+    action: "确认后可以在详情页删除多余的副本。这里不会自动删除任何内容。",
+    attention: true,
+    clear: "没有发现可能重复的音轨。",
+    key: "duplicates",
+    title: "可能重复",
+  },
+  {
+    action: "上传后还没播放过的音轨。",
+    attention: false,
+    clear: "每首可播放音轨都至少播放过一次。",
+    key: "never",
+    title: "从未播放",
+  },
+  {
+    action: "播放次数很少的音轨，可能值得重新听听或整理。",
+    attention: false,
+    clear: "没有低频播放的音轨。",
+    key: "rarely",
+    title: "很少播放",
+  },
+  {
+    action: "冷却时间已经过了，可以按需清除冷却设置。",
+    attention: false,
+    clear: "没有过期的冷却设置。",
+    key: "cooldown",
+    title: "冷却已过期",
+  },
+];
+
 export function LibraryReportsPage() {
   const { accessToken } = useAuth();
   const [reportState, setReportState] = useState<ReportState>({ name: "loading" });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadReport = useCallback(async (showLoading: boolean) => {
-    if (!accessToken) {
-      setReportState({
-        name: "error",
-        message: "请重新登录后再加载曲库报告。",
-      });
-      return;
-    }
+  const loadReport = useCallback(
+    async (showLoading: boolean) => {
+      if (!accessToken) {
+        setReportState({ name: "error", message: "登录已失效，请重新登录。" });
+        return;
+      }
 
-    if (showLoading) {
-      setReportState({ name: "loading" });
-    } else {
-      setIsRefreshing(true);
-    }
+      if (showLoading) {
+        setReportState({ name: "loading" });
+      } else {
+        setIsRefreshing(true);
+      }
 
-    try {
-      const report = await getLibraryOrganizationReport(accessToken);
-      setReportState({ name: "ready", report });
-    } catch (error: unknown) {
-      setReportState({
-        name: "error",
-        message: getErrorMessage(error),
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [accessToken]);
+      try {
+        setReportState({ name: "ready", report: await getLibraryOrganizationReport(accessToken) });
+      } catch (error: unknown) {
+        setReportState({ name: "error", message: getErrorMessage(error, "无法加载整理报告。") });
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    [accessToken],
+  );
 
   useEffect(() => {
     void loadReport(true);
   }, [loadReport]);
 
+  const report = reportState.name === "ready" ? reportState.report : null;
+  const counts: Record<SectionKey, number> = report
+    ? {
+        cooldown: report.stale_cooldown_tracks.length,
+        duplicates: report.duplicate_groups.length,
+        metadata: report.missing_metadata_tracks.length,
+        never: report.never_played_ready_tracks.length,
+        processing: report.processing_tracks.length,
+        rarely: report.rarely_played_ready_tracks.length,
+        untagged: report.untagged_ready_tracks.length,
+      }
+    : { cooldown: 0, duplicates: 0, metadata: 0, never: 0, processing: 0, rarely: 0, untagged: 0 };
+  const todoCount = sections
+    .filter((section) => section.attention)
+    .reduce((sum, section) => sum + counts[section.key], 0);
+
   return (
-    <section className="page-panel" aria-labelledby="library-reports-title">
-      <div className="page-header-row">
-        <div>
-          <p className="eyebrow">报告</p>
-          <h1 id="library-reports-title">曲库整理</h1>
-          <p className="page-copy">
-            找出需要补元数据、补标签、关注处理状态，或值得重新听听的音轨。
-          </p>
-        </div>
-      </div>
-      <div className="toolbar">
-        <button
-          className="button secondary"
-          disabled={reportState.name === "loading" || isRefreshing}
-          onClick={() => void loadReport(false)}
-          type="button"
-        >
-          {isRefreshing ? "正在刷新..." : "刷新报告"}
-        </button>
-        <RouteLink className="button secondary" to="/library">
-          返回曲库
-        </RouteLink>
-      </div>
+    <div className="page">
+      <PageHeader
+        actions={
+          <button
+            className="btn btn-secondary"
+            disabled={reportState.name === "loading" || isRefreshing}
+            onClick={() => void loadReport(false)}
+            type="button"
+          >
+            <Icon name="refresh" size={16} />
+            {isRefreshing ? "正在刷新…" : "重新生成"}
+          </button>
+        }
+        description="找出需要补标签、补信息或关注处理状态的音轨。报告只读，不会修改任何内容。"
+        meta={
+          report ? (
+            <>
+              <span>
+                待整理 <strong>{todoCount}</strong> 项
+              </span>
+              <span>生成于 {formatDateTime(report.generated_at)}</span>
+            </>
+          ) : null
+        }
+        title="整理报告"
+      />
 
       {reportState.name === "loading" ? (
-        <div className="empty-state" aria-live="polite">
-          正在加载曲库报告...
+        <div className="card">
+          <LoadingRows rows={6} />
         </div>
       ) : null}
 
       {reportState.name === "error" ? (
-        <div className="empty-state error" role="alert">
-          {reportState.message}
+        <div className="card card-pad stack">
+          <Callout title="报告加载失败" tone="danger">
+            {reportState.message}
+          </Callout>
+          <div>
+            <button className="btn btn-secondary" onClick={() => void loadReport(true)} type="button">
+              重试
+            </button>
+          </div>
         </div>
       ) : null}
 
-      {reportState.name === "ready" ? <ReportSections report={reportState.report} /> : null}
-    </section>
-  );
-}
+      {report ? (
+        <>
+          <div className="stat-grid">
+            {sections.map((section) => {
+              const count = counts[section.key];
+              const tone = count === 0 ? "clear" : section.attention ? "attention" : "";
+              return (
+                <button
+                  className={`stat-card ${tone}`}
+                  key={section.key}
+                  onClick={() =>
+                    document
+                      .getElementById(`report-${section.key}`)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                  type="button"
+                >
+                  <span className="stat-card-value">{count}</span>
+                  <span className="stat-card-label">{section.title}</span>
+                </button>
+              );
+            })}
+          </div>
 
-function ReportSections({ report }: { report: LibraryOrganizationReport }) {
-  return (
-    <div className="recommendation-results">
-      <p className="page-copy" style={{ margin: 0 }}>
-        生成于 {formatDateTime(report.generated_at)}。
-      </p>
-
-      <TrackSection
-        emptyMessage="没有缺少标签的可播放音轨。"
-        title="未打标签的可播放音轨"
-        tracks={report.untagged_ready_tracks}
-      />
-      <IssueSection
-        emptyMessage="没有缺少核心元数据的可播放音轨。"
-        issues={report.missing_metadata_tracks}
-        title="缺少元数据"
-      />
-      <IssueSection
-        emptyMessage="当前没有处理中或处理失败的上传。"
-        issues={report.processing_tracks}
-        title="处理状态关注"
-      />
-      <DuplicateSection groups={report.duplicate_groups} />
-      <TrackSection
-        emptyMessage="没有等待首次播放的可播放音轨。"
-        title="从未播放的可播放音轨"
-        tracks={report.never_played_ready_tracks}
-      />
-      <TrackSection
-        emptyMessage="没有超过低频播放阈值的可播放音轨。"
-        title="很少播放的可播放音轨"
-        tracks={report.rarely_played_ready_tracks}
-      />
-      <IssueSection
-        emptyMessage="没有冷却期已过的可播放音轨。"
-        issues={report.stale_cooldown_tracks}
-        title="已过期冷却"
-      />
+          <div className="stack">
+            {sections.map((section) => (
+              <ReportSection count={counts[section.key]} key={section.key} section={section}>
+                {section.key === "untagged" ? <TrackRows tracks={report.untagged_ready_tracks} /> : null}
+                {section.key === "metadata" ? <IssueRows issues={report.missing_metadata_tracks} /> : null}
+                {section.key === "processing" ? <IssueRows issues={report.processing_tracks} showStatus /> : null}
+                {section.key === "duplicates" ? <DuplicateRows groups={report.duplicate_groups} /> : null}
+                {section.key === "never" ? <TrackRows tracks={report.never_played_ready_tracks} /> : null}
+                {section.key === "rarely" ? <TrackRows tracks={report.rarely_played_ready_tracks} /> : null}
+                {section.key === "cooldown" ? <IssueRows issues={report.stale_cooldown_tracks} /> : null}
+              </ReportSection>
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
 
-function TrackSection({
-  emptyMessage,
-  title,
-  tracks,
-}: {
-  emptyMessage: string;
-  title: string;
-  tracks: LibraryReportTrack[];
-}) {
-  return (
-    <ReportPanel count={tracks.length} title={title}>
-      {tracks.length === 0 ? (
-        <p style={emptyTextStyle}>{emptyMessage}</p>
-      ) : (
-        <TrackList tracks={tracks} />
-      )}
-    </ReportPanel>
-  );
-}
-
-function IssueSection({
-  emptyMessage,
-  issues,
-  title,
-}: {
-  emptyMessage: string;
-  issues: LibraryReportTrackIssue[];
-  title: string;
-}) {
-  return (
-    <ReportPanel count={issues.length} title={title}>
-      {issues.length === 0 ? (
-        <p style={emptyTextStyle}>{emptyMessage}</p>
-      ) : (
-        <ul style={listStyle}>
-          {issues.map((issue) => (
-            <li key={issue.track.id} style={itemStyle}>
-              <TrackSummary track={issue.track} />
-              <p style={{ color: "#526174", lineHeight: 1.5, margin: "10px 0 0" }}>
-                {issue.reasons.join(" ")}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </ReportPanel>
-  );
-}
-
-function DuplicateSection({ groups }: { groups: LibraryOrganizationReport["duplicate_groups"] }) {
-  return (
-    <ReportPanel count={groups.length} title="重复音轨候选">
-      {groups.length === 0 ? (
-        <p style={emptyTextStyle}>没有重复音轨候选组。</p>
-      ) : (
-        <ul style={listStyle}>
-          {groups.map((group) => (
-            <li key={group.group_id} style={itemStyle}>
-              <h3 style={{ margin: 0 }}>{formatMatchType(group.match_type)}</h3>
-              <p style={{ color: "#526174", lineHeight: 1.5, margin: "8px 0 0" }}>
-                {group.reason}
-              </p>
-              <ul style={{ display: "grid", gap: "8px", margin: "12px 0 0", paddingLeft: "20px" }}>
-                {group.candidates.map((candidate) => (
-                  <li key={candidate.id}>
-                    <RouteLink
-                      style={trackLinkStyle}
-                      to={`/tracks/${encodeURIComponent(candidate.id)}`}
-                    >
-                      {candidate.title || "未命名音轨"}
-                    </RouteLink>
-                    <span style={{ color: "#526174" }}>
-                      {" "}
-                      / {candidate.artist || "艺人未设置"} /{" "}
-                      {formatDuration(candidate.duration_seconds)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
-    </ReportPanel>
-  );
-}
-
-function ReportPanel({
+function ReportSection({
   children,
   count,
-  title,
+  section,
 }: {
   children: ReactNode;
   count: number;
-  title: string;
+  section: SectionDef;
 }) {
   return (
-    <section className="panel">
-      <div
-        style={{
-          alignItems: "center",
-          display: "flex",
-          gap: "12px",
-          justifyContent: "space-between",
-        }}
-      >
-          <h2>{title}</h2>
-        <span className="score-pill">{count}</span>
+    <section aria-labelledby={`report-${section.key}-title`} className="card" id={`report-${section.key}`}>
+      <div className="card-header" style={count === 0 ? { paddingBottom: 16 } : undefined}>
+        <div>
+          <h2 className="card-title row" id={`report-${section.key}-title`} style={{ gap: 8 }}>
+            {section.title}
+            <span className="count-pill">{count}</span>
+          </h2>
+          <p className="card-subtitle">
+            {count === 0 ? (
+              <span className="row" style={{ gap: 6, color: "var(--ok)" }}>
+                <Icon name="check" size={15} />
+                {section.clear}
+              </span>
+            ) : (
+              section.action
+            )}
+          </p>
+        </div>
       </div>
-      <div style={{ marginTop: "16px" }}>{children}</div>
+      {count > 0 ? <div style={{ marginTop: 12 }}>{children}</div> : null}
     </section>
   );
 }
 
-function TrackList({ tracks }: { tracks: LibraryReportTrack[] }) {
+const PREVIEW_LIMIT = 8;
+
+function useExpandable<T>(items: T[]) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? items : items.slice(0, PREVIEW_LIMIT);
+  const toggle =
+    items.length > PREVIEW_LIMIT ? (
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={() => setExpanded((current) => !current)}
+        style={{ margin: "4px 12px 12px" }}
+        type="button"
+      >
+        {expanded ? "收起" : `显示全部 ${items.length} 项`}
+      </button>
+    ) : null;
+  return { toggle, visible };
+}
+
+function TrackRows({ tracks }: { tracks: LibraryReportTrack[] }) {
+  const { toggle, visible } = useExpandable(tracks);
   return (
-    <ul style={listStyle}>
-      {tracks.map((track) => (
-        <li key={track.id} style={itemStyle}>
-          <TrackSummary track={track} />
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="list-rows">
+        {visible.map((track) => (
+          <li className="list-row" key={track.id}>
+            <ReportTrack track={track} />
+          </li>
+        ))}
+      </ul>
+      {toggle}
+    </>
   );
 }
 
-function TrackSummary({ track }: { track: LibraryReportTrack }) {
+function IssueRows({ issues, showStatus = false }: { issues: LibraryReportTrackIssue[]; showStatus?: boolean }) {
+  const { toggle, visible } = useExpandable(issues);
   return (
-    <div>
-      <div
-        style={{
-          alignItems: "flex-start",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "10px",
-          justifyContent: "space-between",
-        }}
-      >
-        <RouteLink style={trackLinkStyle} to={`/tracks/${encodeURIComponent(track.id)}`}>
+    <>
+      <ul className="list-rows">
+        {visible.map((issue) => (
+          <li className="list-row" key={issue.track.id}>
+            <ReportTrack note={issue.reasons.map(formatBackendReason).join("、")} showStatus={showStatus} track={issue.track} />
+          </li>
+        ))}
+      </ul>
+      {toggle}
+    </>
+  );
+}
+
+function ReportTrack({
+  note,
+  showStatus = false,
+  track,
+}: {
+  note?: string;
+  showStatus?: boolean;
+  track: LibraryReportTrack;
+}) {
+  return (
+    <>
+      <TrackCover size={36} track={{ cover_path: null, id: track.id, title: track.title }} />
+      <div className="list-row-main">
+        <RouteLink className="track-cell-title" to={`/tracks/${encodeURIComponent(track.id)}`}>
           {track.title || "未命名音轨"}
         </RouteLink>
-        <TrackStatusBadge status={track.status} />
+        <span className="track-cell-sub">
+          {[track.artist || "未填写艺人", track.album, formatDuration(track.duration_seconds)]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+        {note ? <p className="list-row-note">{note}</p> : null}
       </div>
-      <dl className="duplicate-candidate-meta">
-        <Meta label="艺人" value={track.artist || "未设置"} />
-        <Meta label="专辑" value={track.album || "未设置"} />
-        <Meta label="时长" value={formatDuration(track.duration_seconds)} />
-        <Meta label="播放次数" value={track.playback_count.toString()} />
-        <Meta label="上次播放" value={formatDateTime(track.last_played_at)} />
-        <Meta label="更新时间" value={formatDateTime(track.updated_at)} />
-      </dl>
-    </div>
+      {showStatus ? <TrackStatusBadge status={track.status} /> : null}
+      <span className="list-row-meta">
+        播放 {track.playback_count} 次
+        <br />
+        <span className="faint">上次 {formatRelativeDays(track.last_played_at)}</span>
+      </span>
+      <RouteLink
+        aria-label={`编辑「${track.title || "未命名音轨"}」`}
+        className="icon-btn"
+        title="去编辑"
+        to={`/tracks/${encodeURIComponent(track.id)}`}
+      >
+        <Icon name="chevronRight" size={17} />
+      </RouteLink>
+    </>
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function DuplicateRows({ groups }: { groups: LibraryOrganizationReport["duplicate_groups"] }) {
   return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
+    <>
+      <ul className="list-rows">
+        {groups.map((group) => (
+          <li className="list-row" key={group.group_id} style={{ alignItems: "flex-start" }}>
+            <span className="file-icon">
+              <Icon name="copy" size={17} />
+            </span>
+            <div className="list-row-main">
+              <span className="track-cell-title">{formatMatchType(group.match_type)}</span>
+              <span className="track-cell-sub">{formatBackendReason(group.reason)}</span>
+              <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                {group.candidates.map((candidate) => (
+                  <RouteLink
+                    className="chip"
+                    key={candidate.id}
+                    to={`/tracks/${encodeURIComponent(candidate.id)}`}
+                  >
+                    {candidate.title || "未命名音轨"} · {formatDuration(candidate.duration_seconds)}
+                  </RouteLink>
+                ))}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div style={{ padding: "4px 20px 14px" }}>
+        <RouteLink className="btn btn-ghost btn-sm" to="/duplicates">
+          打开重复音轨对比
+          <Icon name="chevronRight" size={14} />
+        </RouteLink>
+      </div>
+    </>
   );
 }
 
@@ -308,48 +396,8 @@ function formatMatchType(matchType: string) {
   }
 
   if (matchType === "metadata_duration") {
-    return "元数据和时长疑似一致";
+    return "元数据和时长相近";
   }
 
-  return matchType
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return matchType.replace(/[_-]+/g, " ");
 }
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "无法加载曲库报告。";
-}
-
-const listStyle = {
-  display: "grid",
-  gap: "12px",
-  listStyle: "none",
-  margin: 0,
-  padding: 0,
-} as const;
-
-const itemStyle = {
-  background: "#ffffff",
-  border: "1px solid #e2e8f0",
-  borderRadius: "8px",
-  padding: "16px",
-} as const;
-
-const emptyTextStyle = {
-  color: "#526174",
-  lineHeight: 1.55,
-  margin: 0,
-} as const;
-
-const trackLinkStyle = {
-  color: "#0f766e",
-  fontWeight: 800,
-  textDecoration: "underline",
-  textUnderlineOffset: "3px",
-} as const;

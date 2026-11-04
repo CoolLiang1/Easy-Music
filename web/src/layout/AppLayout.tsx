@@ -1,121 +1,193 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { useAuth } from "../auth/AuthProvider";
 import { PlaybackQueueDrawer } from "../components/PlaybackQueueDrawer";
-import { WebPlaybackQueuePlayer } from "../components/WebAudioPlayer";
+import { Icon, type IconName } from "../components/ui/Icon";
+import { PlayerDeck } from "../components/WebAudioPlayer";
 import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
 import { RouteLink } from "../routes/RouteLink";
 
 type AppLayoutProps = {
   children: ReactNode;
   onSignOut: () => void;
+  path: string;
+  title: string;
 };
 
-const navGroups = [
+type NavItem = { icon: IconName; label: string; path: string };
+
+export const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
-    label: "管理",
+    label: "收听",
     items: [
-      { label: "曲库", path: "/library" },
-      { label: "歌单", path: "/playlists" },
-      { label: "上传", path: "/upload" },
-      { label: "导入", path: "/imports" },
-      { label: "标签", path: "/tags" },
+      { icon: "compass", label: "推荐", path: "/recommendations" },
+      { icon: "sparkle", label: "AI 助手", path: "/ai-assistant" },
+    ],
+  },
+  {
+    label: "音乐库",
+    items: [
+      { icon: "library", label: "曲库", path: "/library" },
+      { icon: "listMusic", label: "歌单", path: "/playlists" },
+    ],
+  },
+  {
+    label: "添加音乐",
+    items: [
+      { icon: "upload", label: "上传", path: "/upload" },
+      { icon: "folder", label: "从服务器导入", path: "/imports" },
     ],
   },
   {
     label: "整理",
     items: [
-      { label: "报告", path: "/reports" },
-      { label: "重复音轨", path: "/duplicates" },
-    ],
-  },
-  {
-    label: "收听",
-    items: [
-      { label: "推荐", path: "/recommendations" },
-      { label: "AI 助手", path: "/ai-assistant" },
+      { icon: "tag", label: "标签", path: "/tags" },
+      { icon: "chart", label: "整理报告", path: "/reports" },
+      { icon: "copy", label: "重复音轨", path: "/duplicates" },
     ],
   },
 ];
 
-export function AppLayout({ children, onSignOut }: AppLayoutProps) {
-  const { accessToken } = useAuth();
+export function AppLayout({ children, onSignOut, path, title }: AppLayoutProps) {
+  const { currentUser } = useAuth();
   const { state: queueState } = usePlaybackQueue();
   const [isQueueDrawerOpen, setIsQueueDrawerOpen] = useState(false);
-  const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
-  const activePath = currentPath.startsWith("/tracks/") ? "/library" : currentPath;
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const normalizedPath = path.replace(/\/+$/, "") || "/";
+  const activePath =
+    normalizedPath === "/" || normalizedPath.startsWith("/tracks/") ? "/library" : normalizedPath;
   const queueCount =
-    queueState.history.length +
-    queueState.upcoming.length +
-    (queueState.current ? 1 : 0);
+    queueState.upcoming.length + (queueState.current ? 1 : 0);
+  const hasDeck = Boolean(queueState.current);
+  const openQueue = useCallback(() => setIsQueueDrawerOpen(true), []);
+  const closeQueue = useCallback(() => setIsQueueDrawerOpen(false), []);
+
+  useEffect(() => {
+    setIsNavOpen(false);
+  }, [normalizedPath]);
+
+  // The deck height also offsets portals (toasts, menus) rendered outside the shell.
+  useEffect(() => {
+    document.documentElement.classList.toggle("has-deck", hasDeck);
+    return () => document.documentElement.classList.remove("has-deck");
+  }, [hasDeck]);
+
+  useEffect(() => {
+    if (!isNavOpen) return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsNavOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isNavOpen]);
+
+  const shellClasses = ["app-shell", isNavOpen ? "nav-open" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const username = currentUser?.username ?? "";
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar" aria-label="主导航">
-        <div className="sidebar-brand-block">
-          <p className="eyebrow">个人曲库</p>
-          <RouteLink className="brand" to="/library">
-            Easy Music
-          </RouteLink>
-          <p className="sidebar-subtitle">上传、整理、播放和推荐</p>
-        </div>
+    <div className={shellClasses}>
+      <header className="topbar">
+        <button
+          aria-expanded={isNavOpen}
+          aria-label="打开导航"
+          className="icon-btn"
+          onClick={() => setIsNavOpen(true)}
+          type="button"
+        >
+          <Icon name="menu" />
+        </button>
+        <img alt="" className="brand-mark" src="/icons/pwa-192x192.png" />
+        <span className="topbar-title">{title}</span>
+        <button
+          aria-label={`播放队列，共 ${queueCount} 首`}
+          className="icon-btn"
+          onClick={openQueue}
+          type="button"
+        >
+          <Icon name="queue" />
+        </button>
+      </header>
 
-        <nav className="nav-list">
+      <div className="sidebar-backdrop" onClick={() => setIsNavOpen(false)} role="presentation" />
+
+      <aside aria-label="主导航" className="sidebar">
+        <RouteLink className="sidebar-brand" to="/library">
+          <img alt="" className="brand-mark" src="/icons/pwa-192x192.png" />
+          <span>
+            <span className="brand-name">Easy Music</span>
+            <span className="brand-sub">私人曲库</span>
+          </span>
+        </RouteLink>
+
+        <nav className="nav">
           {navGroups.map((group) => (
-            <div className="nav-group" key={group.label}>
-              <p className="nav-group-label">{group.label}</p>
-              {group.items.map((item) => (
-                <RouteLink
-                  className={
-                    activePath === item.path ? "nav-link active" : "nav-link"
-                  }
-                  key={item.path}
-                  to={item.path}
-                  aria-current={activePath === item.path ? "page" : undefined}
-                >
-                  {item.label}
-                </RouteLink>
-              ))}
+            <div className="nav-section" key={group.label}>
+              <p className="nav-section-label">{group.label}</p>
+              {group.items.map((item) => {
+                const isActive = activePath === item.path;
+                return (
+                  <RouteLink
+                    aria-current={isActive ? "page" : undefined}
+                    className={isActive ? "nav-item active" : "nav-item"}
+                    key={item.path}
+                    to={item.path}
+                  >
+                    <Icon name={item.icon} size={18} />
+                    <span>{item.label}</span>
+                  </RouteLink>
+                );
+              })}
             </div>
           ))}
+
+          <div className="nav-section">
+            <button
+              className="nav-item"
+              onClick={openQueue}
+              type="button"
+            >
+              <Icon name="queue" size={18} />
+              <span>播放队列</span>
+              <span className={queueCount > 0 ? "nav-item-badge live" : "nav-item-badge"}>
+                {queueCount}
+              </span>
+            </button>
+          </div>
         </nav>
 
-        <div className="sidebar-footer">
-          <button
-            className="button secondary sidebar-queue-button"
-            onClick={() => setIsQueueDrawerOpen(true)}
-            type="button"
-          >
-            <span>播放队列</span>
-            <strong>{queueCount} 首</strong>
-          </button>
-          <button className="button secondary" onClick={onSignOut} type="button">
-            退出登录
-          </button>
+        <div className="sidebar-foot">
+          <div className="user-chip">
+            <span aria-hidden="true" className="user-avatar">
+              {username.slice(0, 1) || "?"}
+            </span>
+            <span className="user-chip-name truncate">
+              {username || "已登录"}
+              <small>管理员</small>
+            </span>
+            <button
+              aria-label="退出登录"
+              className="icon-btn"
+              onClick={onSignOut}
+              title="退出登录"
+              type="button"
+            >
+              <Icon name="logout" size={18} />
+            </button>
+          </div>
         </div>
       </aside>
 
-      <main className="content-shell">
+      <main className="main" id="main">
         {children}
-        {queueState.current ? (
-          <div className="global-player-bar" aria-label="当前播放">
-            <div className="global-player-row">
-              <WebPlaybackQueuePlayer accessToken={accessToken} />
-              <button
-                className="button secondary"
-                onClick={() => setIsQueueDrawerOpen(true)}
-                type="button"
-              >
-                队列
-              </button>
-            </div>
-          </div>
-        ) : null}
       </main>
-      <PlaybackQueueDrawer
-        isOpen={isQueueDrawerOpen}
-        onClose={() => setIsQueueDrawerOpen(false)}
-      />
+
+      {hasDeck ? (
+        <PlayerDeck onOpenQueue={openQueue} queueCount={queueCount} />
+      ) : null}
+
+      <PlaybackQueueDrawer isOpen={isQueueDrawerOpen} onClose={closeQueue} />
     </div>
   );
 }

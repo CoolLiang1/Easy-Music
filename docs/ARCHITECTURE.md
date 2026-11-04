@@ -189,14 +189,17 @@ Android should store:
 
 - Login
 - Audio upload
-- Library management, including client-side title search with an explicit
-  filter-mode toggle
+- Library management, including client-side title/artist/album search with an
+  explicit filter-mode toggle (off highlights and jumps to matches, on shows
+  only matches), status filters, sorting, and a selection toolbar for queue,
+  playlist, batch tag, and delete actions
 - Playlist management
 - Track editing
 - Tag management
 - AI tag confirmation
 - Recommendation testing
-- Web playback
+- Web playback through one global player deck (list rows only start or toggle
+  it), with space-bar play/pause and browser Media Session metadata/actions
 - Client-side playback queue with history/current/upcoming, queue editing,
   playlist sequence/shuffle/reverse generation, upcoming reorder, and
   playlist-only repeat
