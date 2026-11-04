@@ -1,4 +1,6 @@
 import type { RecommendationExplanation } from "../types/recommendation";
+import { Callout } from "./ui/common";
+import { Icon } from "./ui/Icon";
 
 type RecommendationExplanationDetailsProps = {
   explanation?: RecommendationExplanation;
@@ -36,19 +38,25 @@ export function RecommendationExplanationDetails({
   }
 
   return (
-    <dl className="recommendation-meta" aria-label="结构化推荐解释">
-      {matchedEntries.map(([group, tags]) => (
-        <div key={group}>
-          <dt>{groupLabels[group] ?? `${formatLabel(group)} 匹配`}</dt>
-          <dd>{tags.map((tag) => tag.name).join(", ")}</dd>
-        </div>
-      ))}
+    <details className="explain">
+      <summary>
+        <Icon name="chevronRight" size={14} />
+        为什么推荐这首
+      </summary>
+      <dl aria-label="推荐评分明细" className="explain-list">
+        {matchedEntries.map(([group, tags]) => (
+          <div key={group}>
+            <dt>{groupLabels[group] ?? `${formatLabel(group)} 匹配`}</dt>
+            <dd>{tags.map((tag) => tag.name).join("、")}</dd>
+          </div>
+        ))}
 
-      <ExplanationPartList label="加分项" parts={boosts} />
-      <ExplanationPartList label="降权项" parts={penalties} />
-      <ExplanationPartList label="反馈影响" parts={feedbackImpacts} />
-      <ExplanationPartList label="规避原因" parts={avoidanceReasons} />
-    </dl>
+        <ExplanationPartList label="加分" parts={boosts} />
+        <ExplanationPartList label="降权" parts={penalties} />
+        <ExplanationPartList label="反馈影响" parts={feedbackImpacts} />
+        <ExplanationPartList label="规避原因" parts={avoidanceReasons} />
+      </dl>
+    </details>
   );
 }
 
@@ -62,10 +70,14 @@ export function RecommendationExclusionsNotice({
   }
 
   return (
-    <div className="empty-state" aria-label="推荐排序前过滤项">
-      <strong>排序前已过滤：</strong>{" "}
-      {exclusions.map(formatRecommendationExclusionForDisplay).join(" ")}
-    </div>
+    <Callout title={`排序前已过滤 ${exclusions.length} 首`} tone="info">
+      <ul>
+        {exclusions.slice(0, 6).map((exclusion, index) => (
+          <li key={`${exclusion}-${index}`}>{formatRecommendationExclusionForDisplay(exclusion)}</li>
+        ))}
+        {exclusions.length > 6 ? <li>以及另外 {exclusions.length - 6} 首…</li> : null}
+      </ul>
+    </Callout>
   );
 }
 
@@ -85,7 +97,7 @@ export function formatRecommendationReasonForDisplay(reason: string) {
 export function formatRecommendationExclusionForDisplay(exclusion: string) {
   const activeCooldown = exclusion.match(/^(.+) excluded by active cooldown\.$/);
   if (activeCooldown) {
-    return `${activeCooldown[1]} 仍在冷却期，strict 模式下已过滤。`;
+    return `${activeCooldown[1]} 仍在冷却期，严格模式下已过滤。`;
   }
 
   const notToday = exclusion.match(
@@ -111,7 +123,7 @@ function ExplanationPartList({ label, parts }: ExplanationPartListProps) {
   return (
     <div>
       <dt>{label}</dt>
-      <dd>{parts.map(formatPart).join("; ")}</dd>
+      <dd>{parts.map(formatPart).join("；")}</dd>
     </div>
   );
 }
@@ -123,7 +135,7 @@ function formatPart(part: { label: string; score_delta: number | null }) {
   }
 
   const prefix = part.score_delta > 0 ? "+" : "";
-  return `${label} (${prefix}${formatScoreDelta(part.score_delta)})`;
+  return `${label}（${prefix}${formatScoreDelta(part.score_delta)}）`;
 }
 
 function formatReasonSegment(segment: string) {
@@ -151,7 +163,7 @@ function formatExplanationLabel(label: string) {
   const labels: Record<string, string> = {
     "liked track boost": "你喜欢的歌曲",
     "active cooldown soft penalty": "最近听过，已轻微降权",
-    "active cooldown retained by soft mode": "软冷却模式保留了这首歌，只降低排序",
+    "active cooldown retained by soft mode": "柔性冷却保留了这首歌，只降低排序",
     "recently played penalty": "最近播放过，已降低排序",
     "dislike feedback penalty": "你标记过不喜欢，已明显降权",
     "not suitable for this context penalty": "曾反馈不适合类似场景，已降权",

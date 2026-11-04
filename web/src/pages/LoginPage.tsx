@@ -1,15 +1,12 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useId, useState } from "react";
 
+import { ApiClientError } from "../api/http";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
-import { RouteLink } from "../routes/RouteLink";
+import { Callout } from "../components/ui/common";
+import { Icon } from "../components/ui/Icon";
 import { navigateTo } from "../routes/router";
 
-type LoginPageProps = {
-  isAuthenticated?: boolean;
-  onUsePlaceholderSession?: () => void;
-};
-
-export function LoginPage(_props: LoginPageProps) {
+export function LoginPage() {
   return (
     <AuthProvider restoreStoredSession={false}>
       <LoginForm />
@@ -19,8 +16,11 @@ export function LoginPage(_props: LoginPageProps) {
 
 function LoginForm() {
   const { login, logout, status } = useAuth();
+  const usernameId = useId();
+  const passwordId = useId();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -34,7 +34,7 @@ function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      await login({ username, password });
+      await login({ username: username.trim(), password });
       navigateTo("/library");
     } catch (requestError: unknown) {
       setError(getLoginErrorMessage(requestError));
@@ -43,21 +43,28 @@ function LoginForm() {
     }
   };
 
-  return (
-    <main className="login-shell">
-      <section className="login-panel" aria-labelledby="login-title">
-        <p className="eyebrow">个人曲库</p>
-        <h1 id="login-title">Easy Music</h1>
-        <p className="page-copy">
-          使用 Easy Music 服务器的管理员账号登录。
-        </p>
+  const disabled = isSubmitting || status === "checking";
 
-        <form className="login-actions" onSubmit={handleSubmit}>
-          <label>
-            用户名
+  return (
+    <main className="login-screen">
+      <section aria-labelledby="login-title" className="login-card">
+        <div className="login-brand">
+          <img alt="" src="/icons/pwa-192x192.png" />
+          <div>
+            <h1 id="login-title">Easy Music</h1>
+            <p>登录你的私人曲库</p>
+          </div>
+        </div>
+
+        <form className="login-form" onSubmit={handleSubmit}>
+          <label className="field" htmlFor={usernameId}>
+            <span className="field-label">用户名</span>
             <input
               autoComplete="username"
-              disabled={isSubmitting || status === "checking"}
+              autoFocus
+              className="input"
+              disabled={disabled}
+              id={usernameId}
               name="username"
               onChange={(event) => setUsername(event.target.value)}
               required
@@ -66,44 +73,61 @@ function LoginForm() {
             />
           </label>
 
-          <label>
-            密码
-            <input
-              autoComplete="current-password"
-              disabled={isSubmitting || status === "checking"}
-              name="password"
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
+          <label className="field" htmlFor={passwordId}>
+            <span className="field-label">密码</span>
+            <span className="password-box">
+              <input
+                autoComplete="current-password"
+                className="input"
+                disabled={disabled}
+                id={passwordId}
+                name="password"
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                type={showPassword ? "text" : "password"}
+                value={password}
+              />
+              <button
+                aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                aria-pressed={showPassword}
+                className="icon-btn"
+                onClick={() => setShowPassword((current) => !current)}
+                type="button"
+              >
+                <Icon name={showPassword ? "eyeOff" : "eye"} size={17} />
+              </button>
+            </span>
           </label>
 
-          {error ? (
-            <p className="page-copy" role="alert">
-              {error}
-            </p>
-          ) : null}
+          {error ? <Callout tone="danger">{error}</Callout> : null}
 
-          <div className="login-actions">
-            <button
-              className="button primary"
-              disabled={isSubmitting || status === "checking"}
-              type="submit"
-            >
-              {isSubmitting ? "正在登录..." : "登录"}
-            </button>
-            <RouteLink className="button secondary" to="/library">
-              返回曲库
-            </RouteLink>
-          </div>
+          <button className="btn btn-primary btn-lg btn-block" disabled={disabled} type="submit">
+            {isSubmitting ? (
+              <>
+                <span aria-hidden="true" className="spinner" />
+                正在登录…
+              </>
+            ) : (
+              "登录"
+            )}
+          </button>
         </form>
+
+        <p className="login-foot">使用服务器上创建的管理员账号登录</p>
       </section>
     </main>
   );
 }
 
 function getLoginErrorMessage(error: unknown) {
+  if (error instanceof ApiClientError && (error.status === 400 || error.status === 401)) {
+    return "用户名或密码不正确。";
+  }
+
+  if (error instanceof TypeError) {
+    return "无法连接服务器，请确认后端正在运行。";
+  }
+
   if (error instanceof Error && error.message) {
     return error.message;
   }

@@ -1,494 +1,286 @@
 import { useCallback, useState } from "react";
 
 import { aiRecommend } from "../api/ai";
-import { syncFeedbackEvents } from "../api/feedback";
 import { ApiClientError } from "../api/http";
 import { useAuth } from "../auth/AuthProvider";
+import { RecommendationExclusionsNotice } from "../components/RecommendationExplanationDetails";
 import {
-  RecommendationExclusionsNotice,
-  RecommendationExplanationDetails,
-  formatRecommendationReasonForDisplay,
-} from "../components/RecommendationExplanationDetails";
-import { feedbackLabels } from "../i18n/zh";
-import type { AiRecommendResponse, AiProviderStatus } from "../types/ai";
-import type { FeedbackType } from "../types/feedback";
-import type { RecommendationResult, RecommendationRequest } from "../types/recommendation";
+  RecommendationResultCard,
+  useRecommendationFeedback,
+} from "../components/RecommendationResultCard";
+import { Callout, EmptyState, PageHeader, TagChip, tagGroupOrder } from "../components/ui/common";
+import { Icon } from "../components/ui/Icon";
+import { tagGroupLabels } from "../i18n/zh";
+import { RouteLink } from "../routes/RouteLink";
+import type { AiProviderStatus, AiRecommendResponse } from "../types/ai";
 import type { TagGroup } from "../types/tag";
-
-// ---------------------------------------------------------------------------
-// state types
-// ---------------------------------------------------------------------------
 
 type AiState =
   | { name: "idle" }
-  | { name: "loading" }
-  | { name: "ready"; response: AiRecommendResponse }
+  | { name: "loading"; text: string }
+  | { name: "ready"; response: AiRecommendResponse; text: string }
   | { name: "error"; message: string };
 
-type FeedbackState = {
-  key: string;
-  message: string;
-  status: "sending" | "success" | "error";
-} | null;
-
-// ---------------------------------------------------------------------------
-// constants
-// ---------------------------------------------------------------------------
-
-const TAG_GROUP_ORDER: TagGroup[] = ["scene", "type", "feature"];
-
-const GROUP_LABELS: Record<TagGroup, string> = {
-  scene: "场景",
-  type: "类型",
-  feature: "特点",
-};
-
-const feedbackActions: Array<{
-  label: string;
-  type: Extract<
-    FeedbackType,
-    "like" | "not_today" | "tired" | "not_suitable_for_context"
-  >;
-}> = [
-  { label: feedbackLabels.like ?? "喜欢", type: "like" },
-  { label: feedbackLabels.not_today ?? "今天不听", type: "not_today" },
-  { label: feedbackLabels.tired ?? "听腻了", type: "tired" },
-  { label: feedbackLabels.not_suitable_for_context ?? "不适合", type: "not_suitable_for_context" },
+const examplePrompts = [
+  "适合专注工作的安静纯音乐",
+  "深夜写代码，不要有人声",
+  "跑步时听的快节奏电子",
+  "下雨天在咖啡馆的感觉",
 ];
-
-// ---------------------------------------------------------------------------
-// page
-// ---------------------------------------------------------------------------
 
 export function AiAssistantPage() {
   const { accessToken } = useAuth();
   const [text, setText] = useState("");
   const [aiState, setAiState] = useState<AiState>({ name: "idle" });
-  const [feedbackState, setFeedbackState] = useState<FeedbackState>(null);
+  const { feedbackStatus, resetFeedback, sendFeedback } = useRecommendationFeedback(accessToken);
 
-  const handleRequest = useCallback(async () => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return;
-    }
+  const runRequest = useCallback(
+    async (rawText: string) => {
+      const trimmed = rawText.trim();
+      if (!trimmed) return;
 
-    if (!accessToken) {
-      setAiState({
-        name: "error",
-        message: "请重新登录后再使用 AI 助手。",
-      });
-      return;
-    }
-
-    setFeedbackState(null);
-    setAiState({ name: "loading" });
-
-    try {
-      const response = await aiRecommend(accessToken, {
-        text: trimmed,
-        limit: 3,
-        client: "web",
-      });
-      setAiState({ name: "ready", response });
-    } catch (error: unknown) {
-      setAiState({
-        name: "error",
-        message: getErrorMessage(error, "AI 推荐请求失败。"),
-      });
-    }
-  }, [accessToken, text]);
-
-  const handleFeedback = useCallback(
-    async (
-      result: RecommendationResult,
-      feedbackType: FeedbackType,
-      structuredRequest: RecommendationRequest,
-    ) => {
       if (!accessToken) {
-        setFeedbackState({
-          key: `${result.track.id}:${feedbackType}`,
-          message: "请重新登录后再发送反馈。",
-          status: "error",
-        });
+        setAiState({ name: "error", message: "登录已失效，请重新登录后再使用 AI 助手。" });
         return;
       }
 
-      const key = `${result.track.id}:${feedbackType}`;
-      setFeedbackState({ key, message: "正在发送反馈...", status: "sending" });
+      resetFeedback();
+      setAiState({ name: "loading", text: trimmed });
 
       try {
-        const response = await syncFeedbackEvents(accessToken, {
-          events: [
-            {
-              client: "web",
-              client_event_id: createClientEventId(),
-              feedback_type: feedbackType,
-              occurred_at: new Date().toISOString(),
-              scene_tag_ids: structuredRequest.scene_tag_ids,
-              type_tag_ids: structuredRequest.type_tag_ids,
-              feature_tag_ids: structuredRequest.feature_tag_ids,
-              track_id: result.track.id,
-            },
-          ],
-        });
-
-        const failed = response.failed[0];
-        if (failed) {
-          setFeedbackState({
-            key,
-            message: failed.error || "反馈未被接受。",
-            status: "error",
-          });
-          return;
-        }
-
-        const accepted = response.accepted[0];
-        setFeedbackState({
-          key,
-          message:
-            accepted?.status === "duplicate"
-              ? "反馈已记录过。"
-              : "反馈已记录。",
-          status: "success",
-        });
+        const response = await aiRecommend(accessToken, { text: trimmed, limit: 3, client: "web" });
+        setAiState({ name: "ready", response, text: trimmed });
       } catch (error: unknown) {
-        setFeedbackState({
-          key,
-          message: getErrorMessage(error, "反馈请求失败。"),
-          status: "error",
-        });
+        setAiState({ name: "error", message: getErrorMessage(error, "AI 推荐请求失败。") });
       }
     },
-    [accessToken],
+    [accessToken, resetFeedback],
   );
 
-  const canRequest = text.trim().length > 0 && aiState.name !== "loading";
+  const isLoading = aiState.name === "loading";
+  const canRequest = text.trim().length > 0 && !isLoading;
 
   return (
-    <section className="page-panel" aria-labelledby="ai-assistant-title">
-      <p className="eyebrow">AI 助手</p>
-      <h1 id="ai-assistant-title">自然语言推荐</h1>
-      <p className="page-copy">
-        用自己的话描述现在想听什么。AI 助手会把请求解析成结构化上下文，
-        再交给现有推荐服务排序；它不会直接选择音轨，也不会绕过冷却或反馈惩罚。
-      </p>
+    <div className="page narrow">
+      <PageHeader
+        description="用一句话描述现在想听什么。AI 只负责把这句话理解成标签，具体选哪首仍由规则推荐决定，冷却和反馈照常生效。"
+        title="AI 助手"
+      />
 
-      {/* ---- input ---- */}
-      <div className="recommendation-toolbar">
-        <input
-          aria-label="自然语言收听请求"
-          className="text-input"
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && canRequest) {
-              void handleRequest();
-            }
+      <div className="stack">
+        <form
+          className="prompt-box"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canRequest) void runRequest(text);
           }}
-          placeholder='例如：“适合专注工作的安静纯音乐”'
-          type="text"
-          value={text}
-        />
-        <button
-          className="button primary"
-          disabled={!canRequest}
-          onClick={() => void handleRequest()}
-          type="button"
         >
-          {aiState.name === "loading"
-            ? "正在询问 AI..."
-            : "获取 AI 推荐"}
-        </button>
+          <label className="visually-hidden" htmlFor="ai-prompt">
+            描述你想听的音乐
+          </label>
+          <textarea
+            id="ai-prompt"
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                if (canRequest) void runRequest(text);
+              }
+            }}
+            placeholder="例如：适合专注工作的安静纯音乐"
+            rows={2}
+            value={text}
+          />
+          <div className="prompt-box-foot">
+            <span className="prompt-hint">Enter 发送 · Shift + Enter 换行</span>
+            <button className="btn btn-primary" disabled={!canRequest} type="submit">
+              {isLoading ? (
+                <>
+                  <span aria-hidden="true" className="spinner" />
+                  正在理解…
+                </>
+              ) : (
+                <>
+                  <Icon name="sparkle" size={16} />
+                  帮我挑
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
+        {aiState.name === "idle" ? (
+          <div>
+            <span className="faint" style={{ fontSize: "0.84rem" }}>
+              试试这些：
+            </span>
+            <div className="prompt-examples">
+              {examplePrompts.map((prompt) => (
+                <button
+                  className="prompt-example"
+                  key={prompt}
+                  onClick={() => {
+                    setText(prompt);
+                    void runRequest(prompt);
+                  }}
+                  type="button"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {aiState.name === "loading" ? (
+          <div className="card card-pad">
+            <div className="row muted">
+              <span aria-hidden="true" className="spinner" />
+              正在理解「{aiState.text}」，并从曲库里挑选…
+            </div>
+          </div>
+        ) : null}
+
+        {aiState.name === "error" ? (
+          <Callout title="请求失败" tone="danger">
+            {aiState.message}
+          </Callout>
+        ) : null}
+
+        {aiState.name === "ready" ? (
+          <AiReadyContent
+            feedbackStatus={feedbackStatus}
+            onFeedback={(result, type) =>
+              void sendFeedback(result, type, aiState.response.parsed_intent.structured_request)
+            }
+            response={aiState.response}
+            text={aiState.text}
+          />
+        ) : null}
       </div>
-
-      {/* ---- states: idle ---- */}
-      {aiState.name === "idle" ? (
-        <div className="empty-state">
-          在上方输入自然语言请求，然后点击按钮获取 AI 辅助推荐。
-        </div>
-      ) : null}
-
-      {/* ---- states: loading ---- */}
-      {aiState.name === "loading" ? (
-        <div className="empty-state" aria-live="polite">
-          AI 助手正在解析请求，推荐服务正在排序结果...
-        </div>
-      ) : null}
-
-      {/* ---- states: error ---- */}
-      {aiState.name === "error" ? (
-        <div className="empty-state error" role="alert">
-          {aiState.message}
-        </div>
-      ) : null}
-
-      {/* ---- states: ready ---- */}
-      {aiState.name === "ready" ? (
-        <AiReadyContent
-          feedbackState={feedbackState}
-          onFeedback={(result, feedbackType) =>
-            void handleFeedback(
-              result,
-              feedbackType,
-              aiState.response.parsed_intent.structured_request,
-            )
-          }
-          response={aiState.response}
-        />
-      ) : null}
-    </section>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// ready-content sub-component
-// ---------------------------------------------------------------------------
-
-type AiReadyContentProps = {
-  feedbackState: FeedbackState;
-  onFeedback: (
-    result: RecommendationResult,
-    feedbackType: FeedbackType,
-  ) => void;
-  response: AiRecommendResponse;
-};
-
 function AiReadyContent({
-  feedbackState,
+  feedbackStatus,
   onFeedback,
   response,
-}: AiReadyContentProps) {
+  text,
+}: {
+  feedbackStatus: ReturnType<typeof useRecommendationFeedback>["feedbackStatus"];
+  onFeedback: Parameters<typeof RecommendationResultCard>[0]["onFeedback"];
+  response: AiRecommendResponse;
+  text: string;
+}) {
   const { parsed_intent: parsed, results } = response;
-  const providerStatus = parsed.provider_status;
+  const matchedGroups = tagGroupOrder.filter((group) => (parsed.matched_tags[group] ?? []).length > 0);
+
+  if (parsed.provider_status !== "ok") {
+    return <ProviderStatusNotice status={parsed.provider_status} />;
+  }
 
   return (
     <>
-      {/* ---- provider status ---- */}
-      <ProviderStatusBadge status={providerStatus} />
 
-      {/* ---- parsed intent ---- */}
-      <ParsedIntentSection parsed={parsed} />
+      <section aria-label="AI 的理解" className="card card-pad intent">
+        <div className="row between">
+          <span className="ai-panel-title">
+            <Icon name="sparkle" size={17} />
+            AI 理解为
+          </span>
+          <span className="faint" style={{ fontSize: "0.84rem" }}>
+            「{text}」
+          </span>
+        </div>
+        {matchedGroups.length === 0 ? (
+          <p className="muted">
+            没有匹配到已有标签，下面的结果没有按标签筛选。可以到{" "}
+            <RouteLink className="inline-link" to="/tags">
+              标签页面
+            </RouteLink>{" "}
+            补充更贴切的标签。
+          </p>
+        ) : (
+          matchedGroups.map((group) => (
+            <div className="intent-row" key={group}>
+              <span className="intent-label">{tagGroupLabels[group as TagGroup]}</span>
+              {(parsed.matched_tags[group] ?? []).map((tag) => (
+                <TagChip key={tag.id} tag={{ group: group as TagGroup, name: tag.name }} />
+              ))}
+            </div>
+          ))
+        )}
+        {parsed.unmatched_terms.length > 0 ? (
+          <div className="intent-row">
+            <span className="intent-label">未匹配</span>
+            {parsed.unmatched_terms.map((term) => (
+              <span className="chip chip-dashed" key={term}>
+                {term}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {parsed.explanation ? <p className="muted">{parsed.explanation}</p> : null}
+      </section>
 
-      {/* ---- results ---- */}
       <RecommendationExclusionsNotice exclusions={response.exclusions_considered} />
 
       {results.length === 0 ? (
-        <div className="empty-state">
-          没有返回推荐。可能还没有可播放音轨，或所有可播放音轨都被冷却、
-          反馈等规则过滤了。
+        <div className="card">
+          <EmptyState
+            compact
+            description="可能还没有可播放的音轨，或者符合条件的都被冷却、反馈等规则过滤了。换个说法再试试。"
+            icon="search"
+            title="这次没有找到合适的音轨"
+          />
         </div>
       ) : (
-        <div className="recommendation-results">
+        <section aria-label="推荐结果" className="rec-results">
           {results.slice(0, 3).map((result, index) => (
-            <AiResultCard
-              feedbackState={feedbackState}
+            <RecommendationResultCard
+              feedbackStatus={feedbackStatus}
               isPrimary={index === 0}
               key={`${result.rank}:${result.track.id}`}
               onFeedback={onFeedback}
               result={result}
             />
           ))}
-        </div>
+        </section>
       )}
     </>
   );
 }
 
-// ---------------------------------------------------------------------------
-// provider status badge
-// ---------------------------------------------------------------------------
-
-function ProviderStatusBadge({ status }: { status: AiProviderStatus }) {
+function ProviderStatusNotice({ status }: { status: AiProviderStatus }) {
   if (status === "ok") {
     return null;
   }
 
-  const messages: Record<AiProviderStatus, string> = {
-    ok: "",
-    disabled: "AI provider 已禁用。请在后端配置中设置 AI_ENABLED=true。",
-    unconfigured:
-      "AI provider 尚未完整配置。请检查 AI_API_KEY 和 AI_MODEL。",
-    error:
-      "AI provider 发生错误。请查看后端日志了解详情。",
+  const messages: Record<Exclude<AiProviderStatus, "ok">, string> = {
+    disabled: "服务器上的 AI 功能已关闭（AI_ENABLED），这句话没有被解析，也就没有推荐结果。",
+    error: "AI 服务调用出错，这句话没有被解析。请查看后端日志后重试。",
+    unconfigured: "AI 服务还没配置完整（AI_API_KEY / AI_MODEL），这句话没有被解析。",
   };
 
   return (
-    <div className="empty-state error" role="alert">
-      {messages[status]}
-    </div>
+    <Callout title="AI 暂不可用" tone="warn">
+      {messages[status]} 你仍然可以在{" "}
+      <RouteLink className="inline-link" to="/recommendations">
+        推荐
+      </RouteLink>{" "}
+      页面手动选择标签。
+    </Callout>
   );
-}
-
-// ---------------------------------------------------------------------------
-// parsed intent section
-// ---------------------------------------------------------------------------
-
-function ParsedIntentSection({ parsed }: { parsed: AiRecommendResponse["parsed_intent"] }) {
-  const { matched_tags: matched, unmatched_terms: unmatched, explanation } =
-    parsed;
-
-  return (
-    <section className="recommendation-grid" aria-label="已解析意图">
-      {TAG_GROUP_ORDER.map((group) => {
-        const items = matched[group];
-        return (
-          <div className="recommendation-card" key={group}>
-            <h2>{GROUP_LABELS[group]}</h2>
-            {items && items.length > 0 ? (
-              <div className="tag-chip-list">
-                {items.map((tag) => (
-                  <span className="tag-chip readonly" key={tag.id}>
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="recommendation-muted">未匹配</p>
-            )}
-          </div>
-        );
-      })}
-
-      {/* unmatched terms */}
-      {unmatched.length > 0 ? (
-        <div className="recommendation-card">
-          <h2>未匹配词</h2>
-          <p className="recommendation-muted">{unmatched.join(", ")}</p>
-        </div>
-      ) : null}
-
-      {/* AI explanation */}
-      {explanation ? (
-        <div
-          className="recommendation-card"
-          style={{ gridColumn: "1 / -1" }}
-        >
-          <h2>AI 解释</h2>
-          <p className="recommendation-reason">{explanation}</p>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AI result card
-// ---------------------------------------------------------------------------
-
-type AiResultCardProps = {
-  feedbackState: FeedbackState;
-  isPrimary: boolean;
-  onFeedback: (
-    result: RecommendationResult,
-    feedbackType: FeedbackType,
-  ) => void;
-  result: RecommendationResult;
-};
-
-function AiResultCard({
-  feedbackState,
-  isPrimary,
-  onFeedback,
-  result,
-}: AiResultCardProps) {
-  const track = result.track;
-
-  return (
-    <article className="recommendation-result-card">
-      <div className="recommendation-result-heading">
-        <div>
-          <p className="eyebrow">{isPrimary ? "首选" : "备选"}</p>
-          <h2>{track.title || "未命名音轨"}</h2>
-        </div>
-        <span className="score-pill">
-          排名 {result.rank} / {formatScore(result.score)}
-        </span>
-      </div>
-
-      <dl className="recommendation-meta">
-        <div>
-          <dt>艺人</dt>
-          <dd>{track.artist || "未设置"}</dd>
-        </div>
-        <div>
-          <dt>专辑</dt>
-          <dd>{track.album || "未设置"}</dd>
-        </div>
-      </dl>
-
-      {/* Phase 5 deterministic rule reason */}
-      <p className="recommendation-reason">
-        {formatRecommendationReasonForDisplay(result.reason)}
-      </p>
-      <RecommendationExplanationDetails explanation={result.explanation} />
-
-      {track.tags.length > 0 ? (
-        <div className="tag-chip-list" aria-label="音轨标签">
-          {track.tags.map((tag) => (
-            <span className="tag-chip readonly" key={tag.id}>
-              {tag.name}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="recommendation-muted">这个音轨没有分配标签。</p>
-      )}
-
-      {/* feedback actions */}
-      <div className="recommendation-feedback-actions">
-        {feedbackActions.map((action) => {
-          const feedbackKey = `${track.id}:${action.type}`;
-          const isSending =
-            feedbackState?.key === feedbackKey &&
-            feedbackState.status === "sending";
-
-          return (
-            <button
-              className="button secondary"
-              disabled={isSending}
-              key={action.type}
-              onClick={() => onFeedback(result, action.type)}
-              type="button"
-            >
-              {isSending ? "正在发送..." : action.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {feedbackState?.key.startsWith(`${track.id}:`) ? (
-        <p
-          className={`recommendation-feedback-message ${feedbackState.status}`}
-          role={feedbackState.status === "error" ? "alert" : undefined}
-        >
-          {feedbackState.message}
-        </p>
-      ) : null}
-    </article>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-function createClientEventId() {
-  if ("crypto" in window && "randomUUID" in window.crypto) {
-    return window.crypto.randomUUID();
-  }
-  return `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function formatScore(score: number) {
-  return `评分 ${Number.isInteger(score) ? score : score.toFixed(2)}`;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiClientError) {
     if (error.status === 401) {
-      return "当前会话未授权。请重新登录后重试。";
+      return "登录已失效，请重新登录后重试。";
     }
     if (error.status === 503) {
-      return "AI provider 不可用。请确认后端已配置 AI_ENABLED、AI_API_KEY 和 AI_MODEL。";
+      return "AI 服务不可用。请确认后端已配置 AI_ENABLED、AI_API_KEY 和 AI_MODEL。";
     }
   }
   if (error instanceof Error && error.message) {

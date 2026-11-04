@@ -5,23 +5,17 @@ type TrackStatusBadgeProps = {
   status: TrackStatus;
 };
 
-const statusLabels: Record<string, string> = {
-  failed: "处理失败",
-  processing: "处理中",
-  ready: "可播放",
-  uploaded: "已上传",
-  uploading: "上传中",
+const statusTones: Record<string, string> = {
+  failed: "badge-danger",
+  processing: "badge-warn",
+  ready: "badge-ok",
+  uploaded: "badge-warn",
+  uploading: "badge-info",
 };
 
 export function TrackStatusBadge({ status }: TrackStatusBadgeProps) {
   const normalizedStatus = status.toLowerCase();
-  const statusClass = statusLabels[normalizedStatus]
-    ? normalizedStatus
-    : "unknown";
+  const tone = statusTones[normalizedStatus] ?? "";
 
-  return (
-    <span className={`status-badge ${statusClass}`}>
-      {statusLabels[normalizedStatus] ?? formatTrackStatusLabel(status)}
-    </span>
-  );
+  return <span className={`badge ${tone}`}>{formatTrackStatusLabel(status)}</span>;
 }

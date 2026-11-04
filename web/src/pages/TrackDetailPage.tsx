@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { addPlaylistTrack, listPlaylists } from "../api/playlists";
 import { listTags } from "../api/tags";
 import { deleteTrack, getTrack, updateTrack, updateTrackCover } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
-import { PlaybackQueueActions } from "../components/PlaybackQueueActions";
 import { TrackCoverEditor } from "../components/TrackCoverEditor";
 import { TrackMetadataForm } from "../components/TrackMetadataForm";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
 import { TrackTagEditor } from "../components/TrackTagEditor";
-import { WebAudioPlayer } from "../components/WebAudioPlayer";
+import { Callout, EmptyState, LoadingRows, TagChips, getErrorMessage } from "../components/ui/common";
+import { useConfirm } from "../components/ui/Dialog";
+import { Icon } from "../components/ui/Icon";
+import { MenuButton, type MenuEntry } from "../components/ui/Menu";
+import { useToast } from "../components/ui/Toast";
+import { TrackCover } from "../components/ui/TrackCover";
+import { PlayButton, isReadyTrack } from "../components/WebAudioPlayer";
+import { formatContentTypeLabel, formatDateTime, formatDuration } from "../i18n/zh";
+import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
+import { RouteLink } from "../routes/RouteLink";
 import { navigateTo } from "../routes/router";
-import { formatDateTime } from "../i18n/zh";
+import type { PlaylistSummary } from "../types/playlist";
 import type { Tag } from "../types/tag";
 import type { Track, TrackMetadataUpdate, TrackTagUpdate } from "../types/track";
 
@@ -21,347 +30,394 @@ type TrackDetailPageProps = {
 type TrackDetailState =
   | { name: "loading" }
   | { name: "ready"; tags: Tag[]; track: Track }
-  | { name: "deleted"; message: string }
   | { name: "error"; message: string };
 
 export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
   const { accessToken } = useAuth();
-  const [detailState, setDetailState] = useState<TrackDetailState>({
-    name: "loading",
-  });
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [isSavingTags, setIsSavingTags] = useState(false);
-  const [tagSaveError, setTagSaveError] = useState<string | null>(null);
-  const [tagSaveSuccess, setTagSaveSuccess] = useState<string | null>(null);
-  const [isSavingCover, setIsSavingCover] = useState(false);
-  const [coverSaveError, setCoverSaveError] = useState<string | null>(null);
-  const [coverSaveSuccess, setCoverSaveSuccess] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { addToQueue, playNext } = usePlaybackQueue();
+  const showToast = useToast();
+  const confirm = useConfirm();
+  const [detailState, setDetailState] = useState<TrackDetailState>({ name: "loading" });
+  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
+  const [saving, setSaving] = useState<"metadata" | "tags" | "cover" | "delete" | "liked" | null>(
+    null,
+  );
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [tagError, setTagError] = useState<string | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
-  const loadTrack = useCallback(async (showLoading: boolean) => {
-    if (!accessToken) {
-      setDetailState({
-        name: "error",
-        message: "请重新登录后再加载这个音轨。",
-      });
-      return;
-    }
+  const loadTrack = useCallback(
+    async (showLoading: boolean) => {
+      if (!accessToken) {
+        setDetailState({ name: "error", message: "登录已失效，请重新登录。" });
+        return;
+      }
 
-    if (showLoading) {
-      setDetailState({ name: "loading" });
-    } else {
-      setIsRefreshing(true);
-    }
+      if (showLoading) {
+        setDetailState({ name: "loading" });
+      }
 
-    try {
-      const [track, tags] = await Promise.all([
-        getTrack(accessToken, trackId),
-        listTags(accessToken),
-      ]);
-      setDetailState({ name: "ready", tags, track });
-    } catch (error: unknown) {
-      setDetailState({
-        name: "error",
-        message: getErrorMessage(error),
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [accessToken, trackId]);
-
-  const saveMetadata = async (payload: TrackMetadataUpdate) => {
-    if (!accessToken) {
-      setSaveError("请重新登录后再保存这个音轨。");
-      return;
-    }
-
-    setIsSaving(true);
-    setSaveError(null);
-    setSaveSuccess(null);
-
-    try {
-      await updateTrack(accessToken, trackId, payload);
-      const track = await getTrack(accessToken, trackId);
-      setDetailState((current) =>
-        current.name === "ready"
-          ? { name: "ready", tags: current.tags, track }
-          : { name: "ready", tags: [], track },
-      );
-      setSaveSuccess("元数据已保存。");
-    } catch (error: unknown) {
-      setSaveError(getErrorMessage(error));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const saveTags = async (payload: TrackTagUpdate) => {
-    if (!accessToken) {
-      setTagSaveError("请重新登录后再保存这个音轨的标签。");
-      return;
-    }
-
-    setIsSavingTags(true);
-    setTagSaveError(null);
-    setTagSaveSuccess(null);
-
-    try {
-      await updateTrack(accessToken, trackId, payload);
-      const track = await getTrack(accessToken, trackId);
-      setDetailState((current) =>
-        current.name === "ready"
-          ? { name: "ready", tags: current.tags, track }
-          : { name: "ready", tags: [], track },
-      );
-      setTagSaveSuccess("标签已保存。");
-    } catch (error: unknown) {
-      setTagSaveError(getErrorMessage(error));
-    } finally {
-      setIsSavingTags(false);
-    }
-  };
-
-  const saveCover = async (file: File) => {
-    if (!accessToken) {
-      setCoverSaveError("请重新登录后再上传这个音轨的封面。");
-      return;
-    }
-
-    setIsSavingCover(true);
-    setCoverSaveError(null);
-    setCoverSaveSuccess(null);
-
-    try {
-      const track = await updateTrackCover(accessToken, trackId, file);
-      setDetailState((current) =>
-        current.name === "ready"
-          ? { name: "ready", tags: current.tags, track }
-          : { name: "ready", tags: [], track },
-      );
-      setCoverSaveSuccess("封面已更新。");
-    } catch (error: unknown) {
-      setCoverSaveError(getErrorMessage(error));
-    } finally {
-      setIsSavingCover(false);
-    }
-  };
-
-  const handleDeleteTrack = async () => {
-    if (detailState.name !== "ready") {
-      return;
-    }
-
-    if (!accessToken) {
-      setDeleteError("请重新登录后再删除这个音轨。");
-      return;
-    }
-
-    const trackTitle = detailState.track.title || "未命名音轨";
-    const shouldDelete = window.confirm(
-      `确定删除音轨“${trackTitle}”吗？这会删除服务器上的音轨记录和已保存媒体文件。`,
-    );
-    if (!shouldDelete) {
-      return;
-    }
-
-    setIsDeleting(true);
-    setDeleteError(null);
-    setSaveError(null);
-    setSaveSuccess(null);
-    setTagSaveError(null);
-    setTagSaveSuccess(null);
-
-    try {
-      await deleteTrack(accessToken, detailState.track.id);
-      setDetailState({
-        name: "deleted",
-        message: "音轨已删除，正在返回曲库...",
-      });
-      window.setTimeout(() => navigateTo("/library"), 800);
-    } catch (error: unknown) {
-      setDeleteError(`删除失败：${getErrorMessage(error)}`);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+      try {
+        const [track, tags] = await Promise.all([
+          getTrack(accessToken, trackId),
+          listTags(accessToken),
+        ]);
+        setDetailState({ name: "ready", tags, track });
+      } catch (error: unknown) {
+        if (showLoading) {
+          setDetailState({ name: "error", message: getErrorMessage(error, "无法加载这首音轨。") });
+        }
+      }
+    },
+    [accessToken, trackId],
+  );
 
   useEffect(() => {
     void loadTrack(true);
   }, [loadTrack]);
 
   useEffect(() => {
-    if (
-      detailState.name !== "ready" ||
-      !isProcessingStatus(detailState.track.status)
-    ) {
-      return;
-    }
+    if (!accessToken) return;
+    listPlaylists(accessToken)
+      .then(setPlaylists)
+      .catch(() => setPlaylists([]));
+  }, [accessToken]);
 
+  const isProcessing =
+    detailState.name === "ready" && isProcessingStatus(detailState.track.status);
+
+  useEffect(() => {
+    if (!isProcessing) return undefined;
     const intervalId = window.setInterval(() => {
       void loadTrack(false);
     }, 5000);
-
     return () => window.clearInterval(intervalId);
-  }, [detailState, loadTrack]);
+  }, [isProcessing, loadTrack]);
+
+  const applyTrack = (track: Track) => {
+    setDetailState((current) =>
+      current.name === "ready" ? { ...current, track } : { name: "ready", tags: [], track },
+    );
+  };
+
+  const saveMetadata = async (payload: TrackMetadataUpdate) => {
+    if (!accessToken) return;
+    setSaving("metadata");
+    setMetadataError(null);
+    try {
+      applyTrack(await updateTrack(accessToken, trackId, payload));
+      showToast("信息已保存。");
+    } catch (error: unknown) {
+      setMetadataError(getErrorMessage(error, "保存失败。"));
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const saveTags = async (payload: TrackTagUpdate) => {
+    if (!accessToken) return;
+    setSaving("tags");
+    setTagError(null);
+    try {
+      applyTrack(await updateTrack(accessToken, trackId, payload));
+      showToast("标签已保存。");
+    } catch (error: unknown) {
+      setTagError(getErrorMessage(error, "保存标签失败。"));
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const saveCover = async (file: File) => {
+    if (!accessToken) return false;
+    setSaving("cover");
+    setCoverError(null);
+    try {
+      applyTrack(await updateTrackCover(accessToken, trackId, file));
+      showToast("封面已更新。");
+      return true;
+    } catch (error: unknown) {
+      setCoverError(getErrorMessage(error, "上传封面失败。"));
+      return false;
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const toggleLiked = async (track: Track) => {
+    if (!accessToken) return;
+    setSaving("liked");
+    try {
+      applyTrack(await updateTrack(accessToken, track.id, { liked: !track.liked }));
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, "无法更新喜欢状态。"), "error");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleDelete = async (track: Track) => {
+    if (!accessToken) return;
+    const confirmed = await confirm({
+      confirmLabel: "删除音轨",
+      message: `「${track.title || "未命名音轨"}」的记录和服务器上保存的媒体文件都会被删除，无法恢复。`,
+      title: "删除这首音轨？",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setSaving("delete");
+    try {
+      await deleteTrack(accessToken, track.id);
+      showToast(`已删除「${track.title || "未命名音轨"}」。`);
+      navigateTo("/library");
+    } catch (error: unknown) {
+      showToast(`删除失败：${getErrorMessage(error, "未知错误")}`, "error");
+      setSaving(null);
+    }
+  };
+
+  const addToPlaylist = async (track: Track, playlist: PlaylistSummary) => {
+    if (!accessToken) return;
+    try {
+      const updated = await addPlaylistTrack(accessToken, playlist.id, { track_id: track.id });
+      setPlaylists((current) =>
+        current.map((item) =>
+          item.id === updated.id ? { ...item, track_count: updated.track_count } : item,
+        ),
+      );
+      showToast(`已加入「${updated.name}」。`);
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, "加入歌单失败。"), "error");
+    }
+  };
+
+  const backLink = (
+    <RouteLink className="back-link" to="/library">
+      <Icon name="arrowLeft" size={15} />
+      曲库
+    </RouteLink>
+  );
+
+  if (detailState.name === "loading") {
+    return (
+      <div className="page">
+        {backLink}
+        <div className="card">
+          <LoadingRows rows={4} />
+        </div>
+      </div>
+    );
+  }
+
+  if (detailState.name === "error") {
+    return (
+      <div className="page">
+        {backLink}
+        <div className="card">
+          <EmptyState
+            action={
+              <button className="btn btn-secondary" onClick={() => void loadTrack(true)} type="button">
+                重试
+              </button>
+            }
+            description={detailState.message}
+            icon="alert"
+            title="无法打开这首音轨"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const { tags, track } = detailState;
+  const ready = isReadyTrack(track);
+  const status = track.status.toLowerCase();
+
+  const moreMenu: MenuEntry[] = [
+    { type: "label", label: "加入歌单" },
+    ...(playlists.length === 0
+      ? [{ type: "empty" as const, label: "还没有歌单" }]
+      : playlists.map((playlist) => ({
+          hint: String(playlist.track_count),
+          icon: "listMusic" as const,
+          label: playlist.name,
+          onSelect: () => void addToPlaylist(track, playlist),
+        }))),
+    { type: "separator" },
+    {
+      disabled: saving !== null,
+      danger: true,
+      icon: "trash",
+      label: "删除音轨",
+      onSelect: () => void handleDelete(track),
+    },
+  ];
 
   return (
-    <section className="page-panel" aria-labelledby="track-detail-title">
-      <div className="page-header-row">
+    <div className="page">
+      {backLink}
+
+      <section aria-labelledby="track-title" className="detail-hero">
+        <TrackCover eager size={200} track={track} />
         <div>
-          <p className="eyebrow">音轨详情</p>
-          <h1 id="track-detail-title">
-            {detailState.name === "ready"
-              ? detailState.track.title || "未命名音轨"
-              : detailState.name === "deleted"
-                ? "音轨已删除"
-              : "音轨元数据"}
+          <div className="detail-kicker">
+            <span>{formatContentTypeLabel(track.content_type)}</span>
+            <span aria-hidden="true">·</span>
+            <span className="mono">{formatDuration(track.duration_seconds)}</span>
+            <TrackStatusBadge status={track.status} />
+          </div>
+          <h1 className="detail-title" id="track-title">
+            {track.title || "未命名音轨"}
           </h1>
-          <p className="page-copy">
-            查看处理状态、播放可用音频，并更新这个音轨的自定义元数据。
+          <p className="detail-artist">
+            {track.artist ? <strong>{track.artist}</strong> : <span className="faint">未填写艺人</span>}
+            {track.album ? <> · {track.album}</> : null}
           </p>
-        </div>
-        {detailState.name === "ready" ? (
-          <TrackStatusBadge status={detailState.track.status} />
-        ) : null}
-      </div>
-      <div className="toolbar">
-        <button
-          className="button secondary"
-          disabled={
-            detailState.name === "loading" ||
-            detailState.name === "deleted" ||
-            isRefreshing ||
-            isDeleting
-          }
-          onClick={() => void loadTrack(false)}
-          type="button"
-        >
-          {isRefreshing ? "正在刷新..." : "刷新状态"}
-        </button>
-        {detailState.name === "ready" ? (
-          <button
-            className="button danger"
-            disabled={isDeleting || isSaving || isSavingTags}
-            onClick={() => void handleDeleteTrack()}
-            type="button"
-          >
-            {isDeleting ? "正在删除..." : "删除音轨"}
-          </button>
-        ) : null}
-      </div>
 
-      {deleteError ? (
-        <div className="empty-state error" role="alert">
-          {deleteError}
+          <div className="detail-actions">
+            <PlayButton large track={track} />
+            <button
+              className="btn btn-secondary"
+              disabled={!ready}
+              onClick={() => {
+                playNext(track);
+                showToast("已设为下一首播放。");
+              }}
+              type="button"
+            >
+              <Icon name="playNext" size={16} />
+              下一首播放
+            </button>
+            <button
+              className="btn btn-secondary"
+              disabled={!ready}
+              onClick={() => {
+                addToQueue(track);
+                showToast("已加入播放队列。");
+              }}
+              type="button"
+            >
+              <Icon name="listPlus" size={16} />
+              加入队列
+            </button>
+            <button
+              aria-pressed={track.liked}
+              className={track.liked ? "icon-btn active" : "icon-btn"}
+              disabled={saving === "liked"}
+              onClick={() => void toggleLiked(track)}
+              title={track.liked ? "取消喜欢" : "喜欢"}
+              type="button"
+            >
+              <Icon name={track.liked ? "heartFilled" : "heart"} size={20} />
+              <span className="visually-hidden">{track.liked ? "取消喜欢" : "喜欢"}</span>
+            </button>
+            <MenuButton entries={moreMenu} label="更多操作">
+              <Icon name="more" size={20} />
+            </MenuButton>
+          </div>
+
+          {track.tags.length > 0 ? (
+            <div className="detail-tags">
+              <TagChips tags={track.tags} />
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {isProcessingStatus(status) ? (
+        <div style={{ marginBottom: 16 }}>
+          <Callout title="后台正在处理" tone="warn">
+            转码完成后就可以播放，本页每 5 秒自动刷新状态。
+          </Callout>
+        </div>
+      ) : null}
+      {status === "failed" ? (
+        <div style={{ marginBottom: 16 }}>
+          <Callout title="处理失败" tone="danger">
+            {track.processing_error_message ?? "请查看后端 worker 日志了解原因。"}
+          </Callout>
         </div>
       ) : null}
 
-      {detailState.name === "loading" ? (
-        <div className="empty-state" aria-live="polite">
-          正在加载音轨...
-        </div>
-      ) : null}
-
-      {detailState.name === "error" ? (
-        <div className="empty-state error" role="alert">
-          {detailState.message}
-        </div>
-      ) : null}
-
-      {detailState.name === "deleted" ? (
-        <div className="empty-state" aria-live="polite">
-          {detailState.message}
-        </div>
-      ) : null}
-
-      {detailState.name === "ready" ? (
-        <>
-          <section className="panel white" aria-live="polite">
-            <h2>播放</h2>
-            <p className="recommendation-muted">
-              {getStatusSummary(detailState.track.status)}
-            </p>
-            <WebAudioPlayer accessToken={accessToken} track={detailState.track} />
-            <PlaybackQueueActions track={detailState.track} />
-          </section>
+      <div className="detail-grid">
+        <div className="stack">
           <TrackMetadataForm
-            disabled={isSaving}
-            errorMessage={saveError}
+            disabled={saving === "metadata"}
+            errorMessage={metadataError}
             onSave={saveMetadata}
-            successMessage={saveSuccess}
-            track={detailState.track}
-          />
-          <TrackCoverEditor
-            accessToken={accessToken}
-            disabled={isSavingCover}
-            errorMessage={coverSaveError}
-            onSave={saveCover}
-            successMessage={coverSaveSuccess}
-            track={detailState.track}
+            track={track}
           />
           <TrackTagEditor
             accessToken={accessToken}
-            allTags={detailState.tags}
-            disabled={isSavingTags}
-            errorMessage={tagSaveError}
+            allTags={tags}
+            disabled={saving === "tags"}
+            errorMessage={tagError}
             onSave={saveTags}
-            successMessage={tagSaveSuccess}
-            track={detailState.track}
+            track={track}
           />
-          <section className="panel">
-            <h2>技术字段</h2>
-            <dl className="detail-list">
-              <div>
-                <dt>音轨 ID</dt>
-                <dd>{detailState.track.id}</dd>
+        </div>
+        <div className="stack">
+          <TrackCoverEditor
+            disabled={saving === "cover"}
+            errorMessage={coverError}
+            onSave={saveCover}
+            track={track}
+          />
+          <section className="card">
+            <div className="card-header">
+              <h2 className="card-title">文件信息</h2>
+            </div>
+            <div className="card-body">
+              <dl className="kv">
+                <div>
+                  <dt>音轨 ID</dt>
+                  <dd className="mono">{track.id}</dd>
+                </div>
+                <div>
+                  <dt>格式</dt>
+                  <dd>{track.format?.toUpperCase() || "—"}</dd>
+                </div>
+                <div>
+                  <dt>比特率</dt>
+                  <dd>{formatBitrate(track.bitrate)}</dd>
+                </div>
+                <div>
+                  <dt>添加时间</dt>
+                  <dd>{formatDateTime(track.created_at)}</dd>
+                </div>
+                <div>
+                  <dt>最近修改</dt>
+                  <dd>{formatDateTime(track.updated_at)}</dd>
+                </div>
+              </dl>
+            </div>
+            <details className="disclosure">
+              <summary>
+                <Icon name="chevronRight" size={15} />
+                存储路径
+              </summary>
+              <div className="disclosure-body">
+                <dl className="kv">
+                  <div>
+                    <dt>原始文件</dt>
+                    <dd className="mono">{track.original_file_path || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>播放文件</dt>
+                    <dd className="mono">{track.playback_file_path || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>封面</dt>
+                    <dd className="mono">{track.cover_path || "—"}</dd>
+                  </div>
+                </dl>
               </div>
-              <div>
-                <dt>状态</dt>
-                <dd>
-                  <TrackStatusBadge status={detailState.track.status} />
-                </dd>
-              </div>
-              <div>
-                <dt>时长</dt>
-                <dd>{formatDuration(detailState.track.duration_seconds)}</dd>
-              </div>
-              <div>
-                <dt>格式</dt>
-                <dd>{detailState.track.format || "暂无"}</dd>
-              </div>
-              <div>
-                <dt>比特率</dt>
-                <dd>{formatBitrate(detailState.track.bitrate)}</dd>
-              </div>
-              <div>
-                <dt>原始文件路径</dt>
-                <dd>{detailState.track.original_file_path || "暂无"}</dd>
-              </div>
-              <div>
-                <dt>播放文件路径</dt>
-                <dd>{detailState.track.playback_file_path || "暂无"}</dd>
-              </div>
-              <div>
-                <dt>封面路径</dt>
-                <dd>{detailState.track.cover_path || "暂无"}</dd>
-              </div>
-              <div>
-                <dt>创建时间</dt>
-                <dd>{formatDateTime(detailState.track.created_at)}</dd>
-              </div>
-              <div>
-                <dt>更新时间</dt>
-                <dd>{formatDateTime(detailState.track.updated_at)}</dd>
-              </div>
-            </dl>
+            </details>
           </section>
-        </>
-      ) : null}
-    </section>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -370,47 +426,10 @@ function isProcessingStatus(status: string) {
   return normalizedStatus === "processing" || normalizedStatus === "uploaded";
 }
 
-function getStatusSummary(status: string) {
-  const normalizedStatus = status.toLowerCase();
-
-  if (normalizedStatus === "ready") {
-    return "这个音轨已完成后台处理，可以播放。";
-  }
-
-  if (isProcessingStatus(status)) {
-    return "后台仍在处理。处理期间页面会自动刷新。";
-  }
-
-  if (normalizedStatus === "failed") {
-    return "处理失败。请查看后端 worker 日志了解详情。";
-  }
-
-  return "这个音轨的后端状态暂时无法被 Web 控制台识别。";
-}
-
-function formatDuration(durationSeconds: number | null) {
-  if (durationSeconds === null) {
-    return "暂无";
-  }
-
-  const wholeSeconds = Math.max(0, Math.round(durationSeconds));
-  const minutes = Math.floor(wholeSeconds / 60);
-  const seconds = wholeSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
 function formatBitrate(bitrate: number | null) {
   if (bitrate === null) {
-    return "暂无";
+    return "—";
   }
 
-  return `${bitrate} bps`;
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "无法加载这个音轨。";
+  return bitrate >= 1000 ? `${Math.round(bitrate / 1000)} kbps` : `${bitrate} bps`;
 }

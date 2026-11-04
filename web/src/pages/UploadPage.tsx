@@ -1,166 +1,264 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type DragEvent,
+  type KeyboardEvent,
+  type SetStateAction,
+} from "react";
 
 import { listDuplicateCandidates } from "../api/duplicates";
 import { getTrack, uploadTrack, uploadVideoTrack } from "../api/tracks";
 import { useAuth } from "../auth/AuthProvider";
-import { UploadForm } from "../components/UploadForm";
-import {
-  UploadResultList,
-  type UploadResult,
-} from "../components/UploadResultList";
-import { VideoUploadForm } from "../components/VideoUploadForm";
-import { navigateTo } from "../routes/router";
+import { UploadResultList, type UploadResult } from "../components/UploadResultList";
+import { PageHeader } from "../components/ui/common";
+import { Icon } from "../components/ui/Icon";
+import { env } from "../config/env";
+import { RouteLink } from "../routes/RouteLink";
+
+const audioExtensions = [".mp3", ".flac", ".m4a", ".wav", ".ogg", ".aac"];
+const audioMimeTypes = [
+  "audio/aac",
+  "audio/flac",
+  "audio/m4a",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
+  "audio/x-aac",
+  "audio/x-m4a",
+  "audio/x-wav",
+];
+const videoExtensions = [".mp4", ".mkv", ".mov", ".webm"];
+
+type UploadJob = { file: File; id: string; kind: "audio" | "video" };
 
 export function UploadPage() {
   const { accessToken } = useAuth();
-  const [isUploading, setIsUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const queueRef = useRef<UploadJob[]>([]);
+  const runningRef = useRef(false);
+  const idRef = useRef(0);
   const [results, setResults] = useState<UploadResult[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleUpload = async (files: File[]) => {
-    if (!accessToken) {
-      setResults(
-        files.map((file, index) => ({
-          id: buildUploadResultId(file, index),
-          fileName: file.name,
-          kind: "audio" as const,
-          message: "请重新登录后再上传文件。",
-          state: "error",
-        })),
-      );
-      return;
-    }
-
+  const runQueue = async (token: string) => {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setIsUploading(true);
-    setResults([]);
 
-    for (const [index, file] of files.entries()) {
-      const resultId = buildUploadResultId(file, index);
-      setResults((currentResults) => [
-        ...currentResults,
-        {
-          id: resultId,
-          fileName: file.name,
-          kind: "audio" as const,
-          state: "uploading",
-          uploadProgress: { percent: 0 },
-        },
-      ]);
+    while (queueRef.current.length > 0) {
+      const job = queueRef.current.shift()!;
+      updateUploadResult(setResults, job.id, { state: "uploading", uploadProgress: { percent: 0 } });
 
       try {
-        const track = await uploadTrack(accessToken, file, (progress) => {
-          updateUploadResult(setResults, resultId, {
-            uploadProgress: { percent: progress.percent },
-          });
+        const upload = job.kind === "video" ? uploadVideoTrack : uploadTrack;
+        const track = await upload(token, job.file, (progress) => {
+          updateUploadResult(setResults, job.id, { uploadProgress: { percent: progress.percent } });
         });
-        updateUploadResult(setResults, resultId, {
-          duplicateCheck: { state: "loading" },
+        updateUploadResult(setResults, job.id, {
+          duplicateCheck: job.kind === "audio" ? { state: "loading" } : undefined,
           state: "success",
           track,
           uploadProgress: { percent: 100 },
         });
-        void checkDuplicateCandidates(accessToken, track.id, resultId, setResults);
-        void pollTrackStatus(accessToken, track.id, resultId, setResults);
+        if (job.kind === "audio") {
+          void checkDuplicateCandidates(token, track.id, job.id, setResults);
+        }
+        void pollTrackStatus(token, track.id, job.id, setResults);
       } catch (error) {
-        updateUploadResult(setResults, resultId, {
+        updateUploadResult(setResults, job.id, {
           message: getErrorMessage(error),
           state: "error",
         });
       }
     }
 
+    runningRef.current = false;
     setIsUploading(false);
   };
 
-  const handleVideoUpload = async (files: File[]) => {
-    if (!accessToken) {
-      setResults((currentResults) => [
-        ...currentResults,
-        ...files.map((file, index) => ({
-          id: buildVideoResultId(file, index),
-          fileName: file.name,
-          kind: "video" as const,
-          message: "请重新登录后再上传文件。",
-          state: "error" as const,
-        })),
-      ]);
-      return;
-    }
+  const addFiles = (files: File[]) => {
+    if (files.length === 0) return;
 
-    setIsUploading(true);
+    const newResults: UploadResult[] = [];
+    for (const file of files) {
+      idRef.current += 1;
+      const id = `upload-${Date.now()}-${idRef.current}`;
+      const kind = detectKind(file);
+      const base = { fileName: file.name, fileSize: file.size, id, kind: kind ?? "audio" } as const;
 
-    for (const [index, file] of files.entries()) {
-      const resultId = buildVideoResultId(file, index);
-      setResults((currentResults) => [
-        ...currentResults,
-        {
-          id: resultId,
-          fileName: file.name,
-          kind: "video" as const,
-          state: "uploading" as const,
-          uploadProgress: { percent: 0 },
-        },
-      ]);
-
-      try {
-        const track = await uploadVideoTrack(accessToken, file, (progress) => {
-          updateUploadResult(setResults, resultId, {
-            uploadProgress: { percent: progress.percent },
-          });
-        });
-        updateUploadResult(setResults, resultId, {
-          state: "success",
-          track,
-          uploadProgress: { percent: 100 },
-        });
-        void pollTrackStatus(accessToken, track.id, resultId, setResults);
-      } catch (error) {
-        updateUploadResult(setResults, resultId, {
-          message: getErrorMessage(error),
+      if (!accessToken) {
+        newResults.push({ ...base, message: "登录已失效，请重新登录后上传。", state: "error" });
+      } else if (!kind) {
+        newResults.push({
+          ...base,
+          message: "不支持的文件类型。音频支持 MP3/FLAC/M4A/WAV/OGG/AAC，视频支持 MP4/MKV/MOV/WEBM。",
           state: "error",
         });
+      } else if (kind === "video" && file.size > env.maxVideoUploadMb * 1024 * 1024) {
+        newResults.push({
+          ...base,
+          message: `视频超过 ${env.maxVideoUploadMb} MB 的上传上限。`,
+          state: "error",
+        });
+      } else {
+        newResults.push({ ...base, state: "queued" });
+        queueRef.current.push({ file, id, kind });
       }
     }
 
-    setIsUploading(false);
+    setResults((current) => [...newResults, ...current]);
+    if (accessToken) void runQueue(accessToken);
   };
 
-  const hasSuccessfulUpload = results.some((result) => result.state === "success");
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(event.target.files ?? []));
+    event.target.value = "";
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    addFiles(Array.from(event.dataTransfer.files ?? []));
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      inputRef.current?.click();
+    }
+  };
+
+  const finishedCount = results.filter(
+    (result) =>
+      result.state === "error" ||
+      (result.state === "success" &&
+        (result.track?.status === "ready" || result.track?.status === "failed")),
+  ).length;
+  const readyCount = results.filter((result) => result.track?.status === "ready").length;
+  const activeCount = results.filter(
+    (result) => result.state === "queued" || result.state === "uploading",
+  ).length;
 
   return (
-    <section className="page-panel" aria-labelledby="upload-title">
-      <div className="page-header-row">
-        <div>
-          <p className="eyebrow">上传</p>
-          <h1 id="upload-title">上传音频与视频</h1>
-          <p className="page-copy">
-            将支持的音频或用户提供的视频加入曲库，并查看上传进度、重复检查和后台处理状态。
-          </p>
-        </div>
-        {results.length > 0 ? (
-          <span className="score-pill">{results.length} 个文件</span>
-        ) : null}
+    <div className="page narrow">
+      <PageHeader
+        actions={
+          readyCount > 0 ? (
+            <RouteLink className="btn btn-secondary" to="/library">
+              <Icon name="library" size={16} />
+              去曲库查看
+            </RouteLink>
+          ) : null
+        }
+        description="音频直接转码为可播放音轨；视频会先提取音轨。上传完成后自动检查是否与曲库重复。"
+        title="上传音乐"
+      />
+
+      <div
+        aria-label="选择或拖入要上传的文件"
+        className={isDragging ? "dropzone dragging" : "dropzone"}
+        onClick={() => inputRef.current?.click()}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setIsDragging(false);
+          }
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDrop={handleDrop}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
+      >
+        <span className="dropzone-icon">
+          <Icon name="upload" size={26} />
+        </span>
+        <span className="dropzone-title">
+          {isDragging ? "松开即可开始上传" : "拖入文件，或点击选择"}
+        </span>
+        <span>可以一次选择多个文件，选中后会自动依次上传</span>
+        <span className="dropzone-formats">
+          {["MP3", "FLAC", "M4A", "WAV", "OGG", "AAC"].map((format) => (
+            <span className="chip" key={format}>
+              {format}
+            </span>
+          ))}
+          {["MP4", "MKV", "MOV", "WEBM"].map((format) => (
+            <span className="chip chip-type" key={format}>
+              {format}
+            </span>
+          ))}
+        </span>
+        <span className="faint" style={{ fontSize: "0.8rem" }}>
+          视频单个不超过 {env.maxVideoUploadMb} MB
+        </span>
+        <input
+          accept={[...audioExtensions, ...videoExtensions].join(",")}
+          className="visually-hidden"
+          multiple
+          onChange={handleInputChange}
+          onClick={(event) => event.stopPropagation()}
+          ref={inputRef}
+          tabIndex={-1}
+          type="file"
+        />
       </div>
-      <UploadForm disabled={isUploading} onUpload={handleUpload} />
-      <VideoUploadForm disabled={isUploading} onUpload={handleVideoUpload} />
-      {isUploading ? (
-        <div className="empty-state" aria-live="polite">
-          正在上传选中文件...
-        </div>
+
+      {results.length > 0 ? (
+        <section className="card" style={{ marginTop: 18 }}>
+          <div className="card-header bordered">
+            <div>
+              <h2 className="card-title">上传记录</h2>
+              <p className="card-subtitle">
+                {isUploading || activeCount > 0
+                  ? `还有 ${activeCount} 个文件在上传，请不要关闭页面。`
+                  : `本次共 ${results.length} 个文件，${readyCount} 个已可播放。`}
+              </p>
+            </div>
+            {finishedCount > 0 ? (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() =>
+                  setResults((current) =>
+                    current.filter(
+                      (result) =>
+                        result.state === "queued" ||
+                        result.state === "uploading" ||
+                        (result.state === "success" &&
+                          result.track?.status !== "ready" &&
+                          result.track?.status !== "failed"),
+                    ),
+                  )
+                }
+                type="button"
+              >
+                清除已完成
+              </button>
+            ) : null}
+          </div>
+          <UploadResultList results={results} />
+        </section>
       ) : null}
-      <UploadResultList results={results} />
-      {hasSuccessfulUpload ? (
-        <div className="login-actions">
-          <button
-            className="button secondary"
-            onClick={() => navigateTo("/library")}
-            type="button"
-          >
-            返回曲库
-          </button>
-        </div>
-      ) : null}
-    </section>
+    </div>
   );
+}
+
+function detectKind(file: File): "audio" | "video" | null {
+  const lowerName = file.name.toLowerCase();
+  if (videoExtensions.some((extension) => lowerName.endsWith(extension))) return "video";
+  if (
+    audioExtensions.some((extension) => lowerName.endsWith(extension)) ||
+    audioMimeTypes.includes(file.type)
+  ) {
+    return "audio";
+  }
+  return null;
 }
 
 async function checkDuplicateCandidates(
@@ -175,10 +273,7 @@ async function checkDuplicateCandidates(
     try {
       const groups = await listDuplicateCandidates(accessToken, trackId);
       if (groups.length > 0) {
-        updateDuplicateCheck(setResults, resultId, {
-          state: "found",
-          groups,
-        });
+        updateUploadResult(setResults, resultId, { duplicateCheck: { state: "found", groups } });
         return;
       }
 
@@ -186,27 +281,14 @@ async function checkDuplicateCandidates(
         await delay(2500);
       }
     } catch (error) {
-      updateDuplicateCheck(setResults, resultId, {
-        state: "error",
-        message: getDuplicateCheckErrorMessage(error),
+      updateUploadResult(setResults, resultId, {
+        duplicateCheck: { state: "error", message: getErrorMessage(error) },
       });
       return;
     }
   }
 
-  updateDuplicateCheck(setResults, resultId, { state: "none" });
-}
-
-function updateDuplicateCheck(
-  setResults: Dispatch<SetStateAction<UploadResult[]>>,
-  resultId: string,
-  duplicateCheck: NonNullable<UploadResult["duplicateCheck"]>,
-) {
-  setResults((currentResults) =>
-    currentResults.map((result) =>
-      result.id === resultId ? { ...result, duplicateCheck } : result,
-    ),
-  );
+  updateUploadResult(setResults, resultId, { duplicateCheck: { state: "none" } });
 }
 
 async function pollTrackStatus(
@@ -226,9 +308,7 @@ async function pollTrackStatus(
         return;
       }
     } catch (error) {
-      updateUploadResult(setResults, resultId, {
-        statusMessage: getErrorMessage(error),
-      });
+      updateUploadResult(setResults, resultId, { statusMessage: getErrorMessage(error) });
       return;
     }
 
@@ -236,7 +316,7 @@ async function pollTrackStatus(
   }
 
   updateUploadResult(setResults, resultId, {
-    statusMessage: "后台仍在处理。稍后可到曲库页面查看最新状态。",
+    statusMessage: "后台仍在处理，稍后可以到曲库查看最新状态。",
   });
 }
 
@@ -246,30 +326,12 @@ function updateUploadResult(
   updates: Partial<UploadResult>,
 ) {
   setResults((currentResults) =>
-    currentResults.map((result) =>
-      result.id === resultId ? { ...result, ...updates } : result,
-    ),
+    currentResults.map((result) => (result.id === resultId ? { ...result, ...updates } : result)),
   );
-}
-
-function buildUploadResultId(file: File, index: number) {
-  return `${Date.now()}-audio-${index}-${file.name}`;
-}
-
-function buildVideoResultId(file: File, index: number) {
-  return `${Date.now()}-video-${index}-${file.name}`;
 }
 
 function delay(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-}
-
-function getDuplicateCheckErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "无法检查可能重复的音轨。";
 }
 
 function getErrorMessage(error: unknown) {

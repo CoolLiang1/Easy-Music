@@ -3,11 +3,10 @@ import { useCallback, useEffect, useState } from "react";
 import { listDuplicateCandidates } from "../api/duplicates";
 import { useAuth } from "../auth/AuthProvider";
 import { TrackStatusBadge } from "../components/TrackStatusBadge";
-import {
-  formatContentTypeLabel,
-  formatDuration,
-  formatTrackStatusLabel,
-} from "../i18n/zh";
+import { Callout, EmptyState, LoadingRows, PageHeader, getErrorMessage } from "../components/ui/common";
+import { Icon } from "../components/ui/Icon";
+import { TrackCover } from "../components/ui/TrackCover";
+import { formatBackendReason, formatContentTypeLabel, formatDuration } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
 import type { DuplicateCandidateGroup } from "../types/duplicate";
 
@@ -18,193 +17,146 @@ type DuplicateReviewState =
 
 export function DuplicateReviewPage() {
   const { accessToken } = useAuth();
-  const [reviewState, setReviewState] = useState<DuplicateReviewState>({
-    name: "loading",
-  });
+  const [reviewState, setReviewState] = useState<DuplicateReviewState>({ name: "loading" });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadDuplicateGroups = useCallback(async (showLoading: boolean) => {
-    if (!accessToken) {
-      setReviewState({
-        name: "error",
-        message: "请重新登录后再查看重复音轨候选。",
-      });
-      return;
-    }
+  const loadDuplicateGroups = useCallback(
+    async (showLoading: boolean) => {
+      if (!accessToken) {
+        setReviewState({ name: "error", message: "登录已失效，请重新登录。" });
+        return;
+      }
 
-    if (showLoading) {
-      setReviewState({ name: "loading" });
-    } else {
-      setIsRefreshing(true);
-    }
+      if (showLoading) {
+        setReviewState({ name: "loading" });
+      } else {
+        setIsRefreshing(true);
+      }
 
-    try {
-      const groups = await listDuplicateCandidates(accessToken);
-      setReviewState({ name: "ready", groups });
-    } catch (error: unknown) {
-      setReviewState({
-        name: "error",
-        message: getErrorMessage(error),
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [accessToken]);
+      try {
+        setReviewState({ name: "ready", groups: await listDuplicateCandidates(accessToken) });
+      } catch (error: unknown) {
+        setReviewState({ name: "error", message: getErrorMessage(error, "无法加载重复音轨。") });
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    [accessToken],
+  );
 
   useEffect(() => {
     void loadDuplicateGroups(true);
   }, [loadDuplicateGroups]);
 
   return (
-    <section className="page-panel" aria-labelledby="duplicate-review-title">
-      <div className="page-header-row">
-        <div>
-          <p className="eyebrow">重复检查</p>
-          <h1 id="duplicate-review-title">重复音轨候选</h1>
-          <p className="page-copy">
-            查看曲库中完全一致或疑似重复的音轨组。这里只提供参考，不会删除、
-            合并、隐藏或修改任何音轨。
-          </p>
-        </div>
-        {reviewState.name === "ready" ? (
-          <span className="score-pill">{reviewState.groups.length} 组</span>
-        ) : null}
-      </div>
-      <div className="toolbar">
-        <button
-          className="button secondary"
-          disabled={reviewState.name === "loading" || isRefreshing}
-          onClick={() => void loadDuplicateGroups(false)}
-          type="button"
-        >
-          {isRefreshing ? "正在刷新..." : "刷新重复音轨"}
-        </button>
-        <RouteLink className="button secondary" to="/library">
-          返回曲库
-        </RouteLink>
-      </div>
+    <div className="page">
+      <PageHeader
+        actions={
+          <button
+            className="btn btn-secondary"
+            disabled={reviewState.name === "loading" || isRefreshing}
+            onClick={() => void loadDuplicateGroups(false)}
+            type="button"
+          >
+            <Icon name="refresh" size={16} />
+            {isRefreshing ? "正在检查…" : "重新检查"}
+          </button>
+        }
+        description="并排对比文件完全一致或信息相近的音轨。这里只做提示，不会删除或合并任何内容；要清理请进入详情页手动删除。"
+        meta={
+          reviewState.name === "ready" ? (
+            <span>
+              发现 <strong>{reviewState.groups.length}</strong> 组
+            </span>
+          ) : null
+        }
+        title="重复音轨"
+      />
 
       {reviewState.name === "loading" ? (
-        <div className="empty-state" aria-live="polite">
-          正在加载重复音轨候选...
+        <div className="card">
+          <LoadingRows rows={4} />
         </div>
       ) : null}
 
       {reviewState.name === "error" ? (
-        <div className="empty-state error" role="alert">
-          {reviewState.message}
+        <div className="card card-pad stack">
+          <Callout title="加载失败" tone="danger">
+            {reviewState.message}
+          </Callout>
+          <div>
+            <button className="btn btn-secondary" onClick={() => void loadDuplicateGroups(true)} type="button">
+              重试
+            </button>
+          </div>
         </div>
       ) : null}
 
       {reviewState.name === "ready" && reviewState.groups.length === 0 ? (
-        <div className="empty-state">未发现重复音轨候选组。</div>
+        <div className="card">
+          <EmptyState
+            description="曲库里没有文件完全一致或信息相近的音轨。"
+            icon="check"
+            title="没有发现重复"
+          />
+        </div>
       ) : null}
 
       {reviewState.name === "ready" && reviewState.groups.length > 0 ? (
-        <DuplicateGroupList groups={reviewState.groups} />
-      ) : null}
-    </section>
-  );
-}
-
-function DuplicateGroupList({ groups }: { groups: DuplicateCandidateGroup[] }) {
-  return (
-    <div style={{ display: "grid", gap: "16px", marginTop: "28px" }}>
-      {groups.map((group) => (
-        <article
-          key={group.group_id}
-          style={{
-            background: "#f8fafc",
-            border: "1px solid #d5dde8",
-            borderRadius: "8px",
-            padding: "22px",
-          }}
-        >
-          <div
-            style={{
-              alignItems: "flex-start",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <h2 style={{ marginBottom: "8px" }}>{formatMatchType(group.match_type)}</h2>
-              <p style={{ color: "#334155", lineHeight: 1.55, margin: 0 }}>
-                {group.reason}
-              </p>
-            </div>
-            <span className="score-pill">{formatConfidence(group.confidence)}</span>
-          </div>
-
-          <ul
-            style={{
-              display: "grid",
-              gap: "12px",
-              listStyle: "none",
-              margin: "18px 0 0",
-              padding: 0,
-            }}
-          >
-            {group.candidates.map((candidate) => (
-              <li
-                key={candidate.id}
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "8px",
-                  padding: "16px",
-                }}
-              >
-                <div
-                  style={{
-                    alignItems: "flex-start",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "10px",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <RouteLink
-                    style={{
-                      color: "#0f766e",
-                      fontWeight: 800,
-                      textDecoration: "underline",
-                      textUnderlineOffset: "3px",
-                    }}
-                    to={`/tracks/${encodeURIComponent(candidate.id)}`}
-                  >
-                    {candidate.title || "未命名音轨"}
-                  </RouteLink>
-                  <TrackStatusBadge status={candidate.status} />
+        <div className="stack">
+          {reviewState.groups.map((group) => (
+            <article className="card" key={group.group_id}>
+              <div className="card-header">
+                <div>
+                  <h2 className="card-title">{formatMatchType(group.match_type)}</h2>
+                  <p className="card-subtitle">{formatBackendReason(group.reason)}</p>
                 </div>
-                <dl className="duplicate-candidate-meta">
-                  <CandidateMeta label="艺人" value={candidate.artist || "未设置"} />
-                  <CandidateMeta label="专辑" value={candidate.album || "未设置"} />
-                  <CandidateMeta
-                    label="时长"
-                    value={formatDuration(candidate.duration_seconds)}
-                  />
-                  <CandidateMeta
-                    label="类型"
-                    value={formatContentTypeLabel(candidate.content_type)}
-                  />
-                </dl>
-              </li>
-            ))}
-          </ul>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function CandidateMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
+                <span className={group.confidence >= 0.9 ? "badge badge-danger plain" : "badge badge-warn plain"}>
+                  可信度 {Math.round(Math.max(0, Math.min(1, group.confidence)) * 100)}%
+                </span>
+              </div>
+              <div className="dup-candidates" style={{ marginTop: 14 }}>
+                {group.candidates.map((candidate) => (
+                  <div className="dup-candidate" key={candidate.id}>
+                    <div className="row" style={{ flexWrap: "nowrap", gap: 10 }}>
+                      <TrackCover
+                        size={40}
+                        track={{ cover_path: null, id: candidate.id, title: candidate.title }}
+                      />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <RouteLink
+                          className="track-cell-title"
+                          to={`/tracks/${encodeURIComponent(candidate.id)}`}
+                        >
+                          {candidate.title || "未命名音轨"}
+                        </RouteLink>
+                        <span className="track-cell-sub mono">#{candidate.id}</span>
+                      </div>
+                      <TrackStatusBadge status={candidate.status} />
+                    </div>
+                    <dl>
+                      <dt>艺人</dt>
+                      <dd>{candidate.artist || "—"}</dd>
+                      <dt>专辑</dt>
+                      <dd>{candidate.album || "—"}</dd>
+                      <dt>时长</dt>
+                      <dd className="mono">{formatDuration(candidate.duration_seconds)}</dd>
+                      <dt>类型</dt>
+                      <dd>{formatContentTypeLabel(candidate.content_type)}</dd>
+                    </dl>
+                    <RouteLink
+                      className="btn btn-secondary btn-sm"
+                      to={`/tracks/${encodeURIComponent(candidate.id)}`}
+                    >
+                      查看详情
+                    </RouteLink>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -215,21 +167,8 @@ function formatMatchType(matchType: string) {
   }
 
   if (matchType === "metadata_duration") {
-    return "元数据和时长疑似一致";
+    return "元数据和时长相近";
   }
 
-  return formatTrackStatusLabel(matchType);
-}
-
-function formatConfidence(confidence: number) {
-  const percentage = Math.round(Math.max(0, Math.min(1, confidence)) * 100);
-  return `${percentage}% 可信度`;
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "无法加载重复音轨候选。";
+  return matchType.replace(/[_-]+/g, " ");
 }
