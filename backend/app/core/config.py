@@ -44,6 +44,18 @@ class Settings(BaseSettings):
     import_scan_max_file_mb: int = Field(default=200, validation_alias="IMPORT_SCAN_MAX_FILE_MB")
     ffmpeg_path: str = Field(default="ffmpeg", validation_alias="FFMPEG_PATH")
     ffprobe_path: str = Field(default="ffprobe", validation_alias="FFPROBE_PATH")
+    playback_loudness_normalization: bool = Field(
+        default=True,
+        validation_alias="PLAYBACK_LOUDNESS_NORMALIZATION",
+    )
+    playback_target_lufs: float = Field(
+        default=-16.0,
+        validation_alias="PLAYBACK_TARGET_LUFS",
+    )
+    playback_max_true_peak_dbtp: float = Field(
+        default=-1.0,
+        validation_alias="PLAYBACK_MAX_TRUE_PEAK_DBTP",
+    )
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
         validation_alias="CORS_ORIGINS",

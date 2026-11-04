@@ -230,6 +230,9 @@ Version 1 is single-user, but tables should still include `user_id`.
 - `original_file_sha256`
 - `playback_file_path`
 - `playback_file_sha256`
+- `loudness_lufs`, `true_peak_dbtp`: measured on the original file
+- `playback_gain_db`: static gain baked into the playback file
+- `loudness_version`: normalization rule version; null means not normalized
 - `cover_path`
 - `source_url`
 - `format`
@@ -446,7 +449,8 @@ Supported user-provided video upload formats:
 2. Store advisory duplicate signals for the original, including file size and
    SHA-256 hash when the saved file is readable.
 3. Extract metadata.
-4. Generate normalized MP3 playback file.
+4. Measure loudness and generate the gain-adjusted MP3 playback file
+   (see 9.3).
 5. Store a normalized metadata key and playback SHA-256 hash when available.
 6. Extract or generate cover if available.
 7. Create or update Track.
@@ -463,6 +467,24 @@ audio or modify the preserved original audio file.
 Version 1 uses MP3 playback files for compatibility.
 
 Original files are preserved for future reprocessing.
+
+Playback files are loudness-normalized on the server so clients need no
+volume logic and Android offline copies inherit the result:
+
+- The worker measures integrated loudness and true peak of the original with
+  ffmpeg `loudnorm=print_format=json`.
+- It applies one static `volume` gain toward `PLAYBACK_TARGET_LUFS`, reduced
+  so the measured peak stays under `PLAYBACK_MAX_TRUE_PEAK_DBTP` and capped
+  at +20 dB. There is no compression or limiting, so dynamics are unchanged.
+- Measurement failure never fails a track; the file is encoded without gain
+  and `loudness_version` stays null.
+- The MP3 is written to a `.partial.mp3` sibling and atomically replaces the
+  previous playback file only after ffmpeg succeeds.
+- `python -m app.worker.renormalize` regenerates playback files for ready
+  tracks whose `loudness_version` is older than the current rule. It never
+  re-applies file metadata, unlike `process_track`, so owner edits survive.
+- Regeneration changes `playback_file_sha256`; Android offline copies made
+  earlier keep the old audio until they are cached again.
 
 ### 9.4 Duplicate Signals
 

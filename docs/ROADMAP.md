@@ -25,7 +25,7 @@ task files contain plans; acceptance files contain evidence. See
 [Documentation Guide](README.md) for the ownership and update rules.
 
 <!-- status-snapshot: 2026-11-04 -->
-Last verified: 2026-11-04 on `feature/web-ui-redesign`.
+Last verified: 2026-11-04 on `fix/playback-loudness-normalization`.
 
 ## Current Status
 
@@ -43,6 +43,7 @@ Last verified: 2026-11-04 on `feature/web-ui-redesign`.
 | UI optimization round 1 | Implemented | [UI task](TASKS/NEXT_UI_OPTIMIZATION_TASKS.md) / [acceptance](ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md) | Web and Android automated gates passed; complete manual visual/flow acceptance before marking it accepted. |
 | Web UI redesign | Implemented | [Redesign task](TASKS/WEB_UI_REDESIGN_TASKS.md) / [acceptance](ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md) | Owner-reported Web usability problem; Web-only redesign with no API change. Typecheck, build, and local browser smoke passed; owner review on the real library remains. |
 | Auth session renewal | Implemented | [Auth task](TASKS/AUTH_SESSION_RENEWAL_TASKS.md) / [acceptance](ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md) | Owner-reported repeated logins; rotating refresh tokens with silent Web/Android renewal. Backend, Web smoke, and Android unit tests passed; Android device check and owner daily use remain. |
+| Playback loudness normalization | Implemented | [Loudness task](TASKS/PLAYBACK_LOUDNESS_NORMALIZATION_TASKS.md) / [acceptance](ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md) | Owner-reported loud jumps between tracks; server bakes one static gain per playback MP3 with a backfill command. Backend tests and a real-ffmpeg check passed; production backfill and owner listening remain. |
 
 ## Development Direction
 
@@ -76,15 +77,19 @@ real use:
    acceptance document. Select any further pain point one at a time.
 3. The owner-reported repeated-login problem is addressed by the auth session
    renewal slice; verify it on an Android device and in daily use, then record
-   the result in its acceptance document. Remaining owner-selected pain points
-   are tag-entry effort and uneven loudness, to be taken one at a time.
-4. Maintenance work may address a reproducible bug, a security issue, data
+   the result in its acceptance document.
+4. The owner-reported uneven-loudness problem is addressed by the playback
+   loudness normalization slice; run the backfill on the real deployment,
+   re-cache Android offline tracks, and record the listening result in its
+   acceptance document. The remaining owner-selected pain point is tag-entry
+   effort.
+5. Maintenance work may address a reproducible bug, a security issue, data
    safety, backup recovery, or certificate continuity with the smallest
    reviewable change.
-5. The outstanding V2.2, UI round 1, and production-smoke evidence gaps remain
+6. The outstanding V2.2, UI round 1, and production-smoke evidence gaps remain
    recorded in their existing acceptance documents. They are not mandatory
    roadmap work unless the owner chooses to revisit the affected flow.
-6. Register any selected product slice here and link its task and acceptance
+7. Register any selected product slice here and link its task and acceptance
    records before implementation.
 
 ## Phase 0: Project Foundation
