@@ -2,6 +2,8 @@ import { apiRequest } from "./http";
 import type {
   AiRecommendRequest,
   AiRecommendResponse,
+  AutoTagBatchResponse,
+  AutoTagStatusResponse,
   ParsedIntentResponse,
   ParseListeningIntentRequest,
   TagSuggestionRequest,
@@ -43,4 +45,15 @@ export function suggestTrackTags(
       body: payload,
     },
   );
+}
+
+export function getAutoTagStatus(accessToken: string) {
+  return apiRequest<AutoTagStatusResponse>("/api/ai/auto-tag/status", { accessToken });
+}
+
+export function autoTagNextBatch(accessToken: string) {
+  return apiRequest<AutoTagBatchResponse>("/api/ai/auto-tag/next-batch", {
+    method: "POST",
+    accessToken,
+  });
 }

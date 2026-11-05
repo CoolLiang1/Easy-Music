@@ -10,12 +10,17 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.api.routes.ai import _get_ai_provider
+from app.auth.tokens import create_access_token
 from app.core.config import Settings
 from app.db.base import Base
+from app.db.session import get_db
+from app.main import create_app
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import TrackTag
@@ -23,7 +28,9 @@ from app.models.user import User
 from app.schemas.ai import AiCompletionRequest, AiCompletionResult, AiProviderStatus
 from app.services.ai_auto_tagging import (
     AI_AUTO_TAGGING_VERSION,
+    AUTO_TAG_MAX_TOKENS,
     MAX_AI_TAGS_PER_TRACK,
+    WEB_BATCH_SIZE,
     AutoTagBatchResult,
     auto_tag_batch,
     auto_tag_tracks,
@@ -429,6 +436,77 @@ def test_empty_catalogue_is_reported_without_calling_provider(db_session: Sessio
     assert track.ai_tags_version is None
 
 
+def truncated() -> AiCompletionResult:
+    return AiCompletionResult.error(error_type="output_truncated", message="Provider output was truncated.")
+
+
+def test_batch_requests_large_output_budget(
+    db_session: Session,
+    library: dict[str, Any],
+) -> None:
+    track = create_track(db_session, library["user"], "Budget")
+    client = FakeClient(ok_json([{"track_id": track.id, "tags": []}]))
+
+    auto_tag_batch(db_session, make_provider(client), [track.id], min_confidence=0.6)
+
+    assert client.calls[0].max_tokens == AUTO_TAG_MAX_TOKENS == 8192
+
+
+def test_truncated_batch_is_split_and_retried(
+    db_session: Session,
+    library: dict[str, Any],
+) -> None:
+    tracks = [create_track(db_session, library["user"], f"S{index}") for index in range(3)]
+    calm = library["calm"].id
+
+    class SplittingClient(FakeClient):
+        def complete(self, request: AiCompletionRequest) -> AiCompletionResult:
+            self.calls.append(request)
+            prompt = request.messages[-1]["content"]
+            lines = set(prompt.splitlines())
+            ids = [track.id for track in tracks if f"- track_id: {track.id}" in lines]
+            if len(ids) > 1:
+                return truncated()
+            return ok_json([{"track_id": ids[0], "tags": [{"tag_id": calm, "confidence": 0.9}]}])
+
+    client = SplittingClient()
+
+    result = auto_tag_batch(
+        db_session,
+        make_provider(client),
+        [track.id for track in tracks],
+        min_confidence=0.6,
+    )
+
+    assert result.ok
+    assert sorted(result.tagged_track_ids) == [track.id for track in tracks]
+    # 3 -> truncated, [1] ok, [2] -> truncated, [1] ok, [1] ok
+    assert len(client.calls) == 5
+    for track in tracks:
+        assert tag_rows(db_session, track) == {calm: ("ai", 0.9)}
+
+
+def test_single_track_truncation_fails_without_changes(
+    db_session: Session,
+    library: dict[str, Any],
+) -> None:
+    tracks = [create_track(db_session, library["user"], f"T{index}") for index in range(2)]
+    client = FakeClient(truncated(), truncated(), truncated())
+
+    result = auto_tag_batch(
+        db_session,
+        make_provider(client),
+        [track.id for track in tracks],
+        min_confidence=0.6,
+    )
+
+    assert not result.ok
+    assert "truncated" in (result.error or "")
+    assert len(client.calls) == 3
+    db_session.expire_all()
+    assert all(track.ai_tags_version is None for track in tracks)
+
+
 def test_auto_tag_tracks_chunks_into_batches(
     db_session: Session,
     library: dict[str, Any],
@@ -642,3 +720,124 @@ def test_cli_track_id_retags_already_tagged_track(
 
     assert code == 0
     assert tag_rows(db_session, track) == {library["study"].id: ("ai", 0.9)}
+
+
+# ---------------------------------------------------------------------------
+# Web endpoints
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def api(db_session: Session) -> Generator[tuple[TestClient, Any]]:
+    app = create_app()
+
+    def override_get_db() -> Generator[Session]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client, app
+
+
+def install_provider(app: Any, client: FakeClient, **overrides: Any) -> None:
+    app.dependency_overrides[_get_ai_provider] = lambda: make_provider(client, **overrides)
+
+
+def auth(user: User) -> dict[str, str]:
+    return {"Authorization": f"Bearer {create_access_token(user.id)}"}
+
+
+def test_auto_tag_endpoints_require_authentication(api: tuple[TestClient, Any]) -> None:
+    client, _ = api
+
+    assert client.get("/api/ai/auto-tag/status").status_code == 401
+    assert client.post("/api/ai/auto-tag/next-batch").status_code == 401
+
+
+def test_status_counts_only_owner_pending_ready_tracks(
+    api: tuple[TestClient, Any],
+    db_session: Session,
+    library: dict[str, Any],
+) -> None:
+    client, app = api
+    user = library["user"]
+    other = create_user(db_session, "other")
+    create_track(db_session, user, "pending")
+    create_track(db_session, user, "done", ai_tags_version=AI_AUTO_TAGGING_VERSION)
+    create_track(db_session, user, "processing", status="processing")
+    create_track(db_session, other, "someone else")
+    install_provider(app, FakeClient())
+
+    response = client.get("/api/ai/auto-tag/status", headers=auth(user))
+
+    assert response.status_code == 200
+    assert response.json() == {"provider_status": "ok", "pending_count": 1}
+
+
+def test_next_batch_tags_owner_tracks_in_web_sized_batches(
+    api: tuple[TestClient, Any],
+    db_session: Session,
+    library: dict[str, Any],
+) -> None:
+    client, app = api
+    user = library["user"]
+    other = create_user(db_session, "other")
+    tracks = [create_track(db_session, user, f"W{index}") for index in range(WEB_BATCH_SIZE + 2)]
+    foreign = create_track(db_session, other, "foreign")
+    calm = library["calm"].id
+    fake = FakeClient(
+        ok_json(
+            [
+                {"track_id": track.id, "tags": [{"tag_id": calm, "confidence": 0.9}]}
+                for track in tracks[:WEB_BATCH_SIZE]
+            ],
+        ),
+        ok_json([{"track_id": track.id, "tags": []} for track in tracks[WEB_BATCH_SIZE:]]),
+    )
+    install_provider(app, fake)
+
+    first = client.post("/api/ai/auto-tag/next-batch", headers=auth(user))
+    second = client.post("/api/ai/auto-tag/next-batch", headers=auth(user))
+    third = client.post("/api/ai/auto-tag/next-batch", headers=auth(user))
+
+    assert first.status_code == 200
+    assert first.json() == {
+        "provider_status": "ok",
+        "tagged_count": WEB_BATCH_SIZE,
+        "applied_tag_count": WEB_BATCH_SIZE,
+        "remaining_count": 2,
+        "error": None,
+    }
+    assert second.json()["tagged_count"] == 2
+    assert second.json()["remaining_count"] == 0
+    assert third.json()["tagged_count"] == 0
+    assert len(fake.calls) == 2
+    assert f"track_id: {foreign.id}" not in "".join(fake.prompts)
+    db_session.expire_all()
+    assert foreign.ai_tags_version is None
+
+
+def test_next_batch_reports_provider_problems_without_changes(
+    api: tuple[TestClient, Any],
+    db_session: Session,
+    library: dict[str, Any],
+) -> None:
+    client, app = api
+    user = library["user"]
+    track = create_track(db_session, user, "Waiting")
+
+    install_provider(app, FakeClient(), ai_enabled=False)
+    disabled = client.post("/api/ai/auto-tag/next-batch", headers=auth(user))
+
+    bad = AiCompletionResult.ok("nope")
+    install_provider(app, FakeClient(bad, bad, bad))
+    failed = client.post("/api/ai/auto-tag/next-batch", headers=auth(user))
+
+    assert disabled.status_code == 200
+    assert disabled.json()["provider_status"] == "disabled"
+    assert disabled.json()["remaining_count"] == 1
+    assert failed.json()["provider_status"] == "error"
+    assert failed.json()["error"]
+    assert failed.json()["remaining_count"] == 1
+    db_session.expire_all()
+    assert track.ai_tags_version is None

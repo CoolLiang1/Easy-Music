@@ -56,7 +56,7 @@ it on 2026-11-04.
   [the loudness acceptance record](docs/ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md).
 - AI auto-tagging (the worker applies AI catalogue tags to untagged tracks in
   batches, weighted below owner tags in recommendations, plus a backfill
-  command) is implemented and passed backend tests; a real-provider run and
+  command and a Web Library "AI 打标签" button) is implemented and passed backend tests; a real-provider run and
   owner review remain. See
   [the auto-tagging acceptance record](docs/ACCEPTANCE/AI_AUTO_TAGGING_ACCEPTANCE.md).
 - A repository-owned production update script (`deploy/update.sh`) with host

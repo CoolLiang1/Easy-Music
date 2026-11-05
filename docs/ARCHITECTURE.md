@@ -477,9 +477,10 @@ Supported user-provided video upload formats:
 8. Mark track as ready or failed.
 9. Later, while the worker's media queue is idle and
    `AI_AUTO_TAGGING_ENABLED` is true, the worker auto-tags up to 10 ready
-   tracks per provider call. A failed batch changes nothing and pauses
-   auto-tagging for 10 minutes. `python -m app.worker.autotag` runs the same
-   step on demand.
+   tracks per provider call (8192-token budget; a batch whose output is
+   truncated is split in half and retried). A failed batch changes nothing and pauses
+   auto-tagging for 10 minutes. `python -m app.worker.autotag` and the Web
+   Library page "AI 打标签" button run the same step on demand.
 
 V1.1 also allows the owner to replace a track cover image from the Web Track
 Detail page. Replacement covers are stored under the configured cover media
@@ -702,10 +703,15 @@ session; network errors keep it for a later retry.
 - `POST /api/ai/parse-listening-intent`
 - `POST /api/ai/recommend`
 - `POST /api/ai/tracks/{track_id}/suggest-tags`
+- `GET /api/ai/auto-tag/status`
+- `POST /api/ai/auto-tag/next-batch`
 
 `suggest-tags` may internally use configured Tavily search context, but this
 does not add `/organize`, `/organize/apply`, playlist suggestions, Android UI,
-or automatic tag application.
+or automatic tag application. Automatic tag application is the separate
+auto-tag pair: `status` reports the owner's pending count, and each
+`next-batch` call tags up to 5 of the owner's pending tracks and returns the
+remaining count, so the Web Library button loops without a long request.
 
 ## 12. Security
 

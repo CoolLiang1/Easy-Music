@@ -30,7 +30,7 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
   [登录续期验收记录](docs/ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md)。
 - 播放音量统一（服务端测量响度，并给每个播放 MP3 写入一个固定增益，附带老曲目回填命令）已实现，并通过后端测试、真实 ffmpeg 验证和生产环境回填；仍需所有者实际试听，见
   [音量统一验收记录](docs/ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md)。
-- AI 自动打标签（worker 分批给未打标签的曲目套用已有标签，推荐时权重低于手动标签，附带老曲目回填命令）已实现，并通过后端测试；仍需用真实 AI 服务运行一次并由所有者检查结果，见
+- AI 自动打标签（worker 分批给未打标签的曲目套用已有标签，推荐时权重低于手动标签，附带老曲目回填命令和 Web 曲库页的“AI 打标签”按钮）已实现，并通过后端测试；仍需用真实 AI 服务运行一次并由所有者检查结果，见
   [自动打标签验收记录](docs/ACCEPTANCE/AI_AUTO_TAGGING_ACCEPTANCE.md)。
 - 仓库自带的生产更新脚本（`deploy/update.sh`，支持主机专属 compose 覆盖文件，数据库备份可直接恢复）已实现，恢复演练已通过；仍需在真实服务器上运行一次，见
   [更新脚本验收记录](docs/ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md)。

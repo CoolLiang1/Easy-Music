@@ -79,3 +79,16 @@ export type TagSuggestionResponse = {
   explanation: string | null;
   provider_status: AiProviderStatus;
 };
+
+export type AutoTagStatusResponse = {
+  provider_status: AiProviderStatus;
+  pending_count: number;
+};
+
+export type AutoTagBatchResponse = {
+  provider_status: AiProviderStatus;
+  tagged_count: number;
+  applied_tag_count: number;
+  remaining_count: number;
+  error: string | null;
+};

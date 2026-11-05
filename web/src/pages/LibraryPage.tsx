@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { autoTagNextBatch, getAutoTagStatus } from "../api/ai";
 import { addPlaylistTrack, addPlaylistTracks, listPlaylists } from "../api/playlists";
 import { listTags } from "../api/tags";
 import { batchDeleteTracks, batchUpdateTrackTags, listTracks, updateTrack } from "../api/tracks";
@@ -18,6 +19,7 @@ import { useToast } from "../components/ui/Toast";
 import { isReadyTrack } from "../components/WebAudioPlayer";
 import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
 import { RouteLink } from "../routes/RouteLink";
+import type { AiProviderStatus, AutoTagStatusResponse } from "../types/ai";
 import type { PlaylistSummary } from "../types/playlist";
 import type { Tag } from "../types/tag";
 import type { Track } from "../types/track";
@@ -55,6 +57,19 @@ export function LibraryPage() {
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
   const [isBatchTagOpen, setIsBatchTagOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<"tags" | "playlist" | "delete" | null>(null);
+  const [autoTagStatus, setAutoTagStatus] = useState<AutoTagStatusResponse | null>(null);
+  const [autoTagProgress, setAutoTagProgress] = useState<{ done: number; total: number } | null>(null);
+  const stopAutoTagRef = useRef(false);
+
+  const loadAutoTagStatus = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      setAutoTagStatus(await getAutoTagStatus(accessToken));
+    } catch {
+      // The button stays hidden when the status cannot be read.
+      setAutoTagStatus(null);
+    }
+  }, [accessToken]);
 
   const loadTracks = useCallback(
     async (showLoading: boolean) => {
@@ -76,6 +91,7 @@ export function LibraryPage() {
           listPlaylists(accessToken),
         ]);
         setLibraryState({ name: "ready", playlists, tags, tracks });
+        void loadAutoTagStatus();
         setSelectedTrackIds((current) => {
           const availableTrackIds = new Set(tracks.map((track) => track.id));
           return new Set([...current].filter((trackId) => availableTrackIds.has(trackId)));
@@ -90,7 +106,7 @@ export function LibraryPage() {
         setIsRefreshing(false);
       }
     },
-    [accessToken, showToast],
+    [accessToken, loadAutoTagStatus, showToast],
   );
 
   useEffect(() => {
@@ -365,6 +381,56 @@ export function LibraryPage() {
     );
   };
 
+  const runAutoTagging = async () => {
+    if (!accessToken || !autoTagStatus || autoTagStatus.pending_count === 0) return;
+    if (autoTagProgress) {
+      stopAutoTagRef.current = true;
+      return;
+    }
+
+    const total = autoTagStatus.pending_count;
+    const confirmed = await confirm({
+      confirmLabel: "开始打标签",
+      message:
+        "AI 会根据歌名、艺人、专辑和文件名，从你现有的标签里挑选合适的套用上去，不会新建标签，也不会改动你手动打的标签。" +
+        "推荐时 AI 标签的权重低于手动标签。看到打错的直接删掉，删掉后不会再被加回来。",
+      title: `用 AI 给 ${total} 首音轨打标签？`,
+    });
+    if (!confirmed) return;
+
+    stopAutoTagRef.current = false;
+    setAutoTagProgress({ done: 0, total });
+    let tagged = 0;
+    let applied = 0;
+    let failure: string | null = null;
+    try {
+      while (!stopAutoTagRef.current) {
+        const response = await autoTagNextBatch(accessToken);
+        tagged += response.tagged_count;
+        applied += response.applied_tag_count;
+        setAutoTagProgress({ done: tagged, total: Math.max(total, tagged + response.remaining_count) });
+        if (response.provider_status !== "ok" || response.error) {
+          failure = describeAutoTagFailure(response.provider_status, response.error);
+          break;
+        }
+        // Stop when finished, or if a batch made no progress.
+        if (response.remaining_count === 0 || response.tagged_count === 0) break;
+      }
+    } catch (error: unknown) {
+      failure = getErrorMessage(error, "AI 打标签请求失败。");
+    } finally {
+      setAutoTagProgress(null);
+    }
+
+    const summary = `已为 ${tagged} 首音轨套用 ${applied} 个 AI 标签`;
+    if (failure) {
+      showToast(tagged > 0 ? `${summary}，随后中断：${failure}` : `AI 打标签失败：${failure}`, "error");
+    } else {
+      showToast(stopAutoTagRef.current ? `${summary}，已停止。` : `${summary}。`);
+    }
+    await loadTracks(false);
+  };
+
   const isBusy = busyAction !== null;
 
   return (
@@ -372,6 +438,32 @@ export function LibraryPage() {
       <PageHeader
         actions={
           <>
+            {autoTagStatus ? (
+              <button
+                className="btn btn-secondary"
+                disabled={
+                  !autoTagProgress &&
+                  (autoTagStatus.provider_status !== "ok" || autoTagStatus.pending_count === 0)
+                }
+                onClick={() => void runAutoTagging()}
+                title={autoTagButtonTitle(autoTagStatus, autoTagProgress !== null)}
+                type="button"
+              >
+                <Icon className={autoTagProgress ? "spin" : undefined} name="sparkle" size={16} />
+                {autoTagProgress ? (
+                  <span>
+                    停止（{autoTagProgress.done}/{autoTagProgress.total}）
+                  </span>
+                ) : (
+                  <span>
+                    <span className="hide-sm">AI 打标签</span>
+                    {autoTagStatus.pending_count > 0 ? (
+                      <span className="hide-sm">（{autoTagStatus.pending_count}）</span>
+                    ) : null}
+                  </span>
+                )}
+              </button>
+            ) : null}
             <button
               aria-label="刷新曲库"
               className="btn btn-secondary"
@@ -714,4 +806,17 @@ function readFilterMode() {
   } catch {
     return false;
   }
+}
+
+function autoTagButtonTitle(status: AutoTagStatusResponse, running: boolean): string {
+  if (running) return "点击停止；已完成的部分会保留";
+  if (status.provider_status !== "ok") return describeAutoTagFailure(status.provider_status, null);
+  if (status.pending_count === 0) return "所有可播放音轨都已由 AI 打过标签";
+  return `用 AI 给 ${status.pending_count} 首尚未自动打标签的音轨套用已有标签`;
+}
+
+function describeAutoTagFailure(status: AiProviderStatus, error: string | null): string {
+  if (status === "disabled") return "服务器未开启 AI（AI_ENABLED）。";
+  if (status === "unconfigured") return "服务器的 AI 配置不完整（AI_API_KEY / AI_MODEL）。";
+  return error || "AI 服务返回错误。";
 }

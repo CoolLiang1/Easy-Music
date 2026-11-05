@@ -285,6 +285,28 @@ class AiAutoTagBatchOutput(BaseModel):
     tracks: list[AiAutoTagTrackOutput] = Field(default_factory=list)
 
 
+class AutoTagStatusResponse(BaseModel):
+    """Response for ``GET /api/ai/auto-tag/status``."""
+
+    provider_status: AiProviderStatus
+    pending_count: int
+
+
+class AutoTagBatchResponse(BaseModel):
+    """Response for ``POST /api/ai/auto-tag/next-batch``.
+
+    One small batch is tagged per call; ``remaining_count`` tells the client
+    whether to call again. A failed batch changes nothing and reports
+    ``error``.
+    """
+
+    provider_status: AiProviderStatus
+    tagged_count: int
+    applied_tag_count: int
+    remaining_count: int
+    error: str | None = None
+
+
 class TagSuggestionResponse(BaseModel):
     """Response for ``POST /api/ai/tracks/{track_id}/suggest-tags``.
 

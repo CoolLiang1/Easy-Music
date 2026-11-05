@@ -194,8 +194,9 @@ Version 1 supports:
 2. User uploads one or more audio files.
 3. Server saves original files.
 4. Worker extracts metadata and generates MP3 playback files.
-5. When AI auto-tagging is enabled, the worker applies tags from the owner's
-   catalogue based on filename and metadata. AI tags count less than owner
+5. When AI auto-tagging is enabled, or when the owner presses "AI 打标签" on
+   the Web Library page, tags from the owner's catalogue are applied based on
+   filename and metadata. AI tags count less than owner
    tags in recommendation.
 6. User corrects a wrong tag when noticing one; no per-track confirmation is
    required. Per-track AI suggestions remain available on request.
