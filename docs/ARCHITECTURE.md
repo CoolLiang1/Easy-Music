@@ -82,6 +82,10 @@ queues.
   tag the owner adds through batch editing becomes `user`, even if an `ai` row
   existed.
 - Web and Android do not show provenance.
+- Provider tag output (suggest-tags and auto-tagging) is parsed per item: an
+  id written into a key such as `"tag_id:12"` is repaired, extra keys are
+  ignored, confidence is clamped to 0-1, and an item that still fails
+  validation is dropped without discarding the rest of the response.
 
 ## Media Processing
 

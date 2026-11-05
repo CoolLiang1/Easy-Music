@@ -415,6 +415,54 @@ def test_suggest_tags_uses_v2_existing_suggestion_reason_and_confidence(
     assert body["explanation"] == "V2 structured suggestion."
 
 
+def test_suggest_tags_repairs_id_in_key_and_drops_malformed_items(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Regression: a provider wrote {"tag_id:12": 0, ...} and the whole
+    response used to be rejected as extra_forbidden."""
+    user = create_user(db_session)
+    track = create_track(db_session, user, "Mixed Output")
+    focus = create_tag(db_session, user, "scene", "Focus")
+    calm = create_tag(db_session, user, "feature", "Calm")
+    anime = create_tag(db_session, user, "type", "Anime")
+
+    fake = _install_provider(client.app)
+    fake.result = AiCompletionResult.ok(
+        json.dumps(
+            {
+                "existing_tag_suggestions": [
+                    {"tag_id": focus.id, "confidence": 0.9, "reason": "ok"},
+                    {"tag_id": calm.id, "confidence": 1.4, "reason": "over one"},
+                    {f"tag_id:{anime.id}": 0, "confidence": 0.7, "reason": "id in key"},
+                    {"confidence": 0.8, "reason": "no id at all"},
+                    "not an object",
+                ],
+                "existing_tag_ids": [],
+                "new_tag_suggestions": [],
+                "explanation": "messy but usable",
+                "unexpected_top_level": True,
+            }
+        )
+    )
+
+    response = client.post(
+        f"/api/ai/tracks/{track.id}/suggest-tags",
+        json={},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_status"] == "ok"
+    grouped = body["existing_tag_suggestions"]
+    assert [item["tag_id"] for item in grouped["scene"]] == [focus.id]
+    assert grouped["feature"][0]["confidence"] == 1.0
+    assert grouped["type"][0]["tag_id"] == anime.id
+    assert grouped["type"][0]["reason"] == "id in key"
+    assert body["explanation"] == "messy but usable"
+
+
 def test_suggest_tags_filters_legacy_groups_from_catalogue_and_output(
     client: TestClient,
     db_session: Session,

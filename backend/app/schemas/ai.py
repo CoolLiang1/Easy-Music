@@ -1,8 +1,18 @@
 """AI provider schemas — development-only, no real secrets committed."""
 
+import logging
+import re
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from app.schemas.recommendation import RecommendationRequest, RecommendationResult
 from app.schemas.tag import TagGroup
@@ -211,25 +221,102 @@ class TagSearchContextItem(BaseModel):
     url: str = ""
 
 
+# ---------------------------------------------------------------------------
+# Tolerant parsing of provider tag output
+#
+# Models sometimes copy the prompt's "id:12" catalogue notation into the JSON
+# ({"tag_id:12": 0}) or emit one malformed item. Repair what is unambiguous
+# and drop items that still do not validate, so one bad item never discards
+# the rest of a response. Every surviving id is still checked against the
+# owner's catalogue by the calling service.
+# ---------------------------------------------------------------------------
+
+_ai_output_logger = logging.getLogger("app.schemas.ai")
+
+
+def _repair_id_key(data: Any, field: str) -> Any:
+    """Turn a key such as ``"tag_id:12"`` into ``tag_id=12`` when *field* is missing."""
+    if not isinstance(data, dict) or field in data:
+        return data
+    pattern = re.compile(rf"\s*{field}\s*[:=]\s*(\d+)\s*")
+    for key in data:
+        match = pattern.fullmatch(str(key))
+        if match:
+            repaired = {k: v for k, v in data.items() if k != key}
+            repaired[field] = int(match.group(1))
+            return repaired
+    return data
+
+
+def _keep_valid_items(items: Any, model: type[BaseModel]) -> Any:
+    """Validate list items one by one and drop those that fail."""
+    if not isinstance(items, list):
+        return items
+    kept: list[BaseModel] = []
+    for item in items:
+        try:
+            kept.append(model.model_validate(item))
+        except ValidationError as exc:
+            _ai_output_logger.warning(
+                "Dropped malformed AI %s item %r: %s",
+                model.__name__,
+                item,
+                exc.errors()[0].get("msg", "invalid"),
+            )
+    return kept
+
+
+def _keep_int_items(items: Any) -> Any:
+    if not isinstance(items, list):
+        return items
+    return [
+        int(item)
+        for item in items
+        if (isinstance(item, int) and not isinstance(item, bool))
+        or (isinstance(item, str) and item.strip().isdigit())
+    ]
+
+
+def _clamp_confidence(value: Any) -> Any:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return min(max(float(value), 0.0), 1.0)
+    return value
+
+
 class AiTagExistingSuggestionOutput(BaseModel):
     """Existing-tag suggestion shape returned by the provider."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     tag_id: int
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     reason: str = ""
 
+    @model_validator(mode="before")
+    @classmethod
+    def _repair_tag_id(cls, data: Any) -> Any:
+        return _repair_id_key(data, "tag_id")
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _clamp(cls, value: Any) -> Any:
+        return _clamp_confidence(value)
+
 
 class AiTagNewSuggestionOutput(BaseModel):
     """New-tag suggestion shape returned by the provider before validation."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     name: str
     group: str
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     reason: str = ""
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _clamp(cls, value: Any) -> Any:
+        return _clamp_confidence(value)
 
 
 class AiTagSuggestionOutput(BaseModel):
@@ -237,10 +324,10 @@ class AiTagSuggestionOutput(BaseModel):
 
     ``existing_tag_ids`` must come from the catalogue in the prompt.
     ``new_tag_suggestions`` are suggestions only — the endpoint never creates
-    or binds them automatically.
+    or binds them automatically. Malformed items are dropped individually.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     existing_tag_suggestions: list[AiTagExistingSuggestionOutput] = Field(
         default_factory=list,
@@ -248,6 +335,21 @@ class AiTagSuggestionOutput(BaseModel):
     existing_tag_ids: list[int] = Field(default_factory=list)
     new_tag_suggestions: list[AiTagNewSuggestionOutput] = Field(default_factory=list)
     explanation: str | None = None
+
+    @field_validator("existing_tag_suggestions", mode="before")
+    @classmethod
+    def _drop_bad_existing(cls, value: Any) -> Any:
+        return _keep_valid_items(value, AiTagExistingSuggestionOutput)
+
+    @field_validator("new_tag_suggestions", mode="before")
+    @classmethod
+    def _drop_bad_new(cls, value: Any) -> Any:
+        return _keep_valid_items(value, AiTagNewSuggestionOutput)
+
+    @field_validator("existing_tag_ids", mode="before")
+    @classmethod
+    def _drop_bad_ids(cls, value: Any) -> Any:
+        return _keep_int_items(value)
 
 
 class AiAutoTagOutput(BaseModel):
@@ -262,6 +364,11 @@ class AiAutoTagOutput(BaseModel):
     tag_id: int
     confidence: float = 0.5
 
+    @model_validator(mode="before")
+    @classmethod
+    def _repair_tag_id(cls, data: Any) -> Any:
+        return _repair_id_key(data, "tag_id")
+
 
 class AiAutoTagTrackOutput(BaseModel):
     """Tags the provider assigns to one track of the batch."""
@@ -270,6 +377,16 @@ class AiAutoTagTrackOutput(BaseModel):
 
     track_id: int
     tags: list[AiAutoTagOutput] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _repair_track_id(cls, data: Any) -> Any:
+        return _repair_id_key(data, "track_id")
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _drop_bad_tags(cls, value: Any) -> Any:
+        return _keep_valid_items(value, AiAutoTagOutput)
 
 
 class AiAutoTagBatchOutput(BaseModel):
@@ -283,6 +400,11 @@ class AiAutoTagBatchOutput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     tracks: list[AiAutoTagTrackOutput] = Field(default_factory=list)
+
+    @field_validator("tracks", mode="before")
+    @classmethod
+    def _drop_bad_tracks(cls, value: Any) -> Any:
+        return _keep_valid_items(value, AiAutoTagTrackOutput)
 
 
 class AutoTagStatusResponse(BaseModel):
