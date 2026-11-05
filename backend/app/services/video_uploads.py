@@ -5,6 +5,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.media.storage import MediaStorage
+from app.media.titles import clean_filename_title
 from app.models.track import Track
 from app.models.user import User
 from app.services.jobs import VIDEO_EXTRACTION_JOB_TYPE, create_processing_job
@@ -68,7 +69,7 @@ def create_video_upload_track(
     upload_format = validate_video_upload_file(file)
     filename = file.filename or f"video.{upload_format}"
     title = Path(filename.replace("\\", "/")).name
-    title = Path(title).stem or "Untitled Video"
+    title = clean_filename_title(Path(title).stem) or "Untitled Video"
 
     track = Track(
         user_id=user.id,

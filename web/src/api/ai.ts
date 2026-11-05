@@ -4,6 +4,10 @@ import type {
   AiRecommendResponse,
   AutoTagBatchResponse,
   AutoTagStatusResponse,
+  MetadataCleanupApplyRequest,
+  MetadataCleanupApplyResponse,
+  MetadataCleanupBatchResponse,
+  MetadataCleanupStatusResponse,
   ParsedIntentResponse,
   ParseListeningIntentRequest,
   TagSuggestionRequest,
@@ -55,5 +59,25 @@ export function autoTagNextBatch(accessToken: string) {
   return apiRequest<AutoTagBatchResponse>("/api/ai/auto-tag/next-batch", {
     method: "POST",
     accessToken,
+  });
+}
+
+export function getMetadataCleanupStatus(accessToken: string) {
+  return apiRequest<MetadataCleanupStatusResponse>("/api/ai/metadata-cleanup/status", { accessToken });
+}
+
+export function metadataCleanupNextBatch(accessToken: string, afterId: number | null) {
+  return apiRequest<MetadataCleanupBatchResponse>("/api/ai/metadata-cleanup/next-batch", {
+    method: "POST",
+    accessToken,
+    body: { after_id: afterId },
+  });
+}
+
+export function applyMetadataCleanup(accessToken: string, payload: MetadataCleanupApplyRequest) {
+  return apiRequest<MetadataCleanupApplyResponse>("/api/ai/metadata-cleanup/apply", {
+    method: "POST",
+    accessToken,
+    body: payload,
   });
 }

@@ -155,6 +155,34 @@ unconfigured, or failing, the call returns `200` with that `provider_status`
 (and `error` on failure) and changes nothing. To preview without writing, run
 `python -m app.worker.autotag --dry-run --limit 5` from `backend/`.
 
+Reviewed title and artist clean-up, as used by the Web page 标题与艺人:
+
+```powershell
+(Invoke-RestMethod -Uri "$api/api/ai/metadata-cleanup/status" -Headers $headers).pending_count
+$batch = Invoke-RestMethod -Method Post -Uri "$api/api/ai/metadata-cleanup/next-batch" `
+  -Headers $headers -ContentType "application/json" -Body '{"after_id": null}'
+$batch.suggestions | Format-Table track_id, current_title, suggested_title, suggested_artist, artist_confidence
+```
+
+Expected: `next-batch` looks at up to 5 pending tracks after `after_id` and
+saves nothing. Pass `next_after_id` to continue. To save, send the accepted
+values and every reviewed id:
+
+```powershell
+$body = @{
+  changes = @(@{ track_id = $batch.suggestions[0].track_id; title = $batch.suggestions[0].suggested_title })
+  reviewed_track_ids = $batch.reviewed_track_ids
+} | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Method Post -Uri "$api/api/ai/metadata-cleanup/apply" -Headers $headers `
+  -ContentType "application/json" -Body $body
+```
+
+Expected: `updated_count` counts tracks whose title or artist changed and
+`reviewed_count` counts the owner's reviewed tracks; they leave
+`pending_count`. Other users' track ids are ignored. With AI disabled,
+unconfigured, or failing, `next-batch` returns `200` with that
+`provider_status` and no suggestions.
+
 ## Imports
 
 Needs `IMPORT_ALLOWED_ROOTS` set (see [DEVELOPMENT.md](DEVELOPMENT.md#optional-features)).

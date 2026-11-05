@@ -42,6 +42,7 @@ export const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "整理",
     items: [
       { icon: "tag", label: "标签", path: "/tags" },
+      { icon: "edit", label: "标题与艺人", path: "/metadata" },
       { icon: "chart", label: "整理报告", path: "/reports" },
       { icon: "copy", label: "重复音轨", path: "/duplicates" },
     ],

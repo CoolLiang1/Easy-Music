@@ -156,7 +156,11 @@ The system supports:
    tags in recommendation.
 6. User corrects a wrong tag when noticing one; no per-track confirmation is
    required. Per-track AI suggestions remain available on request.
-7. Tracks become available for recommendation and playback.
+7. Titles come from cleaned file names. On the Web page "标题与艺人" the AI
+   proposes a clean title and the artist for many tracks at once; the owner
+   reviews the list and applies it. An unknown artist stays empty. Album is
+   optional and not shown.
+8. Tracks become available for recommendation and playback.
 
 ### 7.2 Android Listening
 

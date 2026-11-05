@@ -92,3 +92,46 @@ export type AutoTagBatchResponse = {
   remaining_count: number;
   error: string | null;
 };
+
+export type MetadataCleanupStatusResponse = {
+  provider_status: AiProviderStatus;
+  pending_count: number;
+};
+
+export type MetadataSuggestion = {
+  track_id: number;
+  current_title: string;
+  current_artist: string | null;
+  suggested_title: string;
+  suggested_artist: string | null;
+  artist_confidence: number;
+  title_changed: boolean;
+  artist_changed: boolean;
+  title_selected: boolean;
+  artist_selected: boolean;
+};
+
+export type MetadataCleanupBatchResponse = {
+  provider_status: AiProviderStatus;
+  suggestions: MetadataSuggestion[];
+  reviewed_track_ids: number[];
+  next_after_id: number | null;
+  remaining_count: number;
+  error: string | null;
+};
+
+export type MetadataChange = {
+  track_id: number;
+  title?: string;
+  artist?: string | null;
+};
+
+export type MetadataCleanupApplyRequest = {
+  changes: MetadataChange[];
+  reviewed_track_ids: number[];
+};
+
+export type MetadataCleanupApplyResponse = {
+  updated_count: number;
+  reviewed_count: number;
+};

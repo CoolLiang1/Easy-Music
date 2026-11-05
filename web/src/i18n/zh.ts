@@ -144,14 +144,14 @@ export function formatBytes(value: number) {
   return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-export function trackSubtitle(track: { artist: string | null; album: string | null }) {
-  return [track.artist, track.album].filter(Boolean).join(" · ");
+/** Artist line under a track title. Album is not shown: the owner identifies tracks by artist. */
+export function trackSubtitle(track: { artist: string | null }) {
+  return track.artist?.trim() ?? "";
 }
 
 const backendReasonLabels: Record<string, string> = {
   "Backend processing is still running.": "后台仍在处理",
   "Cooldown has already expired.": "冷却时间已过",
-  "Missing album.": "缺少专辑",
   "Missing artist.": "缺少艺人",
   "Missing cover.": "缺少封面",
   "Missing duration.": "缺少时长",

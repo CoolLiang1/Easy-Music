@@ -126,7 +126,7 @@ export function RecommendationResultCard({
           <RouteLink className="rec-title" title={title} to={`/tracks/${encodeURIComponent(track.id)}`}>
             {title}
           </RouteLink>
-          <div className="rec-sub">{trackSubtitle(track) || "未填写艺人"}</div>
+          <div className="rec-sub">{trackSubtitle(track)}</div>
         </div>
         <span className="rec-score hide-sm" title="规则推荐评分">
           {formatScore(result.score)}

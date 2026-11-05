@@ -29,6 +29,7 @@ class Track(Base):
     playback_gain_db: Mapped[float | None] = mapped_column(Float)
     loudness_version: Mapped[int | None] = mapped_column(Integer)
     ai_tags_version: Mapped[int | None] = mapped_column(Integer)
+    ai_metadata_version: Mapped[int | None] = mapped_column(Integer)
     cover_path: Mapped[str | None] = mapped_column(String(1024))
     source_url: Mapped[str | None] = mapped_column(String(2048))
     format: Mapped[str | None] = mapped_column(String(50))

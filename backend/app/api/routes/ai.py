@@ -19,12 +19,17 @@ from app.schemas.ai import (
     AiRecommendResponse,
     AutoTagBatchResponse,
     AutoTagStatusResponse,
+    MetadataCleanupApplyRequest,
+    MetadataCleanupApplyResponse,
+    MetadataCleanupBatchRequest,
+    MetadataCleanupBatchResponse,
+    MetadataCleanupStatusResponse,
     ParsedIntentResponse,
     ParseListeningIntentRequest,
     TagSuggestionRequest,
     TagSuggestionResponse,
 )
-from app.services import ai_auto_tagging, ai_intent, ai_tag_suggestions
+from app.services import ai_auto_tagging, ai_intent, ai_metadata_cleanup, ai_tag_suggestions
 from app.services.ai_provider import AiProviderService
 from app.services.ai_client import build_ai_provider
 from app.services.ai_tag_search import AiTagSearchService
@@ -205,6 +210,73 @@ def auto_tag_next_batch(
         remaining_count=remaining,
         error=result.error,
     )
+
+
+@router.get(
+    "/metadata-cleanup/status",
+    response_model=MetadataCleanupStatusResponse,
+)
+def metadata_cleanup_status(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+) -> MetadataCleanupStatusResponse:
+    """Report how many of the owner's ready tracks wait for a metadata review."""
+    return MetadataCleanupStatusResponse(
+        provider_status=ai_provider.status,
+        pending_count=ai_metadata_cleanup.count_pending_tracks(db, user_id=current_user.id),
+    )
+
+
+@router.post(
+    "/metadata-cleanup/next-batch",
+    response_model=MetadataCleanupBatchResponse,
+)
+def metadata_cleanup_next_batch(
+    payload: MetadataCleanupBatchRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+) -> MetadataCleanupBatchResponse:
+    """Propose clean titles and artists for the owner's next few tracks.
+
+    Saves nothing; the client collects suggestions and sends the accepted
+    ones to ``apply``. Provider failures return 200 with the status and
+    ``error`` so the client can stop and explain.
+    """
+    result, next_after_id, remaining = ai_metadata_cleanup.suggest_next_batch(
+        db,
+        ai_provider,
+        user_id=current_user.id,
+        after_id=payload.after_id,
+    )
+    return MetadataCleanupBatchResponse(
+        provider_status=result.provider_status,
+        suggestions=result.suggestions,
+        reviewed_track_ids=result.reviewed_track_ids,
+        next_after_id=next_after_id,
+        remaining_count=remaining,
+        error=result.error,
+    )
+
+
+@router.post(
+    "/metadata-cleanup/apply",
+    response_model=MetadataCleanupApplyResponse,
+)
+def metadata_cleanup_apply(
+    payload: MetadataCleanupApplyRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> MetadataCleanupApplyResponse:
+    """Save the titles and artists the owner accepted and mark tracks reviewed."""
+    updated, reviewed = ai_metadata_cleanup.apply_metadata_changes(
+        db,
+        user_id=current_user.id,
+        changes=payload.changes,
+        reviewed_track_ids=payload.reviewed_track_ids,
+    )
+    return MetadataCleanupApplyResponse(updated_count=updated, reviewed_count=reviewed)
 
 
 def _is_ok(provider_status) -> bool:

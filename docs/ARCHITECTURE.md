@@ -46,9 +46,10 @@ Python 3.12, FastAPI, SQLAlchemy, Alembic, PostgreSQL, FFmpeg/ffprobe.
 - `services/` hold the business logic: uploads, video uploads, imports,
   processing, tracks, tags, playlists, playback and feedback events,
   recommendations, revived tracks, duplicates, library reports, and AI
-  (provider, intent parsing, tag suggestions, tag search, auto-tagging).
-- `media/` owns storage paths, path-safety checks, FFmpeg and ffprobe
-  wrappers, and streaming responses.
+  (provider, intent parsing, tag suggestions, tag search, auto-tagging,
+  metadata clean-up).
+- `media/` owns storage paths, path-safety checks, filename title clean-up,
+  FFmpeg and ffprobe wrappers, and streaming responses.
 - `worker/` runs the job loop and the `renormalize` and `autotag` backfills.
 
 ### Data Model
@@ -57,7 +58,7 @@ Python 3.12, FastAPI, SQLAlchemy, Alembic, PostgreSQL, FFmpeg/ffprobe.
 | --- | --- | --- |
 | `users` | The owner account. | Created once by `app.auth.initial_user`. |
 | `refresh_tokens` | SHA-256 hashes of refresh tokens. | Never the token itself. |
-| `tracks` | Metadata, media file references, status, liked flag, cooldown, duplicate signals, loudness and AI-tagging versions. | Status is `uploading`, `processing`, `ready`, or `failed`. |
+| `tracks` | Metadata, media file references, status, liked flag, cooldown, duplicate signals, loudness, AI-tagging, and AI-metadata versions. | Status is `uploading`, `processing`, `ready`, or `failed`. |
 | `tags`, `track_tags` | Owner tag catalogue in groups `scene`, `type`, `feature`; track links with `source` and `confidence`. | See tag provenance below. |
 | `playlists`, `playlist_tracks` | Manual ordered playlists. | Only the owner's tracks; adding twice is a no-op. |
 | `playback_events`, `feedback_events` | Listening history and feedback from both clients. | Idempotent on `client_event_id`. |
@@ -86,6 +87,23 @@ queues.
   id written into a key such as `"tag_id:12"` is repaired, extra keys are
   ignored, confidence is clamped to 0-1, and an item that still fails
   validation is dropped without discarding the rest of the response.
+
+### Title And Artist Clean-Up
+
+- New uploads, video uploads, and imports take their title from the file name
+  after `media/titles.clean_filename_title` removes quality marks, platform
+  noise, video ids, track numbers, and underscores. Bracketed text without
+  noise, such as a source work or a version, is kept. ffprobe title, artist,
+  and album tags still win when the file has them.
+- The Web page 标题与艺人 asks the AI for a clean title and the credited artist,
+  5 tracks per call, without web search. Suggestions are previews; only
+  `POST /api/ai/metadata-cleanup/apply` writes, and only to the owner's
+  tracks. An artist below 0.5 confidence is dropped; only artists at 0.8 or
+  above for tracks without one are pre-selected.
+- Apply records `ai_metadata_version` on every reviewed track, accepted or
+  not, so it is offered once per version.
+- Clients show the artist under a title; album is kept in the data but not
+  shown in lists.
 
 ## Media Processing
 
@@ -202,7 +220,7 @@ logout, and streams opened with a signed stream URL. `GET /health` is public.
 | `/playback-events`, `/feedback-events` | `playback_events.py`, `feedback_events.py` | Batched, idempotent event sync. |
 | `/recommendations` | `recommendations.py` | Structured recommendations and revived tracks. |
 | `/library/reports` | `library_reports.py` | Read-only organization reports. |
-| `/ai` | `ai.py` | Intent parsing, AI recommendation, per-track tag suggestions, on-demand auto-tagging (`auto-tag/status`, `auto-tag/next-batch`). |
+| `/ai` | `ai.py` | Intent parsing, AI recommendation, per-track tag suggestions, on-demand auto-tagging (`auto-tag/status`, `auto-tag/next-batch`), reviewed title/artist clean-up (`metadata-cleanup/status`, `metadata-cleanup/next-batch`, `metadata-cleanup/apply`). |
 
 ### Sessions
 

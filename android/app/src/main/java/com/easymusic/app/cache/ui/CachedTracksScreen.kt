@@ -155,7 +155,7 @@ fun CachedTracksScreen(
                     trackId = track.trackId,
                     title = track.title,
                     subtitle = listOfNotNull(
-                        trackSubtitle(track.artist, track.album),
+                        trackSubtitle(track.artist),
                         track.durationSeconds?.formatDuration(),
                         track.byteSize?.formatBytes(),
                     ).joinToString(" · "),

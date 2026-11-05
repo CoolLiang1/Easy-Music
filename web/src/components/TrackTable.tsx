@@ -160,7 +160,7 @@ export function TrackTable({
               .filter(Boolean)
               .join(" ");
             const title = track.title || "未命名音轨";
-            const subtitle = [track.artist, track.album].filter(Boolean).join(" · ");
+            const subtitle = track.artist?.trim() ?? "";
 
             return (
               <tr
@@ -206,7 +206,7 @@ export function TrackTable({
                             <TrackStatusBadge status={track.status} />{" "}
                           </>
                         ) : null}
-                        {subtitle || <span className="faint">未填写艺人/专辑</span>}
+                        {subtitle}
                       </span>
                     </div>
                   </div>

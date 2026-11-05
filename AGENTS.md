@@ -52,8 +52,10 @@ needs the owner's explicit agreement.
 ### AI And Recommendation
 
 - AI parses listening intent, suggests tags, and may apply existing catalogue
-  tags as `source="ai"` rows. It never creates tags, never changes owner
-  (`user`) rows, and never selects or orders tracks. Ranking stays in
+  tags as `source="ai"` rows. It may propose titles and artists, which are
+  saved only through the owner-reviewed `metadata-cleanup/apply` call. It
+  never creates tags, never changes owner (`user`) rows, and never selects or
+  orders tracks. Ranking stays in
   `services/recommendations.py` and keeps cooldown, recent-play, feedback, and
   ownership rules.
 - AI endpoints answer HTTP 200 with provider status `disabled`,

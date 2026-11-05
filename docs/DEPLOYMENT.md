@@ -636,6 +636,14 @@ brings back removed AI tags, so use it only after changing the catalogue or
 logs it and retries after 10 minutes. If batches keep failing with
 `output_truncated`, try a smaller `--batch-size` or a non-reasoning model.
 
+### Title And Artist Clean-Up
+
+With the AI provider configured, open 标题与艺人 in the Web console, press
+开始分析, review the list, and press 应用选中. Nothing is saved before that.
+Every analysed track is marked as reviewed when you apply, including the ones
+you unchecked, so later runs show only new tracks. There is no server command
+and no environment variable for this.
+
 When an update introduces session renewal (refresh tokens), install the
 matching Android APK before lowering `ACCESS_TOKEN_EXPIRE_MINUTES` in
 `.env.production`; an older APK cannot renew and would ask for a login each
