@@ -19,7 +19,7 @@ The canonical status register is
 it on 2026-11-04.
 
 <!-- status-snapshot: 2026-11-04 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented; Deploy update script=Implemented -->
 
 - MVP Phase 0 through Phase 7 are implemented and locally accepted.
 - V1.1 workflow improvements, duplicate detection, cover editing, advanced
@@ -51,9 +51,13 @@ it on 2026-11-04.
   [the auth acceptance record](docs/ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md).
 - Playback loudness normalization (server-measured loudness with one static
   gain baked into each playback MP3, plus a backfill command) is implemented
-  and passed backend tests and a real-ffmpeg check; the production backfill
-  and owner listening review remain. See
+  and passed backend tests, a real-ffmpeg check, and the production backfill;
+  owner listening review remains. See
   [the loudness acceptance record](docs/ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md).
+- A repository-owned production update script (`deploy/update.sh`) with host
+  compose override support and restorable clean database backups is
+  implemented; a restore drill passed and the first real server run remains.
+  See [the update script acceptance record](docs/ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md).
 
 Easy Music now follows a private stable-edition direction. The former complete
 V2.6 milestone is not planned work. Future changes are selected one at a time

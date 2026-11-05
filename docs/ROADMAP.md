@@ -25,7 +25,7 @@ task files contain plans; acceptance files contain evidence. See
 [Documentation Guide](README.md) for the ownership and update rules.
 
 <!-- status-snapshot: 2026-11-04 -->
-Last verified: 2026-11-04 on `fix/playback-loudness-normalization`.
+Last verified: 2026-11-04 on `fix/deploy-update-script`.
 
 ## Current Status
 
@@ -44,7 +44,8 @@ Last verified: 2026-11-04 on `fix/playback-loudness-normalization`.
 | Web UI redesign | Implemented | [Redesign task](TASKS/WEB_UI_REDESIGN_TASKS.md) / [acceptance](ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md) | Owner-reported Web usability problem; Web-only redesign with no API change. Typecheck, build, and local browser smoke passed; owner review on the real library remains. |
 | Android UI redesign | Implemented | [Android redesign task](TASKS/ANDROID_UI_REDESIGN_TASKS.md) / [acceptance](ACCEPTANCE/ANDROID_UI_REDESIGN_ACCEPTANCE.md) | Owner-requested follow-up to the Web redesign; Android-only UI with no API change. Unit tests, debug build, and emulator smoke passed; real-device review remains. |
 | Auth session renewal | Implemented | [Auth task](TASKS/AUTH_SESSION_RENEWAL_TASKS.md) / [acceptance](ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md) | Owner-reported repeated logins; rotating refresh tokens with silent Web/Android renewal. Backend, Web smoke, and Android unit tests passed; Android device check and owner daily use remain. |
-| Playback loudness normalization | Implemented | [Loudness task](TASKS/PLAYBACK_LOUDNESS_NORMALIZATION_TASKS.md) / [acceptance](ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md) | Owner-reported loud jumps between tracks; server bakes one static gain per playback MP3 with a backfill command. Backend tests and a real-ffmpeg check passed; production backfill and owner listening remain. |
+| Playback loudness normalization | Implemented | [Loudness task](TASKS/PLAYBACK_LOUDNESS_NORMALIZATION_TASKS.md) / [acceptance](ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md) | Owner-reported loud jumps between tracks; server bakes one static gain per playback MP3 with a backfill command. Backend tests, a real-ffmpeg check, and the production backfill passed; owner listening and Android re-cache remain. |
+| Deploy update script | Implemented | [Update script task](TASKS/DEPLOY_UPDATE_SCRIPT_TASKS.md) / [acceptance](ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md) | Maintenance: repository-owned `deploy/update.sh`, host compose override support, and restorable clean database dumps. Restore drill passed; the first real server run remains. |
 
 ## Development Direction
 
@@ -82,17 +83,19 @@ real use:
    renewal slice; verify it on an Android device and in daily use, then record
    the result in its acceptance document.
 4. The owner-reported uneven-loudness problem is addressed by the playback
-   loudness normalization slice; run the backfill on the real deployment,
-   re-cache Android offline tracks, and record the listening result in its
-   acceptance document. The remaining owner-selected pain point is tag-entry
-   effort.
-5. Maintenance work may address a reproducible bug, a security issue, data
+   loudness normalization slice; the production backfill is done. Re-cache
+   Android offline tracks and record the listening result in its acceptance
+   document. The remaining owner-selected pain point is tag-entry effort.
+5. The deploy update script maintenance slice replaces the host-only update
+   script; run it once on the real server and record the result in its
+   acceptance document.
+6. Maintenance work may address a reproducible bug, a security issue, data
    safety, backup recovery, or certificate continuity with the smallest
    reviewable change.
-6. The outstanding V2.2, UI round 1, and production-smoke evidence gaps remain
+7. The outstanding V2.2, UI round 1, and production-smoke evidence gaps remain
    recorded in their existing acceptance documents. They are not mandatory
    roadmap work unless the owner chooses to revisit the affected flow.
-7. Register any selected product slice here and link its task and acceptance
+8. Register any selected product slice here and link its task and acceptance
    records before implementation.
 
 ## Phase 0: Project Foundation

@@ -487,17 +487,25 @@ After the first successful deployment:
 
 ```bash
 chmod +x deploy/backup-db.sh
-./deploy/backup-db.sh /srv/easy-music/backups
+sudo ./deploy/backup-db.sh /srv/easy-music/backups
 ls -lh /srv/easy-music/backups
 ```
 
-Optional daily backup cron:
+The script needs to read `.env.production`; keep that file mode `600` and run
+the script with `sudo` (or as the file's owner). If the host uses a
+`DEPLOY_COMPOSE_OVERRIDE` file, pass it as `COMPOSE_OVERRIDE_FILE=<path>` too.
+
+Daily backup, installed in root's crontab with `sudo crontab -e`:
 
 ```cron
 0 3 * * * /srv/easy-music/repo/deploy/backup-db.sh /srv/easy-music/backups
 ```
 
-The backup script creates files only. It does not delete old backups.
+Dumps are created with `pg_dump --clean --if-exists` and mode `600`. The
+backup script creates files only; it does not delete old backups. Database
+dumps do not include media: back up `MEDIA_HOST_ORIGINALS` and
+`MEDIA_HOST_COVERS` separately, because playback files can be regenerated from
+originals but originals cannot be recreated.
 
 ## Ongoing Maintenance
 
@@ -515,29 +523,78 @@ docker compose -f docker-compose.prod.yml --env-file .env.production restart api
 docker compose -f docker-compose.prod.yml --env-file .env.production restart worker
 ```
 
-Apply updates:
+### Apply Updates
+
+Select the commit as the operator user, then deploy it with
+`deploy/update.sh`. The script never runs `git`; it deploys whatever is
+checked out.
 
 ```bash
 cd /srv/easy-music/repo
-./deploy/backup-db.sh /srv/easy-music/backups
-
 git fetch origin
-git switch main
-git pull --ff-only origin main
-
-cd web
-export VITE_API_BASE_URL="https://music.example.com"
-export VITE_MAX_VIDEO_UPLOAD_MB="1024"
-npm ci
-npm run build
-cd ..
-
-docker compose -f docker-compose.prod.yml --env-file .env.production build
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  exec api alembic upgrade head
-docker compose -f docker-compose.prod.yml --env-file .env.production ps
+git log --oneline HEAD..origin/main
+git diff --stat HEAD origin/main -- .env.production.example docker-compose.prod.yml backend/alembic
+git checkout --detach origin/main
+sudo ./deploy/update.sh
 ```
+
+Before running the script, add any new variables from
+`.env.production.example` to `.env.production`. New files under
+`backend/alembic` mean the update includes migrations.
+
+`deploy/update.sh` reads `VITE_API_BASE_URL`, `VITE_MAX_VIDEO_UPLOAD_MB`,
+`BACKUP_DIR`, `CADDYFILE_PATH`, `CADDY_CERT_DIR`, and the optional
+`DEPLOY_*` values from `.env.production` without sourcing it, then:
+
+1. Checks the compose config and, in manual-cert mode, refuses to continue
+   when the certificate expires within 30 days.
+2. Backs up the database with `deploy/backup-db.sh`.
+3. Builds the Web app as the non-root operator.
+4. Builds images, through `DEPLOY_BUILD_PROXY` when set.
+5. Starts `postgres` and runs `alembic upgrade head` before the new `api`
+   starts.
+6. Recreates `api`, `worker`, and `caddy` and waits for health.
+7. Checks `VITE_API_BASE_URL/health` on the host and prints `UPDATE_OK`.
+
+To roll back code, check out the previous commit and run the script again.
+Migrations are not reverted; restore the pre-update backup only when the new
+schema or data is the problem.
+
+After an update, follow any one-time step that the change documents, such as
+the loudness regeneration below, and install a matching Android APK when the
+update changes Android or client contracts (Step 9).
+
+### Host-Specific Compose Override
+
+Keep host-only differences, such as extra read-only import mounts or a
+different published port, in a compose file outside the checkout instead of
+editing `docker-compose.prod.yml`, and set its path in `.env.production`:
+
+```env
+DEPLOY_COMPOSE_OVERRIDE=/srv/easy-music/compose.override.yml
+```
+
+Example override:
+
+```yaml
+services:
+  api:
+    volumes:
+      - type: bind
+        source: /srv/easy-music/imports
+        target: /app/imports/library
+        read_only: true
+  worker:
+    volumes:
+      - type: bind
+        source: /srv/easy-music/imports
+        target: /app/imports/library
+        read_only: true
+```
+
+When running compose commands by hand on such a host, pass both files:
+`docker compose -f docker-compose.prod.yml -f <override> --env-file .env.production ...`.
+The manual commands elsewhere in this guide show the single-file form.
 
 ### Regenerate Playback Loudness
 
@@ -566,18 +623,44 @@ matching Android APK before lowering `ACCESS_TOKEN_EXPIRE_MINUTES` in
 `.env.production`; an older APK cannot renew and would ask for a login each
 time the access token expires.
 
-Restore from a backup only after taking a fresh backup and confirming you want
-to overwrite current data:
+### Restore a Database Backup
+
+Restore only after taking a fresh backup and confirming you want to overwrite
+current data. Stop writers first:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production stop api worker
+```
 
+Check whether the dump was made with `--clean` (backups from the current
+`deploy/backup-db.sh` are):
+
+```bash
+zgrep -m1 -c 'DROP TABLE IF EXISTS' /srv/easy-music/backups/easy_music_backup_YYYY-MM-DD_HHMMSS.sql.gz
+```
+
+If it prints `0`, the dump has no DROP statements and cannot be loaded over
+existing tables. Recreate an empty database first:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
+  psql -U easy_music -d postgres -c 'DROP DATABASE easy_music' -c 'CREATE DATABASE easy_music OWNER easy_music'
+```
+
+Load the dump and stop at the first error:
+
+```bash
 gunzip < /srv/easy-music/backups/easy_music_backup_YYYY-MM-DD_HHMMSS.sql.gz \
   | docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
-    psql -U easy_music -d easy_music
+    psql -v ON_ERROR_STOP=1 -U easy_music -d easy_music
 
 docker compose -f docker-compose.prod.yml --env-file .env.production start api worker
 ```
+
+The restored schema matches the code that was running when the dump was made.
+If the checked-out code is newer, run `alembic upgrade head` before starting
+`api` and `worker`; if it is older than the dump, check out the matching
+commit first.
 
 ## Troubleshooting
 
@@ -647,4 +730,5 @@ docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail
 - `docs/API_MANUAL_TESTING.md` - API smoke tests.
 - `deploy/setup-host.sh` - host directory setup script.
 - `deploy/backup-db.sh` - database backup script.
+- `deploy/update.sh` - update script for the checked-out commit.
 - `.env.production.example` - production environment variable template.

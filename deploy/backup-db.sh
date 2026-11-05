@@ -5,7 +5,9 @@
 #
 # Dumps the production PostgreSQL database to a compressed, timestamped file
 # using pg_dump inside the running postgres container. The script does NOT
-# modify, drop, or recreate the source database.
+# modify, drop, or recreate the source database. Dumps are written with
+# pg_dump --clean --if-exists, so they contain DROP ... IF EXISTS statements
+# that are used only when the dump is restored over an existing database.
 #
 # ---------------------------------------------------------------------------
 # Usage
@@ -19,30 +21,25 @@
 #   POSTGRES_DB                database name    (default easy_music)
 #   POSTGRES_USER              database user    (default easy_music)
 #   COMPOSE_FILE               path to production compose file
+#   COMPOSE_OVERRIDE_FILE      optional host-specific compose file layered on top
+#   ENV_FILE                   path to .env.production
 #
 # ---------------------------------------------------------------------------
-# Cron example  (daily at 3:00 AM)
+# Cron example  (daily at 3:00 AM, in root's crontab: sudo crontab -e)
 # ---------------------------------------------------------------------------
+# .env.production is normally readable only by root, so schedule the backup
+# as root:
 #   0 3 * * * /srv/easy-music/repo/deploy/backup-db.sh /srv/easy-music/backups
 #
 # ---------------------------------------------------------------------------
 # Restore  (MANUAL - review before running)
 # ---------------------------------------------------------------------------
-# Restoring overwrites the existing database. Only run this when you are
-# certain you want to replace the current data with the backup.
+# Restoring overwrites the existing database. Follow "Restore a Database
+# Backup" in docs/DEPLOYMENT.md. Dumps created before --clean was added have no
+# DROP statements and must be restored into a recreated, empty database; the
+# guide covers both cases.
 #
-#   1. Stop the api and worker so no writes happen during restore:
-#        docker compose -f docker-compose.prod.yml --env-file .env.production stop api worker
-#
-#   2. Restore from the backup file:
-#        gunzip < /srv/easy-music/backups/easy_music_backup_YYYY-MM-DD_HHMMSS.sql.gz \
-#          | docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
-#            psql -U easy_music -d easy_music
-#
-#   3. Start the services again:
-#        docker compose -f docker-compose.prod.yml --env-file .env.production start api worker
-#
-#   WARNING: step 2 overwrites data. There is no undo.
+#   WARNING: restoring overwrites data. There is no undo.
 #            Take a fresh backup before restoring.
 
 set -euo pipefail
@@ -54,6 +51,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.production}"
+COMPOSE_OVERRIDE_FILE="${COMPOSE_OVERRIDE_FILE:-}"
 
 # ------------------------------------------------------------------
 # Pre-flight checks
@@ -70,6 +68,16 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
+COMPOSE=(docker compose -f "$COMPOSE_FILE")
+if [ -n "$COMPOSE_OVERRIDE_FILE" ]; then
+    if [ ! -f "$COMPOSE_OVERRIDE_FILE" ]; then
+        echo "[backup-db] ERROR: compose override file not found: ${COMPOSE_OVERRIDE_FILE}" >&2
+        exit 1
+    fi
+    COMPOSE+=(-f "$COMPOSE_OVERRIDE_FILE")
+fi
+COMPOSE+=(--env-file "$ENV_FILE")
+
 # Read only the variables this script needs from .env.production. Do not source
 # the whole file, because it may contain secrets or characters with shell
 # meaning.
@@ -81,14 +89,16 @@ BACKUP_DIR="${1:-${BACKUP_DIR:-/srv/easy-music/backups}}"
 TIMESTAMP="$(date +%Y-%m-%d_%H%M%S)"
 BACKUP_FILE="${BACKUP_DIR}/easy_music_backup_${TIMESTAMP}.sql.gz"
 
-if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps postgres 2>/dev/null | grep -q 'Up\|running'; then
+if ! "${COMPOSE[@]}" ps postgres 2>/dev/null | grep -q 'Up\|running'; then
     echo "[backup-db] ERROR: postgres container is not running." >&2
     echo "[backup-db] Start the stack first:" >&2
-    echo "  docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d postgres" >&2
+    echo "  ${COMPOSE[*]} up -d postgres" >&2
     exit 1
 fi
 
 mkdir -p "$BACKUP_DIR"
+# Dumps contain password hashes and library metadata; keep them private.
+umask 077
 
 # ------------------------------------------------------------------
 # Run pg_dump inside the postgres container
@@ -96,8 +106,8 @@ mkdir -p "$BACKUP_DIR"
 echo "[backup-db] Dumping database '${DB_NAME}' ..."
 
 set +e
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T postgres \
-    pg_dump -U "$DB_USER" -d "$DB_NAME" \
+"${COMPOSE[@]}" exec -T postgres \
+    pg_dump --clean --if-exists -U "$DB_USER" -d "$DB_NAME" \
     2> >(sed 's/^/[backup-db] /' >&2) \
     | gzip > "$BACKUP_FILE"
 DUMP_EXIT="${PIPESTATUS[0]}"   # pg_dump exit code, not gzip

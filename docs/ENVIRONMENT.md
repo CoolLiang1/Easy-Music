@@ -69,6 +69,9 @@ contain placeholders only, not production-ready secrets.
 | `CADDY_VIDEO_UPLOAD_LIMIT` | No | Yes | Caddy request-body limit for `/api/tracks/upload-video`, using a Caddy size string such as `1024MB`. |
 | `BACKUP_DIR` | No | No | Host directory used by deployment scripts for database backup files. Defaults to `/srv/easy-music/backups`. |
 | `BACKUP_RETENTION_DAYS` | No | No | Documentation value for operator-managed database backup retention. The bundled backup script does not delete files. |
+| `DEPLOY_COMPOSE_OVERRIDE` | No | No | Read only by `deploy/update.sh`. Optional host-specific compose file layered on top of `docker-compose.prod.yml` (extra mounts, published port). Keep it outside the checkout. |
+| `DEPLOY_BUILD_USER` | No | No | Read only by `deploy/update.sh`. Non-root user that runs `npm ci` and `npm run build`. Defaults to the user who invoked `sudo`. |
+| `DEPLOY_BUILD_PROXY` | No | No | Read only by `deploy/update.sh`. Optional HTTP(S) proxy applied only to `docker compose build`. |
 
 ## Development Defaults
 
