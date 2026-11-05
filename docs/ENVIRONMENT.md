@@ -1,14 +1,9 @@
 # Environment
 
-This document defines the environment variable contract for the current Easy
-Music MVP implementation.
-
-## Current Status
-
-Backend, Web, Android, and deployment artifacts are implemented through the
-accepted Phase 7 scope. Use `.env.example` as a development-safe reference and
-`.env.production.example` as the production deployment template. Both files
-contain placeholders only, not production-ready secrets.
+The environment variable contract. `.env.example` holds development-safe
+placeholders and `.env.production.example` is the production template; neither
+contains real secrets. When a variable or default changes, update this table
+and both examples together.
 
 ## Variables
 
@@ -81,14 +76,12 @@ contain placeholders only, not production-ready secrets.
 
 The example intentionally avoids real credentials, tokens, private host paths, and production domains. Before any real deployment, replace passwords and secrets through the deployment environment rather than by editing committed files.
 
-AI providers use the OpenAI-compatible contract. DeepSeek-style testing can use
-`AI_PROVIDER=openai-compatible`, a DeepSeek model id such as `deepseek-chat`,
-and `AI_BASE_URL=https://api.deepseek.com/v1`. V2.5 optionally adds
-suggest-tags-only `AI_TAG_SEARCH_*` settings for Tavily title/snippet/URL prompt
-context. It does not add broad `AI_SEARCH_*` settings, web scraping, or any
-organization/apply endpoint.
+AI providers use the OpenAI-compatible contract; DeepSeek, for example, works
+with `AI_PROVIDER=openai-compatible`, `AI_MODEL=deepseek-chat`, and
+`AI_BASE_URL=https://api.deepseek.com/v1`. The `AI_TAG_SEARCH_*` settings
+affect only per-track tag suggestions.
 
-`IMPORT_ALLOWED_ROOTS` is empty by default. For local V2 import testing, point it
+`IMPORT_ALLOWED_ROOTS` is empty by default. For local import testing, point it
 at one or more throwaway directories outside the repository and outside
 `MEDIA_ROOT`. Use semicolons for Windows paths, for example:
 

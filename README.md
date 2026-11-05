@@ -3,133 +3,53 @@
 Language: [English](README.md) | [简体中文](README.zh-CN.md)
 
 Easy Music is a self-hosted personal cloud music system for scenario-based
-listening. It includes a FastAPI backend, PostgreSQL, a media-processing
-worker, a React/Vite Web management console, and a Kotlin/Jetpack Compose
-Android listening client.
+listening. It answers "what should I listen to right now?" from your own
+library, using scene, type, and feature tags, listening history, and feedback
+such as "tired of it" or "not today".
 
-The project is intended for a personal music library: upload or import tracks,
-edit tags and metadata, play music from Web or Android, cache tracks on
-Android, manage playlists and queues, and use rule-based recommendations with
-optional AI-assisted tag suggestions.
-
-## Status
-
-The canonical status register is
-[docs/ROADMAP.md](docs/ROADMAP.md). This public summary was synchronized from
-it on 2026-11-04.
-
-<!-- status-snapshot: 2026-11-04 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented; AI auto-tagging=Implemented; Deploy update script=Implemented -->
-
-- MVP Phase 0 through Phase 7 are implemented and locally accepted.
-- V1.1 workflow improvements, duplicate detection, cover editing, advanced
-  recommendation explanations, revived tracks, reports, and Android shortcuts
-  are implemented and accepted.
-- V2 import/video, playlists, Recommendation V2 foundation, simplified tags,
-  and AI Tag Suggestions V2 are implemented and accepted.
-- V2.2 client playback queues are implemented; targeted Web manual regression
-  checks remain after later playback-control fixes.
-- The first real Ubuntu/domain/HTTPS functional smoke passed on `develop`, but
-  remains `Implemented` rather than `Accepted` because the exact Ubuntu release
-  was not recorded. See
-  [the production smoke record](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md).
-- Web and Android UI optimization round 1 is implemented and passed automated
-  gates; manual visual/flow acceptance is still unrecorded.
-- The Web UI redesign (new visual system, single player bar, library selection
-  toolbar, simpler editing and upload flows, mobile layout) is implemented and
-  passed typecheck, build, and a local browser smoke; owner review on the real
-  library remains. See
-  [the redesign acceptance record](docs/ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md).
-- The Android UI redesign (the same visual language, cover art, play from any
-  list, a mini player on every tab, system Back, clearer cache, playlist, and
-  recommendation screens, dark mode) is implemented and passed unit tests, a
-  debug build, and an emulator smoke; real-device review remains. See
-  [the Android redesign acceptance record](docs/ACCEPTANCE/ANDROID_UI_REDESIGN_ACCEPTANCE.md).
-- Auth session renewal (rotating refresh tokens, silent Web and Android
-  re-authentication) is implemented and passed backend tests, a local Web
-  smoke, and Android unit tests; Android device verification remains. See
-  [the auth acceptance record](docs/ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md).
-- Playback loudness normalization (server-measured loudness with one static
-  gain baked into each playback MP3, plus a backfill command) is implemented
-  and passed backend tests, a real-ffmpeg check, and the production backfill;
-  owner listening review remains. See
-  [the loudness acceptance record](docs/ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md).
-- AI auto-tagging (the worker applies AI catalogue tags to untagged tracks in
-  batches, weighted below owner tags in recommendations, plus a backfill
-  command and a Web Library "AI 打标签" button) is implemented and passed backend tests; a real-provider run and
-  owner review remain. See
-  [the auto-tagging acceptance record](docs/ACCEPTANCE/AI_AUTO_TAGGING_ACCEPTANCE.md).
-- A repository-owned production update script (`deploy/update.sh`) with host
-  compose override support and restorable clean database backups is
-  implemented; a restore drill passed and the first real server run remains.
-  See [the update script acceptance record](docs/ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md).
-
-Easy Music now follows a private stable-edition direction. The former complete
-V2.6 milestone is not planned work. Future changes are selected one at a time
-from concrete problems observed by the owner, with maintenance, security, and
-data safety preferred over product expansion.
+It is a private, single-owner project: a FastAPI backend with PostgreSQL and a
+media-processing worker, a React/Vite Web console, and a Kotlin/Jetpack Compose
+Android player. Current status and open work are in
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Features
 
-- Authenticated personal music library.
-- Audio upload for MP3, FLAC, M4A, WAV, OGG, and AAC files.
-- Optional user-provided video-to-audio extraction.
-- Safe server-side import preview and confirmed import from configured roots.
-- Background worker for metadata extraction, playback media generation, cover
-  extraction, duplicate signals, and processing status updates.
-- Track, tag, cover, playlist, and queue management.
-- Web playback and Android Media3 playback with background controls.
-- Android manual offline cache and playback-event sync.
+- Authenticated personal library with silent session renewal on Web and
+  Android.
+- Upload of MP3, FLAC, M4A, WAV, OGG, and AAC; audio extraction from
+  user-provided video; read-only import preview from configured server
+  directories.
+- Worker that extracts metadata and covers, records duplicate signals, and
+  produces loudness-normalized MP3 playback files while keeping the originals.
+- Track, tag, cover, playlist, and queue management in the Web console.
+- Web playback, and Android Media3 playback with background, notification,
+  lock-screen, and headset controls, manual offline cache, and offline
+  playback-event sync.
 - Rule-based recommendations with feedback, cooldown modes, `not_today`, and
-  playlist scoring signals.
-- AI Assistant V1 and AI tag suggestions through an OpenAI-compatible provider,
-  disabled by default unless configured.
-- Production Docker Compose deployment with Caddy HTTPS reverse proxy, host
-  setup, health checks, and database backup helper.
+  playlist signals.
+- Optional AI through an OpenAI-compatible provider: natural-language
+  listening requests, per-track tag suggestions, and batch auto-tagging from
+  your own tag catalogue. AI never chooses tracks. It is off unless configured.
+- Production Docker Compose deployment behind Caddy HTTPS, with an update
+  script and database backups.
 
-## Project Entry Points
-
-### Runtime URLs
-
-Local development defaults:
-
-| Surface | URL |
-| --- | --- |
-| Web console | `http://127.0.0.1:8081/` |
-| Backend API | `http://127.0.0.1:8000/` |
-| Health check | `http://127.0.0.1:8000/health` |
-| FastAPI OpenAPI docs | `http://127.0.0.1:8000/docs` |
-
-Production uses the HTTPS origin configured in `.env.production`, for example
-`https://music.example.com` or a high-port origin such as
-`https://music.example.com:25443` when the upstream network blocks inbound
-80/443.
-
-### Repository Map
+## Repository Map
 
 | Path | Purpose |
 | --- | --- |
-| `backend/` | FastAPI app, SQLAlchemy models, Alembic migrations, auth, APIs, services, worker, tests. |
-| `web/` | React/Vite Web management console. |
+| `backend/` | FastAPI app, SQLAlchemy models, Alembic migrations, services, worker, tests. |
+| `web/` | React/Vite Web console. |
 | `android/` | Kotlin/Jetpack Compose Android app. |
-| `deploy/` | Caddy config, host setup script, database backup script. |
-| `docs/` | Product, architecture, workflow, deployment, task, and acceptance docs. |
-| `docker-compose.yml` | Local development services. |
-| `docker-compose.prod.yml` | Production services. |
-| `.env.example` | Development-safe environment reference. |
-| `.env.production.example` | Production environment template with placeholders only. |
+| `deploy/` | Caddy config, host setup, update and backup scripts. |
+| `docs/` | Product, architecture, development, deployment, and slice records. |
+| `docker-compose.yml`, `docker-compose.prod.yml` | Local and production services. |
+| `.env.example`, `.env.production.example` | Environment templates with placeholders only. |
 
-## Quick Start: Local Development
+## Quick Start
 
-Prerequisites:
-
-- Docker Engine with the Docker Compose plugin.
-- Python 3.12 for backend host-side tests and commands.
-- Node.js 20.19+ or 22.12+ for the Web app.
-- FFmpeg and ffprobe for local host-side media processing.
-- Android Studio or Android SDK platform tools for Android development.
-
-Start the backend stack from the repository root:
+Prerequisites: Docker with Compose, Node.js 20.19+ or 22.12+, and, for
+Android, Android Studio or the Android SDK. From the repository root in
+PowerShell:
 
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
@@ -139,201 +59,43 @@ docker compose exec `
   -e EASY_MUSIC_INITIAL_PASSWORD="replace-with-a-local-password" `
   api python -m app.auth.initial_user --username admin
 docker compose up -d worker-loop
-```
 
-If an initial user already exists, keep using that account. The initial-user
-command is intentionally single-use and refuses to create another user.
-
-Start the Web console:
-
-```powershell
 cd web
 npm install
 $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
 npm run dev
 ```
 
-Open `http://127.0.0.1:8081/`, log in with the local admin account, upload a
-small supported audio file, and wait for the worker to move it from
-`processing` to `ready`.
+Open `http://127.0.0.1:8081/`, log in as `admin`, upload a short audio file,
+and wait for it to become `ready`. The API is at `http://127.0.0.1:8000`, with
+OpenAPI docs at `/docs`.
 
-## Backend Development
-
-Host-side backend setup from `backend/`:
-
-```powershell
-cd backend
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-$env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@localhost:5432/easy_music_dev"
-$env:MEDIA_ROOT = ".\media"
-.\.venv\Scripts\python.exe -m alembic upgrade head
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-Run one pending worker job:
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m app.worker
-```
-
-Run the worker continuously:
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m app.worker --loop --poll-interval 5
-```
-
-Backend tests:
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pytest
-```
-
-## Web Development
-
-```powershell
-cd web
-npm install
-$env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
-npm run dev
-```
-
-Useful checks:
-
-```powershell
-cd web
-npm run typecheck
-npm run build
-```
-
-There is no `npm run lint` script configured at this time.
-
-## Android Development and Use
-
-Build and test the Android app:
-
-```powershell
-cd android
-.\gradlew.bat build
-.\gradlew.bat test
-```
-
-The default Android API base URL is `http://10.0.2.2:8000`, which is suitable
-for an Android emulator talking to a backend on the development machine.
-
-For a connected physical device using a local backend, either use `adb reverse`
-or build a package with a reachable API origin:
-
-```powershell
-adb reverse tcp:8000 tcp:8000
-cd android
-.\gradlew.bat assembleDebug -PeasyMusicApiBaseUrl=http://127.0.0.1:8000
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-```
-
-For production Android use, pass the deployed HTTPS origin at build time. Do
-not commit real domains into source files:
-
-```powershell
-cd android
-.\gradlew.bat assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-```
-
-For a high-port HTTPS deployment:
-
-```powershell
-cd android
-.\gradlew.bat assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com:25443
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-```
-
-After installation, open Easy Music on the device, log in with the same account
-used by the server, browse the library, and play a `ready` track.
-
-## Production Deployment Summary
-
-The canonical production and operations procedure is
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Follow it rather than copying commands
-from this overview.
-
-- Never commit `.env.production`.
-- Never commit real domains, passwords, API keys, bearer tokens, or private
-  host paths.
-- Build the Web app with `VITE_API_BASE_URL` set to the public HTTPS origin.
-- For Android production APKs, pass the public API origin through
-  `-PeasyMusicApiBaseUrl=...`.
-- Use standard automatic HTTPS when public 80/443 are available. Otherwise
-  follow the documented high-port/DNS-certificate path.
-- Verify Compose configuration, migrations, HTTPS health, login,
-  upload/processing/playback, logs, and backup creation for every new
-  environment.
-
-## Verification
-
-Recommended checks before opening a pull request or deploying:
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pytest
-```
-
-```powershell
-cd web
-npm run typecheck
-npm run build
-```
-
-```powershell
-cd android
-.\gradlew.bat test
-.\gradlew.bat build
-```
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
-```
-
-Choose focused checks based on the files changed. Deployment changes should
-also review `.env.production.example`, `docker-compose.prod.yml`, Caddy config,
-host setup, backup scripts, and `docs/DEPLOYMENT.md`.
+Host-side backend setup, Android builds, and checks are in
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Production deployment is in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Documentation
 
-Start here:
-
-- [Documentation Guide and Update Rules](docs/README.md)
-- [Product Requirements](docs/PRD.md)
+- [Documentation guide](docs/README.md): which document owns what.
+- [Roadmap](docs/ROADMAP.md): status and open work.
+- [Product requirements](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Development Workflow](docs/DEVELOPMENT.md)
-- [Environment Variables](docs/ENVIRONMENT.md)
-- [Production Deployment](docs/DEPLOYMENT.md)
-- [API Manual Testing](docs/API_MANUAL_TESTING.md)
-- [Git Workflow](docs/GIT_WORKFLOW.md)
-- [Ubuntu Production Smoke Record](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
-- [UI Optimization Work Record](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Environment variables](docs/ENVIRONMENT.md)
+- [Production deployment](docs/DEPLOYMENT.md)
+- [API manual testing](docs/API_MANUAL_TESTING.md)
+- [Agent guide](AGENTS.md)
 
-Acceptance evidence lives under `docs/ACCEPTANCE/`, and task plans and
-completion notes live under `docs/TASKS/`. Neither directory replaces the
-roadmap as the current status source.
+## Security
 
-## Security and Secrets
-
-- Commit only example environment files.
-- Keep `.env`, `.env.production`, production domains, passwords, API keys,
-  bearer tokens, personal paths, media libraries, build outputs, dependency
-  directories, and database files out of version control.
-- Leave AI features disabled until provider credentials are intentionally
-  configured.
-- Keep import roots explicit, dedicated, and outside the repository, user home
-  directories, and managed media storage.
-- Do not expose PostgreSQL directly to the public internet in production.
+- Only the example env files are committed. Keep `.env`, `.env.production`,
+  domains, passwords, API keys, tokens, personal paths, media, and databases
+  out of version control.
+- Keep import roots explicit and outside the repository, home directories, and
+  managed media storage.
+- Do not expose PostgreSQL to the internet.
 
 ## License
 
-No license file is currently included. Until one is added, do not assume public
-reuse rights beyond viewing the repository.
+No license file is included. Do not assume reuse rights beyond viewing the
+repository.

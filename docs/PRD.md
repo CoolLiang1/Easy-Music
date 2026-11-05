@@ -14,7 +14,7 @@ It is not just a music player. Its core job is to help the user answer:
 
 > What should I listen to right now?
 
-The first version combines:
+It combines:
 
 - Personal cloud music library
 - Android music player
@@ -58,78 +58,38 @@ The system must distinguish:
 
 Jumping to an external platform makes it hard to record playback duration, skips, background playback, offline cache, and precise feedback.
 
-Therefore the first version will build a self-hosted cloud player instead of a link-only manager.
+Therefore Easy Music is a self-hosted cloud player, not a link-only manager.
 
-## 4. Version 1 Goal
+## 4. Scope
 
-Build a usable personal cloud music app that supports:
+The owner uses Easy Music daily to:
 
-- Uploading existing audio files from the web console
-- Preserving original files
-- Generating standard MP3 playback files
-- Managing tracks, tags, metadata, and source links
-- Playing music from Android and Web
-- Stable Android background playback
-- Android notification, lock screen, and headset controls
-- Manual Android offline cache
-- Scenario-based recommendation
-- AI assistant for natural-language recommendation and tag suggestions
-- Single-user login for public deployment
+- Upload audio from the Web console, or import it from configured server
+  directories, or extract it from user-provided video files.
+- Keep the original files and listen to generated, loudness-normalized MP3
+  playback files.
+- Manage tracks, metadata, covers, source links, tags, and playlists.
+- Play from Web and Android, with stable Android background playback,
+  notification, lock-screen, and headset controls, and a local playback queue.
+- Cache selected tracks on Android, play them offline, and sync the listening
+  history later.
+- Get scenario-based recommendations from tags, listening history, and
+  feedback, asked for with structured tags or natural language.
+- Let AI tag the library from the owner's catalogue, and correct it only where
+  it is wrong.
+- Use one owner login on a public HTTPS deployment.
 
-## 5. First Version Scope
+## 5. Non-Goals
 
-### 5.1 In Scope
-
-- Single-user system with login
-- Web app for Windows/browser use
-- Android app for mobile playback
-- Server-hosted audio library
-- Upload audio files from Web
-- Supported upload formats:
-  - MP3
-  - FLAC
-  - M4A
-  - WAV
-  - OGG
-  - AAC
-- Preserve original upload
-- Generate MP3 playback version
-- Track metadata extraction
-- Track editing
-- Tag editing
-- Source link field, such as a Bilibili URL
-- Scene tags
-- Type tags
-- Feature tags
-- AI tag suggestion
-- Natural-language recommendation request
-- Rule-based ranking combined with LLM intent parsing
-- Recommendation reason text
-- Playback history
-- Feedback actions:
-  - Like
-  - Tired of it
-  - Not today
-  - Skip
-  - Not suitable for this scenario
-- Android manual cache
-- Offline playback for cached tracks
-- Sync cached playback events when online
-
-### 5.2 Out Of Scope For Version 1
-
-- Automatic Bilibili download
-- Automatic video-to-audio extraction from a pasted URL
-- Multi-user sharing
-- Social features
-- Full native Windows desktop client
-- Deep audio analysis such as BPM, vocal detection, mood classification, or embeddings
-- Full offline library sync
-- Complex machine-learning recommendation model
-- Public music discovery service
-- Commercial or SaaS product development
-- Enterprise release governance and generalized observability
-- Speculative scaling work or broad refactors without an owner-reported need
+- Automatic downloading from Bilibili or any other site, including
+  extracting audio from a pasted URL.
+- Multiple users, sharing, social features, or public discovery.
+- A native Windows desktop client.
+- Full offline sync of the whole library.
+- Deep audio analysis (BPM, vocals, mood, embeddings) or a machine-learning
+  recommendation model.
+- Letting AI choose or rank tracks.
+- Commercial or SaaS product development.
 
 ## 6. Main Concepts
 
@@ -161,7 +121,7 @@ Example content types:
 
 The app uses multi-dimensional tags instead of folder-like categories.
 
-Current tag groups:
+Tag groups (the owner's catalogue; these are examples):
 
 - Scene: study, work, exercise, relax, sleep
 - Type: Japanese, anime, game OST, instrumental, electronic, white noise,
@@ -169,17 +129,13 @@ Current tag groups:
 - Feature: focus, energetic, calm, healing, exciting, vocal, instrumental,
   loopable, distracting, noisy
 
-The V2.4 taxonomy replaced the original `scenario`, `state`, and `attribute`
-groups. `scenario` migrated to `scene`, `state` migrated to `feature`, and
-legacy `attribute` tags were removed rather than retained as a fourth group.
-
 Tracks can have many tags across different groups.
 
 ### 6.3 Listening Fatigue
 
 Listening fatigue means "temporarily reduce or avoid recommendation", not dislike.
 
-Version 1 supports:
+The system supports:
 
 - Manual cooldown: "tired of it", default 14 days
 - Daily avoidance: "not today"
@@ -216,13 +172,11 @@ Version 1 supports:
 
 1. User opens Web console on Windows.
 2. User manages music library, uploads files, edits tags, and tests recommendations.
-3. AI assistant helps with tag cleanup and organization suggestions.
+3. AI suggests or applies tags; the owner corrects them.
 
 ## 8. AI Assistant
 
-The AI assistant is part of Version 1.
-
-It should support:
+The AI assistant supports:
 
 - Natural-language recommendation:
   - "I want Japanese anime songs for studying, but not too noisy."
@@ -231,7 +185,6 @@ It should support:
 - Tag suggestion on request, and automatic tagging from the owner's tag
   catalogue without per-track confirmation
 - Recommendation reason generation
-- Simple organization suggestions
 
 The LLM should not be the only ranking system.
 
@@ -247,7 +200,7 @@ This keeps recommendation controllable and prevents the LLM from ignoring recent
 
 Android is the primary listening client.
 
-First-version responsibilities:
+Responsibilities:
 
 - Stable online playback
 - Background playback
@@ -265,7 +218,7 @@ First-version responsibilities:
 
 Web is the primary management client and also a Windows player.
 
-First-version responsibilities:
+Responsibilities:
 
 - Login
 - Upload audio
@@ -279,7 +232,7 @@ First-version responsibilities:
 
 ## 10. Success Criteria
 
-Version 1 is successful if:
+The product works when:
 
 - The user can upload music from a Windows browser.
 - The user can play music from Android with stable background playback.

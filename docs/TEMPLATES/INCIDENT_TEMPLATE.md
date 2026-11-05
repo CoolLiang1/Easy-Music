@@ -2,7 +2,6 @@
 
 Status: Investigating
 Last updated: YYYY-MM-DD
-Canonical role: incident
 Related: None
 
 ## Summary And Impact

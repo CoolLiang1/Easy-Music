@@ -1,11 +1,11 @@
 # UI Optimization Round 1 Acceptance
 
-Status: Implemented
-Last updated: 2026-07-27
+Status: Superseded
+Last updated: 2026-11-05
 Canonical role: acceptance
 Related: `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`, `docs/ROADMAP.md`
 Pair: `docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md`
-Decision: Implemented
+Decision: Superseded
 
 This document owns the verification evidence and acceptance decision for the
 first focused Web and Android UI optimization round.
@@ -52,9 +52,10 @@ applicable check:
 
 ## Acceptance Decision
 
-Current decision: `Implemented`, not `Accepted`.
+Current decision: `Superseded`.
 
 The implementation and automated gates are recorded, but the manual visual and
-flow checks above are not. Promote this document, the task record, the roadmap,
-and both README summaries to `Accepted` only after those checks are completed
-and their evidence is recorded here.
+flow checks above never were. On 2026-11-05 the round was superseded by the Web
+UI redesign (`docs/ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md`) and the Android UI
+redesign (`docs/ACCEPTANCE/ANDROID_UI_REDESIGN_ACCEPTANCE.md`), which replaced
+these screens; their owner reviews cover the same flows.

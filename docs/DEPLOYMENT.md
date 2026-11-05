@@ -4,13 +4,8 @@ This guide deploys Easy Music on a fresh Ubuntu server with Docker Compose and
 HTTPS. Replace placeholder values such as `music.example.com` with your real
 domain and never commit production secrets.
 
-The repository has local/static deployment acceptance through Phase 7. A first
-real Ubuntu/domain/HTTPS functional smoke is recorded in
-`docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md`. That run used
-`develop`, a DNS-validated certificate, and a non-standard HTTPS port, but did
-not capture the exact Ubuntu release; its status therefore remains
-`Implemented`, not `Accepted`. Each new production environment still requires
-its own smoke verification.
+For an existing server, go straight to [Apply Updates](#apply-updates). A new
+server needs every step below, ending with the browser smoke in Step 8.
 
 ## Deployment Readiness Summary
 
@@ -67,8 +62,7 @@ https://docs.docker.com/engine/install/ubuntu/
 
 ## Step 1 - Clone the Repository
 
-Production should normally deploy the `main` branch. Use `develop` only for a
-temporary pre-production deployment.
+Production deploys the `main` branch.
 
 ```bash
 sudo mkdir -p /srv/easy-music
