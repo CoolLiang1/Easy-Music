@@ -1,7 +1,7 @@
 # AI Metadata Clean-Up
 
 Status: Implemented
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 Related: `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/API_MANUAL_TESTING.md`
 
 ## Problem
@@ -23,6 +23,10 @@ The list showed "未填写艺人/专辑" under nearly every track.
   - Album is no longer shown in Web or Android track subtitles, the Web no
     longer shows "未填写艺人/专辑" placeholders in lists, and library reports
     no longer count a missing album as a problem.
+  - Owner follow-up (2026-11-05): the Web track form no longer edits album,
+    content type, or cooldown, the detail header no longer shows type or
+    album, and the library table drops the always-"歌曲" 类型 column. The data
+    and API fields stay; saving the form leaves them unchanged.
 - Out of scope:
   - Web search for artists. A live evaluation showed search made the model
     confidently pick the most popular song with the same name.
@@ -61,6 +65,10 @@ Automated:
   Search-assisted runs were worse (one confident wrong guess) and slower.
 - [x] Local Web smoke with the real provider on 36 seeded tracks: analysis,
   default selections, inline edit, unchecking, apply, and the library view.
+- [x] Form follow-up: typecheck and build passed; local Web check that the
+  form shows only 标题/艺人/来源链接, saving an artist leaves a seeded album,
+  content type, and cooldown unchanged, and the library table has no 类型
+  column.
 
 Owner checks:
 

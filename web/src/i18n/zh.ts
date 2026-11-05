@@ -72,15 +72,6 @@ export function unavailableLabel(value: string | null | undefined) {
   return value || "未设置";
 }
 
-export const contentTypeOptions = [
-  "song",
-  "mix",
-  "long_audio",
-  "white_noise",
-  "ost",
-  "other",
-] as const;
-
 export function formatShortDate(value: string | null) {
   if (!value) {
     return "—";
