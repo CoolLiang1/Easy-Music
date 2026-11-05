@@ -7,7 +7,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.easymusic.app.auth.data.AuthTokenStore
 import com.easymusic.app.core.config.AppConfig
 import com.easymusic.app.core.network.ApiClient
-import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.playlist.data.HttpPlaylistApi
 import com.easymusic.app.playlist.domain.PlaylistRepository
 import com.easymusic.app.playlist.ui.PlaylistsRouteContent
@@ -19,7 +18,6 @@ object PlaylistRoutes {
 
 @Composable
 fun PlaylistsRoute(
-    onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
 ) {
@@ -38,6 +36,5 @@ fun PlaylistsRoute(
         modifier = modifier,
         viewModel = viewModel,
         isNetworkAvailable = isNetworkAvailable,
-        onTrackSelected = onTrackSelected,
     )
 }

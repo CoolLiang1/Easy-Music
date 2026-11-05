@@ -1,22 +1,25 @@
 package com.easymusic.app.player.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,13 +27,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.easymusic.app.player.domain.PlaybackSource
 import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
 import com.easymusic.app.player.domain.canSkipToNext
-import com.easymusic.app.player.domain.canSkipToPrevious
+import com.easymusic.app.ui.components.LevelMeter
+import com.easymusic.app.ui.components.TrackArtwork
+import com.easymusic.app.ui.components.subtitle
+import com.easymusic.app.ui.theme.EasyMusicThemeTokens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -40,12 +49,12 @@ fun MiniPlayer(
     onOpenNowPlaying: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
-    onPrevious: () -> Unit,
     onNext: () -> Unit,
     onTick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val track = uiState.track ?: return
+    val colors = EasyMusicThemeTokens.colors
 
     LaunchedEffect(track.id) {
         while (isActive) {
@@ -55,100 +64,118 @@ fun MiniPlayer(
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        tonalElevation = 3.dp,
-        shadowElevation = 2.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        color = colors.deck,
+        contentColor = colors.onDeck,
+        shape = MaterialTheme.shapes.medium,
+        shadowElevation = 6.dp,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Column {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenNowPlaying)
+                    .semantics { contentDescription = "打开正在播放：${track.title}" }
+                    .padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                TrackArtwork(
+                    trackId = track.id,
+                    title = track.title,
+                    coverPath = track.coverPath,
+                    coverVersion = track.updatedAt,
+                    size = 42.dp,
+                )
                 Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (uiState.isPlaying) {
+                            LevelMeter(isPlaying = true, height = 12.dp)
+                        }
+                        Text(
+                            text = track.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = uiState.status.label(),
+                        text = when {
+                            uiState.status == PlaybackStatus.Error ->
+                                uiState.errorMessage ?: "播放出错"
+                            uiState.status == PlaybackStatus.Buffering -> "正在缓冲…"
+                            uiState.playbackSource == PlaybackSource.OfflineCache ->
+                                "${track.subtitle()} · 离线"
+                            else -> track.subtitle()
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (uiState.status == PlaybackStatus.Error) {
-                            MaterialTheme.colorScheme.error
+                            MaterialTheme.colorScheme.errorContainer
                         } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            colors.onDeckMuted
                         },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                IconButton(
-                    enabled = uiState.canSkipToPrevious(),
-                    onClick = onPrevious,
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(colors.onDeck),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "上一首",
-                    )
-                }
-                if (uiState.isPlaying) {
-                    FilledTonalIconButton(onClick = onPause) {
-                        Icon(
-                            imageVector = Icons.Default.Pause,
-                            contentDescription = "暂停",
+                    if (uiState.status == PlaybackStatus.Buffering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = colors.deck,
                         )
-                    }
-                } else {
-                    FilledTonalIconButton(
-                        enabled = track.isReady,
-                        onClick = onPlay,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "播放",
-                        )
+                    } else {
+                        IconButton(
+                            onClick = if (uiState.isPlaying) onPause else onPlay,
+                            enabled = uiState.isPlaying || track.isReady,
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = colors.deck),
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (uiState.isPlaying) "暂停" else "播放",
+                            )
+                        }
                     }
                 }
                 IconButton(
                     enabled = uiState.canSkipToNext(),
                     onClick = onNext,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = colors.onDeck,
+                        disabledContentColor = colors.onDeckMuted.copy(alpha = 0.4f),
+                    ),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "下一首",
-                    )
-                }
-                IconButton(onClick = onOpenNowPlaying) {
-                    Icon(
-                        imageVector = Icons.Default.OpenInFull,
-                        contentDescription = "打开播放中",
-                    )
+                    Icon(imageVector = Icons.Default.SkipNext, contentDescription = "下一首")
                 }
             }
-
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                progress = { uiState.progressFraction() },
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(colors.onDeck.copy(alpha = 0.14f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(uiState.progressFraction())
+                        .fillMaxHeight()
+                        .background(colors.signal),
+                )
+            }
         }
     }
 }
-
-private fun PlaybackStatus.label(): String =
-    when (this) {
-        PlaybackStatus.Idle -> "就绪"
-        PlaybackStatus.Buffering -> "缓冲中"
-        PlaybackStatus.Playing -> "播放中"
-        PlaybackStatus.Paused -> "已暂停"
-        PlaybackStatus.Ended -> "已结束"
-        PlaybackStatus.Error -> "播放错误"
-    }
 
 private fun PlayerUiState.progressFraction(): Float {
     if (durationMs <= 0L) {

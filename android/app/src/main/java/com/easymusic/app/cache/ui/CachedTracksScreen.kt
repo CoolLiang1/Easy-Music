@@ -1,27 +1,19 @@
 package com.easymusic.app.cache.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,26 +21,36 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.cache.data.CacheFileStore
 import com.easymusic.app.cache.data.EasyMusicDatabase
 import com.easymusic.app.cache.domain.CacheStatus
 import com.easymusic.app.cache.domain.CachedTrack
 import com.easymusic.app.cache.domain.TrackCacheRepository
+import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.player.domain.PlaybackStateStore
+import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerController
-import com.easymusic.app.ui.theme.BannerTone
-import com.easymusic.app.ui.theme.SectionHeader
-import com.easymusic.app.ui.theme.StatusBanner
+import com.easymusic.app.player.domain.TrackPlaybackLauncher
+import com.easymusic.app.ui.LocalShowMessage
+import com.easymusic.app.ui.components.Banner
+import com.easymusic.app.ui.components.BannerTone
+import com.easymusic.app.ui.components.EmptyState
+import com.easymusic.app.ui.components.PillTone
+import com.easymusic.app.ui.components.StatusPill
+import com.easymusic.app.ui.components.TrackListRow
+import com.easymusic.app.ui.components.formatBytes
+import com.easymusic.app.ui.components.formatDuration
+import com.easymusic.app.ui.components.trackSubtitle
+import kotlinx.coroutines.launch
 
 @Composable
 fun CachedTracksRoute(
-    onTrackSelected: (CachedTrack) -> Unit,
+    onBrowseLibrary: () -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
 ) {
@@ -69,7 +71,7 @@ fun CachedTracksRoute(
         modifier = modifier,
         uiState = uiState,
         isNetworkAvailable = isNetworkAvailable,
-        onTrackSelected = onTrackSelected,
+        onBrowseLibrary = onBrowseLibrary,
         onDeleteCachedTrack = viewModel::deleteCachedTrack,
         onClearDeleteError = viewModel::clearDeleteError,
     )
@@ -78,241 +80,130 @@ fun CachedTracksRoute(
 @Composable
 fun CachedTracksScreen(
     uiState: CachedTracksUiState,
-    onTrackSelected: (CachedTrack) -> Unit,
+    onBrowseLibrary: () -> Unit,
     onDeleteCachedTrack: (CachedTrack) -> Unit,
     onClearDeleteError: () -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
 ) {
+    val context = LocalContext.current
+    val launcher = remember(context) { TrackPlaybackLauncher.create(context) }
+    val playerController = remember(context) { PlayerController(context) }
+    val showMessage = LocalShowMessage.current
+    val scope = rememberCoroutineScope()
+    val playerState by PlaybackStateStore.state.collectAsState()
     var pendingDelete by remember { mutableStateOf<CachedTrack?>(null) }
 
     pendingDelete?.let { track ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除离线缓存") },
-            text = { Text("要从这台设备删除“${track.title}”的本地缓存文件吗？") },
+            title = { Text("删除离线缓存？") },
+            text = { Text("只删除这台设备上的「${track.title}」，云端曲库不受影响，之后可以重新缓存。") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         pendingDelete = null
                         onDeleteCachedTrack(track)
                     },
-                ) {
-                    Text("删除")
-                }
+                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) {
-                    Text("取消")
-                }
+                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
             },
         )
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-    ) {
-        SectionHeader(
-            title = "离线缓存",
-            subtitle = if (isNetworkAvailable) {
-                "这台设备已保存的音轨，可直接离线播放"
-            } else {
-                "已保存在这台设备上，离线时也可播放"
-            },
-        )
-
-        if (uiState.cachedTracks.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            CachedTracksStats(cachedTracks = uiState.cachedTracks)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
+    Column(modifier = modifier.fillMaxSize()) {
         uiState.deleteErrorMessage?.let { message ->
-            StatusBanner(
+            Banner(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 text = message,
                 tone = BannerTone.Error,
-                modifier = Modifier.padding(bottom = 12.dp),
-                action = {
-                    TextButton(onClick = onClearDeleteError) {
-                        Text("关闭")
-                    }
-                },
+                action = { TextButton(onClick = onClearDeleteError) { Text("知道了") } },
             )
         }
 
         if (uiState.cachedTracks.isEmpty()) {
-            CachedTracksEmpty()
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(
-                    items = uiState.cachedTracks,
-                    key = { track -> track.trackId },
-                ) { track ->
-                    CachedTrackRow(
-                        track = track,
-                        onClick = { onTrackSelected(track) },
-                        onDeleteClick = { pendingDelete = track },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CachedTracksEmpty() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = "还没有离线缓存音轨",
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            modifier = Modifier.padding(top = 8.dp),
-            text = "在音轨详情中缓存一个可播放音轨后，它会出现在这里供离线访问。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun CachedTracksStats(cachedTracks: List<CachedTrack>) {
-    val totalBytes = cachedTracks.sumOf { track -> track.byteSize ?: 0L }
-
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        AssistChip(onClick = {}, label = { Text("${cachedTracks.size} 首") })
-        AssistChip(onClick = {}, label = { Text(totalBytes.formatBytes()) })
-    }
-}
-
-@Composable
-private fun CachedTrackRow(
-    track: CachedTrack,
-    onClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = track.artistAlbumLabel(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                AssistChip(
-                    onClick = {},
-                    label = { Text(track.cacheStatus.label()) },
-                    enabled = track.cacheStatus == CacheStatus.Cached,
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = track.durationSeconds?.formatDuration() ?: "时长未知",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = track.byteSize?.formatBytes() ?: "文件大小未知",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Text(
-                text = "缓存时间：${track.cachedAt ?: "未知"}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            EmptyState(
+                icon = Icons.Default.DownloadForOffline,
+                title = "还没有离线音轨",
+                message = "在曲库里打开一首歌的「详情与离线缓存」，缓存后没有网络也能播放。",
+                action = { Button(onClick = onBrowseLibrary) { Text("去曲库") } },
             )
+            return@Column
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+        val totalBytes = uiState.cachedTracks.sumOf { it.byteSize ?: 0L }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 16.dp),
+        ) {
+            item(key = "summary") {
                 Text(
-                    text = "点按播放",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    text = "${uiState.cachedTracks.size} 首 · 占用 ${totalBytes.formatBytes()}" +
+                        if (!isNetworkAvailable) " · 离线也能播放" else "",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedButton(onClick = onDeleteClick) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("删除")
-                }
+            }
+            items(items = uiState.cachedTracks, key = { it.trackId }) { track ->
+                val isCurrent = playerState.track?.id == track.trackId
+                val isPlaying = isCurrent && playerState.status == PlaybackStatus.Playing
+                val isPlayable = track.cacheStatus == CacheStatus.Cached
+                TrackListRow(
+                    trackId = track.trackId,
+                    title = track.title,
+                    subtitle = listOfNotNull(
+                        trackSubtitle(track.artist, track.album),
+                        track.durationSeconds?.formatDuration(),
+                        track.byteSize?.formatBytes(),
+                    ).joinToString(" · "),
+                    isCurrent = isCurrent,
+                    isPlaying = isPlaying,
+                    dimmed = !isPlayable,
+                    onClick = {
+                        when {
+                            !isPlayable -> showMessage("这首还没缓存完成。")
+                            isPlaying -> playerController.pause()
+                            isCurrent -> playerController.resume()
+                            else -> scope.launch {
+                                launcher.play(track.toTrackResponse(), isNetworkAvailable).message?.let(showMessage)
+                            }
+                        }
+                    },
+                    badges = when (track.cacheStatus) {
+                        CacheStatus.Caching -> ({ StatusPill(text = "缓存中", tone = PillTone.Warn) })
+                        CacheStatus.Failed -> ({ StatusPill(text = "缓存失败", tone = PillTone.Error) })
+                        else -> null
+                    },
+                    trailing = {
+                        IconButton(onClick = { pendingDelete = track }) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "删除「${track.title}」的缓存",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                )
             }
         }
     }
 }
 
-private fun CachedTrack.artistAlbumLabel(): String =
-    listOfNotNull(artist, album)
-        .filter { value -> value.isNotBlank() }
-        .joinToString(separator = " - ")
-        .ifBlank { "未知艺人或专辑" }
-
-private fun CacheStatus.label(): String =
-    when (this) {
-        CacheStatus.NotCached -> "未缓存"
-        CacheStatus.Caching -> "缓存中"
-        CacheStatus.Cached -> "已缓存"
-        CacheStatus.Failed -> "缓存失败"
-    }
-
-private fun Int.formatDuration(): String {
-    val minutes = this / 60
-    val seconds = this % 60
-    return "$minutes:${seconds.toString().padStart(2, '0')}"
-}
-
-private fun Long.formatBytes(): String =
-    when {
-        this >= 1_000_000L -> "${this / 1_000_000L} MB"
-        this >= 1_000L -> "${this / 1_000L} KB"
-        else -> "$this B"
-    }
+private fun CachedTrack.toTrackResponse(): TrackResponse =
+    TrackResponse(
+        id = trackId,
+        title = title,
+        artist = artist,
+        album = album,
+        durationSeconds = durationSeconds,
+        contentType = contentType,
+        status = TrackResponse.STATUS_READY,
+        liked = false,
+        cooldownUntil = null,
+        createdAt = cachedAt ?: sourceUpdatedAt,
+        updatedAt = sourceUpdatedAt,
+        tags = emptyList(),
+    )

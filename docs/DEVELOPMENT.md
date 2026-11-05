@@ -854,10 +854,10 @@ Phase 1 backend:
    emulator host-loopback URL is usually `http://10.0.2.2:8000`.
 8. Log in with the local user and confirm Library loads tracks from
    `GET /api/tracks`.
-9. In Library, type part of a track title in the search field. With filter mode
-   off, confirm the full library remains visible; turn filter mode on and
-   confirm the visible rows update as the input changes, then turn it off again
-   and confirm the full library returns.
+9. In Library, type part of a track title, artist, or album in the search
+   field. With filter mode off, confirm the full library remains visible and
+   matching rows are highlighted; turn filter mode on and confirm only matching
+   rows remain, then turn it off again and confirm the full library returns.
 10. Open a track detail screen and confirm fresh metadata loads from
    `GET /api/tracks/{track_id}`.
 11. Play a `ready` track and confirm streaming uses

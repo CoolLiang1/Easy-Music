@@ -42,6 +42,7 @@ Last verified: 2026-11-04 on `fix/playback-loudness-normalization`.
 | First Ubuntu/domain/HTTPS production smoke | Implemented | [Production smoke record](ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md) | Functional smoke passed from `develop`; exact Ubuntu release was not captured, so acceptance evidence is incomplete and `main` is not verified. |
 | UI optimization round 1 | Implemented | [UI task](TASKS/NEXT_UI_OPTIMIZATION_TASKS.md) / [acceptance](ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md) | Web and Android automated gates passed; complete manual visual/flow acceptance before marking it accepted. |
 | Web UI redesign | Implemented | [Redesign task](TASKS/WEB_UI_REDESIGN_TASKS.md) / [acceptance](ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md) | Owner-reported Web usability problem; Web-only redesign with no API change. Typecheck, build, and local browser smoke passed; owner review on the real library remains. |
+| Android UI redesign | Implemented | [Android redesign task](TASKS/ANDROID_UI_REDESIGN_TASKS.md) / [acceptance](ACCEPTANCE/ANDROID_UI_REDESIGN_ACCEPTANCE.md) | Owner-requested follow-up to the Web redesign; Android-only UI with no API change. Unit tests, debug build, and emulator smoke passed; real-device review remains. |
 | Auth session renewal | Implemented | [Auth task](TASKS/AUTH_SESSION_RENEWAL_TASKS.md) / [acceptance](ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md) | Owner-reported repeated logins; rotating refresh tokens with silent Web/Android renewal. Backend, Web smoke, and Android unit tests passed; Android device check and owner daily use remain. |
 | Playback loudness normalization | Implemented | [Loudness task](TASKS/PLAYBACK_LOUDNESS_NORMALIZATION_TASKS.md) / [acceptance](ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md) | Owner-reported loud jumps between tracks; server bakes one static gain per playback MP3 with a backfill command. Backend tests and a real-ffmpeg check passed; production backfill and owner listening remain. |
 
@@ -73,8 +74,10 @@ real use:
 1. No milestone is currently authorized; owner-reported pain points are taken
    as individual slices.
 2. The owner-reported Web usability problem is addressed by the Web UI redesign
-   slice; review it against the real library and record the result in its
-   acceptance document. Select any further pain point one at a time.
+   slice, and the same pass for Android by the Android UI redesign slice;
+   review each against the real library (Android on a real device) and record
+   the results in their acceptance documents. Select any further pain point one
+   at a time.
 3. The owner-reported repeated-login problem is addressed by the auth session
    renewal slice; verify it on an Android device and in daily use, then record
    the result in its acceptance document.

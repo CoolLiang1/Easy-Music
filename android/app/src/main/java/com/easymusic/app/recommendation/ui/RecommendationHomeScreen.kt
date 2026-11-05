@@ -1,5 +1,6 @@
 package com.easymusic.app.recommendation.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -7,31 +8,47 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.auth.data.AuthTokenStore
@@ -40,24 +57,38 @@ import com.easymusic.app.core.network.ApiClient
 import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackApi
 import com.easymusic.app.library.data.TrackResponse
+import com.easymusic.app.player.domain.PlaybackStateStore
+import com.easymusic.app.player.domain.PlaybackStatus
+import com.easymusic.app.player.domain.PlayerController
+import com.easymusic.app.player.domain.TrackPlaybackLauncher
+import com.easymusic.app.recommendation.data.FeedbackType
 import com.easymusic.app.recommendation.data.HttpAiRecommendationApi
 import com.easymusic.app.recommendation.data.HttpFeedbackApi
 import com.easymusic.app.recommendation.data.HttpRecommendationApi
-import com.easymusic.app.recommendation.data.FeedbackType
-import com.easymusic.app.recommendation.data.MatchedTagItem
 import com.easymusic.app.recommendation.data.RecommendationResult
 import com.easymusic.app.recommendation.domain.RecommendationRepository
-import com.easymusic.app.ui.theme.BannerTone
-import com.easymusic.app.ui.theme.SectionHeader
-import com.easymusic.app.ui.theme.StatusBanner
+import com.easymusic.app.ui.LocalShowMessage
+import com.easymusic.app.ui.components.Banner
+import com.easymusic.app.ui.components.BannerTone
+import com.easymusic.app.ui.components.EmptyState
+import com.easymusic.app.ui.components.GroupHeading
+import com.easymusic.app.ui.components.LevelMeter
+import com.easymusic.app.ui.components.LoadingState
+import com.easymusic.app.ui.components.RowPlayButton
+import com.easymusic.app.ui.components.TagChip
+import com.easymusic.app.ui.components.TagToggleChip
+import com.easymusic.app.ui.components.TrackArtwork
+import com.easymusic.app.ui.components.subtitle
+import com.easymusic.app.ui.components.tagGroupLabel
+import com.easymusic.app.ui.theme.EasyMusicThemeTokens
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun RecommendationHomeRoute(
     modifier: Modifier = Modifier,
     config: AppConfig = AppConfig.default(),
     isNetworkAvailable: Boolean = true,
-    onTrackSelected: (TrackResponse) -> Unit,
 ) {
     val context = LocalContext.current
     val viewModel = remember(context, config) {
@@ -89,23 +120,22 @@ fun RecommendationHomeRoute(
         onAiTextChanged = viewModel::updateAiText,
         onRequestAiRecommendation = { viewModel.requestAiRecommendation(isNetworkAvailable) },
         onSendAiFeedback = { trackId, feedbackType ->
-            viewModel.sendAiFeedback(
-                trackId = trackId,
-                feedbackType = feedbackType,
-                isNetworkAvailable = isNetworkAvailable,
-            )
+            viewModel.sendAiFeedback(trackId = trackId, feedbackType = feedbackType, isNetworkAvailable = isNetworkAvailable)
         },
         onSendFeedback = { trackId, feedbackType ->
-            viewModel.sendFeedback(
-                trackId = trackId,
-                feedbackType = feedbackType,
-                isNetworkAvailable = isNetworkAvailable,
-            )
+            viewModel.sendFeedback(trackId = trackId, feedbackType = feedbackType, isNetworkAvailable = isNetworkAvailable)
         },
-        onTrackSelected = onTrackSelected,
     )
 }
 
+private val examplePrompts = listOf(
+    "适合专注工作的安静纯音乐",
+    "深夜写代码，不要人声",
+    "跑步时听的快节奏",
+    "下雨天的咖啡馆",
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecommendationHomeScreen(
     uiState: RecommendationHomeUiState,
@@ -119,431 +149,464 @@ fun RecommendationHomeScreen(
     onRequestAiRecommendation: () -> Unit,
     onSendAiFeedback: (Int, FeedbackType) -> Unit,
     onSendFeedback: (Int, FeedbackType) -> Unit,
-    onTrackSelected: (TrackResponse) -> Unit,
     modifier: Modifier = Modifier,
     isNetworkAvailable: Boolean = true,
 ) {
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val launcher = remember(context) { TrackPlaybackLauncher.create(context) }
+    val playerController = remember(context) { PlayerController(context) }
+    val playerState by PlaybackStateStore.state.collectAsState()
+    val showMessage = LocalShowMessage.current
+    val scope = rememberCoroutineScope()
+    val onPlay: (TrackResponse) -> Unit = { track ->
+        when {
+            playerState.track?.id == track.id && playerState.status == PlaybackStatus.Playing -> playerController.pause()
+            playerState.track?.id == track.id -> playerController.resume()
+            else -> scope.launch { launcher.play(track, isNetworkAvailable).message?.let(showMessage) }
+        }
+    }
+    val playingTrackId = playerState.track?.id
+    val isPlaying = playerState.status == PlaybackStatus.Playing
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        RecommendationHeader(
-            isNetworkAvailable = isNetworkAvailable,
-            isLoading = uiState.isLoadingTags,
-            onRefreshTags = onRefreshTags,
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            listOf("一句话描述", "按标签挑选").forEachIndexed { index, label ->
+                SegmentedButton(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = 2),
+                    icon = {
+                        Icon(
+                            imageVector = if (index == 0) Icons.Outlined.AutoAwesome else Icons.Default.Tag,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = MaterialTheme.colorScheme.primary,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                ) { Text(label) }
+            }
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        if (!isNetworkAvailable) {
+            Banner(tone = BannerTone.Warning, text = "推荐需要连接服务器。离线时可以去「离线」播放已缓存的音轨。")
+        }
 
-        when {
-            uiState.isLoadingTags -> RecommendationLoading()
-            uiState.tagErrorMessage != null -> RecommendationError(
-                title = if (uiState.needsSignIn) "需要登录" else "无法加载标签",
-                message = uiState.tagErrorMessage,
-                actionLabel = if (isNetworkAvailable) "重试" else "离线",
-                actionEnabled = isNetworkAvailable,
-                onAction = onRefreshTags,
+        if (selectedTab == 0) {
+            AiSection(
+                aiState = uiState.aiState,
+                feedbackStates = uiState.feedbackStates,
+                isNetworkAvailable = isNetworkAvailable,
+                playingTrackId = playingTrackId,
+                isPlaying = isPlaying,
+                onTextChanged = onAiTextChanged,
+                onRequest = onRequestAiRecommendation,
+                onSendFeedback = onSendAiFeedback,
+                onPlay = onPlay,
             )
-
-            !uiState.hasAnyTags -> RecommendationEmptyTags(onRefreshTags = onRefreshTags)
-            else -> RecommendationControls(
+        } else {
+            TagSection(
                 uiState = uiState,
                 isNetworkAvailable = isNetworkAvailable,
+                playingTrackId = playingTrackId,
+                isPlaying = isPlaying,
+                onRefreshTags = onRefreshTags,
                 onToggleScene = onToggleScene,
-                onToggleFeature = onToggleFeature,
                 onToggleType = onToggleType,
+                onToggleFeature = onToggleFeature,
                 onClearSelections = onClearSelections,
                 onRequestRecommendations = onRequestRecommendations,
-                onAiTextChanged = onAiTextChanged,
-                onRequestAiRecommendation = onRequestAiRecommendation,
-                onSendAiFeedback = onSendAiFeedback,
                 onSendFeedback = onSendFeedback,
-                onTrackSelected = onTrackSelected,
+                onPlay = onPlay,
             )
         }
     }
 }
 
 @Composable
-private fun RecommendationHeader(
+private fun AiSection(
+    aiState: AiRecommendationUiState,
+    feedbackStates: Map<Int, RecommendationFeedbackUiState>,
     isNetworkAvailable: Boolean,
-    isLoading: Boolean,
-    onRefreshTags: () -> Unit,
+    playingTrackId: Int?,
+    isPlaying: Boolean,
+    onTextChanged: (String) -> Unit,
+    onRequest: () -> Unit,
+    onSendFeedback: (Int, FeedbackType) -> Unit,
+    onPlay: (TrackResponse) -> Unit,
 ) {
-    SectionHeader(
-        title = "推荐",
-        subtitle = if (isNetworkAvailable) {
-            "输入自然语言，或按场景 / 类型 / 特点选择标签"
-        } else {
-            "推荐标签和推荐请求需要连接后端"
-        },
-        action = {
-            OutlinedButton(
-                enabled = !isLoading && isNetworkAvailable,
-                onClick = onRefreshTags,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    when {
-                        !isNetworkAvailable -> "离线"
-                        isLoading -> "加载中"
-                        else -> "重新加载"
-                    },
-                )
-            }
-        },
-    )
-}
+    val canSend = aiState.textInput.isNotBlank() && !aiState.isRequesting && isNetworkAvailable
 
-@Composable
-private fun RecommendationLoading() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 80.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CircularProgressIndicator()
-        Spacer(modifier = Modifier.height(12.dp))
-        Text("正在加载标签")
-    }
-}
-
-@Composable
-private fun RecommendationEmptyTags(onRefreshTags: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 80.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "还没有推荐标签",
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            modifier = Modifier.padding(top = 8.dp),
-            text = "请先在 Web 控制台创建场景、类型或特点标签，然后重新加载。",
+            text = "说说现在想听什么。AI 只负责理解成标签，选歌仍由规则推荐决定，冷却和反馈照常生效。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Button(
-            modifier = Modifier.padding(top = 16.dp),
-            onClick = onRefreshTags,
-        ) {
-            Text("重新加载标签")
+        OutlinedTextField(
+            value = aiState.textInput,
+            onValueChange = onTextChanged,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !aiState.isRequesting,
+            placeholder = { Text("例如：安静的纯音乐，适合专注") },
+            minLines = 2,
+            maxLines = 4,
+            shape = MaterialTheme.shapes.large,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { if (canSend) onRequest() }),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            ),
+            trailingIcon = {
+                if (aiState.isRequesting) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            },
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = if (aiState.isRequesting) "正在理解你的描述…" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(enabled = canSend, onClick = onRequest) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("帮我挑")
+            }
+        }
+
+        if (aiState.parsedContext == null && aiState.results.isEmpty() && !aiState.isRequesting) {
+            Text("试试这些：", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                examplePrompts.forEach { prompt ->
+                    AssistChip(
+                        onClick = { onTextChanged(prompt) },
+                        label = { Text(prompt) },
+                        shape = CircleShape,
+                    )
+                }
+            }
+        }
+
+        if (aiState.errorMessage != null && !aiState.isRequesting) {
+            Banner(title = "请求失败", text = aiState.errorMessage, tone = BannerTone.Error)
+        }
+
+        val providerStatus = aiState.providerStatus
+        if (!aiState.isRequesting && providerStatus != null && providerStatus != "ok") {
+            Banner(
+                title = "AI 暂不可用",
+                tone = BannerTone.Warning,
+                text = when (providerStatus) {
+                    "disabled" -> "服务器上的 AI 功能已关闭（AI_ENABLED），这句话没有被解析。可以切到「按标签挑选」。"
+                    "unconfigured" -> "AI 服务还没配置完整（AI_API_KEY / AI_MODEL），可以先按标签挑选。"
+                    "error" -> "AI 服务调用出错，请稍后重试，或先按标签挑选。"
+                    else -> "AI 服务状态：$providerStatus"
+                },
+            )
+        }
+
+        val context = aiState.parsedContext
+        if (context != null && !aiState.isRequesting && providerStatus == "ok") {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shape = MaterialTheme.shapes.large,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(
+                            Icons.Outlined.AutoAwesome,
+                            contentDescription = null,
+                            tint = EasyMusicThemeTokens.colors.onSignalSoft,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text("AI 理解为", style = MaterialTheme.typography.titleSmall)
+                    }
+                    val groups = listOf("scene", "type", "feature").filter { context.matchedTags[it].orEmpty().isNotEmpty() }
+                    if (groups.isEmpty()) {
+                        Text(
+                            text = "没有匹配到已有标签，结果没有按标签筛选。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    groups.forEach { group ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = tagGroupLabel(group),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(36.dp),
+                            )
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                context.matchedTags[group].orEmpty().forEach { tag -> TagChip(name = tag.name, group = group) }
+                            }
+                        }
+                    }
+                    if (context.unmatchedTerms.isNotEmpty()) {
+                        Text(
+                            text = "没匹配上：${context.unmatchedTerms.joinToString("、")}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!context.explanation.isNullOrBlank()) {
+                        Text(text = context.explanation, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+
+            if (aiState.results.isEmpty()) {
+                EmptyState(
+                    icon = Icons.Default.SearchOff,
+                    title = "这次没找到合适的音轨",
+                    message = "可能符合条件的都在冷却或被反馈过滤了，换个说法再试试。",
+                )
+            }
+        }
+
+        if (aiState.results.isNotEmpty() && !aiState.isRequesting) {
+            ResultList(
+                results = aiState.results,
+                feedbackStates = feedbackStates,
+                isNetworkAvailable = isNetworkAvailable,
+                playingTrackId = playingTrackId,
+                isPlaying = isPlaying,
+                onSendFeedback = onSendFeedback,
+                onPlay = onPlay,
+            )
         }
     }
 }
 
 @Composable
-private fun RecommendationError(
-    title: String,
-    message: String,
-    actionLabel: String,
-    actionEnabled: Boolean,
-    onAction: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 80.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            modifier = Modifier.padding(top = 8.dp),
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-        )
-        Button(
-            modifier = Modifier.padding(top = 16.dp),
-            enabled = actionEnabled,
-            onClick = onAction,
-        ) {
-            Text(actionLabel)
-        }
-    }
-}
-
-@Composable
-private fun RecommendationControls(
+private fun TagSection(
     uiState: RecommendationHomeUiState,
     isNetworkAvailable: Boolean,
+    playingTrackId: Int?,
+    isPlaying: Boolean,
+    onRefreshTags: () -> Unit,
     onToggleScene: (Int) -> Unit,
-    onToggleFeature: (Int) -> Unit,
     onToggleType: (Int) -> Unit,
+    onToggleFeature: (Int) -> Unit,
     onClearSelections: () -> Unit,
     onRequestRecommendations: () -> Unit,
-    onAiTextChanged: (String) -> Unit,
-    onRequestAiRecommendation: () -> Unit,
-    onSendAiFeedback: (Int, FeedbackType) -> Unit,
     onSendFeedback: (Int, FeedbackType) -> Unit,
-    onTrackSelected: (TrackResponse) -> Unit,
+    onPlay: (TrackResponse) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        AiAssistantSection(
-            aiState = uiState.aiState,
-            feedbackStates = uiState.feedbackStates,
-            isNetworkAvailable = isNetworkAvailable,
-            onTextChanged = onAiTextChanged,
-            onRequestRecommendation = onRequestAiRecommendation,
-            onSendFeedback = onSendAiFeedback,
-            onTrackSelected = onTrackSelected,
-        )
+    when {
+        uiState.isLoadingTags -> {
+            LoadingState(text = "正在加载标签…")
+            return
+        }
 
-        SectionHeader(
-            title = "结构化推荐",
-            subtitle = "需要可预测匹配时，直接选择已有标签",
-        )
+        uiState.tagErrorMessage != null -> {
+            EmptyState(
+                icon = Icons.Default.ErrorOutline,
+                title = if (uiState.needsSignIn) "需要重新登录" else "标签加载失败",
+                message = uiState.tagErrorMessage,
+                action = { Button(enabled = isNetworkAvailable, onClick = onRefreshTags) { Text("重试") } },
+            )
+            return
+        }
 
-        SelectionSummary(uiState = uiState)
+        !uiState.hasAnyTags -> {
+            EmptyState(
+                icon = Icons.Default.Tag,
+                title = "还没有标签",
+                message = "先在 Web 管理端创建场景、类型和特点标签，并给音轨打上。",
+                action = { TextButton(onClick = onRefreshTags) { Text("重新加载") } },
+            )
+            return
+        }
+    }
 
-        TagSection(
-            title = "场景",
-            tags = uiState.groupedTags.scenes,
-            selectedTagIds = uiState.selectedSceneTagIds,
-            emptyText = "暂无场景标签",
-            onToggleTag = onToggleScene,
-        )
-        TagSection(
-            title = "类型",
-            tags = uiState.groupedTags.types,
-            selectedTagIds = uiState.selectedTypeTagIds,
-            emptyText = "暂无类型标签",
-            onToggleTag = onToggleType,
-        )
-        TagSection(
-            title = "特点",
-            tags = uiState.groupedTags.features,
-            selectedTagIds = uiState.selectedFeatureTagIds,
-            emptyText = "暂无特点标签",
-            onToggleTag = onToggleFeature,
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        TagGroupPicker("scene", uiState.groupedTags.scenes, uiState.selectedSceneTagIds, onToggleScene)
+        TagGroupPicker("type", uiState.groupedTags.types, uiState.selectedTypeTagIds, onToggleType)
+        TagGroupPicker("feature", uiState.groupedTags.features, uiState.selectedFeatureTagIds, onToggleFeature)
 
-        RecommendationStatus(uiState = uiState)
-        RecommendationResults(
-            uiState = uiState,
-            isNetworkAvailable = isNetworkAvailable,
-            onSendFeedback = onSendFeedback,
-            onTrackSelected = onTrackSelected,
-        )
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(
-                enabled = uiState.selectedContextCount > 0 && !uiState.isRequestingRecommendations,
-                onClick = onClearSelections,
-            ) {
-                Text("清空")
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (uiState.selectedContextCount > 0) {
+                TextButton(enabled = !uiState.isRequestingRecommendations, onClick = onClearSelections) { Text("清空") }
             }
+            Spacer(modifier = Modifier.weight(1f))
             Button(
-                modifier = Modifier.padding(start = 12.dp),
                 enabled = !uiState.isRequestingRecommendations && isNetworkAvailable,
                 onClick = onRequestRecommendations,
             ) {
-                Text(
-                    when {
-                        !isNetworkAvailable -> "离线"
-                        uiState.isRequestingRecommendations -> "请求中"
-                        else -> "请求推荐"
-                    },
-                )
+                if (uiState.isRequestingRecommendations) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("正在挑选…")
+                } else {
+                    Text(
+                        if (uiState.selectedContextCount > 0) "按 ${uiState.selectedContextCount} 个标签推荐" else "随便推荐几首",
+                    )
+                }
             }
         }
-    }
-}
 
-@Composable
-private fun SelectionSummary(uiState: RecommendationHomeUiState) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        FlowRow(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SummaryChip(label = "场景 ${uiState.selectedSceneTagIds.size}")
-            SummaryChip(label = "类型 ${uiState.selectedTypeTagIds.size}")
-            SummaryChip(label = "特点 ${uiState.selectedFeatureTagIds.size}")
-        }
-    }
-}
+        uiState.recommendationErrorMessage?.let { Banner(text = it, tone = BannerTone.Error) }
 
-@Composable
-private fun SummaryChip(label: String) {
-    FilterChip(
-        selected = false,
-        onClick = {},
-        label = { Text(label) },
-    )
-}
-
-@Composable
-private fun RecommendationResults(
-    uiState: RecommendationHomeUiState,
-    isNetworkAvailable: Boolean,
-    onSendFeedback: (Int, FeedbackType) -> Unit,
-    onTrackSelected: (TrackResponse) -> Unit,
-) {
-    val results = uiState.recommendationResults
-    if (results.isEmpty()) {
-        if (uiState.recommendationMessage?.startsWith("当前条件还没有匹配的推荐") == true) {
-            EmptyRecommendationResults()
-        }
-        return
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        results.firstOrNull()?.let { result ->
-            Text(
-                text = "首选推荐",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            RecommendationResultCard(
-                result = result,
-                isPrimary = true,
+        if (uiState.recommendationResults.isEmpty()) {
+            if (uiState.recommendationMessage?.startsWith("当前条件还没有匹配的推荐") == true) {
+                EmptyState(
+                    icon = Icons.Default.SearchOff,
+                    title = "这次没找到合适的音轨",
+                    message = "调整标签，或减少一些条件再试试。",
+                )
+            }
+        } else {
+            ResultList(
+                results = uiState.recommendationResults,
+                feedbackStates = uiState.feedbackStates,
                 isNetworkAvailable = isNetworkAvailable,
-                feedbackState = uiState.feedbackStates[result.track.id],
-                onSendFeedback = { feedbackType ->
-                    onSendFeedback(result.track.id, feedbackType)
-                },
-                onClick = { onTrackSelected(result.track) },
+                playingTrackId = playingTrackId,
+                isPlaying = isPlaying,
+                onSendFeedback = onSendFeedback,
+                onPlay = onPlay,
             )
-        }
-
-        val alternatives = results.drop(1).take(2)
-        if (alternatives.isNotEmpty()) {
-            Text(
-                modifier = Modifier.padding(top = 4.dp),
-                text = "备选推荐",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            alternatives.forEach { result ->
-                RecommendationResultCard(
-                    result = result,
-                    isPrimary = false,
-                    isNetworkAvailable = isNetworkAvailable,
-                    feedbackState = uiState.feedbackStates[result.track.id],
-                    onSendFeedback = { feedbackType ->
-                        onSendFeedback(result.track.id, feedbackType)
-                    },
-                    onClick = { onTrackSelected(result.track) },
-                )
-            }
         }
     }
 }
 
 @Composable
-private fun EmptyRecommendationResults() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+private fun TagGroupPicker(
+    group: String,
+    tags: List<TagResponse>,
+    selectedIds: Set<Int>,
+    onToggle: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        GroupHeading(group = group, count = selectedIds.size.takeIf { it > 0 })
+        if (tags.isEmpty()) {
             Text(
-                text = "没有匹配的推荐",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "调整已选标签后，再次请求推荐。",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "这个分组还没有标签。",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                tags.forEach { tag ->
+                    TagToggleChip(
+                        name = tag.name,
+                        group = group,
+                        selected = tag.id in selectedIds,
+                        onClick = { onToggle(tag.id) },
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun RecommendationResultCard(
+private fun ResultList(
+    results: List<RecommendationResult>,
+    feedbackStates: Map<Int, RecommendationFeedbackUiState>,
+    isNetworkAvailable: Boolean,
+    playingTrackId: Int?,
+    isPlaying: Boolean,
+    onSendFeedback: (Int, FeedbackType) -> Unit,
+    onPlay: (TrackResponse) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        results.take(3).forEachIndexed { index, result ->
+            ResultCard(
+                result = result,
+                isPrimary = index == 0,
+                isNetworkAvailable = isNetworkAvailable,
+                isCurrent = playingTrackId == result.track.id,
+                isPlaying = isPlaying,
+                feedbackState = feedbackStates[result.track.id],
+                onSendFeedback = { type -> onSendFeedback(result.track.id, type) },
+                onPlay = { onPlay(result.track) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResultCard(
     result: RecommendationResult,
     isPrimary: Boolean,
     isNetworkAvailable: Boolean,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
     feedbackState: RecommendationFeedbackUiState?,
     onSendFeedback: (FeedbackType) -> Unit,
-    onClick: () -> Unit,
+    onPlay: () -> Unit,
 ) {
+    val extended = EasyMusicThemeTokens.colors
     val track = result.track
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isPrimary) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            },
-        ),
+        color = if (isPrimary) extended.signalSoft.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(1.dp, if (isPrimary) extended.signal.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TrackArtwork(
+                    trackId = track.id,
+                    title = track.title,
+                    coverPath = track.coverPath,
+                    coverVersion = track.updatedAt,
+                    size = if (isPrimary) 72.dp else 52.dp,
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        text = if (isPrimary) "最佳匹配" else "备选 ${result.rank}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isPrimary) extended.onSignalSoft else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (isCurrent) LevelMeter(isPlaying = isPlaying, height = 12.dp)
+                        Text(
+                            text = track.title,
+                            style = if (isPrimary) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Text(
-                        text = track.artistAlbumLabel(),
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "${track.subtitle()} · 评分 ${String.format(Locale.US, "%.1f", result.score)}",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Text(
-                    modifier = Modifier.padding(start = 12.dp),
-                    text = "#${result.rank} / ${result.score.formatScore()}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                RowPlayButton(
+                    isCurrent = isCurrent,
+                    isPlaying = isCurrent && isPlaying,
+                    enabled = track.isReady,
+                    contentDescription = "播放「${track.title}」",
+                    onClick = onPlay,
                 )
-            }
-
-            val tags = track.tags.take(4)
-            if (tags.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    tags.forEach { tag ->
-                        FilterChip(
-                            selected = false,
-                            onClick = {},
-                            label = { Text(tag.name) },
-                        )
-                    }
-                }
             }
 
             Text(
@@ -552,445 +615,39 @@ private fun RecommendationResultCard(
                     ?.takeIf { it.isNotBlank() }
                     ?: formatRecommendationReasonForDisplay(result.reason),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            RecommendationFeedbackActions(
-                feedbackState = feedbackState,
-                isNetworkAvailable = isNetworkAvailable,
-                onSendFeedback = onSendFeedback,
-            )
-            Text(
-                text = "点按播放",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
-}
 
-@Composable
-private fun RecommendationFeedbackActions(
-    feedbackState: RecommendationFeedbackUiState?,
-    isNetworkAvailable: Boolean,
-    onSendFeedback: (FeedbackType) -> Unit,
-) {
-    val isSending = feedbackState?.isSending == true
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FeedbackButton(
-                label = "喜欢",
-                enabled = isNetworkAvailable && !isSending,
-                onClick = { onSendFeedback(FeedbackType.Like) },
-            )
-            FeedbackButton(
-                label = "听腻了",
-                enabled = isNetworkAvailable && !isSending,
-                onClick = { onSendFeedback(FeedbackType.Tired) },
-            )
-            FeedbackButton(
-                label = "今天不听",
-                enabled = isNetworkAvailable && !isSending,
-                onClick = { onSendFeedback(FeedbackType.NotToday) },
-            )
-            FeedbackButton(
-                label = "不适合",
-                enabled = isNetworkAvailable && !isSending,
-                onClick = { onSendFeedback(FeedbackType.NotSuitableForContext) },
-            )
-            FeedbackButton(
-                label = "跳过",
-                enabled = isNetworkAvailable && !isSending,
-                onClick = { onSendFeedback(FeedbackType.SkipRecommendation) },
-            )
-        }
-
-        when {
-            isSending -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator()
-                Text(
-                    modifier = Modifier.padding(start = 12.dp),
-                    text = "正在发送反馈",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (track.tags.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    track.tags.take(6).forEach { tag -> TagChip(name = tag.name, group = tag.group) }
+                }
             }
 
-            feedbackState?.errorMessage != null -> Text(
-                text = feedbackState.errorMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-
-            feedbackState?.message != null -> Text(
-                text = feedbackState.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
-}
-
-@Composable
-private fun FeedbackButton(
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    OutlinedButton(
-        enabled = enabled,
-        onClick = onClick,
-    ) {
-        Text(label)
-    }
-}
-
-@Composable
-private fun TagSection(
-    title: String,
-    tags: List<TagResponse>,
-    selectedTagIds: Set<Int>,
-    emptyText: String,
-    onToggleTag: (Int) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "$title · ${tags.size}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (tags.isEmpty()) {
-            Text(
-                text = emptyText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                tags.forEach { tag ->
-                    FilterChip(
-                        selected = tag.id in selectedTagIds,
-                        onClick = { onToggleTag(tag.id) },
-                        label = { Text(tag.name) },
+            val isSending = feedbackState?.isSending == true
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                listOf(
+                    FeedbackType.Like to "喜欢",
+                    FeedbackType.NotToday to "今天不听",
+                    FeedbackType.Tired to "听腻了",
+                    FeedbackType.NotSuitableForContext to "不适合",
+                    FeedbackType.SkipRecommendation to "跳过",
+                ).forEach { (type, label) ->
+                    AssistChip(
+                        enabled = isNetworkAvailable && !isSending,
+                        onClick = { onSendFeedback(type) },
+                        label = { Text(label) },
+                        shape = CircleShape,
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
                     )
                 }
             }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// AI Assistant section
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun AiAssistantSection(
-    aiState: AiRecommendationUiState,
-    feedbackStates: Map<Int, RecommendationFeedbackUiState>,
-    isNetworkAvailable: Boolean,
-    onTextChanged: (String) -> Unit,
-    onRequestRecommendation: () -> Unit,
-    onSendFeedback: (Int, FeedbackType) -> Unit,
-    onTrackSelected: (TrackResponse) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(
-            title = "AI 助手",
-            subtitle = "自然语言会先解析成场景 / 类型 / 特点，再走规则推荐",
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            OutlinedTextField(
-                value = aiState.textInput,
-                onValueChange = onTextChanged,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !aiState.isRequesting && isNetworkAvailable,
-                label = { Text("描述现在想听什么") },
-                placeholder = { Text("例如：安静的纯音乐，适合专注") },
-                singleLine = true,
-            )
-            Button(
-                modifier = Modifier.align(Alignment.End),
-                enabled = aiState.textInput.isNotBlank() &&
-                    !aiState.isRequesting &&
-                    isNetworkAvailable,
-                onClick = onRequestRecommendation,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    when {
-                        !isNetworkAvailable -> "离线"
-                        aiState.isRequesting -> "..."
-                        else -> "获取推荐"
-                    },
-                )
+            when {
+                isSending -> Text("正在发送反馈…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                feedbackState?.errorMessage != null -> Text(feedbackState.errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                feedbackState?.message != null -> Text(feedbackState.message, style = MaterialTheme.typography.bodySmall, color = extended.ok)
             }
-        }
-
-        // AI loading
-        if (aiState.isRequesting) {
-            AiLoadingBanner()
-        }
-
-        // AI error
-        if (aiState.errorMessage != null && !aiState.isRequesting) {
-            AiErrorBanner(message = aiState.errorMessage)
-        }
-
-        // Provider status (non-ok)
-        if (!aiState.isRequesting && aiState.providerStatus != null &&
-            aiState.providerStatus != "ok"
-        ) {
-            AiProviderStatusBanner(status = aiState.providerStatus)
-        }
-
-        // Parsed context
-        if (aiState.parsedContext != null && !aiState.isRequesting) {
-            AiParsedContextSection(context = aiState.parsedContext)
-        }
-
-        // AI results
-        if (aiState.results.isNotEmpty() && !aiState.isRequesting) {
-            AiResultsSection(
-                results = aiState.results,
-                isNetworkAvailable = isNetworkAvailable,
-                feedbackStates = feedbackStates,
-                onSendFeedback = onSendFeedback,
-                onTrackSelected = onTrackSelected,
-            )
-        }
-
-        // Empty AI results
-        if (aiState.results.isEmpty() && aiState.providerStatus == "ok" &&
-            aiState.parsedContext != null && !aiState.isRequesting
-        ) {
-            EmptyAiResults()
-        }
-    }
-}
-
-@Composable
-private fun AiLoadingBanner() {
-    StatusBanner(
-        text = "AI 正在解析你的请求…",
-        tone = BannerTone.Warning,
-        action = {
-            CircularProgressIndicator(modifier = Modifier.height(16.dp).width(16.dp))
-        },
-    )
-}
-
-@Composable
-private fun AiErrorBanner(message: String) {
-    StatusBanner(text = message, tone = BannerTone.Error)
-}
-
-@Composable
-private fun AiProviderStatusBanner(status: String) {
-    val message = when (status) {
-        "disabled" -> "AI 服务已禁用。请在后端配置中设置 AI_ENABLED=true。"
-        "unconfigured" -> "AI 服务尚未配置。请检查 AI_API_KEY 和 AI_MODEL。"
-        "error" -> "AI 服务发生错误。请查看后端日志。"
-        else -> "AI 服务状态：$status"
-    }
-
-    StatusBanner(text = message, tone = BannerTone.Error)
-}
-
-@Composable
-private fun AiParsedContextSection(context: AiParsedContext) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // AI explanation
-        if (!context.explanation.isNullOrBlank()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Text(
-                    modifier = Modifier.padding(12.dp),
-                    text = context.explanation,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-
-        // Matched tags by group
-        val groupOrder = listOf("scene", "type", "feature")
-        val groupLabels = mapOf(
-            "scene" to "场景",
-            "type" to "类型",
-            "feature" to "特点",
-        )
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            groupOrder.forEach { group ->
-                val items = context.matchedTags[group].orEmpty()
-                items.forEach { tag ->
-                    FilterChip(
-                        selected = true,
-                        onClick = {},
-                        label = {
-                            Text("${groupLabels[group] ?: group}: ${tag.name}")
-                        },
-                    )
-                }
-            }
-        }
-
-        // Unmatched terms
-        if (context.unmatchedTerms.isNotEmpty()) {
-            Text(
-                text = "未匹配：${context.unmatchedTerms.joinToString(", ")}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AiResultsSection(
-    results: List<RecommendationResult>,
-    isNetworkAvailable: Boolean,
-    feedbackStates: Map<Int, RecommendationFeedbackUiState>,
-    onSendFeedback: (Int, FeedbackType) -> Unit,
-    onTrackSelected: (TrackResponse) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        results.firstOrNull()?.let { result ->
-            Text(
-                text = "AI 推荐",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            RecommendationResultCard(
-                result = result,
-                isPrimary = true,
-                isNetworkAvailable = isNetworkAvailable,
-                feedbackState = feedbackStates[result.track.id],
-                onSendFeedback = { feedbackType ->
-                    onSendFeedback(result.track.id, feedbackType)
-                },
-                onClick = { onTrackSelected(result.track) },
-            )
-        }
-
-        val alternatives = results.drop(1).take(2)
-        if (alternatives.isNotEmpty()) {
-            Text(
-                modifier = Modifier.padding(top = 4.dp),
-                text = "AI 备选",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            alternatives.forEach { result ->
-                RecommendationResultCard(
-                    result = result,
-                    isPrimary = false,
-                    isNetworkAvailable = isNetworkAvailable,
-                    feedbackState = feedbackStates[result.track.id],
-                    onSendFeedback = { feedbackType ->
-                        onSendFeedback(result.track.id, feedbackType)
-                    },
-                    onClick = { onTrackSelected(result.track) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyAiResults() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Text(
-            modifier = Modifier.padding(16.dp),
-            text = "没有匹配你请求的推荐。可以换个说法，或检查是否存在带有匹配标签的可播放音轨。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-private fun TrackResponse.artistAlbumLabel(): String =
-    listOfNotNull(artist, album)
-        .filter { value -> value.isNotBlank() }
-        .joinToString(separator = " - ")
-        .ifBlank { "未知艺人或专辑" }
-
-private fun Double.formatScore(): String =
-    String.format(Locale.US, "%.1f", this)
-
-@Composable
-private fun RecommendationStatus(uiState: RecommendationHomeUiState) {
-    val errorMessage = uiState.recommendationErrorMessage
-    val message = uiState.recommendationMessage
-
-    when {
-        uiState.isRequestingRecommendations -> Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shape = MaterialTheme.shapes.small,
-        ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator()
-                Text(
-                    modifier = Modifier.padding(start = 12.dp),
-                    text = "正在请求推荐",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-
-        errorMessage != null -> Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            shape = MaterialTheme.shapes.small,
-        ) {
-            Text(
-                modifier = Modifier.padding(12.dp),
-                text = errorMessage,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-
-        message != null -> Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            shape = MaterialTheme.shapes.small,
-        ) {
-            Text(
-                modifier = Modifier.padding(12.dp),
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-            )
         }
     }
 }

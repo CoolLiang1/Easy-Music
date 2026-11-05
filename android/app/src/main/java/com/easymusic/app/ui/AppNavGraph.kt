@@ -1,8 +1,11 @@
 package com.easymusic.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,7 +28,6 @@ import com.easymusic.app.auth.ui.LoginScreen
 import com.easymusic.app.auth.ui.LoginViewModel
 import com.easymusic.app.auth.ui.SessionViewModel
 import com.easymusic.app.cache.data.EasyMusicDatabase
-import com.easymusic.app.cache.domain.CachedTrack
 import com.easymusic.app.cache.sync.PlaybackEventSyncWorker
 import com.easymusic.app.cache.ui.CachedTracksRoute
 import com.easymusic.app.core.config.AppConfig
@@ -34,12 +36,12 @@ import com.easymusic.app.core.network.ConnectivityObserver
 import com.easymusic.app.core.network.ConnectivityStatus
 import com.easymusic.app.library.LibraryRoute
 import com.easymusic.app.library.LibraryRoutes
-import com.easymusic.app.library.data.TagResponse
 import com.easymusic.app.library.data.TrackResponse
 import com.easymusic.app.playlist.PlaylistRoutes
 import com.easymusic.app.playlist.PlaylistsRoute
 import com.easymusic.app.player.NowPlayingRoute
 import com.easymusic.app.player.PlayerRoutes
+import com.easymusic.app.player.domain.PlaybackStateStore
 import com.easymusic.app.recommendation.ui.RecommendationHomeRoute
 
 @Composable
@@ -76,6 +78,7 @@ fun AppNavGraph(
     val pendingPlaybackEventError by offlinePlaybackEventDao.observePendingLastError().collectAsState(initial = null)
     var currentRoute by rememberSaveable { mutableStateOf(startRoute) }
     var nowPlayingTrack by remember { mutableStateOf<TrackResponse?>(null) }
+    var returnRoute by rememberSaveable { mutableStateOf(LibraryRoutes.LIBRARY) }
 
     LaunchedEffect(session, pendingPlaybackEventCount) {
         if (session is AuthSession.Authenticated && pendingPlaybackEventCount > 0) {
@@ -107,8 +110,8 @@ fun AppNavGraph(
         return
     }
 
-    when (currentRoute) {
-        AuthRoutes.LOGIN -> LoginScreen(
+    if (currentRoute == AuthRoutes.LOGIN) {
+        LoginScreen(
             modifier = modifier,
             uiState = loginViewModel.uiState,
             onUsernameChange = loginViewModel::onUsernameChange,
@@ -118,167 +121,83 @@ fun AppNavGraph(
             },
             isNetworkAvailable = isNetworkAvailable,
         )
+        return
+    }
 
-        LibraryRoutes.LIBRARY -> {
-            val authenticated = session as? AuthSession.Authenticated ?: return
-            AppScaffold(
-                modifier = modifier,
-                session = authenticated,
-                isLoggingOut = sessionState.isLoggingOut,
-                currentRoute = currentRoute,
-                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
-                onNavigateToCachedTracks = {
-                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
-                },
-                onNavigateToRecommendations = {
-                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
-                },
-                isNetworkAvailable = isNetworkAvailable,
-                pendingPlaybackEventCount = pendingPlaybackEventCount,
-                playbackEventSyncMessage = pendingPlaybackEventError,
-                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
-                onLogout = sessionViewModel::logout,
-            ) { contentPadding ->
-                LibraryRoute(
-                    modifier = Modifier.padding(contentPadding),
-                    isNetworkAvailable = isNetworkAvailable,
-                    onOpenNowPlaying = { track ->
-                        nowPlayingTrack = track
-                        currentRoute = PlayerRoutes.NOW_PLAYING
-                    },
-                )
-            }
+    val authenticated = session as? AuthSession.Authenticated ?: return
+    val isNowPlaying = currentRoute == PlayerRoutes.NOW_PLAYING
+    val openNowPlaying: (TrackResponse?) -> Unit = { track ->
+        nowPlayingTrack = track ?: PlaybackStateStore.state.value.track
+        if (currentRoute != PlayerRoutes.NOW_PLAYING) {
+            returnRoute = currentRoute
         }
+        currentRoute = PlayerRoutes.NOW_PLAYING
+    }
+    val navigateTopLevel: (String) -> Unit = { route -> currentRoute = route }
 
-        PlaylistRoutes.PLAYLISTS -> {
-            val authenticated = session as? AuthSession.Authenticated ?: return
-            AppScaffold(
-                modifier = modifier,
-                session = authenticated,
-                isLoggingOut = sessionState.isLoggingOut,
-                currentRoute = currentRoute,
-                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
-                onNavigateToCachedTracks = {
-                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
-                },
-                onNavigateToRecommendations = {
-                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
-                },
-                isNetworkAvailable = isNetworkAvailable,
-                pendingPlaybackEventCount = pendingPlaybackEventCount,
-                playbackEventSyncMessage = pendingPlaybackEventError,
-                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
-                onLogout = sessionViewModel::logout,
-            ) { contentPadding ->
-                PlaylistsRoute(
-                    modifier = Modifier.padding(contentPadding),
-                    isNetworkAvailable = isNetworkAvailable,
-                    onTrackSelected = { track ->
-                        nowPlayingTrack = track
-                        currentRoute = PlayerRoutes.NOW_PLAYING
-                    },
-                )
-            }
-        }
+    BackHandler(enabled = currentRoute != LibraryRoutes.LIBRARY) {
+        currentRoute = if (isNowPlaying) returnRoute else LibraryRoutes.LIBRARY
+    }
 
-        PlayerRoutes.NOW_PLAYING -> {
-            val authenticated = session as? AuthSession.Authenticated ?: return
-            AppScaffold(
-                modifier = modifier,
-                session = authenticated,
-                isLoggingOut = sessionState.isLoggingOut,
-                currentRoute = currentRoute,
-                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
-                onNavigateToCachedTracks = {
-                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
-                },
-                onNavigateToRecommendations = {
-                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
-                },
+    AppScaffold(
+        modifier = modifier,
+        session = authenticated,
+        title = routeTitle(currentRoute),
+        currentRoute = currentRoute,
+        onNavigate = navigateTopLevel,
+        onOpenNowPlaying = { openNowPlaying(null) },
+        onBack = if (isNowPlaying) ({ currentRoute = returnRoute }) else null,
+        showNavigation = !isNowPlaying,
+        isLoggingOut = sessionState.isLoggingOut,
+        isNetworkAvailable = isNetworkAvailable,
+        pendingPlaybackEventCount = pendingPlaybackEventCount,
+        playbackEventSyncMessage = pendingPlaybackEventError,
+        onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
+        onLogout = sessionViewModel::logout,
+    ) { contentPadding ->
+        val contentModifier = Modifier.padding(contentPadding)
+        when (currentRoute) {
+            PlaylistRoutes.PLAYLISTS -> PlaylistsRoute(
+                modifier = contentModifier,
                 isNetworkAvailable = isNetworkAvailable,
-                pendingPlaybackEventCount = pendingPlaybackEventCount,
-                playbackEventSyncMessage = pendingPlaybackEventError,
-                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
-                onLogout = sessionViewModel::logout,
-            ) { contentPadding ->
-                NowPlayingRoute(
-                    track = nowPlayingTrack,
-                    modifier = Modifier.padding(contentPadding),
-                    isNetworkAvailable = isNetworkAvailable,
-                    onBackToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                )
-            }
-        }
+            )
 
-        ShortcutRoutes.DESTINATION_CACHED_TRACKS -> {
-            val authenticated = session as? AuthSession.Authenticated ?: return
-            AppScaffold(
-                modifier = modifier,
-                session = authenticated,
-                isLoggingOut = sessionState.isLoggingOut,
-                currentRoute = currentRoute,
-                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
-                onNavigateToCachedTracks = {
-                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
-                },
-                onNavigateToRecommendations = {
-                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
-                },
+            PlayerRoutes.NOW_PLAYING -> NowPlayingRoute(
+                track = nowPlayingTrack,
+                modifier = contentModifier,
                 isNetworkAvailable = isNetworkAvailable,
-                pendingPlaybackEventCount = pendingPlaybackEventCount,
-                playbackEventSyncMessage = pendingPlaybackEventError,
-                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
-                onLogout = sessionViewModel::logout,
-            ) { contentPadding ->
-                CachedTracksRoute(
-                    modifier = Modifier.padding(contentPadding),
-                    isNetworkAvailable = isNetworkAvailable,
-                    onTrackSelected = { cachedTrack ->
-                        nowPlayingTrack = cachedTrack.toTrackResponse()
-                        currentRoute = PlayerRoutes.NOW_PLAYING
-                    },
-                )
-            }
-        }
+                onBackToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+            )
 
-        ShortcutRoutes.DESTINATION_RECOMMENDATIONS -> {
-            val authenticated = session as? AuthSession.Authenticated ?: return
-            AppScaffold(
-                modifier = modifier,
-                session = authenticated,
-                isLoggingOut = sessionState.isLoggingOut,
-                currentRoute = currentRoute,
-                onNavigateToLibrary = { currentRoute = LibraryRoutes.LIBRARY },
-                onNavigateToPlaylists = { currentRoute = PlaylistRoutes.PLAYLISTS },
-                onNavigateToCachedTracks = {
-                    currentRoute = ShortcutRoutes.DESTINATION_CACHED_TRACKS
-                },
-                onNavigateToRecommendations = {
-                    currentRoute = ShortcutRoutes.DESTINATION_RECOMMENDATIONS
-                },
+            ShortcutRoutes.DESTINATION_CACHED_TRACKS -> CachedTracksRoute(
+                modifier = contentModifier,
                 isNetworkAvailable = isNetworkAvailable,
-                pendingPlaybackEventCount = pendingPlaybackEventCount,
-                playbackEventSyncMessage = pendingPlaybackEventError,
-                onRetryPlaybackEventSync = { PlaybackEventSyncWorker.enqueue(context) },
-                onLogout = sessionViewModel::logout,
-            ) { contentPadding ->
-                RecommendationHomeRoute(
-                    modifier = Modifier.padding(contentPadding),
-                    config = config,
-                    isNetworkAvailable = isNetworkAvailable,
-                    onTrackSelected = { track ->
-                        nowPlayingTrack = track
-                        currentRoute = PlayerRoutes.NOW_PLAYING
-                    },
-                )
-            }
+                onBrowseLibrary = { currentRoute = LibraryRoutes.LIBRARY },
+            )
+
+            ShortcutRoutes.DESTINATION_RECOMMENDATIONS -> RecommendationHomeRoute(
+                modifier = contentModifier,
+                config = config,
+                isNetworkAvailable = isNetworkAvailable,
+            )
+
+            else -> LibraryRoute(
+                modifier = contentModifier,
+                isNetworkAvailable = isNetworkAvailable,
+                onOpenNowPlaying = { track -> openNowPlaying(track) },
+            )
         }
     }
 }
+
+private fun routeTitle(route: String): String =
+    when (route) {
+        PlaylistRoutes.PLAYLISTS -> "歌单"
+        PlayerRoutes.NOW_PLAYING -> "正在播放"
+        ShortcutRoutes.DESTINATION_CACHED_TRACKS -> "离线缓存"
+        ShortcutRoutes.DESTINATION_RECOMMENDATIONS -> "推荐"
+        else -> "曲库"
+    }
 
 private fun authenticatedRouteOrLibrary(route: String): String =
     when (route) {
@@ -292,22 +211,6 @@ private fun authenticatedRouteOrLibrary(route: String): String =
         else -> LibraryRoutes.LIBRARY
     }
 
-private fun CachedTrack.toTrackResponse(): TrackResponse =
-    TrackResponse(
-        id = trackId,
-        title = title,
-        artist = artist,
-        album = album,
-        durationSeconds = durationSeconds,
-        contentType = contentType,
-        status = TrackResponse.STATUS_READY,
-        liked = false,
-        cooldownUntil = null,
-        createdAt = cachedAt ?: sourceUpdatedAt,
-        updatedAt = sourceUpdatedAt,
-        tags = emptyList<TagResponse>(),
-    )
-
 @Composable
 private fun SessionChecking(
     modifier: Modifier = Modifier,
@@ -316,6 +219,12 @@ private fun SessionChecking(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator()
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+        ) {
+            BrandMark(size = 56.dp)
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+        }
     }
 }

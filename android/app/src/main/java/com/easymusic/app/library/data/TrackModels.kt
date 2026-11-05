@@ -15,6 +15,7 @@ data class TrackResponse(
     val createdAt: String,
     val updatedAt: String,
     val tags: List<TagResponse>,
+    val coverPath: String? = null,
 ) {
     val isReady: Boolean
         get() = status == STATUS_READY
@@ -43,6 +44,7 @@ data class TrackResponse(
                 createdAt = json.getString("created_at"),
                 updatedAt = json.getString("updated_at"),
                 tags = tags,
+                coverPath = if (json.has("cover_path")) json.optionalString("cover_path") else null,
             )
         }
     }
