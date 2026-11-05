@@ -37,16 +37,22 @@ cream, and dark brown.
     brown. The headphone cup stays `#583426` and hair shading `#9A512F`; both
     only survive in solid areas, so edges carry no brown halo.
   - The artwork was re-centred with a 5% margin.
+  - Owner follow-up (2026-11-05): the cream background read too yellow. The
+    background outside the character (flood-filled from the border) is now
+    warm white `#FBF7F0`; the face, daisy, and ribbon keep their cream.
 - Sizes:
   - The Web PWA icons, Apple touch icon, and Android legacy icon use the full
     artwork. The Android round icon scales it to 92% inside the circle.
   - Maskable PWA icon: 80% of the canvas, inside the safe zone.
   - Adaptive foreground: 62% of the 108 dp layer, so the ear tips stay inside
     the 66 dp safe circle. The background is `ic_launcher_background`, now
-    `#F4E1C5`.
+    `#FBF7F0`.
   - Favicons (32 and 48 px): a tighter crop of face, ears, and headphones.
-- The manifest `background_color` is now `#f4e1c5`, so the PWA splash matches
+- The manifest `background_color` is now `#fbf7f0`, so the PWA splash matches
   the icon.
+- The Web brand mark (sidebar, mobile top bar, login page) is
+  `web/src/assets/brand-mark.png`, imported through Vite so its built name
+  carries a content hash and a new icon is not hidden by the browser cache.
 
 ## Verification
 
