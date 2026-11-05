@@ -117,13 +117,13 @@ function firstGlyph(title: string) {
 }
 
 const palette: Array<[string, string]> = [
-  ["#23708a", "#15303a"],
-  ["#7a4e9a", "#3b2a55"],
-  ["#3d7a4f", "#1e3f2c"],
-  ["#c07a26", "#6b3f12"],
-  ["#2b5f9e", "#18325a"],
-  ["#9a4e5e", "#4f2530"],
-  ["#4f6f78", "#263a40"],
+  ["#dd733f", "#9a512f"],
+  ["#2e6e78", "#1d474e"],
+  ["#8a4c70", "#552d45"],
+  ["#506b28", "#33461a"],
+  ["#b5862f", "#6e4f17"],
+  ["#9a512f", "#5a2e1a"],
+  ["#6e5b4c", "#3b2619"],
 ];
 
 function placeholderGradient(seed: string) {
