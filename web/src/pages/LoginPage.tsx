@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { Callout } from "../components/ui/common";
 import { Icon } from "../components/ui/Icon";
 import { navigateTo } from "../routes/router";
+import brandMarkUrl from "../assets/brand-mark.png";
 
 export function LoginPage() {
   return (
@@ -45,7 +46,7 @@ function LoginForm() {
     <main className="login-screen">
       <section aria-labelledby="login-title" className="login-card">
         <div className="login-brand">
-          <img alt="" src="/icons/pwa-192x192.png" />
+          <img alt="" src={brandMarkUrl} />
           <div>
             <h1 id="login-title">Easy Music</h1>
             <p>登录你的私人曲库</p>
