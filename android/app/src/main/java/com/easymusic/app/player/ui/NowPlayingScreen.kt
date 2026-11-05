@@ -1,41 +1,43 @@
 package com.easymusic.app.player.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.CloudQueue
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.OfflinePin
+import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,9 +51,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.easymusic.app.library.data.TrackResponse
@@ -63,9 +66,17 @@ import com.easymusic.app.player.domain.PlaybackStatus
 import com.easymusic.app.player.domain.PlayerUiState
 import com.easymusic.app.player.domain.canSkipToNext
 import com.easymusic.app.player.domain.canSkipToPrevious
-import com.easymusic.app.ui.theme.BannerTone
-import com.easymusic.app.ui.theme.SectionHeader
-import com.easymusic.app.ui.theme.StatusBanner
+import com.easymusic.app.ui.components.Banner
+import com.easymusic.app.ui.components.BannerTone
+import com.easymusic.app.ui.components.EmptyState
+import com.easymusic.app.ui.components.LevelMeter
+import com.easymusic.app.ui.components.PillTone
+import com.easymusic.app.ui.components.StatusPill
+import com.easymusic.app.ui.components.TagChip
+import com.easymusic.app.ui.components.TrackArtwork
+import com.easymusic.app.ui.components.formatPlaybackTime
+import com.easymusic.app.ui.components.subtitle
+import com.easymusic.app.ui.theme.EasyMusicThemeTokens
 
 @Composable
 fun NowPlayingScreen(
@@ -86,118 +97,96 @@ fun NowPlayingScreen(
     val track = uiState.track
     var showClearQueueConfirm by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        SectionHeader(
-            title = "播放中",
-            subtitle = uiState.queueSummary(),
-            action = {
-                OutlinedButton(onClick = onBackToLibrary) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = null,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("返回曲库")
-                }
-            },
-        )
-
-        if (track == null) {
-            EmptyNowPlaying(onBackToLibrary = onBackToLibrary)
-            return@Column
-        }
-
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                TrackSummary(track = track)
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(uiState.playbackSource.sourceLabel(isNetworkAvailable)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = if (uiState.playbackSource == PlaybackSource.OfflineCache) {
-                                    Icons.Default.OfflinePin
-                                } else {
-                                    Icons.Default.CloudQueue
-                                },
-                                contentDescription = null,
-                            )
-                        },
-                        enabled = uiState.playbackSource == PlaybackSource.OfflineCache ||
-                            isNetworkAvailable,
-                    )
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(uiState.queueMode.modeLabel()) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                                contentDescription = null,
-                            )
-                        },
-                        enabled = true,
-                    )
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(uiState.status.playbackLabel()) },
-                        enabled = uiState.status != PlaybackStatus.Error,
-                    )
-                }
-            }
-        }
-
-        if (uiState.status == PlaybackStatus.Buffering) {
-            StatusBanner(
-                text = "正在缓冲音频",
-                tone = BannerTone.Warning,
-                action = { CircularProgressIndicator() },
+    if (track == null) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EmptyState(
+                icon = Icons.Default.MusicOff,
+                title = "还没有在播放的音轨",
+                message = "在曲库、歌单或推荐里点一首歌开始播放。",
+                action = {
+                    TextButton(onClick = onBackToLibrary) { Text("去曲库") }
+                },
             )
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item(key = "hero") {
+            NowPlayingHero(track = track, uiState = uiState, isNetworkAvailable = isNetworkAvailable)
         }
 
         if (uiState.errorMessage != null) {
-            StatusBanner(
-                text = uiState.errorMessage,
-                tone = BannerTone.Error,
+            item(key = "error") {
+                Banner(text = uiState.errorMessage, tone = BannerTone.Error)
+            }
+        }
+
+        item(key = "seek") {
+            SeekBar(
+                positionMs = uiState.positionMs,
+                durationMs = uiState.durationMs.takeIf { it > 0L }
+                    ?: (track.durationSeconds?.times(1000L) ?: 0L),
+                onSeekTo = onSeekTo,
             )
         }
 
-        PlaybackPosition(
-            positionMs = uiState.positionMs,
-            durationMs = uiState.durationMs,
-            onSeekTo = onSeekTo,
-        )
+        item(key = "controls") {
+            TransportControls(
+                uiState = uiState,
+                canPlayCurrentTrack = track.isReady &&
+                    (isNetworkAvailable || uiState.playbackSource == PlaybackSource.OfflineCache),
+                onPlay = onPlay,
+                onPause = onPause,
+                onPrevious = onPrevious,
+                onNext = onNext,
+            )
+        }
 
-        PlaybackControls(
-            uiState = uiState,
-            canPlayCurrentTrack = track.isReady &&
-                (isNetworkAvailable || uiState.playbackSource == PlaybackSource.OfflineCache),
-            onPlay = onPlay,
-            onPause = onPause,
-            onPrevious = onPrevious,
-            onNext = onNext,
-        )
+        item(key = "queue-header") {
+            QueueHeader(
+                uiState = uiState,
+                onClearQueueRequest = { showClearQueueConfirm = true },
+                onSetRepeatPlaylist = onSetRepeatPlaylist,
+            )
+        }
 
-        QueueManagementSection(
-            uiState = uiState,
-            onClearQueueRequest = { showClearQueueConfirm = true },
-            onMoveUpcomingItem = onMoveUpcomingItem,
-            onRemoveQueueItem = onRemoveQueueItem,
-            onSetRepeatPlaylist = onSetRepeatPlaylist,
-        )
+        if (uiState.upcoming.isEmpty()) {
+            item(key = "queue-empty") {
+                Text(
+                    text = if (uiState.repeatPlaylist) {
+                        "播完后会从头再放一遍这个歌单。"
+                    } else {
+                        "后面没有更多音轨了。在曲库里用「⋮ → 加入队列」添加。"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            itemsIndexed(
+                items = uiState.upcoming,
+                key = { _, item -> item.queueItemId },
+            ) { index, item ->
+                QueueRow(
+                    item = item,
+                    position = index + 1,
+                    canMoveUp = index > 0,
+                    canMoveDown = index < uiState.upcoming.lastIndex,
+                    onMove = { direction ->
+                        val targetIndex = (index + direction).coerceIn(0, uiState.upcoming.lastIndex)
+                        if (targetIndex != index) {
+                            onMoveUpcomingItem(item.queueItemId, targetIndex)
+                        }
+                    },
+                    onRemove = { onRemoveQueueItem(item.queueItemId) },
+                )
+            }
+        }
     }
 
     if (showClearQueueConfirm) {
@@ -210,7 +199,7 @@ fun NowPlayingScreen(
                         onClearQueue()
                     },
                 ) {
-                    Text("清空")
+                    Text("清空并停止", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -219,7 +208,7 @@ fun NowPlayingScreen(
                 }
             },
             title = { Text("清空播放队列？") },
-            text = { Text("当前播放会停止，历史、当前和待播列表都会被清空。") },
+            text = { Text("当前播放会停止，已排队的音轨都会被移除。") },
         )
     }
 }
@@ -257,7 +246,138 @@ fun NowPlayingRouteContent(
 }
 
 @Composable
-private fun PlaybackControls(
+private fun NowPlayingHero(
+    track: TrackResponse,
+    uiState: PlayerUiState,
+    isNetworkAvailable: Boolean,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        TrackArtwork(
+            trackId = track.id,
+            title = track.title,
+            coverPath = track.coverPath,
+            coverVersion = track.updatedAt,
+            size = 240.dp,
+        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (uiState.isPlaying) {
+                    LevelMeter(isPlaying = true, height = 16.dp)
+                }
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = track.subtitle(),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            StatusPill(
+                text = when {
+                    uiState.playbackSource == PlaybackSource.OfflineCache -> "离线缓存"
+                    isNetworkAvailable -> "在线播放"
+                    else -> "离线时无法在线播放"
+                },
+                tone = when {
+                    uiState.playbackSource == PlaybackSource.OfflineCache -> PillTone.Ok
+                    isNetworkAvailable -> PillTone.Info
+                    else -> PillTone.Error
+                },
+            )
+            StatusPill(
+                text = if (uiState.queueMode == null) {
+                    uiState.queueSourceLabel()
+                } else {
+                    "${uiState.queueSourceLabel()} · ${uiState.queueMode.modeLabel()}"
+                },
+                tone = PillTone.Neutral,
+                showDot = false,
+            )
+            if (uiState.status == PlaybackStatus.Buffering) {
+                StatusPill(text = "缓冲中", tone = PillTone.Warn)
+            }
+        }
+        if (track.tags.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                track.tags.take(6).forEach { tag -> TagChip(name = tag.name, group = tag.group) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    onSeekTo: (Long) -> Unit,
+) {
+    var dragValue by remember { mutableStateOf<Float?>(null) }
+    val safeDuration = durationMs.coerceAtLeast(1L).toFloat()
+    val shownPosition = dragValue ?: positionMs.toFloat().coerceIn(0f, safeDuration)
+    val colors = EasyMusicThemeTokens.colors
+
+    Column {
+        Slider(
+            value = shownPosition,
+            onValueChange = { value -> dragValue = value },
+            onValueChangeFinished = {
+                dragValue?.let { onSeekTo(it.toLong()) }
+                dragValue = null
+            },
+            valueRange = 0f..safeDuration,
+            enabled = durationMs > 0L,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = colors.signal,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = shownPosition.toLong().formatPlaybackTime(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = durationMs.formatPlaybackTime(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TransportControls(
     uiState: PlayerUiState,
     canPlayCurrentTrack: Boolean,
     onPlay: () -> Unit,
@@ -267,427 +387,206 @@ private fun PlaybackControls(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilledTonalIconButton(
+        IconButton(
+            modifier = Modifier.size(52.dp),
             enabled = uiState.canSkipToPrevious(),
             onClick = onPrevious,
         ) {
-            Icon(
-                imageVector = Icons.Default.SkipPrevious,
-                contentDescription = "上一首",
-            )
+            Icon(Icons.Default.SkipPrevious, contentDescription = "上一首", modifier = Modifier.size(32.dp))
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        if (uiState.isPlaying) {
-            FilledTonalIconButton(onClick = onPause) {
+        FilledIconButton(
+            modifier = Modifier.size(72.dp),
+            enabled = uiState.isPlaying || canPlayCurrentTrack,
+            onClick = if (uiState.isPlaying) onPause else onPlay,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        ) {
+            if (uiState.status == PlaybackStatus.Buffering) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 3.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
                 Icon(
-                    imageVector = Icons.Default.Pause,
-                    contentDescription = "暂停",
+                    imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = when {
+                        uiState.isPlaying -> "暂停"
+                        uiState.status == PlaybackStatus.Ended -> "重新播放"
+                        else -> "播放"
+                    },
+                    modifier = Modifier.size(38.dp),
                 )
             }
-        } else {
-            FilledTonalIconButton(
-                enabled = canPlayCurrentTrack,
-                onClick = onPlay,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = if (uiState.status == PlaybackStatus.Ended) "重新播放" else "播放",
-                )
-            }
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        FilledTonalIconButton(
+        IconButton(
+            modifier = Modifier.size(52.dp),
             enabled = uiState.canSkipToNext(),
             onClick = onNext,
         ) {
-            Icon(
-                imageVector = Icons.Default.SkipNext,
-                contentDescription = "下一首",
-            )
+            Icon(Icons.Default.SkipNext, contentDescription = "下一首", modifier = Modifier.size(32.dp))
         }
     }
 }
 
 @Composable
-private fun QueueManagementSection(
+private fun QueueHeader(
     uiState: PlayerUiState,
     onClearQueueRequest: () -> Unit,
-    onMoveUpcomingItem: (String, Int) -> Unit,
-    onRemoveQueueItem: (String) -> Unit,
     onSetRepeatPlaylist: (Boolean) -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "播放队列",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = uiState.queueSummary(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedButton(
-                    enabled = uiState.currentQueueItem != null ||
-                        uiState.history.isNotEmpty() ||
-                        uiState.upcoming.isNotEmpty(),
-                    onClick = onClearQueueRequest,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("清空")
-                }
-            }
-
-            QueueMetadata(uiState = uiState)
-            if (uiState.queueSource?.type == PlaybackQueueSourceType.Playlist) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "歌单循环",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = if (uiState.baseCycleItems.isEmpty()) {
-                                "当前歌单没有可播放的基础音轨，无法开启循环。"
-                            } else {
-                                "只重复歌单原始可播放音轨，手动插入项不会进入下一轮。"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = uiState.repeatPlaylist,
-                        enabled = uiState.baseCycleItems.isNotEmpty(),
-                        onCheckedChange = onSetRepeatPlaylist,
-                    )
-                }
-            }
-
-            Text(
-                text = "正在播放",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            val currentItem = uiState.currentQueueItem
-            if (currentItem == null) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "接下来", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "暂无当前音轨。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                QueueItemCard(
-                    item = currentItem,
-                    indexLabel = "当前",
-                    draggable = false,
-                    onMove = {},
-                    onRemove = { onRemoveQueueItem(currentItem.queueItemId) },
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "即将播放",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = "${uiState.upcoming.size} 首",
+                    text = "已播 ${uiState.history.size} 首 · 待播 ${uiState.upcoming.size} 首",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
-            if (uiState.upcoming.isEmpty()) {
-                Text(
-                    text = "队列后面还没有音轨。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                uiState.upcoming.forEachIndexed { index, item ->
-                    QueueItemCard(
-                        item = item,
-                        indexLabel = "${index + 1}",
-                        draggable = true,
-                        onMove = { direction ->
-                            val targetIndex = (index + direction)
-                                .coerceIn(0, uiState.upcoming.lastIndex)
-                            if (targetIndex != index) {
-                                onMoveUpcomingItem(item.queueItemId, targetIndex)
-                            }
+            TextButton(onClick = onClearQueueRequest) {
+                Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("清空")
+            }
+        }
+        if (uiState.queueSource?.type == PlaybackQueueSourceType.Playlist) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(Icons.Default.Repeat, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "歌单循环", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = if (uiState.baseCycleItems.isEmpty()) {
+                            "这个歌单没有可播放的音轨。"
+                        } else {
+                            "播完后从头再来；手动插入的音轨只播一次。"
                         },
-                        onRemove = { onRemoveQueueItem(item.queueItemId) },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                Switch(
+                    checked = uiState.repeatPlaylist,
+                    enabled = uiState.baseCycleItems.isNotEmpty(),
+                    onCheckedChange = onSetRepeatPlaylist,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun QueueMetadata(uiState: PlayerUiState) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        AssistChip(
-            onClick = {},
-            label = { Text(uiState.queueSourceLabel()) },
-            enabled = true,
-        )
-        AssistChip(
-            onClick = {},
-            label = { Text(uiState.queueMode.modeLabel()) },
-            enabled = true,
-        )
-        AssistChip(
-            onClick = {},
-            label = { Text("已播 ${uiState.history.size}") },
-            enabled = true,
-        )
-        AssistChip(
-            onClick = {},
-            label = { Text("待播 ${uiState.upcoming.size}") },
-            enabled = true,
-        )
-        AssistChip(
-            onClick = {},
-            label = { Text(if (uiState.repeatPlaylist) "重复已开启" else "重复未开启") },
-            enabled = true,
-        )
-    }
-}
-
-@Composable
-private fun QueueItemCard(
+private fun QueueRow(
     item: PlaybackQueueItem,
-    indexLabel: String,
-    draggable: Boolean,
+    position: Int,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
     onMove: (Int) -> Unit,
     onRemove: () -> Unit,
 ) {
     val dragThresholdPx = with(LocalDensity.current) { 56.dp.toPx() }
     var dragOffset by remember(item.queueItemId) { mutableFloatStateOf(0f) }
-    val dragModifier = if (draggable) {
-        Modifier.pointerInput(item.queueItemId) {
-            detectDragGestures(
-                onDragEnd = { dragOffset = 0f },
-                onDragCancel = { dragOffset = 0f },
-                onDrag = { change, dragAmount ->
-                    change.consume()
-                    dragOffset += dragAmount.y
-                    when {
-                        dragOffset >= dragThresholdPx -> {
-                            onMove(1)
-                            dragOffset = 0f
-                        }
 
-                        dragOffset <= -dragThresholdPx -> {
-                            onMove(-1)
-                            dragOffset = 0f
-                        }
-                    }
-                },
-            )
-        }
-    } else {
-        Modifier
-    }
-
-    ElevatedCard(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(dragModifier),
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (draggable) {
-                Icon(
-                    imageVector = Icons.Default.DragHandle,
-                    contentDescription = "拖动调整顺序",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Icon(
+            imageVector = Icons.Default.DragHandle,
+            contentDescription = "拖动调整顺序",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(40.dp)
+                .padding(8.dp)
+                .pointerInput(item.queueItemId) {
+                    detectDragGestures(
+                        onDragEnd = { dragOffset = 0f },
+                        onDragCancel = { dragOffset = 0f },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffset += dragAmount.y
+                            when {
+                                dragOffset >= dragThresholdPx -> {
+                                    onMove(1)
+                                    dragOffset = 0f
+                                }
+
+                                dragOffset <= -dragThresholdPx -> {
+                                    onMove(-1)
+                                    dragOffset = 0f
+                                }
+                            }
+                        },
+                    )
+                },
+        )
+        TrackArtwork(
+            trackId = item.track.id,
+            title = item.track.title,
+            coverPath = item.track.coverPath,
+            coverVersion = item.track.updatedAt,
+            size = 40.dp,
+        )
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = indexLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.width(42.dp),
+                text = item.track.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.track.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = item.track.subtitle(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(onClick = onRemove) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "移除",
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyNowPlaying(
-    onBackToLibrary: () -> Unit,
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "还没有加载音轨",
-                style = MaterialTheme.typography.titleLarge,
+                text = "$position · ${item.track.subtitle()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Button(
-                modifier = Modifier.padding(top = 16.dp),
-                onClick = onBackToLibrary,
-            ) {
-                Text("返回曲库")
-            }
+        }
+        IconButton(enabled = canMoveUp, onClick = { onMove(-1) }, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.ArrowUpward, contentDescription = "上移", modifier = Modifier.size(18.dp))
+        }
+        IconButton(enabled = canMoveDown, onClick = { onMove(1) }, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.ArrowDownward, contentDescription = "下移", modifier = Modifier.size(18.dp))
+        }
+        IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "从队列移除", modifier = Modifier.size(18.dp))
         }
     }
 }
-
-@Composable
-private fun TrackSummary(track: TrackResponse) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = track.title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = track.subtitle(),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun PlaybackPosition(
-    positionMs: Long,
-    durationMs: Long,
-    onSeekTo: (Long) -> Unit,
-) {
-    Column {
-        Slider(
-            value = positionMs.toFloat(),
-            onValueChange = { value -> onSeekTo(value.toLong()) },
-            valueRange = 0f..durationMs.coerceAtLeast(1L).toFloat(),
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(positionMs.formatTime())
-            Text(durationMs.formatTime())
-        }
-    }
-}
-
-private fun PlayerUiState.queueSummary(): String =
-    "${queueSourceLabel()} · ${queueMode.modeLabel()} · 已播 ${history.size} · 待播 ${upcoming.size}"
 
 private fun PlayerUiState.queueSourceLabel(): String =
     when (queueSource?.type) {
-        PlaybackQueueSourceType.Playlist -> queueSource.playlistName ?: "歌单队列"
-        PlaybackQueueSourceType.SingleTrack -> "单曲播放"
+        PlaybackQueueSourceType.Playlist -> queueSource.playlistName ?: "歌单"
+        PlaybackQueueSourceType.SingleTrack -> "单曲"
         PlaybackQueueSourceType.Manual -> "手动队列"
-        PlaybackQueueSourceType.Recommendation -> "推荐播放"
+        PlaybackQueueSourceType.Recommendation -> "推荐"
         null -> "临时队列"
     }
 
 private fun PlaybackQueueMode?.modeLabel(): String =
     when (this) {
         PlaybackQueueMode.Sequence -> "顺序"
-        PlaybackQueueMode.Shuffle -> "随机一次"
+        PlaybackQueueMode.Shuffle -> "随机"
         PlaybackQueueMode.Reverse -> "倒序"
         null -> "单曲"
-    }
-
-private fun PlaybackStatus.playbackLabel(): String =
-    when (this) {
-        PlaybackStatus.Idle -> "已加载"
-        PlaybackStatus.Buffering -> "缓冲中"
-        PlaybackStatus.Playing -> "播放中"
-        PlaybackStatus.Paused -> "已暂停"
-        PlaybackStatus.Ended -> "已结束"
-        PlaybackStatus.Error -> "播放错误"
-    }
-
-private fun TrackResponse.subtitle(): String =
-    listOfNotNull(artist, album)
-        .filter { it.isNotBlank() }
-        .joinToString(separator = " - ")
-        .ifBlank { "未知艺人或专辑" }
-
-private fun Long.formatTime(): String {
-    val totalSeconds = (this / 1_000).coerceAtLeast(0L)
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "$minutes:${seconds.toString().padStart(2, '0')}"
-}
-
-private fun PlaybackSource.sourceLabel(isNetworkAvailable: Boolean): String =
-    when (this) {
-        PlaybackSource.OfflineCache -> "离线缓存播放"
-        PlaybackSource.OnlineStream -> if (isNetworkAvailable) {
-            "在线播放"
-        } else {
-            "离线时无法在线播放"
-        }
     }

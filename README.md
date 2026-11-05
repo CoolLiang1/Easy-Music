@@ -19,7 +19,7 @@ The canonical status register is
 it on 2026-11-04.
 
 <!-- status-snapshot: 2026-11-04 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented -->
 
 - MVP Phase 0 through Phase 7 are implemented and locally accepted.
 - V1.1 workflow improvements, duplicate detection, cover editing, advanced
@@ -40,6 +40,11 @@ it on 2026-11-04.
   passed typecheck, build, and a local browser smoke; owner review on the real
   library remains. See
   [the redesign acceptance record](docs/ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md).
+- The Android UI redesign (the same visual language, cover art, play from any
+  list, a mini player on every tab, system Back, clearer cache, playlist, and
+  recommendation screens, dark mode) is implemented and passed unit tests, a
+  debug build, and an emulator smoke; real-device review remains. See
+  [the Android redesign acceptance record](docs/ACCEPTANCE/ANDROID_UI_REDESIGN_ACCEPTANCE.md).
 - Auth session renewal (rotating refresh tokens, silent Web and Android
   re-authentication) is implemented and passed backend tests, a local Web
   smoke, and Android unit tests; Android device verification remains. See

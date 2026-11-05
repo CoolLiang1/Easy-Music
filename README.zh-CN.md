@@ -12,7 +12,7 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 2026-11-04 从路线图同步。
 
 <!-- status-snapshot: 2026-11-04 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented -->
 
 - MVP Phase 0 到 Phase 7 已实现，并完成本地验收。
 - V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
@@ -24,6 +24,8 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 - Web 和 Android 的第一轮 UI 优化已实现并通过自动检查，但尚未记录手动视觉/流程验收。
 - Web 界面重设计（新的视觉体系、统一底部播放栏、曲库多选工具栏、更简单的编辑与上传流程、移动端布局）已实现，并通过类型检查、构建和本地浏览器冒烟测试；仍需所有者在真实曲库上确认，见
   [重设计验收记录](docs/ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md)。
+- Android 界面重设计（与 Web 一致的视觉语言、封面图、在任意列表直接播放、每个标签页都有迷你播放器、支持系统返回键、更清晰的缓存/歌单/推荐界面、深色模式）已实现，并通过单元测试、debug 构建和模拟器冒烟测试；仍需在真机上确认，见
+  [Android 重设计验收记录](docs/ACCEPTANCE/ANDROID_UI_REDESIGN_ACCEPTANCE.md)。
 - 登录会话自动续期（轮换式刷新令牌，Web 和 Android 静默重新认证）已实现，并通过后端测试、本地 Web 冒烟测试和 Android 单元测试；仍需在 Android 真机上验证，见
   [登录续期验收记录](docs/ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md)。
 - 播放音量统一（服务端测量响度，并给每个播放 MP3 写入一个固定增益，附带老曲目回填命令）已实现，并通过后端测试和真实 ffmpeg 验证；仍需在生产环境回填并由所有者实际试听，见

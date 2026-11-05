@@ -154,8 +154,12 @@ queue state across devices.
 
 - Login
 - Recommendation home
-- Client-side Library title search with an explicit filter-mode toggle
-- Cloud playback
+- Client-side Library title/artist/album search with an explicit filter-mode
+  toggle (off highlights and scrolls to matches, on shows only matches) and
+  quick filters (ready, cached, liked, processing)
+- Cloud playback, including direct play, play next, and add to queue from
+  lists through a cache-first playback launcher
+- Authenticated cover artwork with an in-memory cache
 - Playlist browsing and playback handoff
 - Local playback queue management with history/current/upcoming, playlist
   sequence/shuffle/reverse generation, upcoming reorder, and playlist-only
