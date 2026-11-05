@@ -1,220 +1,156 @@
 # Easy Music Agent Guide
 
-This file is for AI agents working in this repository. Follow it before making
-changes. Keep the guide current when project reality changes.
+Easy Music is a self-hosted music system for one owner: a FastAPI backend and
+media worker, a React/Vite Web console, and a Kotlin/Compose Android player,
+deployed with Docker Compose and Caddy on one Ubuntu host.
 
-## Project Snapshot
+This file holds rules that stay true from task to task. It never carries
+project status: current and open work is in [docs/ROADMAP.md](docs/ROADMAP.md),
+and [docs/README.md](docs/README.md) says which document owns what.
 
-Easy Music is a self-hosted personal cloud music system for scenario-based
-listening. The MVP spans backend, Web, Android, and deployment artifacts.
+## How Work Is Chosen
 
-The repository is organized as one product, not independent demos. Changes in
-one area often affect API contracts, documentation, acceptance notes, Android
-models, Web types, and deployment configuration.
+- Work comes from problems the owner meets in real use. Do the task you were
+  given. If you notice an adjacent bug or a better approach, say so rather than
+  silently widening the change.
+- Prefer the smallest change that fully solves the problem. A larger refactor
+  is fine when the task genuinely needs it; explain why in the summary.
+- Easy Music is a private tool, not a product. Do not add release process,
+  observability stacks, multi-user abstractions, or scaling work unless the
+  owner asks.
+- Product boundaries and non-goals are in [docs/PRD.md](docs/PRD.md). Ask the
+  owner before crossing one.
 
-## Main Modules
+## Where Things Live
 
-- `backend/`: FastAPI backend, SQLAlchemy models, Alembic migrations, auth,
-  track/tag/upload APIs, media streaming, playback and feedback event sync,
-  recommendation rules, AI assistant services, worker job processing, tests.
-- `web/`: React/Vite management console for login, upload, library management,
-  track editing, tags, Web playback, structured recommendations, AI assistant,
-  and AI tag suggestions.
-- `android/`: Kotlin/Jetpack Compose listening client using Media3, DataStore,
-  Room, and WorkManager. It covers login, library/detail views, online playback,
-  background/media controls, manual offline cache, playback-event sync, and
-  recommendation flows.
-- `deploy/`: production support files, including Caddy, host directory setup,
-  and database backup scripts.
-- `docs/`: product, architecture, roadmap, development workflow, environment,
-  deployment, phase tasks, and acceptance records.
-- Root compose/env files: local and production Docker Compose plus committed
-  example environment templates only.
+| Area | Path | Notes |
+| --- | --- | --- |
+| HTTP routes | `backend/app/api/routes/` | Thin: validate, call a service, return a schema. |
+| Business logic | `backend/app/services/` | Recommendation, AI, imports, playlists, uploads, processing. |
+| Models and migrations | `backend/app/models/`, `backend/alembic/versions/` | Every schema change needs a migration. |
+| Media and FFmpeg | `backend/app/media/` | Storage paths and path-traversal checks. |
+| Worker and backfills | `backend/app/worker/` | Job loop, `autotag`, `renormalize`. |
+| Backend tests | `backend/tests/` | SQLite in-memory, fake AI clients. |
+| Web | `web/src/` | `api/` typed wrappers, `types/`, `pages/`, `player/`. |
+| Android | `android/app/src/main/java/com/easymusic/app/` | Per feature: `data/`, `domain/`, `ui/`. |
+| Production | `deploy/`, `docker-compose.prod.yml`, `.env.production.example` | Operated through `deploy/update.sh`. |
 
-## How To Understand The Codebase
+## Invariants
 
-Before implementing, read the documentation map and the relevant owners first:
+These protect the owner's data, privacy, or the core product idea. Breaking one
+needs the owner's explicit agreement.
 
-- Documentation ownership and completion rules: `docs/README.md`.
-- Current status and authorized next work: `docs/ROADMAP.md`.
-- Product intent and boundaries: `docs/PRD.md`.
-- System shape and module boundaries: `docs/ARCHITECTURE.md`.
-- Local workflow and verification expectations: `docs/DEVELOPMENT.md`.
-- API smoke flows: `docs/API_MANUAL_TESTING.md`.
-- Deployment and production behavior: `docs/DEPLOYMENT.md`.
-- Work-item context and evidence: the relevant file under `docs/TASKS/` and
-  `docs/ACCEPTANCE/`.
+### Contracts
 
-Then inspect the narrow code path for the task. Prefer existing service,
-repository, schema, route, UI, and test patterns over inventing new structures.
+- Backend, Web (`web/src/api`, `web/src/types`), and Android data models share
+  one API. When a request or response shape changes, update all three and their
+  tests in the same change.
+- Schema changes go through an Alembic migration that upgrades and downgrades.
+  Tests use SQLite and production uses PostgreSQL; check a non-trivial
+  migration against PostgreSQL when Docker is available.
 
-Useful mental map:
+### AI And Recommendation
 
-- Upload problems usually cross Web upload UI, backend upload service, media
-  storage paths, processing jobs, worker, FFmpeg/ffprobe, and Docker volumes.
-- Playback problems usually cross authenticated stream endpoints, Web audio
-  blob loading, Android Media3, bearer-token data sources, MediaSession, and
-  offline cache source selection.
-- Recommendation problems usually belong to structured tag validation,
-  `recommendations` service scoring, playback events, feedback events,
-  cooldowns, `not_today`, and client request models.
-- AI problems usually involve provider state (`disabled`, `unconfigured`,
-  `error`, `ok`), JSON parsing, prompt catalogues, tag-id validation, and then
-  delegation back to rule-based recommendation.
-- Deployment problems usually involve production env values, Caddy, compose
-  health checks, volume permissions, PostgreSQL, worker logs, and HTTPS/DNS.
+- AI parses listening intent, suggests tags, and may apply existing catalogue
+  tags as `source="ai"` rows. It never creates tags, never changes owner
+  (`user`) rows, and never selects or orders tracks. Ranking stays in
+  `services/recommendations.py` and keeps cooldown, recent-play, feedback, and
+  ownership rules.
+- AI endpoints answer HTTP 200 with provider status `disabled`,
+  `unconfigured`, or `error` as normal fallback, not as a transport failure.
+  Tests use fake providers and never need a live key.
+- `track_tags.source` carries meaning: `ai` rows weigh less in ranking and are
+  the only rows auto-tagging may replace. Code that rewrites a track's tags
+  keeps the rows of tags that stay instead of deleting and re-inserting them,
+  or AI tags silently become owner tags. Bump `AI_AUTO_TAGGING_VERSION` only
+  when existing AI tags should be regenerated; it re-adds AI tags the owner
+  removed.
 
-## Development Principles
+### Media
 
-- Work on only the currently requested task or optimization. Do not implement
-  later roadmap items early.
-- Treat Easy Music as a private, single-owner application, not a commercial
-  product. Optimize for owner control, daily usefulness, and maintainability.
-- The former complete V2.6 Stability And Listening Loop plan is superseded and
-  is not authorization to resume its historical branch, stash, tasks, or
-  acceptance work. Reuse only a narrowly selected change explicitly authorized
-  through the current roadmap.
-- Do not add release governance, generalized observability, speculative
-  scaling, or broad product infrastructure solely to make the project resemble
-  a commercial service.
-- Keep changes scoped. Avoid broad rewrites, framework swaps, or large
-  refactors unless the task explicitly asks for them.
-- Preserve existing architecture boundaries: thin FastAPI routes, backend
-  business logic in services, typed schemas/models, Web API wrappers/types, and
-  Android repository/view-model separation.
-- Before adding a new abstraction, search for an existing route, service, repository, ViewModel, API wrapper, schema, or test pattern that should be extended instead.
-- Maintain API contract compatibility across backend, Web, and Android. If a
-  backend response or request shape changes, update all clients and tests that
-  depend on it.
-- Respect the MVP non-goals unless explicitly asked otherwise: no multi-user
-  expansion, social/discovery features, automatic Bilibili downloading, full
-  ML recommendation system, full-library offline sync, or native Windows app.
-- Keep AI constrained. The LLM parses intent, suggests tags, and may apply
-  existing catalogue tags as `source="ai"` rows; rule-based services select
-  and rank tracks. Do not let AI create tags, change owner-chosen tags, or
-  bypass cooldown, recent-play, feedback, or ownership checks.
-- Keep media storage safe. Preserve path traversal protections and avoid
-  exposing internal paths unless an existing API already does so intentionally.
-- Do not hard-code production hosts, usernames, passwords, API keys, bearer
-  tokens, or machine-local absolute paths.
-- Do not commit secrets or local state. Never commit `.env`, `.env.production`,
-  `local.properties`, `.claude/`, build outputs, cache directories, virtual
-  environments, node modules, generated APKs, database files, media files, or
-  other local artifacts.
-- Windows / PowerShell is the primary local development environment. Production
-  deployment targets Ubuntu with Docker Compose and Caddy. Keep both realities
-  in mind when editing scripts, docs, paths, and commands.
-- Do not run destructive recursive cleanup commands across the repository. If deletion is necessary, delete only explicit, task-related paths and explain why.
-
-## Testing And Verification
-
-Agents are expected to test their own changes. Choose checks by risk and touched
-area rather than running unrelated suites blindly.
-
-- Backend changes should be covered by focused backend tests first, then broader
-  backend regression when shared behavior is touched.
-- Web changes should pass TypeScript/build checks and, for user-facing flows,
-  a browser smoke check when practical.
-- Android changes should pass relevant JVM tests/build checks and, for playback,
-  cache, notification, or device behavior, should be treated as needing
-  emulator/device verification when practical.
-- Deployment changes should validate compose/config shape and review production
-  docs, env templates, host scripts, Caddy behavior, and secret exposure.
-- AI behavior should be tested without requiring a live provider whenever
-  possible. Cover disabled/unconfigured/error states and fake-provider success.
-- If a required check cannot be run, state exactly what was not run and why.
-
-Do not mark acceptance complete unless the documented acceptance criteria for
-that area are genuinely satisfied.
-
-## Documentation Completion Gate
-
-Documentation is part of the feature or fix, not a later cleanup. Follow
-`docs/README.md`, including its "One Fact, One Owner" rule, status vocabulary,
-change matrix, and completion sequence.
-
-Before reporting any work item complete:
-
-- Apply the exact change matrix and completion sequence in `docs/README.md`.
-- Record actual verification before promoting a task from `Implemented` to
-  `Accepted`.
-- Include a `Documentation Impact` record with an explanation for every
-  relevant `N/A`.
-- Run `pwsh -File scripts/check-docs.ps1` and inspect the final diff.
-
-For a matrix row that appears relevant but needs no edit, state `N/A` and the
-reason in the task's `Documentation Impact` section or the final change
-summary. An agent must not claim documentation is complete after updating only
-one convenient file without checking the matrix.
-
-Keep documentation concise and operational. Prefer links to the canonical
-owner over copied status paragraphs.
-
-## Git Rules
-
-- Start from the intended branch for the work. The documented workflow uses
-  stable milestone branches plus focused feature/fix branches.
-- Keep commits focused on one logical task.
-- Use concise Conventional Commit-style prefixes when appropriate:
-  `feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`.
-- Inspect the diff before committing.
-- Do not include unrelated local changes in a commit.
-- Do not rewrite, reset, or discard user work unless explicitly instructed.
-- Do not commit secrets, local config, generated build output, caches, media
-  libraries, or dependency directories.
-- If code and docs both change because of one feature, commit them together
-  only when they represent the same logical task.
-
-## Common Pitfalls And Confusions
-
-Update this section when you discover something surprising.
-
-- Do not infer current progress or next work from this file. Use
-  `docs/ROADMAP.md`, then inspect the linked task and acceptance records.
-- Older task documents describe historical scope and are not authorization to
-  restart or extend that work. Only the active work registered in the roadmap
-  is current.
-- AI endpoints can return successful HTTP responses with provider status
-  `disabled`, `unconfigured`, or `error`. This is often expected fallback
-  behavior, not necessarily a transport failure.
-- AI does not choose tracks directly. If recommendations look wrong, inspect
-  structured tag parsing and the rule-based recommendation service separately.
-- Android emulator backend access normally uses a host-loopback style base URL,
-  while real production should use HTTPS. Do not hard-code production URLs.
-- Web authentication has evolved from placeholder scaffolding to real token
-  storage. If login/navigation behavior is odd, inspect both current auth
-  context wiring and any leftover placeholder assumptions.
-- Android playback/cache behavior crosses many layers: selected playback source,
-  local Room cache state, Media3 player/session service, authenticated network
-  data source, and offline playback-event recorder.
-- Android playback performance can be dominated by Media3 foreground
-  notification behavior. Do not manually call `onUpdateNotification` from a
-  `MediaSessionService.onStartCommand`; it can create a notification/service
-  update loop and sustained main-thread CPU on OEM Android builds.
-- The first V2 import/video slice is locally accepted. Import roots are
-  configured allowlists, disabled when empty, and must never imply arbitrary
-  filesystem browsing. Import and video flows must not download from external
-  sites and must not move, rename, delete, or modify source files.
-- Backend upload status depends on both the API creating a processing job and
-  the worker actually running with writable shared media volumes.
+- Original files are never modified or moved, and are deleted only when the
+  owner deletes the track. Playback MP3s can always be regenerated from them.
 - `process_track` re-applies title, artist, and album from file tags. Never use
   it to rebuild playback for an existing track; use
   `regenerate_track_playback`, which keeps owner edits. Bump
-  `LOUDNESS_VERSION` when the playback gain rule changes so the backfill
-  command picks up old files.
+  `LOUDNESS_VERSION` when the playback gain rule changes so the backfill picks
+  up old files.
+- Keep the path-traversal checks in `backend/app/media/`. Do not expose server
+  filesystem paths in new API fields.
+- Import roots are an allowlist, disabled when empty. Import never browses
+  arbitrary paths and never moves, renames, deletes, or modifies source files.
+  Nothing downloads from external sites.
 
-- `track_tags.source` carries meaning: `ai` rows are weighted below owner
-  rows in ranking and are the only rows auto-tagging may replace. Code that
-  rewrites a track's tags must keep the rows of tags that stay instead of
-  deleting and re-inserting them, or AI tags silently become owner tags. Bump
-  `AI_AUTO_TAGGING_VERSION` only when existing AI tags should be regenerated;
-  it re-adds AI tags the owner removed.
+### Android
 
-## Safety Rules
+- Do not call `onUpdateNotification` from
+  `MediaSessionService.onStartCommand`; it creates a notification update loop
+  and sustained main-thread CPU on some OEM builds. See
+  [the playback performance incident](docs/DEBUGGING/ANDROID_PLAYBACK_QUEUE_PERFORMANCE.md).
+- Playback crosses cache-versus-network source selection, Room cache state, the
+  Media3 session service, the authenticated data source, and the offline event
+  recorder. Trace all of them before changing playback or cache behaviour.
 
-- Never run destructive cleanup across the repository.
-- Never bulk delete files or directories.
-- Never edit generated dependency directories or build artifacts as source.
-- Never expose real keys, passwords, bearer tokens, personal paths, or media
-  library contents in committed files.
-- Prefer small, reversible changes with tests over sweeping edits.
+### Secrets And Local State
+
+- Never commit secrets, real domains, personal paths, or local state: `.env`,
+  `.env.production`, `local.properties`, `.claude/`, build outputs, caches,
+  virtual environments, `node_modules`, APKs, databases, or media.
+- API base URLs are configuration (`VITE_API_BASE_URL`, the
+  `easyMusicApiBaseUrl` Gradle property, env files). Do not hard-code hosts.
+
+## Verifying Changes
+
+Run the checks that cover what you touched, and report exactly what ran and
+what did not. Commands are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#checks).
+
+| Touched | Minimum check |
+| --- | --- |
+| Backend | Focused `pytest` first; the full suite when shared code changed. |
+| Migration | `alembic upgrade head`, `downgrade -1`, `upgrade head`. |
+| Web | `npm run typecheck` and `npm run build`; a browser check of a changed user flow. |
+| Android | `gradlew test` and `assembleDebug`; emulator or device for playback, cache, or notifications. |
+| Deployment | Compose `config --quiet` against the example env; read the affected deploy script end to end. |
+| Docs | `pwsh -File scripts/check-docs.ps1`. |
+
+Automated checks prove the code path, not the owner's experience. A change to
+playback, UI, AI quality, or production behaviour stays `Implemented` until
+the owner has confirmed it in real use. Never mark such work `Accepted`
+yourself.
+
+The development machine is Windows with PowerShell; production is Ubuntu.
+Scripts under `deploy/` are bash and must run on the server. Local commands in
+docs use PowerShell; server commands use bash.
+
+## Documentation
+
+Documentation is part of the change. [docs/README.md](docs/README.md) is the
+map. In short:
+
+- Update every document your change makes wrong: architecture, environment
+  variables (with both env examples), deployment steps, development commands.
+- A feature, or a fix the owner will notice, gets a slice record under
+  `docs/TASKS/` and a row in the roadmap. Small fixes, refactors, and test-only
+  changes need only a clear commit message.
+- Add to this file only a rule or pitfall that is stable, not obvious from the
+  code, and would cost the next agent real time.
+
+## Git
+
+- Branch from an up-to-date `main` as `feature/<name>` or `fix/<name>` and
+  merge back through a pull request. `develop` is no longer used.
+- Several agent sessions often work in this repository at the same time. Work
+  in your own worktree or branch, and never edit, stash, or commit another
+  session's uncommitted files.
+- Keep one logical change per commit, with a Conventional Commit prefix
+  (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`). Review the diff
+  before committing.
+- Push, merge, or deploy only when the owner asks. Never rewrite published
+  history or discard work you did not create.
+
+## Safety
+
+- Ask before anything that touches production, the real media library, or the
+  production database: deployments, backfills, migrations, restores, deletes.
+- Delete files only when the deletion is part of the change. Never run
+  repository-wide cleanup commands.

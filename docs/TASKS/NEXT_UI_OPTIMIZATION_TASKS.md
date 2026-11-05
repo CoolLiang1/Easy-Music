@@ -1,7 +1,7 @@
 # UI Optimization Work Record
 
-Status: Implemented
-Last updated: 2026-07-27
+Status: Superseded
+Last updated: 2026-11-05
 Canonical role: task
 Related: `docs/ROADMAP.md`, `docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`
 Pair: `docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`
@@ -9,11 +9,10 @@ Pair: `docs/ACCEPTANCE/UI_OPTIMIZATION_ROUND_1_ACCEPTANCE.md`
 This document records the bounded UI-focused program started after the initial
 Easy Music product reached local functional closure.
 
-Web and Android round 1 implementation and automated checks are complete.
-Required manual visual/flow acceptance is not recorded, so this work is not yet
-`Accepted`. Before another slice starts, name one target flow, define its
-acceptance checks, and register it in `docs/ROADMAP.md`; this file does not
-authorize a broad redesign.
+Superseded on 2026-11-05: the Web UI redesign
+(`docs/TASKS/WEB_UI_REDESIGN_TASKS.md`) and the Android UI redesign
+(`docs/TASKS/ANDROID_UI_REDESIGN_TASKS.md`) replaced the round 1 screens before
+its manual checks were recorded. Their owner reviews cover the same flows.
 
 ## Current Baseline
 

@@ -1,38 +1,22 @@
 # Easy Music Architecture
 
-## 1. Overview
+How the system works now. Field-level detail lives in the code
+(`backend/app/models/`, `backend/app/schemas/`) and the OpenAPI UI at `/docs`;
+this document records the shape of the system and the rules the code must
+keep.
 
-Easy Music is a self-hosted personal cloud music system.
-
-The first version contains:
-
-- FastAPI backend
-- React/Vite web app
-- Android app built with Kotlin, Jetpack Compose, and Media3
-- PostgreSQL database
-- FFmpeg-based media processing
-- Worker for background jobs
-- Local disk media storage
-- Caddy reverse proxy and HTTPS
-- Docker Compose deployment
-
-## 2. High-Level Architecture
-
-This document describes the current architecture after the accepted MVP, V1.1,
-and implemented V2 slices. Backend, Web, Android, recommendation, AI assistant,
-import/video, playlist/queue, and deployment artifacts are now implemented in
-their corresponding top-level directories.
+## Components
 
 ```mermaid
 flowchart LR
-    Android["Android App\nKotlin + Compose + Media3"]
-    Web["Web App\nReact + Vite"]
-    Caddy["Caddy\nHTTPS + reverse proxy"]
+    Android["Android app\nKotlin, Compose, Media3"]
+    Web["Web console\nReact, Vite"]
+    Caddy["Caddy\nHTTPS, static Web"]
     API["FastAPI API"]
-    Worker["Worker\ntranscode + AI jobs"]
+    Worker["Worker\nFFmpeg, AI auto-tagging"]
     DB["PostgreSQL"]
-    Media["Media Storage\noriginals + playback MP3"]
-    AI["AI API Provider"]
+    Media["Media storage\noriginals, playback, covers"]
+    AI["OpenAI-compatible\nprovider"]
 
     Android --> Caddy
     Web --> Caddy
@@ -40,703 +24,206 @@ flowchart LR
     API --> DB
     API --> Media
     API --> AI
-    API --> Worker
     Worker --> DB
     Worker --> Media
     Worker --> AI
 ```
 
-## 3. Repository Structure
-
-Top-level structure:
-
-- `backend/`: FastAPI backend service, Alembic migrations, backend tests, media-processing integration, and worker entry points.
-- `web/`: React/Vite web management console source, static assets, and frontend build configuration.
-- `android/`: Kotlin, Jetpack Compose, and Media3 Android app source, Android tests, and Android build configuration.
-- `deploy/`: production reverse proxy configuration, host setup script, database backup script, and deployment support material.
-- `docs/`: product, architecture, development, environment, deployment, and task documentation.
-
-### 3.1 Backend Module Boundaries
-
-The backend keeps these modules separated at a high level:
-
-- Auth: authentication, token/session handling, password hashing, and access control.
-- Users: user records, ownership boundaries, and single-user-to-future-multi-user compatibility.
-- Tracks: library metadata, playback file references, status, and track updates.
-- Playlists: owner-scoped manually curated playlists, optional descriptions,
-  ordered playlist-track membership, and playlist signals consumed by
-  Recommendation V2 foundation scoring.
-- Tags: tag taxonomy, tag groups, and track-tag assignment.
-- Uploads: audio upload validation, original file persistence, and upload lifecycle state.
-- Video uploads: user-provided video validation, temporary media storage, and
-  creation of video extraction processing jobs.
-- Imports: optional administrator-configured local import roots, path safety
-  checks, read-only scan preview, explicit confirmed import, and small batch
-  history for Web status display.
-- Media processing: metadata extraction, playback MP3 generation, cover extraction, and FFmpeg integration.
-- Playback events: online/offline playback event ingestion and duplicate-safe sync.
-- Feedback events: recommendation feedback ingestion and cooldown/avoidance inputs.
-- Recommendation: structured rule-based ranking and result explanation.
-- AI assistant: provider abstraction, intent parsing, recommendation composition,
-  and tag suggestions. Tag suggestions can optionally enrich their prompt with
-  configured Tavily title/snippet/URL search summaries through the existing
-  suggest-tags endpoint only. Batch auto-tagging applies catalogue tags to
-  ready tracks without per-track confirmation (see 8.4 and 9.2).
-- Worker: background job execution for media processing, plus one batch of AI
-  auto-tagging whenever the media queue is idle and auto-tagging is enabled.
-
-## 4. Deployment
-
-Target environment:
-
-- Ubuntu physical machine
-- Public IP
-- Domain name
-- 4 TB disk
-- Docker Compose
-
-Recommended services:
-
-- `caddy`: HTTPS reverse proxy
-- `api`: FastAPI backend
-- `worker`: background processing
-- `web`: built React web app served by Caddy or a static container
-- `postgres`: PostgreSQL database
-
-Recommended mounted paths:
-
-- `/srv/easy-music/media/originals`
-- `/srv/easy-music/media/playback`
-- `/srv/easy-music/media/covers`
-- `/srv/easy-music/media/temp-videos`
-- `/srv/easy-music/postgres`
-
-## 5. Backend
-
-### 5.1 Technology
-
-- Python 3.12
-- FastAPI
-- SQLAlchemy
-- Alembic migrations
-- PostgreSQL
-- FFmpeg
-- AI provider abstraction
-
-### 5.2 Core Backend Modules
-
-- Auth
-- Users
-- Tracks
-- Uploads
-- Media processing
-- Tags
-- Playback sessions
-- Feedback events
-- Recommendation
-- AI assistant
-- Android cache sync
-
-Playback queue state is client-local. The backend persists playlists and their
-ordered tracks, but it does not persist current playback queues or synchronize
-queue state across devices.
-
-## 6. Android App
-
-### 6.1 Technology
-
-- Kotlin
-- Jetpack Compose
-- Android Media3
-- Room for local cache metadata
-- WorkManager for background sync
-- DataStore for settings and auth tokens (access and refresh)
-
-### 6.2 Responsibilities
-
-- Login
-- Recommendation home
-- Client-side Library title/artist/album search with an explicit filter-mode
-  toggle (off highlights and scrolls to matches, on shows only matches) and
-  quick filters (ready, cached, liked, processing)
-- Cloud playback, including direct play, play next, and add to queue from
-  lists through a cache-first playback launcher
-- Authenticated cover artwork with an in-memory cache
-- Playlist browsing and playback handoff
-- Local playback queue management with history/current/upcoming, playlist
-  sequence/shuffle/reverse generation, upcoming reorder, and playlist-only
-  repeat
-- Background playback
-- Notification and lock screen controls
-- Headset control integration
-- Manual track cache
-- Offline playback for cached tracks
-- Playback and feedback sync
-
-### 6.3 Local Data
-
-Android should store:
-
-- Auth session
-- Cached track metadata
-- Cached audio files
-- Unsynced playback events
-- Unsynced feedback events
-
-## 7. Web App
-
-### 7.1 Technology
-
-- React
-- TypeScript
-- Vite
-
-### 7.2 Responsibilities
-
-- Login
-- Audio upload
-- Library management, including client-side title/artist/album search with an
-  explicit filter-mode toggle (off highlights and jumps to matches, on shows
-  only matches), status filters, sorting, and a selection toolbar for queue,
-  playlist, batch tag, and delete actions
-- Playlist management
-- Track editing
-- Tag management
-- AI tag confirmation
-- Recommendation testing
-- Web playback through one global player deck (list rows only start or toggle
-  it), with space-bar play/pause and browser Media Session metadata/actions
-- Client-side playback queue with history/current/upcoming, queue editing,
-  playlist sequence/shuffle/reverse generation, upcoming reorder, and
-  playlist-only repeat
-- Playback history
-
-## 8. Data Model Draft
-
-### 8.1 User
-
-- `id`
-- `username`
-- `password_hash`
-- `created_at`
-
-Version 1 is single-user, but tables should still include `user_id`.
-
-### 8.2 Track
-
-- `id`
-- `user_id`
-- `title`
-- `artist`
-- `album`
-- `duration_seconds`
-- `content_type`
-- `original_file_path`
-- `original_file_size_bytes`
-- `original_file_sha256`
-- `playback_file_path`
-- `playback_file_sha256`
-- `loudness_lufs`, `true_peak_dbtp`: measured on the original file
-- `playback_gain_db`: static gain baked into the playback file
-- `loudness_version`: normalization rule version; null means not normalized
-- `ai_tags_version`: AI auto-tagging rule version; null means not auto-tagged
-- `cover_path`
-- `source_url`
-- `format`
-- `bitrate`
-- `normalized_metadata_key`
-- `status`
-- `liked`
-- `cooldown_until`
-- `created_at`
-- `updated_at`
-
-Possible statuses:
-
-- uploading
-- processing
-- ready
-- failed
-
-### 8.3 Tag
-
-- `id`
-- `user_id`
-- `name`
-- `group`
-- `created_at`
-
-Possible groups:
-
-- scene
-- type
-- feature
-
-V2.4 simplified the tag taxonomy to these three groups. Existing `scenario`
-tags migrate to `scene`, existing `state` tags migrate to `feature`, and
-`attribute` tags plus their track-tag links are removed by migration.
-
-### 8.4 TrackTag
-
-- `track_id`
-- `tag_id`
-- `confidence`
-- `source`
-
-Possible sources:
-
-- user: chosen by the owner; `confidence` is 1.0
-- ai: applied by batch auto-tagging; `confidence` is the AI confidence
-- system: reserved, currently unused
-
-Provenance rules:
-
-- Auto-tagging only uses tag ids from the owner's catalogue, drops tags below
-  `AI_AUTO_TAGGING_MIN_CONFIDENCE`, applies at most 8 per track, and never
-  changes `user` rows. Re-tagging a track replaces only its `ai` rows.
-- A track is auto-tagged once per `ai_tags_version`, so an `ai` tag the owner
-  removes stays removed until the rule version is bumped or the owner runs an
-  explicit re-tag.
-- Manual edits keep the row of a tag that stays (an `ai` tag stays `ai`). A tag
-  the owner adds through batch tag editing becomes `user`, including an
-  existing `ai` row.
-- Web and Android do not see provenance; they show all tags alike.
-
-### 8.4.1 AiTagSearchCache
-
-Suggest-tags-only cache for optional Tavily search summaries:
-
-- `id`
-- `provider`
-- `query`
-- `status`
-- `results_json` containing normalized title/snippet/URL items only
-- `searched_at`
-- `created_at`
-- `updated_at`
-
-The cache is used only to reduce repeated search API calls for
-`POST /api/ai/tracks/{track_id}/suggest-tags`. It does not store API keys, page
-bodies, playlist suggestions, analysis decisions, or apply events.
-
-### 8.5 PlaybackEvent
-
-- `id`
-- `user_id`
-- `track_id`
-- `client`
-- `event_type`
-- `position_seconds`
-- `duration_seconds`
-- `occurred_at`
-
-Possible event types:
-
-- play
-- pause
-- resume
-- skip
-- complete
-- seek
-
-### 8.6 FeedbackEvent
-
-- `id`
-- `user_id`
-- `track_id`
-- `scene_tag_ids`
-- `feature_tag_ids`
-- `type_context`
-- `feedback_type`
-- `occurred_at`
-
-Possible feedback types:
-
-- like
-- dislike
-- tired
-- not_today
-- not_suitable_for_context
-- skip_recommendation
-
-### 8.7 RecommendationRequest
-
-- `id`
-- `user_id`
-- `raw_text`
-- `cooldown_mode`
-- `parsed_context_json`
-- `created_at`
-
-### 8.8 RecommendationResult
-
-- `id`
-- `request_id`
-- `track_id`
-- `rank`
-- `score`
-- `reason`
-
-### 8.9 ImportBatch
-
-- `id`
-- `user_id`
-- `root_id`
-- `status`
-- `message`
-- `requested_count`
-- `imported_count`
-- `skipped_count`
-- `failed_count`
-- `created_at`
-- `updated_at`
-
-### 8.10 ImportItem
-
-- `id`
-- `batch_id`
-- `user_id`
-- `root_id`
-- `relative_source_path`
-- `display_name`
-- `status`
-- `track_id`
-- `error_message`
-- `created_at`
-- `updated_at`
-
-### 8.11 ProcessingJob
-
-- `id`
-- `track_id`
-- `status`
-- `job_type`
-- `source_path`
-- `error_message`
-- `started_at`
-- `finished_at`
-- `created_at`
-- `updated_at`
-
-### 8.12 Playlist
-
-- `id`
-- `user_id`
-- `name`
-- `description`
-- `created_at`
-- `updated_at`
-
-Playlists are ordinary user-created private lists. Version 2.1 does not include
-smart playlists, public sharing, collaboration, or automatic playlist
-generation. Recommendation V2 foundation consumes only owner-scoped playlist
-membership plus playlist name/description relevance as scoring signals.
-
-### 8.13 PlaylistTrack
-
-- `playlist_id`
-- `track_id`
-- `position`
-- `created_at`
-
-`playlist_tracks` is scoped through its parent playlist owner and only accepts
-tracks owned by the same user. The service also exposes a narrow read-only
-playlist signal method consumed by Recommendation V2 foundation scoring.
-
-## 9. Media Processing
-
-### 9.1 Upload
-
-Supported upload formats:
-
-- MP3
-- FLAC
-- M4A
-- WAV
-- OGG
-- AAC
-
-Supported user-provided video upload formats:
-
-- MP4
-- MKV
-- MOV
-- WEBM
-
-### 9.2 Processing Pipeline
-
-1. Save original file.
-2. Store advisory duplicate signals for the original, including file size and
-   SHA-256 hash when the saved file is readable.
-3. Extract metadata.
-4. Measure loudness and generate the gain-adjusted MP3 playback file
-   (see 9.3).
-5. Store a normalized metadata key and playback SHA-256 hash when available.
-6. Extract or generate cover if available.
-7. Create or update Track.
-8. Mark track as ready or failed.
-9. Later, while the worker's media queue is idle and
-   `AI_AUTO_TAGGING_ENABLED` is true, the worker auto-tags up to 10 ready
-   tracks per provider call (8192-token budget; a batch whose output is
-   truncated is split in half and retried). A failed batch changes nothing and pauses
-   auto-tagging for 10 minutes. `python -m app.worker.autotag` and the Web
-   Library page "AI 打标签" button run the same step on demand.
-
-V1.1 also allows the owner to replace a track cover image from the Web Track
-Detail page. Replacement covers are stored under the configured cover media
-directory and update only `tracks.cover_path`; they do not regenerate playback
-audio or modify the preserved original audio file.
-
-### 9.3 Playback Format
-
-Version 1 uses MP3 playback files for compatibility.
-
-Original files are preserved for future reprocessing.
-
-Playback files are loudness-normalized on the server so clients need no
-volume logic and Android offline copies inherit the result:
+- The API and the worker share one codebase (`backend/`), one database, and
+  the media volumes. The API creates `processing_jobs`; the worker polls and
+  runs them. They never call each other directly.
+- Production runs all services with Docker Compose on one Ubuntu host. Caddy
+  terminates HTTPS and serves the built Web app. Containers run as UID/GID
+  1100. Host paths and procedures are in [DEPLOYMENT.md](DEPLOYMENT.md).
+- The system is single-user, but every owned table carries `user_id` and every
+  query is scoped by it.
+
+## Backend
+
+Python 3.12, FastAPI, SQLAlchemy, Alembic, PostgreSQL, FFmpeg/ffprobe.
+
+- `api/routes/` are thin: authenticate, validate a schema, call a service.
+- `services/` hold the business logic: uploads, video uploads, imports,
+  processing, tracks, tags, playlists, playback and feedback events,
+  recommendations, revived tracks, duplicates, library reports, and AI
+  (provider, intent parsing, tag suggestions, tag search, auto-tagging).
+- `media/` owns storage paths, path-safety checks, FFmpeg and ffprobe
+  wrappers, and streaming responses.
+- `worker/` runs the job loop and the `renormalize` and `autotag` backfills.
+
+### Data Model
+
+| Table | Holds | Rules |
+| --- | --- | --- |
+| `users` | The owner account. | Created once by `app.auth.initial_user`. |
+| `refresh_tokens` | SHA-256 hashes of refresh tokens. | Never the token itself. |
+| `tracks` | Metadata, media file references, status, liked flag, cooldown, duplicate signals, loudness and AI-tagging versions. | Status is `uploading`, `processing`, `ready`, or `failed`. |
+| `tags`, `track_tags` | Owner tag catalogue in groups `scene`, `type`, `feature`; track links with `source` and `confidence`. | See tag provenance below. |
+| `playlists`, `playlist_tracks` | Manual ordered playlists. | Only the owner's tracks; adding twice is a no-op. |
+| `playback_events`, `feedback_events` | Listening history and feedback from both clients. | Idempotent on `client_event_id`. |
+| `processing_jobs` | Work for the worker: `audio_processing` or `video_extraction`. | Source paths are relative to `MEDIA_ROOT`. |
+| `import_batches`, `import_items` | History of confirmed imports. | Relative source paths only. |
+| `ai_tag_search_cache` | Normalized Tavily title/snippet/URL summaries for tag suggestions. | No page bodies, no keys. |
+
+Playback queues are client-local state; the backend stores playlists but not
+queues.
+
+### Tag Provenance
+
+- `user` rows are chosen by the owner, with confidence 1.0. `ai` rows are
+  applied by auto-tagging, with the model's confidence. `system` is reserved.
+- Auto-tagging uses only tag ids from the owner's catalogue, drops tags below
+  `AI_AUTO_TAGGING_MIN_CONFIDENCE`, applies at most 8 per track, never changes
+  `user` rows, and on re-tagging replaces only that track's `ai` rows.
+- A track is auto-tagged once per `ai_tags_version`, so an AI tag the owner
+  removes stays removed until the rule version is bumped or the owner re-tags
+  the track explicitly.
+- Manual edits keep the row of a tag that stays, so an `ai` tag stays `ai`. A
+  tag the owner adds through batch editing becomes `user`, even if an `ai` row
+  existed.
+- Web and Android do not show provenance.
+
+## Media Processing
+
+### Ingest
+
+- Audio upload accepts MP3, FLAC, M4A, WAV, OGG, and AAC; video upload accepts
+  MP4, MKV, MOV, and WEBM. Both check extension, content type, size, and a
+  basic file signature.
+- An audio upload stores the original and creates a `processing` track with an
+  `audio_processing` job.
+- A video upload stores the file under `TEMP_VIDEOS_DIR` and creates a
+  `video_extraction` job. The worker extracts the audio as the track's
+  original, deletes the video on success, keeps it on failure for retry, and
+  continues with normal processing. The video is never exposed or kept as an
+  original.
+- Imports are disabled while `IMPORT_ALLOWED_ROOTS` is empty. Requests name a
+  configured root and a path relative to it; paths that escape the root, or
+  roots that are a drive or OS root, a home directory, the repository, or
+  `MEDIA_ROOT`, are rejected. A scan is read-only. A confirmed import copies
+  the selected files into managed storage and then follows the upload path.
+  Sources are never moved, renamed, modified, or deleted, and responses carry
+  only root ids and relative paths.
+
+### Processing Pipeline
+
+1. Record duplicate signals for the original: size and SHA-256.
+2. Extract metadata with ffprobe.
+3. Measure loudness and write the gain-adjusted playback MP3 (below).
+4. Store the normalized metadata key and playback SHA-256.
+5. Extract an embedded cover if there is one.
+6. Mark the track `ready`, or `failed` with a message.
+7. Later, while the job queue is idle and `AI_AUTO_TAGGING_ENABLED` is true,
+   the worker auto-tags up to 10 ready tracks per provider call. A failed
+   batch changes nothing and pauses auto-tagging for 10 minutes.
+
+Auto-tagging can also run on demand: `python -m app.worker.autotag`, or the
+Web Library "AI 打标签" button, which calls `POST /api/ai/auto-tag/next-batch`
+repeatedly (5 tracks per call) until nothing is pending. Every path uses the
+same service with an 8192-token output budget; a batch whose output is
+truncated is split in half and retried.
+
+Duplicate signals are advisory: they never block an upload or delete, merge,
+or hide a track. A cover replaced from the Web changes only the cover, never
+the audio.
+
+### Playback Files
+
+Playback files are MP3 for compatibility, and are loudness-normalized on the
+server so clients need no volume logic and offline copies inherit it.
 
 - The worker measures integrated loudness and true peak of the original with
-  ffmpeg `loudnorm=print_format=json`.
-- It applies one static `volume` gain toward `PLAYBACK_TARGET_LUFS`, reduced
-  so the measured peak stays under `PLAYBACK_MAX_TRUE_PEAK_DBTP` and capped
-  at +20 dB. There is no compression or limiting, so dynamics are unchanged.
-- Measurement failure never fails a track; the file is encoded without gain
+  ffmpeg `loudnorm=print_format=json`, then applies one static gain toward
+  `PLAYBACK_TARGET_LUFS`, reduced so the peak stays under
+  `PLAYBACK_MAX_TRUE_PEAK_DBTP` and capped at +20 dB. There is no compression
+  or limiting.
+- A failed measurement never fails the track: the file is encoded without gain
   and `loudness_version` stays null.
-- The MP3 is written to a `.partial.mp3` sibling and atomically replaces the
-  previous playback file only after ffmpeg succeeds.
-- `python -m app.worker.renormalize` regenerates playback files for ready
-  tracks whose `loudness_version` is older than the current rule. It never
-  re-applies file metadata, unlike `process_track`, so owner edits survive.
-- Regeneration changes `playback_file_sha256`; Android offline copies made
-  earlier keep the old audio until they are cached again.
+- The MP3 is written to a `.partial.mp3` sibling and replaces the previous
+  file only after ffmpeg succeeds.
+- `python -m app.worker.renormalize` regenerates playback files whose
+  `loudness_version` is out of date. It uses `regenerate_track_playback`, which
+  keeps owner metadata edits; `process_track` would overwrite them from the
+  file tags.
+- Regeneration changes `playback_file_sha256`; Android offline copies keep the
+  old audio until they are cached again.
 
-### 9.4 Duplicate Signals
+## Recommendation
 
-V1.1 stores duplicate-detection signals on each track for later advisory
-duplicate review. The signals are scoped through the existing `tracks.user_id`
-ownership boundary and include original file size, original file SHA-256,
-normalized metadata key, and playback file SHA-256 when processing has produced
-a playback file. These values do not include local filesystem paths, secrets, or
-media contents.
+The LLM parses intent and suggests tags; rules rank tracks using local data.
+This keeps results controllable and stops the model from ignoring history,
+cooldowns, or feedback.
 
-Duplicate detection remains advisory. Signal storage must not block uploads and
-must not delete, merge, overwrite, or hide tracks automatically.
+- `services/recommendations.py` scores ready tracks by matching scene, type,
+  and feature tags (an `ai` tag counts weight × confidence × 0.8), the liked
+  flag, recent playback, skips, dislike and not-suitable feedback, and
+  playlist membership and playlist name/description relevance.
+- Same-day `not_today` feedback is always excluded. Cooldown mode `soft` (the
+  default) lowers cooled-down tracks, `strict` excludes them, and `off`
+  ignores cooldown.
+- A response has at most three results: one primary and two alternatives,
+  each with a reason and a structured explanation (matched tags, boosts,
+  penalties). It also lists the exclusions considered. The explanation is
+  derived from the same score and never changes the order.
+- `POST /api/ai/recommend` parses text into catalogue tag ids, then calls the
+  same service. The LLM never sees or returns track ids.
 
-### 9.5 Import Root Safety
+## Clients
 
-V2 import tools are disabled when `IMPORT_ALLOWED_ROOTS` is empty. When enabled,
-the backend treats configured roots as an allowlist of server-side directories.
-Requested paths are relative to one configured root, resolved before use, and
-rejected if they escape the root or target broad locations such as a drive root,
-OS root, user home directory, repository root, or `MEDIA_ROOT`.
+**Web** (`web/`): React, TypeScript, Vite. Typed API wrappers in `src/api`
+mirror the backend schemas. One global player bar plays through short-lived
+signed stream URLs so `<audio>` can use native Range requests. The queue lives
+in the page.
 
-The import API surface is intentionally small:
+**Android** (`android/`): Kotlin, Compose, Media3, Room, DataStore,
+WorkManager. Features are split into `data`, `domain`, and `ui` layers.
+Playback runs in a `MediaSessionService` with notification, lock-screen, and
+headset controls. A cache-first launcher plays cached files when present and
+otherwise streams with bearer authentication. Room holds cached-track
+metadata and unsynced playback events; WorkManager syncs them when online.
+DataStore holds the access and refresh tokens.
 
-- `GET /api/imports/configuration` returns enabled state and safe root labels.
-- `POST /api/imports/scan` scans one configured root/subdirectory for supported
-  audio candidates and skipped files.
-- `POST /api/imports` imports only explicitly selected audio files by copying
-  them into controlled original media storage, creating normal tracks and normal
-  pending processing jobs.
-- `GET /api/imports/batches/latest` and `GET /api/imports/batches/{batch_id}`
-  return the current user's safe import batch history for Web status display.
+## API Surface
 
-Scan preview responses include safe relative paths, basenames, extensions,
-sizes, support status, skipped reasons, and applied scan limits. They do not
-expose unrestricted absolute paths, run FFmpeg/ffprobe, create tracks, create
-processing jobs, hash files, copy files, delete files, move files, or modify
-source directories.
+All routes are under `/api` and require a bearer token, except login, refresh,
+logout, and streams opened with a signed stream URL. `GET /health` is public.
 
-Confirmed import responses and batch history store only safe source display
-data: configured root id, relative source path, basename, per-file status,
-resulting track id, UI-safe error message, and timestamps. They do not expose
-absolute import source paths. Imported item track details are built from the
-existing safe track response, and track processing status remains the source of
-truth for transcoding results.
+| Prefix | Module | Purpose |
+| --- | --- | --- |
+| `/auth` | `auth.py` | Login, refresh, logout, current user. |
+| `/tracks` | `tracks.py`, `uploads.py`, `duplicates.py` | Library CRUD, batch tags and delete, uploads, covers, streaming, duplicate review. |
+| `/tags` | `tags.py` | Tag catalogue. |
+| `/playlists` | `playlists.py` | Playlists, membership, order. |
+| `/imports` | `imports.py` | Import configuration, scan, confirm, batch history. |
+| `/playback-events`, `/feedback-events` | `playback_events.py`, `feedback_events.py` | Batched, idempotent event sync. |
+| `/recommendations` | `recommendations.py` | Structured recommendations and revived tracks. |
+| `/library/reports` | `library_reports.py` | Read-only organization reports. |
+| `/ai` | `ai.py` | Intent parsing, AI recommendation, per-track tag suggestions, on-demand auto-tagging (`auto-tag/status`, `auto-tag/next-batch`). |
 
-### 9.6 Temporary Video Uploads
+### Sessions
 
-`POST /api/tracks/upload-video` accepts explicit user-provided video files for
-later audio extraction. The request validates extension, content type, upload
-size, and a basic file signature, then stores the video under
-`MEDIA_ROOT/TEMP_VIDEOS_DIR` using media storage helpers.
+Login returns a short-lived signed access token (`ACCESS_TOKEN_EXPIRE_MINUTES`)
+and an opaque refresh token (`REFRESH_TOKEN_EXPIRE_DAYS`).
+`POST /api/auth/refresh` rotates the refresh token: the old one stays valid
+for 60 seconds so simultaneous refreshes from one client do not sign the owner
+out. Unknown, expired, or logged-out tokens return `401`. Logout revokes the
+refresh token without needing an access token.
 
-Video uploads create a normal `Track` with `processing` status and a pending
-`ProcessingJob` with `job_type="video_extraction"` and a safe relative
-`source_path` to the temporary video. The track response does not expose the
-temporary path, and the video is not stored as `tracks.original_file_path`,
-playback media, or cover media. Worker extraction is handled separately by the
-V2 worker task; until then, the existing audio worker only claims
-`audio_processing` jobs and leaves video extraction jobs pending.
+Clients renew silently. Web retries a request once after a `401`, through a
+single shared refresh in `AuthProvider`. Android's `ApiClient` does the same
+through the process-wide `AuthTokenRefresher`, and Media3 streams and cache
+downloads renew a token about to expire before opening the connection. Only a
+rejected refresh token clears the stored session; network errors keep it.
 
-## 10. Recommendation System
+## Security
 
-Version 1 uses hybrid recommendation:
-
-> LLM intent parsing + rule-based ranking + feedback adjustment.
-
-### 10.1 LLM Responsibilities
-
-- Parse natural language into structured context
-- Suggest tags for one track on request, and apply catalogue tags to tracks
-  in batches (auto-tagging); never create tags or choose tracks
-- Generate short recommendation reasons
-- Suggest library organization improvements
-
-### 10.2 Rule Ranking Inputs
-
-- Scene tag match
-- Type tag match
-- Feature tag match (each match counts its group weight; an `ai` tag counts
-  weight × confidence × 0.8 and adds an explanation penalty line naming the
-  AI-inferred tags)
-- Like status
-- Recent playback
-- Cooldown mode (`off`, `soft`, or `strict`)
-- Not-today feedback
-- Dislike feedback
-- Playlist membership
-- Playlist name/description relevance to requested text or tag names
-- Skip frequency
-- Not-suitable feedback for current context
-- Cached status on Android, if relevant
-
-### 10.3 Recommendation Output
-
-The API should return:
-
-- One primary recommendation
-- Two alternatives
-- Reason for each result
-- Structured explanation details for each result, including matched tags,
-  playlist boosts, penalties, feedback impact, and avoidance reasons.
-- Top-level exclusions considered, such as same-day `not_today` feedback
-  filters or active cooldown when strict mode is requested.
-
-The structured explanation is derived from the same rule-based ranking inputs
-as the score and concise `reason` text. It does not change ranking order and
-does not let AI select tracks.
-
-## 11. API Draft
-
-### Auth
-
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-
-Login returns a short-lived signed access token (`expires_in` seconds,
-`ACCESS_TOKEN_EXPIRE_MINUTES`) and an opaque refresh token
-(`REFRESH_TOKEN_EXPIRE_DAYS`). The backend stores only a SHA-256 hash of each
-refresh token in `refresh_tokens`. `POST /api/auth/refresh` rotates it: the
-presented token is revoked and a new pair is returned with a full refresh
-lifetime. A token revoked by rotation remains usable for 60 seconds so
-simultaneous refreshes from one client do not sign the owner out; unknown,
-expired, or logged-out tokens return `401`. `POST /api/auth/logout` with a
-`refresh_token` body revokes it without requiring a valid access token.
-
-Clients keep the session alive without prompting: Web retries a request once
-after a `401` through a single shared refresh in `AuthProvider`; Android's
-`ApiClient` does the same through the process-wide `AuthTokenRefresher`, and
-Media3 stream and cache downloads renew a token that is about to expire before
-opening the connection. Only a rejected refresh token clears the stored
-session; network errors keep it for a later retry.
-
-### Tracks
-
-- `GET /api/tracks`
-- `POST /api/tracks/upload`
-- `POST /api/tracks/upload-video`
-- `GET /api/tracks/{id}`
-- `PATCH /api/tracks/{id}`
-- `PUT /api/tracks/{id}/cover`
-- `GET /api/tracks/{id}/cover`
-- `POST /api/tracks/batch-delete`
-- `DELETE /api/tracks/{id}`
-- `GET /api/tracks/duplicates`
-- `POST /api/tracks/{id}/stream-url`
-- `GET /api/tracks/{id}/stream`
-- `GET /api/tracks/{id}/download-cache`
-
-### Playlists
-
-- `GET /api/playlists`
-- `POST /api/playlists`
-- `GET /api/playlists/{id}`
-- `PATCH /api/playlists/{id}`
-- `DELETE /api/playlists/{id}`
-- `POST /api/playlists/{id}/tracks`
-- `POST /api/playlists/{id}/tracks/batch`
-- `DELETE /api/playlists/{id}/tracks/{track_id}`
-- `PUT /api/playlists/{id}/tracks/order`
-
-### Tags
-
-- `GET /api/tags`
-- `POST /api/tags`
-- `PATCH /api/tags/{id}`
-- `DELETE /api/tags/{id}`
-
-### Imports
-
-- `GET /api/imports/configuration`
-- `POST /api/imports/scan`
-- `POST /api/imports`
-- `GET /api/imports/batches/latest`
-- `GET /api/imports/batches/{batch_id}`
-
-### Playback And Feedback
-
-- `POST /api/playback-events`
-- `POST /api/feedback-events`
-- `POST /api/sync/events`
-
-### Recommendation
-
-- `POST /api/recommendations`
-- `GET /api/recommendations/revived`
-
-### AI
-
-- `POST /api/ai/parse-listening-intent`
-- `POST /api/ai/recommend`
-- `POST /api/ai/tracks/{track_id}/suggest-tags`
-- `GET /api/ai/auto-tag/status`
-- `POST /api/ai/auto-tag/next-batch`
-
-`suggest-tags` may internally use configured Tavily search context, but this
-does not add `/organize`, `/organize/apply`, playlist suggestions, Android UI,
-or automatic tag application. Automatic tag application is the separate
-auto-tag pair: `status` reports the owner's pending count, and each
-`next-batch` call tags up to 5 of the owner's pending tracks and returns the
-remaining count, so the Web Library button loops without a long request.
-
-## 12. Security
-
-Version 1 is single-user but public-facing.
-
-Minimum requirements:
-
-- Login required for all app routes and APIs
-- Hashed passwords
-- HTTPS through Caddy
-- Upload size limits
-- File type validation
-- Path traversal protection
-- API rate limits for AI endpoints
-- Configured secret keys through environment variables
-
-## 13. Future Architecture Hooks
-
-Reserve fields and modules for:
-
-- Multi-user support
-- Audio feature analysis
-- BPM detection
-- Vocal detection
-- Language detection
-- Embedding-based recommendation
-- Android packaged web features, if useful
-- Windows desktop client, if needed later
+- HTTPS through Caddy; PostgreSQL is not published to the host network.
+- Passwords are hashed with `pwdlib`; refresh tokens are stored as hashes;
+  stream URLs are signed, track-scoped, and expire after two minutes.
+- Upload size limits are enforced in Caddy and in the API, with type and
+  signature checks.
+- Media paths are generated server-side and checked against traversal.
+  Responses do not carry absolute paths for import sources or temporary
+  videos.
+- Secrets come from environment variables only.
+- There is no rate limiting on login or AI endpoints.

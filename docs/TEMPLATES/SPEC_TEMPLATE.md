@@ -2,7 +2,6 @@
 
 Status: Draft
 Last updated: YYYY-MM-DD
-Canonical role: specification
 Related: `docs/ARCHITECTURE.md`
 
 ## Problem

@@ -3,44 +3,36 @@ param(
     [string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot)
 )
 
+# Checks what a reader cannot easily verify by eye: local links resolve,
+# record headers are well formed, open slices appear in the roadmap with the
+# same status, legacy task/acceptance pairs agree, and accepted records have
+# no unchecked boxes. It does not judge whether a document is true.
+
 $ErrorActionPreference = "Stop"
 
 $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $errors = [System.Collections.Generic.List[string]]::new()
 
-$requiredFiles = @(
-    "AGENTS.md",
-    "README.md",
-    "README.zh-CN.md",
-    "docs/README.md",
-    "docs/ROADMAP.md",
-    "docs/PRD.md",
-    "docs/ARCHITECTURE.md",
-    "docs/DEVELOPMENT.md",
-    "docs/DEPLOYMENT.md",
-    "docs/ENVIRONMENT.md",
-    "docs/TEMPLATES/TASK_TEMPLATE.md",
-    "docs/TEMPLATES/ACCEPTANCE_TEMPLATE.md",
-    "docs/TEMPLATES/SPEC_TEMPLATE.md",
-    "docs/TEMPLATES/INCIDENT_TEMPLATE.md",
-    ".github/PULL_REQUEST_TEMPLATE.md",
-    ".github/workflows/documentation-check.yml",
-    "deploy/README.md"
-)
-
-foreach ($relativePath in $requiredFiles) {
-    $absolutePath = Join-Path $root $relativePath
-    if (-not (Test-Path -LiteralPath $absolutePath -PathType Leaf)) {
-        $errors.Add("Missing required documentation file: $relativePath")
-    }
+function Get-RelativePath {
+    param([string]$Path)
+    return [System.IO.Path]::GetRelativePath($root, $Path).Replace("\", "/")
 }
 
+# --- Local Markdown links --------------------------------------------------
+
 $markdownFiles = @(
-    Get-Item -LiteralPath (Join-Path $root "AGENTS.md")
-    Get-Item -LiteralPath (Join-Path $root "README.md")
-    Get-Item -LiteralPath (Join-Path $root "README.zh-CN.md")
-    Get-Item -LiteralPath (Join-Path $root "deploy/README.md")
-    Get-Item -LiteralPath (Join-Path $root ".github/PULL_REQUEST_TEMPLATE.md")
+    foreach ($relativePath in @(
+        "AGENTS.md",
+        "README.md",
+        "README.zh-CN.md",
+        "deploy/README.md",
+        ".github/PULL_REQUEST_TEMPLATE.md"
+    )) {
+        $absolutePath = Join-Path $root $relativePath
+        if (Test-Path -LiteralPath $absolutePath -PathType Leaf) {
+            Get-Item -LiteralPath $absolutePath
+        }
+    }
     Get-ChildItem -LiteralPath (Join-Path $root "docs") -Filter "*.md" -File -Recurse
 )
 
@@ -49,525 +41,165 @@ $linkPattern = [regex]'\[[^\]]*\]\((?<target>[^)]+)\)'
 foreach ($file in $markdownFiles) {
     $content = Get-Content -LiteralPath $file.FullName -Raw
     foreach ($match in $linkPattern.Matches($content)) {
-        $target = $match.Groups["target"].Value.Trim()
-        if (
-            $target.StartsWith("#") -or
-            $target -match '^(?i:https?|mailto):' -or
-            $target -match '^[a-zA-Z][a-zA-Z0-9+.-]*://'
-        ) {
+        $target = $match.Groups["target"].Value.Trim().Trim("<", ">")
+        if ($target.StartsWith("#") -or $target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:') {
             continue
         }
-
-        $target = $target.Trim("<", ">")
         $pathPart = ($target -split "#", 2)[0]
         if ([string]::IsNullOrWhiteSpace($pathPart)) {
             continue
         }
-
-        $decodedPath = [System.Uri]::UnescapeDataString($pathPart)
-        $resolvedTarget = Join-Path $file.DirectoryName $decodedPath
-        if (-not (Test-Path -LiteralPath $resolvedTarget)) {
-            $relativeFile = [System.IO.Path]::GetRelativePath($root, $file.FullName)
-            $errors.Add("$relativeFile has a broken local link: $target")
+        $resolved = Join-Path $file.DirectoryName ([System.Uri]::UnescapeDataString($pathPart))
+        if (-not (Test-Path -LiteralPath $resolved)) {
+            $errors.Add("$(Get-RelativePath $file.FullName) has a broken link: $target")
         }
     }
 }
 
-function Get-StatusDate {
-    param([string]$RelativePath)
+# --- Record headers --------------------------------------------------------
 
-    $content = Get-Content -LiteralPath (Join-Path $root $RelativePath) -Raw
-    $match = [regex]::Match(
-        $content,
-        '<!--\s*status-snapshot:\s*(\d{4}-\d{2}-\d{2})\s*-->'
-    )
-    if (-not $match.Success) {
-        $errors.Add("$RelativePath is missing a status-snapshot marker.")
-        return $null
-    }
-    return $match.Groups[1].Value
-}
+$deliveryStatuses = @("Planned", "In progress", "Implemented", "Accepted", "Deferred", "Superseded")
+$closedStatuses = @("Accepted", "Superseded")
 
-$roadmapDate = Get-StatusDate "docs/ROADMAP.md"
-$readmeDate = Get-StatusDate "README.md"
-$readmeZhDate = Get-StatusDate "README.zh-CN.md"
-
-if (
-    $null -ne $roadmapDate -and
-    ($roadmapDate -ne $readmeDate -or $roadmapDate -ne $readmeZhDate)
-) {
-    $errors.Add(
-        "Status snapshot dates differ: ROADMAP=$roadmapDate, " +
-        "README=$readmeDate, README.zh-CN=$readmeZhDate"
-    )
-}
-
-$agentsContent = Get-Content -LiteralPath (Join-Path $root "AGENTS.md") -Raw
-if ($agentsContent -notmatch '## Documentation Completion Gate') {
-    $errors.Add("AGENTS.md is missing the mandatory Documentation Completion Gate.")
-}
-
-$documentationGuide = Get-Content -LiteralPath (
-    Join-Path $root "docs/README.md"
-) -Raw
-if ($documentationGuide -notmatch 'One Fact, One Owner') {
-    $errors.Add("docs/README.md is missing the One Fact, One Owner rule.")
-}
-
-$roadmapContent = Get-Content -LiteralPath (Join-Path $root "docs/ROADMAP.md") -Raw
-
-$currentStatusSection = [regex]::Match(
-    $roadmapContent,
-    '(?ms)^## Current Status\s*\r?\n(?<body>.*?)(?=^##\s|\z)'
+$recordSets = @(
+    @{ Directory = "docs/TASKS"; Kind = "task"; Statuses = $deliveryStatuses },
+    @{ Directory = "docs/ACCEPTANCE"; Kind = "acceptance"; Statuses = $deliveryStatuses },
+    @{ Directory = "docs/SPECS"; Kind = "spec"; Statuses = @("Draft", "Active", "Superseded") },
+    @{ Directory = "docs/DEBUGGING"; Kind = "incident"; Statuses = @("Investigating", "Resolved", "Superseded") }
 )
-if (-not $currentStatusSection.Success) {
-    $errors.Add("docs/ROADMAP.md is missing the Current Status section.")
-}
-else {
-    $roadmapStatusParts = [System.Collections.Generic.List[string]]::new()
-    $deliveryStatusPattern = (
-        "Planned|In progress|Implemented|Accepted|Deferred|Superseded"
-    )
-    foreach ($line in $currentStatusSection.Groups["body"].Value -split "`r?`n") {
-        $row = [regex]::Match(
-            $line,
-            "^\|\s*(?<initiative>[^|]+?)\s*\|\s*" +
-            "(?<status>${deliveryStatusPattern})\s*\|"
-        )
-        if ($row.Success) {
-            $initiative = $row.Groups["initiative"].Value.Trim()
-            $status = $row.Groups["status"].Value.Trim()
-            $roadmapStatusParts.Add("${initiative}=${status}")
-        }
-    }
-
-    if ($roadmapStatusParts.Count -eq 0) {
-        $errors.Add("docs/ROADMAP.md Current Status table has no status rows.")
-    }
-    else {
-        $expectedRoadmapSignature = $roadmapStatusParts -join "; "
-        foreach ($readmePath in @("README.md", "README.zh-CN.md")) {
-            $readmeContent = Get-Content -LiteralPath (
-                Join-Path $root $readmePath
-            ) -Raw
-            $signatureMatch = [regex]::Match(
-                $readmeContent,
-                '<!--\s*roadmap-statuses:\s*(?<value>.*?)\s*-->'
-            )
-            if (-not $signatureMatch.Success) {
-                $errors.Add("$readmePath is missing a roadmap-statuses marker.")
-                continue
-            }
-
-            $actualSignature = $signatureMatch.Groups["value"].Value.Trim()
-            if ($actualSignature -ne $expectedRoadmapSignature) {
-                $errors.Add(
-                    "$readmePath roadmap-statuses marker differs from " +
-                    "docs/ROADMAP.md Current Status."
-                )
-            }
-        }
-    }
-}
 
 function Get-HeaderField {
-    param(
-        [string]$Header,
-        [string]$Name
-    )
-
-    $escapedName = [regex]::Escape($Name)
-    $match = [regex]::Match(
-        $Header,
-        "(?m)^${escapedName}:\s*(?<value>.+?)\s*$"
-    )
-    if (-not $match.Success) {
-        return $null
-    }
-    return $match.Groups["value"].Value.Trim()
+    param([string]$Header, [string]$Name)
+    $match = [regex]::Match($Header, "(?m)^$([regex]::Escape($Name)):\s*(?<value>.+?)\s*$")
+    if ($match.Success) { return $match.Groups["value"].Value.Trim() }
+    return $null
 }
 
-$controlledSets = @(
-    [pscustomobject]@{
-        Directory = "docs/TASKS"
-        Role = "task"
-        Statuses = @(
-            "Planned",
-            "In progress",
-            "Implemented",
-            "Accepted",
-            "Deferred",
-            "Superseded"
-        )
-    },
-    [pscustomobject]@{
-        Directory = "docs/ACCEPTANCE"
-        Role = "acceptance"
-        Statuses = @(
-            "Planned",
-            "In progress",
-            "Implemented",
-            "Accepted",
-            "Deferred",
-            "Superseded"
-        )
-    },
-    [pscustomobject]@{
-        Directory = "docs/SPECS"
-        Role = "specification"
-        Statuses = @("Draft", "Active", "Superseded")
-    },
-    [pscustomobject]@{
-        Directory = "docs/DEBUGGING"
-        Role = "incident"
-        Statuses = @("Investigating", "Resolved", "Superseded")
+function Get-BacktickedPaths {
+    param([string]$Value, [string]$Field, [string]$Record)
+    $paths = @()
+    if ([string]::IsNullOrWhiteSpace($Value) -or $Value -eq "None") {
+        return $paths
     }
-)
-
-$controlledRecordCount = 0
-$controlledRecords = @()
-$openDeliveryStatuses = @("Planned", "In progress", "Implemented", "Deferred")
-
-foreach ($set in $controlledSets) {
-    $directoryPath = Join-Path $root $set.Directory
-    $recordFiles = Get-ChildItem -LiteralPath $directoryPath `
-        -Filter "*.md" -File
-
-    foreach ($recordFile in $recordFiles) {
-        $controlledRecordCount++
-        $header = (
-            Get-Content -LiteralPath $recordFile.FullName -TotalCount 12
-        ) -join "`n"
-        $content = Get-Content -LiteralPath $recordFile.FullName -Raw
-        $rootRelativeRecord = [System.IO.Path]::GetRelativePath(
-            $root,
-            $recordFile.FullName
-        ).Replace("\", "/")
-
-        if ($header -notmatch '(?m)^#\s+\S') {
-            $errors.Add("$rootRelativeRecord is missing a level-one title.")
-        }
-
-        $status = Get-HeaderField -Header $header -Name "Status"
-        $lastUpdated = Get-HeaderField -Header $header -Name "Last updated"
-        $role = Get-HeaderField -Header $header -Name "Canonical role"
-        $related = Get-HeaderField -Header $header -Name "Related"
-        $pair = Get-HeaderField -Header $header -Name "Pair"
-        $decision = Get-HeaderField -Header $header -Name "Decision"
-
-        if ([string]::IsNullOrWhiteSpace($status)) {
-            $errors.Add("$rootRelativeRecord is missing Status metadata.")
-        }
-        elseif ($set.Statuses -notcontains $status) {
-            $allowedStatuses = $set.Statuses -join ", "
-            $errors.Add(
-                "$rootRelativeRecord has invalid Status '$status'. " +
-                "Allowed: $allowedStatuses"
-            )
-        }
-
-        $parsedLastUpdated = [datetime]::MinValue
-        $validLastUpdated = [datetime]::TryParseExact(
-            $lastUpdated,
-            "yyyy-MM-dd",
-            [System.Globalization.CultureInfo]::InvariantCulture,
-            [System.Globalization.DateTimeStyles]::None,
-            [ref]$parsedLastUpdated
-        )
-        if (-not $validLastUpdated) {
-            $errors.Add(
-                "$rootRelativeRecord has missing or invalid Last updated metadata."
-            )
-        }
-
-        if ($role -ne $set.Role) {
-            $errors.Add(
-                "$rootRelativeRecord has Canonical role '$role'; " +
-                "expected '$($set.Role)'."
-            )
-        }
-
-        $relatedPaths = @()
-        if ([string]::IsNullOrWhiteSpace($related)) {
-            $errors.Add("$rootRelativeRecord is missing Related metadata.")
-        }
-        elseif ($related -ne "None") {
-            $relatedMatches = [regex]::Matches(
-                $related,
-                '`(?<path>[^`]+)`'
-            )
-            if ($relatedMatches.Count -eq 0) {
-                $errors.Add(
-                    "$rootRelativeRecord Related metadata has no backticked path."
-                )
-            }
-            foreach ($relatedMatch in $relatedMatches) {
-                $relatedPath = $relatedMatch.Groups["path"].Value.Replace("\", "/")
-                $relatedPaths += $relatedPath
-                if (
-                    [System.IO.Path]::IsPathRooted($relatedPath) -or
-                    $relatedPath -match '(^|[\\/])\.\.([\\/]|$)'
-                ) {
-                    $errors.Add(
-                        "$rootRelativeRecord has an unsafe Related path: " +
-                        $relatedPath
-                    )
-                    continue
-                }
-                $relatedTarget = Join-Path $root $relatedPath
-                if (-not (Test-Path -LiteralPath $relatedTarget -PathType Leaf)) {
-                    $errors.Add(
-                        "$rootRelativeRecord has a missing Related path: " +
-                        $relatedPath
-                    )
-                }
-            }
-        }
-
-        $isDeliveryRecord = $set.Role -in @("task", "acceptance")
-        $isOpenDeliveryRecord = (
-            $isDeliveryRecord -and
-            $openDeliveryStatuses -contains $status
-        )
-
-        $pairPaths = @()
-        if ($isDeliveryRecord) {
-            if ([string]::IsNullOrWhiteSpace($pair)) {
-                $errors.Add("$rootRelativeRecord is missing Pair metadata.")
-            }
-            elseif ($pair -eq "None") {
-                $hasExceptionNote = (
-                    $content -match '(?m)^(Legacy|Operational) record note:'
-                )
-                if (
-                    $status -ne "Superseded" -and
-                    -not $hasExceptionNote
-                ) {
-                    $errors.Add(
-                        "$rootRelativeRecord uses Pair: None without being " +
-                        "Superseded or explaining a legacy/operational exception."
-                    )
-                }
-            }
-            else {
-                $pairMatches = [regex]::Matches(
-                    $pair,
-                    '`(?<path>[^`]+)`'
-                )
-                if ($pairMatches.Count -eq 0) {
-                    $errors.Add(
-                        "$rootRelativeRecord Pair metadata has no backticked path."
-                    )
-                }
-                foreach ($pairMatch in $pairMatches) {
-                    $pairPath = $pairMatch.Groups["path"].Value.Replace("\", "/")
-                    $pairPaths += $pairPath
-                    if (
-                        [System.IO.Path]::IsPathRooted($pairPath) -or
-                        $pairPath -match '(^|[\\/])\.\.([\\/]|$)'
-                    ) {
-                        $errors.Add(
-                            "$rootRelativeRecord has an unsafe Pair path: " +
-                            $pairPath
-                        )
-                        continue
-                    }
-                    $pairTarget = Join-Path $root $pairPath
-                    if (-not (Test-Path -LiteralPath $pairTarget -PathType Leaf)) {
-                        $errors.Add(
-                            "$rootRelativeRecord has a missing Pair path: " +
-                            $pairPath
-                        )
-                    }
-                    if ($relatedPaths -notcontains $pairPath) {
-                        $errors.Add(
-                            "$rootRelativeRecord Pair path is absent from " +
-                            "Related metadata: $pairPath"
-                        )
-                    }
-                }
-            }
-        }
-
-        if ($set.Role -eq "acceptance") {
-            if ([string]::IsNullOrWhiteSpace($decision)) {
-                $errors.Add("$rootRelativeRecord is missing Decision metadata.")
-            }
-            elseif ($set.Statuses -notcontains $decision) {
-                $errors.Add(
-                    "$rootRelativeRecord has invalid Decision '$decision'."
-                )
-            }
-            elseif ($decision -ne $status) {
-                $errors.Add(
-                    "$rootRelativeRecord Decision '$decision' does not match " +
-                    "Status '$status'."
-                )
-            }
-        }
-
-        if ($isDeliveryRecord) {
-            $roadmapRelativeRecord = [System.IO.Path]::GetRelativePath(
-                (Join-Path $root "docs"),
-                $recordFile.FullName
-            ).Replace("\", "/")
-            $matchingRoadmapRows = @(
-                $roadmapContent -split "`r?`n" |
-                    Where-Object {
-                        $_ -match '^\|' -and (
-                            $_ -match [regex]::Escape($rootRelativeRecord) -or
-                            $_ -match [regex]::Escape($roadmapRelativeRecord)
-                        )
-                    }
-            )
-            if (
-                $isOpenDeliveryRecord -and
-                $matchingRoadmapRows.Count -eq 0
-            ) {
-                $errors.Add(
-                    "Open task or acceptance record has no ROADMAP table row: " +
-                    $rootRelativeRecord
-                )
-            }
-            if ($matchingRoadmapRows.Count -gt 0) {
-                $escapedStatus = [regex]::Escape($status)
-                $matchingStatusRows = @(
-                    $matchingRoadmapRows |
-                        Where-Object {
-                            $_ -match "\|\s*${escapedStatus}\s*\|"
-                        }
-                )
-                if ($matchingStatusRows.Count -eq 0) {
-                    $errors.Add(
-                        "ROADMAP status does not match $rootRelativeRecord " +
-                        "Status '$status'."
-                    )
-                }
-            }
-        }
-
-        $controlledRecords += [pscustomobject]@{
-            Path = $rootRelativeRecord
-            Status = $status
-            Role = $role
-            RelatedPaths = $relatedPaths
-            PairPaths = $pairPaths
-            Decision = $decision
-            Content = $content
-        }
-
-        if (
-            $set.Role -eq "task" -and
-            $isOpenDeliveryRecord -and
-            $content -notmatch '(?m)^## Documentation Impact\s*$'
-        ) {
-            $errors.Add(
-                "Open task is missing a Documentation Impact section: " +
-                $rootRelativeRecord
-            )
-        }
-
-        if ($set.Role -eq "acceptance") {
-            $decisionSection = [regex]::Match(
-                $content,
-                '(?ms)^## Acceptance Decision\s*\r?\n' +
-                '(?<body>.*?)(?=^##\s|\z)'
-            )
-
-            if ($isOpenDeliveryRecord -and -not $decisionSection.Success) {
-                $errors.Add(
-                    "Open acceptance record is missing an Acceptance Decision " +
-                    "section: $rootRelativeRecord"
-                )
-            }
-            elseif ($decisionSection.Success) {
-                $currentDecisionMatch = [regex]::Match(
-                    $decisionSection.Groups["body"].Value,
-                    '(?m)^Current decision:\s*`(?<value>[^`]+)`'
-                )
-                if (-not $currentDecisionMatch.Success) {
-                    $errors.Add(
-                        "Acceptance Decision section is missing a parseable " +
-                        "Current decision: $rootRelativeRecord"
-                    )
-                }
-                elseif (
-                    $currentDecisionMatch.Groups["value"].Value.Trim() -ne $status
-                ) {
-                    $errors.Add(
-                        "Acceptance Current decision does not match Status " +
-                        "'$status': $rootRelativeRecord"
-                    )
-                }
-            }
-        }
-
-        if (
-            $set.Role -eq "acceptance" -and
-            $status -eq "Accepted" -and
-            $content -match '(?m)^\s*-\s+\[ \]'
-        ) {
-            $errors.Add(
-                "Accepted record still has unchecked criteria: " +
-                $rootRelativeRecord
-            )
-        }
-    }
-}
-
-$deliveryRecordsByPath = @{}
-foreach ($record in $controlledRecords) {
-    if ($record.Role -in @("task", "acceptance")) {
-        $deliveryRecordsByPath[$record.Path] = $record
-    }
-}
-
-foreach ($record in $deliveryRecordsByPath.Values) {
-    foreach ($pairPath in $record.PairPaths) {
-        if (-not $deliveryRecordsByPath.ContainsKey($pairPath)) {
-            $errors.Add(
-                "$($record.Path) Pair target is not a controlled task or " +
-                "acceptance record: $pairPath"
-            )
+    foreach ($match in [regex]::Matches($Value, '`(?<path>[^`]+)`')) {
+        $path = $match.Groups["path"].Value.Replace("\", "/")
+        if ([System.IO.Path]::IsPathRooted($path) -or $path -match '(^|/)\.\.(/|$)') {
+            $errors.Add("$Record has an unsafe $Field path: $path")
             continue
         }
+        if (-not (Test-Path -LiteralPath (Join-Path $root $path) -PathType Leaf)) {
+            $errors.Add("$Record has a missing $Field path: $path")
+        }
+        $paths += $path
+    }
+    if ($paths.Count -eq 0) {
+        $errors.Add("$Record $Field metadata has no backticked path.")
+    }
+    return $paths
+}
 
-        $pairedRecord = $deliveryRecordsByPath[$pairPath]
-        if ($record.Role -eq $pairedRecord.Role) {
-            $errors.Add(
-                "$($record.Path) Pair target has the same role " +
-                "'$($record.Role)': $pairPath"
-            )
+$records = @{}
+
+foreach ($set in $recordSets) {
+    $directory = Join-Path $root $set.Directory
+    if (-not (Test-Path -LiteralPath $directory)) { continue }
+
+    foreach ($file in Get-ChildItem -LiteralPath $directory -Filter "*.md" -File) {
+        $path = Get-RelativePath $file.FullName
+        $content = Get-Content -LiteralPath $file.FullName -Raw
+        $header = (Get-Content -LiteralPath $file.FullName -TotalCount 12) -join "`n"
+
+        if ($header -notmatch '(?m)^#\s+\S') {
+            $errors.Add("$path is missing a level-one title.")
         }
-        if ($pairedRecord.PairPaths -notcontains $record.Path) {
-            $errors.Add(
-                "One-sided delivery pair: $($record.Path) names $pairPath, " +
-                "but the target does not name it."
-            )
+
+        $status = Get-HeaderField $header "Status"
+        if ($null -eq $status) {
+            $errors.Add("$path is missing Status.")
         }
-        if ($record.Status -ne $pairedRecord.Status) {
-            $errors.Add(
-                "Paired task/acceptance statuses differ: " +
-                "$($record.Path)=$($record.Status), " +
-                "$($pairedRecord.Path)=$($pairedRecord.Status)"
-            )
+        elseif ($set.Statuses -notcontains $status) {
+            $errors.Add("$path has Status '$status'. Allowed: $($set.Statuses -join ', ')")
+        }
+
+        $lastUpdated = Get-HeaderField $header "Last updated"
+        $parsed = [datetime]::MinValue
+        if (-not [datetime]::TryParseExact(
+            $lastUpdated, "yyyy-MM-dd",
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::None, [ref]$parsed
+        )) {
+            $errors.Add("$path has a missing or invalid 'Last updated' date.")
+        }
+
+        $null = Get-BacktickedPaths (Get-HeaderField $header "Related") "Related" $path
+        $pairPaths = @(Get-BacktickedPaths (Get-HeaderField $header "Pair") "Pair" $path)
+
+        # Legacy acceptance records repeat the status in two more places.
+        $decision = Get-HeaderField $header "Decision"
+        if ($null -ne $decision -and $decision -ne $status) {
+            $errors.Add("$path Decision '$decision' does not match Status '$status'.")
+        }
+        $currentDecision = [regex]::Match($content, '(?m)^Current decision:\s*`(?<value>[^`]+)`')
+        if ($currentDecision.Success -and $currentDecision.Groups["value"].Value.Trim() -ne $status) {
+            $errors.Add("$path 'Current decision' does not match Status '$status'.")
+        }
+
+        $records[$path] = [pscustomobject]@{
+            Path = $path
+            Kind = $set.Kind
+            Status = $status
+            PairPaths = $pairPaths
+            Content = $content
+        }
+    }
+}
+
+# --- Delivery records against the roadmap ----------------------------------
+
+$roadmapRows = @(
+    (Get-Content -LiteralPath (Join-Path $root "docs/ROADMAP.md")) |
+        Where-Object { $_ -match '^\|' }
+)
+
+foreach ($record in $records.Values | Where-Object { $_.Kind -in @("task", "acceptance") }) {
+    $docsRelative = $record.Path -replace '^docs/', ''
+    $rows = @($roadmapRows | Where-Object {
+        $_.Contains("($docsRelative)") -or $_.Contains("($($record.Path))")
+    })
+
+    if ($closedStatuses -notcontains $record.Status -and $rows.Count -eq 0) {
+        $errors.Add("Open record has no ROADMAP row: $($record.Path) ($($record.Status))")
+    }
+    foreach ($row in $rows) {
+        if ($row -notmatch "\|\s*$([regex]::Escape($record.Status))\s*\|") {
+            $errors.Add("ROADMAP row status differs from $($record.Path) Status '$($record.Status)'.")
+        }
+    }
+
+    if ($record.Status -eq "Accepted" -and $record.Content -match '(?m)^\s*-\s+\[ \]') {
+        $errors.Add("Accepted record still has unchecked boxes: $($record.Path)")
+    }
+
+    foreach ($pairPath in $record.PairPaths) {
+        $paired = $records[$pairPath]
+        if ($null -eq $paired) {
+            $errors.Add("$($record.Path) pairs with a non-record: $pairPath")
+            continue
+        }
+        if ($paired.PairPaths -notcontains $record.Path) {
+            $errors.Add("One-sided pair: $($record.Path) names $pairPath, which does not name it back.")
+        }
+        if ($paired.Status -ne $record.Status) {
+            $errors.Add("Paired statuses differ: $($record.Path)=$($record.Status), $pairPath=$($paired.Status)")
         }
     }
 }
 
 if ($errors.Count -gt 0) {
     foreach ($message in $errors) {
-        Write-Error $message
+        Write-Error $message -ErrorAction Continue
     }
     exit 1
 }
 
-$successMessage = (
-    "Documentation checks passed: {0} Markdown files, {1} controlled records, " +
-    "status snapshot {2}."
-) -f (
-    $markdownFiles.Count,
-    $controlledRecordCount,
-    $roadmapDate
-)
-Write-Host $successMessage
+Write-Host ("Documentation checks passed: {0} Markdown files, {1} records." -f $markdownFiles.Count, $records.Count)

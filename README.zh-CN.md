@@ -2,95 +2,36 @@
 
 语言：[English](README.md) | [简体中文](README.zh-CN.md)
 
-Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的个人音乐库使用。项目包含 FastAPI 后端、PostgreSQL、媒体处理 Worker、React/Vite Web 管理端，以及 Kotlin/Jetpack Compose Android 播放客户端。
+Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌。它从你自己的曲库里回答"现在该听什么"，依据是场景、类型、特征三类标签，加上播放历史和"听腻了""今天不想听"这类反馈。
 
-这个项目适合用来管理自己的音乐库：上传或导入歌曲，编辑标签和元数据，在 Web 或 Android 上播放音乐，在 Android 上手动离线缓存，管理歌单和播放队列，并使用规则推荐和可选的 AI 标签建议。
-
-## 项目状态
-
-当前状态的唯一权威记录是 [docs/ROADMAP.md](docs/ROADMAP.md)。以下公开摘要已于
-2026-11-04 从路线图同步。
-
-<!-- status-snapshot: 2026-11-04 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented; AI auto-tagging=Implemented; Deploy update script=Implemented -->
-
-- MVP Phase 0 到 Phase 7 已实现，并完成本地验收。
-- V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
-- V2 导入/视频、歌单、Recommendation V2 基础、标签简化和 AI Tag Suggestions V2 已实现并验收。
-- V2.2 客户端播放队列已实现；后续播放控制修复仍缺少针对性的 Web 手动回归检查。
-- 首次真实 Ubuntu/domain/HTTPS 功能 smoke 已在 `develop` 上通过，但因未记录 Ubuntu
-  具体版本，状态仍为 `Implemented` 而非 `Accepted`，见
-  [生产 smoke 记录](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)。
-- Web 和 Android 的第一轮 UI 优化已实现并通过自动检查，但尚未记录手动视觉/流程验收。
-- Web 界面重设计（新的视觉体系、统一底部播放栏、曲库多选工具栏、更简单的编辑与上传流程、移动端布局）已实现，并通过类型检查、构建和本地浏览器冒烟测试；仍需所有者在真实曲库上确认，见
-  [重设计验收记录](docs/ACCEPTANCE/WEB_UI_REDESIGN_ACCEPTANCE.md)。
-- Android 界面重设计（与 Web 一致的视觉语言、封面图、在任意列表直接播放、每个标签页都有迷你播放器、支持系统返回键、更清晰的缓存/歌单/推荐界面、深色模式）已实现，并通过单元测试、debug 构建和模拟器冒烟测试；仍需在真机上确认，见
-  [Android 重设计验收记录](docs/ACCEPTANCE/ANDROID_UI_REDESIGN_ACCEPTANCE.md)。
-- 登录会话自动续期（轮换式刷新令牌，Web 和 Android 静默重新认证）已实现，并通过后端测试、本地 Web 冒烟测试和 Android 单元测试；仍需在 Android 真机上验证，见
-  [登录续期验收记录](docs/ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md)。
-- 播放音量统一（服务端测量响度，并给每个播放 MP3 写入一个固定增益，附带老曲目回填命令）已实现，并通过后端测试、真实 ffmpeg 验证和生产环境回填；仍需所有者实际试听，见
-  [音量统一验收记录](docs/ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md)。
-- AI 自动打标签（worker 分批给未打标签的曲目套用已有标签，推荐时权重低于手动标签，附带老曲目回填命令和 Web 曲库页的“AI 打标签”按钮）已实现，并通过后端测试；仍需用真实 AI 服务运行一次并由所有者检查结果，见
-  [自动打标签验收记录](docs/ACCEPTANCE/AI_AUTO_TAGGING_ACCEPTANCE.md)。
-- 仓库自带的生产更新脚本（`deploy/update.sh`，支持主机专属 compose 覆盖文件，数据库备份可直接恢复）已实现，恢复演练已通过；仍需在真实服务器上运行一次，见
-  [更新脚本验收记录](docs/ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md)。
-
-Easy Music 现在采用“私人稳定版”方向，不再计划完整实现 V2.6。后续开发只从所有者真实使用中遇到的具体问题逐项选择，优先维护、安全和数据保护，而不是扩张产品范围。
+这是一个私人的单用户项目，包含 FastAPI 后端（PostgreSQL 和媒体处理 Worker）、React/Vite Web 管理端，以及 Kotlin/Jetpack Compose Android 播放器。当前状态和待办见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 ## 功能
 
-- 登录保护的个人音乐库。
-- 支持上传 MP3、FLAC、M4A、WAV、OGG、AAC 音频文件。
-- 可选的用户上传视频转音频处理。
-- 安全的服务端导入预览，以及从配置好的导入根目录确认导入。
-- 后台 Worker 处理元数据提取、播放文件生成、封面提取、重复信号和处理状态更新。
-- 曲目、标签、封面、歌单和播放队列管理。
-- Web 播放，以及 Android Media3 播放和后台控制。
-- Android 手动离线缓存和播放事件同步。
-- 基于规则的推荐，支持反馈、冷却模式、`not_today` 和歌单评分信号。
-- AI Assistant V1 和 AI 标签建议，使用 OpenAI-compatible provider，默认关闭，需显式配置。
-- 基于 Docker Compose 的生产部署，包含 Caddy HTTPS 反向代理、主机目录初始化、健康检查和数据库备份脚本。
+- 需要登录的个人曲库，Web 和 Android 会在后台自动续期登录。
+- 支持上传 MP3、FLAC、M4A、WAV、OGG、AAC；可从用户自己提供的视频中提取音频；可从服务器上配置好的目录只读预览后导入。
+- Worker 负责提取元数据和封面、记录重复检测信号，并生成响度统一的 MP3 播放文件，原始文件保持不变。
+- 在 Web 管理端管理曲目、标签、封面、歌单和播放队列。
+- Web 播放；Android 使用 Media3 播放，支持后台、通知栏、锁屏和耳机控制，支持手动离线缓存，离线播放记录联网后同步。
+- 基于规则的推荐，考虑反馈、冷却模式、`not_today` 和歌单信号。
+- 可选 AI（OpenAI 兼容接口）：用自然语言提出听歌需求、单曲标签建议、基于你自己标签库的批量自动打标签。AI 从不直接挑选曲目，未配置时默认关闭。
+- 生产环境使用 Docker Compose 部署，经 Caddy 提供 HTTPS，附带更新脚本和数据库备份。
 
-## 项目入口
+## 仓库结构
 
-### 运行地址
-
-本地开发默认入口：
-
-| 入口 | 地址 |
+| 路径 | 用途 |
 | --- | --- |
-| Web 管理端 | `http://127.0.0.1:8081/` |
-| 后端 API | `http://127.0.0.1:8000/` |
-| 健康检查 | `http://127.0.0.1:8000/health` |
-| FastAPI OpenAPI 文档 | `http://127.0.0.1:8000/docs` |
-
-生产环境使用 `.env.production` 中配置的 HTTPS origin，例如 `https://music.example.com`。如果上游网络屏蔽入站 80/443，也可以使用高端口 HTTPS，例如 `https://music.example.com:25443`。
-
-### 仓库结构
-
-| 路径 | 说明 |
-| --- | --- |
-| `backend/` | FastAPI 应用、SQLAlchemy 模型、Alembic 迁移、认证、API、服务、Worker 和测试。 |
+| `backend/` | FastAPI 应用、SQLAlchemy 模型、Alembic 迁移、服务层、Worker、测试。 |
 | `web/` | React/Vite Web 管理端。 |
 | `android/` | Kotlin/Jetpack Compose Android 应用。 |
-| `deploy/` | Caddy 配置、主机目录初始化脚本、数据库备份脚本。 |
-| `docs/` | 产品、架构、开发流程、部署、任务和验收文档。 |
-| `docker-compose.yml` | 本地开发服务。 |
-| `docker-compose.prod.yml` | 生产服务。 |
-| `.env.example` | 开发环境示例配置，不包含真实密钥。 |
-| `.env.production.example` | 生产环境模板，只包含占位符。 |
+| `deploy/` | Caddy 配置、主机初始化、更新和备份脚本。 |
+| `docs/` | 产品、架构、开发、部署文档和工作记录。 |
+| `docker-compose.yml`、`docker-compose.prod.yml` | 本地和生产环境服务。 |
+| `.env.example`、`.env.production.example` | 只含占位值的环境变量模板。 |
 
-## 快速开始：本地开发
+## 快速开始
 
-前置要求：
-
-- Docker Engine 和 Docker Compose plugin。
-- Python 3.12，用于后端本机测试和命令。
-- Node.js 20.19+ 或 22.12+，用于 Web 应用。
-- FFmpeg 和 ffprobe，用于本机媒体处理 smoke。
-- Android Studio 或 Android SDK platform tools，用于 Android 开发。
-
-从仓库根目录启动后端栈：
+需要：带 Compose 的 Docker、Node.js 20.19+ 或 22.12+；开发 Android 还需要 Android Studio 或 Android SDK。在仓库根目录的 PowerShell 中运行：
 
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
@@ -100,182 +41,35 @@ docker compose exec `
   -e EASY_MUSIC_INITIAL_PASSWORD="replace-with-a-local-password" `
   api python -m app.auth.initial_user --username admin
 docker compose up -d worker-loop
-```
 
-如果数据库里已经有初始用户，继续使用现有账号即可。初始用户命令是一次性的，如果已有用户会拒绝继续创建。
-
-启动 Web 管理端：
-
-```powershell
 cd web
 npm install
 $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
 npm run dev
 ```
 
-打开 `http://127.0.0.1:8081/`，使用本地 admin 账号登录，上传一个小的受支持音频文件，等待 Worker 将状态从 `processing` 处理到 `ready`。
+打开 `http://127.0.0.1:8081/`，用 `admin` 登录，上传一个短音频，等它变成 `ready`。API 地址是 `http://127.0.0.1:8000`，OpenAPI 文档在 `/docs`。
 
-## 后端开发
-
-从 `backend/` 目录进行本机后端开发：
-
-```powershell
-cd backend
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-$env:DATABASE_URL = "postgresql+psycopg://easy_music:change-me-development-only@localhost:5432/easy_music_dev"
-$env:MEDIA_ROOT = ".\media"
-.\.venv\Scripts\python.exe -m alembic upgrade head
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-处理一个待处理的 Worker 任务：
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m app.worker
-```
-
-持续运行 Worker：
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m app.worker --loop --poll-interval 5
-```
-
-运行后端测试：
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pytest
-```
-
-## Web 开发
-
-```powershell
-cd web
-npm install
-$env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
-npm run dev
-```
-
-常用检查：
-
-```powershell
-cd web
-npm run typecheck
-npm run build
-```
-
-当前 `web/package.json` 还没有配置 `npm run lint`。
-
-## Android 开发和使用
-
-构建并测试 Android 应用：
-
-```powershell
-cd android
-.\gradlew.bat build
-.\gradlew.bat test
-```
-
-Android 默认 API 地址是 `http://10.0.2.2:8000`，适合 Android 模拟器访问开发机上的后端。
-
-如果是真机连接本地后端，可以使用 `adb reverse`，或构建时传入一个手机可访问的 API 地址：
-
-```powershell
-adb reverse tcp:8000 tcp:8000
-cd android
-.\gradlew.bat assembleDebug -PeasyMusicApiBaseUrl=http://127.0.0.1:8000
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-```
-
-生产 Android APK 需要在构建时传入部署后的 HTTPS origin。不要把真实域名写进源码：
-
-```powershell
-cd android
-.\gradlew.bat assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-```
-
-如果生产环境使用高端口 HTTPS：
-
-```powershell
-cd android
-.\gradlew.bat assembleDebug -PeasyMusicApiBaseUrl=https://music.example.com:25443
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-```
-
-安装后，在手机上打开 Easy Music，使用服务器上的同一个账号登录，进入曲库，播放一个 `ready` 状态的曲目。
-
-## 生产部署摘要
-
-生产部署与运维流程的唯一权威文档是
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)，请按该文档操作，不要从本摘要复制命令。
-
-- 不要提交 `.env.production`。
-- 不要提交真实域名、密码、API key、Bearer token 或私有主机路径。
-- Web 构建前必须将 `VITE_API_BASE_URL` 设置为公开 HTTPS origin。
-- Android 生产 APK 通过 `-PeasyMusicApiBaseUrl=...` 传入公开 API origin。
-- 公网 80/443 可用时采用标准自动 HTTPS；否则按部署文档使用高端口和 DNS
-  验证证书方案。
-- 每个新环境都要验证 Compose 配置、迁移、HTTPS 健康检查、登录、
-  上传/处理/播放、日志和备份。
-
-## 验证
-
-提交 PR 或部署前建议按改动范围选择检查：
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pytest
-```
-
-```powershell
-cd web
-npm run typecheck
-npm run build
-```
-
-```powershell
-cd android
-.\gradlew.bat test
-.\gradlew.bat build
-```
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
-```
-
-部署相关改动还应检查 `.env.production.example`、`docker-compose.prod.yml`、Caddy 配置、host setup、backup 脚本和 `docs/DEPLOYMENT.md`。
+在主机上直接运行后端、构建 Android、运行各项检查，见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。生产部署见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
 ## 文档
 
-建议从这些文档开始：
-
-- [文档导航与更新规则](docs/README.md)
+- [文档指南](docs/README.md)：每类信息由哪份文档负责。
+- [路线图](docs/ROADMAP.md)：状态和待办。
 - [产品需求](docs/PRD.md)
-- [系统架构](docs/ARCHITECTURE.md)
-- [路线图](docs/ROADMAP.md)
-- [开发流程](docs/DEVELOPMENT.md)
+- [架构](docs/ARCHITECTURE.md)
+- [开发](docs/DEVELOPMENT.md)
 - [环境变量](docs/ENVIRONMENT.md)
 - [生产部署](docs/DEPLOYMENT.md)
 - [API 手动测试](docs/API_MANUAL_TESTING.md)
-- [Git 工作流](docs/GIT_WORKFLOW.md)
-- [Ubuntu 生产 smoke 记录](docs/ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md)
-- [UI 优化工作记录](docs/TASKS/NEXT_UI_OPTIMIZATION_TASKS.md)
+- [Agent 指南](AGENTS.md)
 
-验收证据位于 `docs/ACCEPTANCE/`，任务计划和完成记录位于 `docs/TASKS/`；
-两者都不能替代路线图作为当前状态的唯一来源。
+## 安全
 
-## 安全和密钥
-
-- 只提交示例环境文件。
-- 不要提交 `.env`、`.env.production`、生产域名、密码、API key、Bearer token、个人路径、媒体库、构建产物、依赖目录或数据库文件。
-- AI 功能默认关闭，只有在明确配置 provider 凭据后再启用。
-- 导入根目录必须显式配置，使用专用目录，并避免指向仓库、用户 home 目录或 Easy Music 管理的媒体目录。
-- 生产环境不要把 PostgreSQL 直接暴露到公网。
+- 只提交示例环境变量文件。`.env`、`.env.production`、域名、密码、API Key、令牌、个人路径、媒体文件和数据库都不要进版本库。
+- 导入目录要明确指定，并放在仓库、用户主目录和受管媒体目录之外。
+- 不要把 PostgreSQL 暴露到公网。
 
 ## License
 
-当前仓库还没有包含 license 文件。在添加 license 前，不应假定该项目具备公开复用授权。
+仓库没有附带许可证文件。除查看外，不要默认拥有任何复用权利。

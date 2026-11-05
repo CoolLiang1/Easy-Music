@@ -1,58 +1,33 @@
-# <Feature Slice> Tasks
+# <Slice Title>
 
 Status: Planned
 Last updated: YYYY-MM-DD
-Canonical role: task
-Related: `docs/ACCEPTANCE/<FEATURE_SLICE>_ACCEPTANCE.md`, `docs/ROADMAP.md`
-Pair: `docs/ACCEPTANCE/<FEATURE_SLICE>_ACCEPTANCE.md`
+Related: `docs/ROADMAP.md`
 
-## Goal
+## Problem
 
-State the user outcome and why this slice exists.
+What the owner ran into, in their words where possible, and why it matters.
 
 ## Scope
 
-In scope:
+- In scope: ...
+- Out of scope: ...
 
-- ...
+## Changes
 
-Out of scope:
+API, data model, migration, environment, deployment, and client changes, with
+any one-time step the owner must run (backfill, re-cache, new variable).
 
-- ...
+## Verification
 
-## Dependencies And Contracts
+Automated:
 
-- Existing behavior and documents that must remain compatible.
-- API, data, Web, Android, deployment, or migration boundaries.
+- [ ] Command and result.
 
-## Implementation Tasks
+Owner checks (leave empty if none are needed):
 
-- [ ] ...
+- [ ] What the owner should try in real use, and what should happen.
 
-## Acceptance Criteria
+## Notes
 
-- ...
-
-## Verification Plan
-
-- Automated:
-- Manual:
-- Environment/device requirements:
-
-## Documentation Impact
-
-- [ ] Task status and completion notes
-- [ ] Acceptance evidence
-- [ ] Roadmap status or next work
-- [ ] English and Chinese README summaries
-- [ ] PRD / architecture / specification
-- [ ] Development / environment / deployment / API testing
-- [ ] AGENTS.md stable rules
-
-N/A reasons:
-
-- ...
-
-## Progress Notes
-
-- YYYY-MM-DD: ...
+- YYYY-MM-DD: Decisions, known gaps, follow-ups.
