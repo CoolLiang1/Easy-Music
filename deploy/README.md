@@ -9,8 +9,11 @@ production deployment flow documented in `docs/DEPLOYMENT.md`.
   certificate, useful when upstream networks block inbound 80/443.
 - `setup-host.sh`: non-destructive host directory and ownership setup for media,
   temporary video inputs, PostgreSQL data, and backups.
-- `backup-db.sh`: compressed PostgreSQL dump helper that writes backup files and
-  does not delete old backups.
+- `backup-db.sh`: compressed PostgreSQL dump helper that writes restorable
+  (`--clean --if-exists`), mode `600` backup files and does not delete old
+  backups.
+- `update.sh`: deploys the checked-out commit (backup, Web build, image build,
+  migrations, health checks). Run with `sudo`; it never runs `git`.
 
 Keep real domains, passwords, API keys, and `.env.production` out of version
 control.

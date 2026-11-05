@@ -61,10 +61,15 @@ Decision: Implemented
 - [x] Flow: `python -m app.worker.renormalize --help` in the backend image.
   - Expected: command loads and shows `--track-id`, `--all`, `--dry-run`.
   - Observed: as expected.
-- [ ] Flow: production `alembic upgrade head`, `renormalize --dry-run`, then
+- [x] Flow: production `alembic upgrade head`, `renormalize --dry-run`, then
   `renormalize`.
   - Expected: every ready track regenerated, or failures listed for retry.
-  - Observed: not run (production access is the owner's).
+  - Observed: 2026-11-04 on the owner's server (Ubuntu 26.04.1 LTS, stack at
+    `a9d8e81`): schema at `20261104_0014`; dry-run listed 57 tracks;
+    `renormalize` finished `57 regenerated, 0 failed` in about 11.5 minutes.
+    Measured source loudness ranged from -13.4 to -2.9 LUFS (gains
+    -2.6 to -13.2 dB). All 57 tracks have `loudness_version=1`; a second
+    dry-run reported no tracks to process.
 - [ ] Flow: owner listening across consecutive tracks on Web and Android after
   backfill and Android re-cache.
   - Expected: no startling loudness jumps.
@@ -72,7 +77,7 @@ Decision: Implemented
 
 ## Known Gaps
 
-- Production backfill and owner listening review are not yet recorded.
+- Owner listening review is not yet recorded.
 - Android offline copies cached before the backfill keep the old audio until
   re-cached; there is no automatic stale-cache detection in this slice.
 - The real-ffmpeg check used synthetic sources rather than real music.
