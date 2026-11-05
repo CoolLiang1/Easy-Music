@@ -1,6 +1,6 @@
 package com.easymusic.app.ui
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -50,7 +49,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.easymusic.app.R
 import com.easymusic.app.ShortcutRoutes
 import com.easymusic.app.auth.domain.AuthSession
 import com.easymusic.app.library.LibraryRoutes
@@ -262,18 +263,11 @@ fun BrandMark(
     modifier: Modifier = Modifier,
     size: androidx.compose.ui.unit.Dp = 30.dp,
 ) {
-    Box(
+    Image(
+        painter = painterResource(R.drawable.easy_music_brand_mark),
+        contentDescription = null,
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(size * 0.28f))
-            .background(com.easymusic.app.ui.theme.EasyMusicThemeTokens.colors.deck),
-        contentAlignment = androidx.compose.ui.Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Default.MusicNote,
-            contentDescription = null,
-            tint = com.easymusic.app.ui.theme.EasyMusicThemeTokens.colors.signal,
-            modifier = Modifier.size(size * 0.6f),
-        )
-    }
+            .clip(RoundedCornerShape(size * 0.24f)),
+    )
 }
