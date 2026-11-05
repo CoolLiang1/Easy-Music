@@ -4,7 +4,7 @@
   "description": "Self-hosted personal cloud music for scenario-based listening.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#faf5ed",
+  "background_color": "#f4e1c5",
   "theme_color": "#faf5ed",
   "icons": [
     {

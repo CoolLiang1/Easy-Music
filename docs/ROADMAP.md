@@ -28,6 +28,7 @@ the slice's acceptance record and move the row to History.
 | Auth session renewal | Implemented | [task](TASKS/AUTH_SESSION_RENEWAL_TASKS.md) / [acceptance](ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md) | Android device check; no unexpected sign-outs in daily use. |
 | Playback loudness normalization | Implemented | [task](TASKS/PLAYBACK_LOUDNESS_NORMALIZATION_TASKS.md) / [acceptance](ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md) | Re-cache Android offline tracks; owner listening check. The production backfill is done. |
 | AI auto-tagging | Implemented | [task](TASKS/AI_AUTO_TAGGING_TASKS.md) / [acceptance](ACCEPTANCE/AI_AUTO_TAGGING_ACCEPTANCE.md) | PostgreSQL migration check, a real-provider run (worker or the Web "AI 打标签" button), owner review of tag quality. |
+| App icon redesign | Implemented | [task](TASKS/APP_ICON_REDESIGN.md) | Check the launcher icon on the real phone and the Web icons in daily use. |
 | AI metadata clean-up | Implemented | [task](TASKS/AI_METADATA_CLEANUP.md) | Owner runs 标题与艺人 on the production library and reviews the suggestions. |
 | Deploy update script | Implemented | [task](TASKS/DEPLOY_UPDATE_SCRIPT_TASKS.md) / [acceptance](ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md) | First run on the real server. |
 | First Ubuntu production smoke | Implemented | [acceptance](ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md) | Record the server's Ubuntu release (`lsb_release -a`); production has run since. |
