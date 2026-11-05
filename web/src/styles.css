@@ -3867,23 +3867,73 @@ details.disclosure > .disclosure-body {
    Metadata clean-up review
    ========================================================================== */
 
+.metadata-callout {
+  margin-bottom: 14px;
+}
+
+.metadata-progress {
+  display: grid;
+  flex: 1 1 220px;
+  max-width: 360px;
+  gap: 2px;
+  color: var(--text-2);
+  font-size: 0.84rem;
+}
+
+.metadata-progress .progress {
+  margin-top: 0;
+}
+
+.metadata-bulk {
+  margin-left: auto;
+  gap: 4px;
+}
+
 .metadata-table td {
   vertical-align: top;
+}
+
+.metadata-table td:nth-child(2) {
+  width: 52%;
   min-width: 260px;
+}
+
+.metadata-table td:nth-child(3) {
+  width: 30%;
+  min-width: 220px;
+}
+
+.metadata-table td.col-num,
+.metadata-table td:last-child {
+  padding-top: 13px;
+  white-space: nowrap;
+}
+
+.metadata-table tbody tr.is-analyzing {
+  background: var(--info-soft);
 }
 
 .metadata-cell {
   display: grid;
   gap: 6px;
   min-width: 0;
+  padding: 4px 0;
 }
 
 .metadata-current {
   overflow: hidden;
-  color: var(--text-3);
-  font-size: 0.82rem;
+  color: var(--text);
+  font-weight: 560;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.metadata-current.is-old {
+  color: var(--text-3);
+  font-size: 0.82rem;
+  font-weight: 450;
+  text-decoration: line-through;
+  text-decoration-color: var(--line-strong);
 }
 
 .metadata-edit {
@@ -3903,7 +3953,6 @@ details.disclosure > .disclosure-body {
   flex: none;
 }
 
-.metadata-same {
-  font-size: 0.82rem;
-  line-height: 32px;
+.metadata-note {
+  font-size: 0.8rem;
 }

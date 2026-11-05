@@ -158,13 +158,16 @@ unconfigured, or failing, the call returns `200` with that `provider_status`
 Reviewed title and artist clean-up, as used by the Web page 标题与艺人:
 
 ```powershell
-(Invoke-RestMethod -Uri "$api/api/ai/metadata-cleanup/status" -Headers $headers).pending_count
+$status = Invoke-RestMethod -Uri "$api/api/ai/metadata-cleanup/status" -Headers $headers
+$status.pending_count; $status.pending_tracks | Select-Object -First 5
 $batch = Invoke-RestMethod -Method Post -Uri "$api/api/ai/metadata-cleanup/next-batch" `
   -Headers $headers -ContentType "application/json" -Body '{"after_id": null}'
 $batch.suggestions | Format-Table track_id, current_title, suggested_title, suggested_artist, artist_confidence
 ```
 
-Expected: `next-batch` looks at up to 5 pending tracks after `after_id` and
+Expected: `status` lists pending tracks oldest first in `pending_tracks`
+(capped at 2000), with the total in `pending_count`. `next-batch` looks at up
+to 5 pending tracks after `after_id` and
 saves nothing. Pass `next_after_id` to continue. To save, send the accepted
 values and every reviewed id:
 

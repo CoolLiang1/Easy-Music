@@ -472,11 +472,25 @@ class AiMetadataBatchOutput(BaseModel):
         return _keep_valid_items(value, AiMetadataTrackOutput)
 
 
+class PendingMetadataTrack(BaseModel):
+    """A ready track still waiting for a title/artist review."""
+
+    track_id: int
+    title: str
+    artist: str | None = None
+    duration_seconds: int | None = None
+
+
 class MetadataCleanupStatusResponse(BaseModel):
-    """Response for ``GET /api/ai/metadata-cleanup/status``."""
+    """Response for ``GET /api/ai/metadata-cleanup/status``.
+
+    ``pending_tracks`` lists the pending tracks in review order (oldest id
+    first), capped at ``MAX_PENDING_LISTED``; ``pending_count`` is the total.
+    """
 
     provider_status: AiProviderStatus
     pending_count: int
+    pending_tracks: list[PendingMetadataTrack] = Field(default_factory=list)
 
 
 class MetadataCleanupBatchRequest(BaseModel):

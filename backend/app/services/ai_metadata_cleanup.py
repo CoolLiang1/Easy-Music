@@ -46,6 +46,9 @@ METADATA_MAX_TOKENS = 8192
 ARTIST_MIN_CONFIDENCE = 0.5
 ARTIST_PRESELECT_CONFIDENCE = 0.8
 MAX_FIELD_LENGTH = 255
+# The review page lists pending tracks up front; a single-owner library stays
+# well below this.
+MAX_PENDING_LISTED = 2000
 _TRUNCATED_ERROR_TYPE = "output_truncated"
 
 _SYSTEM_INSTRUCTION = """\
@@ -119,6 +122,13 @@ def count_pending_tracks(db: Session, *, user_id: int, after_id: int | None = No
     if after_id is not None:
         statement = statement.where(Track.id > after_id)
     return db.scalar(statement) or 0
+
+
+def list_pending_tracks(db: Session, *, user_id: int, limit: int = MAX_PENDING_LISTED) -> list[Track]:
+    """The owner's pending tracks in review order, so the page can list them."""
+    return list(
+        db.scalars(_pending_statement(user_id, None).order_by(Track.id).limit(max(1, limit))),
+    )
 
 
 def suggest_next_batch(

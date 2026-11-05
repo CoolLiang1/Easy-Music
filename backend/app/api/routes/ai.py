@@ -24,6 +24,7 @@ from app.schemas.ai import (
     MetadataCleanupBatchRequest,
     MetadataCleanupBatchResponse,
     MetadataCleanupStatusResponse,
+    PendingMetadataTrack,
     ParsedIntentResponse,
     ParseListeningIntentRequest,
     TagSuggestionRequest,
@@ -221,10 +222,20 @@ def metadata_cleanup_status(
     db: Annotated[Session, Depends(get_db)],
     ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
 ) -> MetadataCleanupStatusResponse:
-    """Report how many of the owner's ready tracks wait for a metadata review."""
+    """List the owner's ready tracks that wait for a title/artist review."""
+    pending = ai_metadata_cleanup.list_pending_tracks(db, user_id=current_user.id)
     return MetadataCleanupStatusResponse(
         provider_status=ai_provider.status,
         pending_count=ai_metadata_cleanup.count_pending_tracks(db, user_id=current_user.id),
+        pending_tracks=[
+            PendingMetadataTrack(
+                track_id=track.id,
+                title=track.title,
+                artist=track.artist,
+                duration_seconds=track.duration_seconds,
+            )
+            for track in pending
+        ],
     )
 
 
