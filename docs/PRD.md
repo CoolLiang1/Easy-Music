@@ -194,8 +194,11 @@ Version 1 supports:
 2. User uploads one or more audio files.
 3. Server saves original files.
 4. Worker extracts metadata and generates MP3 playback files.
-5. AI suggests title cleanup and tags based on filename and metadata.
-6. User confirms or edits tags.
+5. When AI auto-tagging is enabled, the worker applies tags from the owner's
+   catalogue based on filename and metadata. AI tags count less than owner
+   tags in recommendation.
+6. User corrects a wrong tag when noticing one; no per-track confirmation is
+   required. Per-track AI suggestions remain available on request.
 7. Tracks become available for recommendation and playback.
 
 ### 7.2 Android Listening
@@ -224,7 +227,8 @@ It should support:
   - "I want Japanese anime songs for studying, but not too noisy."
   - "Give me something energetic for exercise."
   - "I am tired of this style; find something similar but fresher."
-- Tag suggestion after upload
+- Tag suggestion on request, and automatic tagging from the owner's tag
+  catalogue without per-track confirmation
 - Recommendation reason generation
 - Simple organization suggestions
 

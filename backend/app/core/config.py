@@ -71,6 +71,16 @@ class Settings(BaseSettings):
     ai_api_key: str = Field(default="", validation_alias="AI_API_KEY")
     ai_model: str = Field(default="", validation_alias="AI_MODEL")
     ai_base_url: str = Field(default="", validation_alias="AI_BASE_URL")
+    ai_auto_tagging_enabled: bool = Field(
+        default=False,
+        validation_alias="AI_AUTO_TAGGING_ENABLED",
+    )
+    ai_auto_tagging_min_confidence: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        validation_alias="AI_AUTO_TAGGING_MIN_CONFIDENCE",
+    )
     ai_tag_search_enabled: bool = Field(
         default=False,
         validation_alias="AI_TAG_SEARCH_ENABLED",

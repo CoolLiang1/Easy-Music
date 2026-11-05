@@ -34,6 +34,17 @@ if TYPE_CHECKING:
 
 _VALID_GROUPS: frozenset = frozenset({"scene", "type", "feature"})
 
+# Shared with batch auto-tagging so both prompts describe the groups alike.
+TAXONOMY_GUIDE_LINES: tuple[str, ...] = (
+    "Taxonomy guide:",
+    "  scene = when or where the owner would listen, such as focus, sleep, "
+    "commute, workout, rainy day, late night.",
+    "  type = musical or content format, such as instrumental, vocal, OST, "
+    "podcast, live, lo-fi, piano.",
+    "  feature = sound, mood, energy, texture, era, season, or atmosphere, "
+    "such as calm, bright, heavy, warm, nostalgic.",
+)
+
 
 def suggest_tags_for_track(
     db: Session,
@@ -241,19 +252,7 @@ def _build_tag_suggestion_prompt(
 
     # Instruction
     lines.append("")
-    lines.append("Taxonomy guide:")
-    lines.append(
-        "  scene = when or where the owner would listen, such as focus, sleep, "
-        "commute, workout, rainy day, late night."
-    )
-    lines.append(
-        "  type = musical or content format, such as instrumental, vocal, OST, "
-        "podcast, live, lo-fi, piano."
-    )
-    lines.append(
-        "  feature = sound, mood, energy, texture, era, season, or atmosphere, "
-        "such as calm, bright, heavy, warm, nostalgic."
-    )
+    lines.extend(TAXONOMY_GUIDE_LINES)
     lines.append("")
     lines.append(
         "Suggest the most appropriate existing tags from the catalogue above. "

@@ -246,6 +246,52 @@ def test_feature_match_changes_order(db_session: Session) -> None:
     assert results[0].explanation.matched_tags["feature"][0].name == "Calm"
 
 
+def test_ai_applied_tags_count_less_than_owner_tags(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scene", "Focus")
+    owner_track = create_track(db_session, user, "Owner Tagged")
+    ai_track = create_track(db_session, user, "AI Tagged")
+    assign_tags(db_session, owner_track, focus)
+    db_session.add(TrackTag(track_id=ai_track.id, tag_id=focus.id, source="ai", confidence=0.9))
+    db_session.commit()
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scene_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert [result.track.title for result in results[:2]] == ["Owner Tagged", "AI Tagged"]
+    assert results[0].score == 3.0
+    # 3.0 * 0.9 confidence * 0.8 AI factor
+    assert results[1].score == 2.16
+    assert results[1].explanation.matched_tags["scene"][0].name == "Focus"
+    discount = results[1].explanation.penalties[0]
+    assert discount.label == "AI-inferred tags weighted lower: Focus"
+    assert discount.score_delta == -0.84
+    assert "AI-inferred tags weighted lower: Focus" in results[1].reason
+    assert results[0].explanation.penalties == []
+
+
+def test_ai_tag_match_still_ranks_above_untagged_track(db_session: Session) -> None:
+    user = create_user(db_session)
+    focus = create_tag(db_session, user, "scene", "Focus")
+    create_track(db_session, user, "Untagged Liked", liked=True)
+    ai_track = create_track(db_session, user, "AI Tagged")
+    db_session.add(TrackTag(track_id=ai_track.id, tag_id=focus.id, source="ai", confidence=0.6))
+    db_session.commit()
+
+    results = recommend_tracks(
+        db_session,
+        user,
+        RecommendationRequest(scene_tag_ids=[focus.id]),
+        now=NOW,
+    )
+
+    assert results[0].track.title == "AI Tagged"
+
+
 def test_default_soft_cooldown_keeps_track_but_not_today_is_excluded(
     db_session: Session,
 ) -> None:

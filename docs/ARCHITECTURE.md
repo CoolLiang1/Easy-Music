@@ -80,8 +80,10 @@ The backend keeps these modules separated at a high level:
 - AI assistant: provider abstraction, intent parsing, recommendation composition,
   and tag suggestions. Tag suggestions can optionally enrich their prompt with
   configured Tavily title/snippet/URL search summaries through the existing
-  suggest-tags endpoint only.
-- Worker: background job execution for media processing.
+  suggest-tags endpoint only. Batch auto-tagging applies catalogue tags to
+  ready tracks without per-track confirmation (see 8.4 and 9.2).
+- Worker: background job execution for media processing, plus one batch of AI
+  auto-tagging whenever the media queue is idle and auto-tagging is enabled.
 
 ## 4. Deployment
 
@@ -237,6 +239,7 @@ Version 1 is single-user, but tables should still include `user_id`.
 - `loudness_lufs`, `true_peak_dbtp`: measured on the original file
 - `playback_gain_db`: static gain baked into the playback file
 - `loudness_version`: normalization rule version; null means not normalized
+- `ai_tags_version`: AI auto-tagging rule version; null means not auto-tagged
 - `cover_path`
 - `source_url`
 - `format`
@@ -282,9 +285,22 @@ tags migrate to `scene`, existing `state` tags migrate to `feature`, and
 
 Possible sources:
 
-- user
-- ai
-- system
+- user: chosen by the owner; `confidence` is 1.0
+- ai: applied by batch auto-tagging; `confidence` is the AI confidence
+- system: reserved, currently unused
+
+Provenance rules:
+
+- Auto-tagging only uses tag ids from the owner's catalogue, drops tags below
+  `AI_AUTO_TAGGING_MIN_CONFIDENCE`, applies at most 8 per track, and never
+  changes `user` rows. Re-tagging a track replaces only its `ai` rows.
+- A track is auto-tagged once per `ai_tags_version`, so an `ai` tag the owner
+  removes stays removed until the rule version is bumped or the owner runs an
+  explicit re-tag.
+- Manual edits keep the row of a tag that stays (an `ai` tag stays `ai`). A tag
+  the owner adds through batch tag editing becomes `user`, including an
+  existing `ai` row.
+- Web and Android do not see provenance; they show all tags alike.
 
 ### 8.4.1 AiTagSearchCache
 
@@ -458,8 +474,12 @@ Supported user-provided video upload formats:
 5. Store a normalized metadata key and playback SHA-256 hash when available.
 6. Extract or generate cover if available.
 7. Create or update Track.
-8. Ask AI for tag suggestions.
-9. Mark track as ready or failed.
+8. Mark track as ready or failed.
+9. Later, while the worker's media queue is idle and
+   `AI_AUTO_TAGGING_ENABLED` is true, the worker auto-tags up to 10 ready
+   tracks per provider call. A failed batch changes nothing and pauses
+   auto-tagging for 10 minutes. `python -m app.worker.autotag` runs the same
+   step on demand.
 
 V1.1 also allows the owner to replace a track cover image from the Web Track
 Detail page. Replacement covers are stored under the configured cover media
@@ -558,7 +578,8 @@ Version 1 uses hybrid recommendation:
 ### 10.1 LLM Responsibilities
 
 - Parse natural language into structured context
-- Suggest tags for new tracks
+- Suggest tags for one track on request, and apply catalogue tags to tracks
+  in batches (auto-tagging); never create tags or choose tracks
 - Generate short recommendation reasons
 - Suggest library organization improvements
 
@@ -566,7 +587,9 @@ Version 1 uses hybrid recommendation:
 
 - Scene tag match
 - Type tag match
-- Feature tag match
+- Feature tag match (each match counts its group weight; an `ai` tag counts
+  weight × confidence × 0.8 and adds an explanation penalty line naming the
+  AI-inferred tags)
 - Like status
 - Recent playback
 - Cooldown mode (`off`, `soft`, or `strict`)

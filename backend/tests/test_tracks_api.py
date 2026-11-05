@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -213,6 +213,73 @@ def test_update_track_tag_associations(
 
     assert response.status_code == 200
     assert response.json()["tags"] == []
+
+
+def _track_tag_rows(db_session: Session, track: Track) -> dict[int, tuple[str, float]]:
+    db_session.expire_all()
+    return {
+        row.tag_id: (row.source, row.confidence)
+        for row in db_session.scalars(select(TrackTag).where(TrackTag.track_id == track.id))
+    }
+
+
+def test_update_track_tags_keeps_ai_rows_that_stay(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    focus = create_tag(db_session, user, name="Focus")
+    calm = create_tag(db_session, user, name="Calm")
+    loud = create_tag(db_session, user, name="Loud")
+    db_session.add_all(
+        [
+            TrackTag(track_id=track.id, tag_id=focus.id, source="ai", confidence=0.7),
+            TrackTag(track_id=track.id, tag_id=loud.id, source="ai", confidence=0.65),
+        ],
+    )
+    db_session.commit()
+
+    response = client.patch(
+        f"/api/tracks/{track.id}",
+        json={"tag_ids": [focus.id, calm.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert _track_tag_rows(db_session, track) == {
+        focus.id: ("ai", 0.7),
+        calm.id: ("user", 1.0),
+    }
+
+
+def test_batch_add_promotes_ai_tag_and_keeps_other_ai_tags(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    track = create_track(db_session, user)
+    focus = create_tag(db_session, user, name="Focus")
+    calm = create_tag(db_session, user, name="Calm")
+    db_session.add_all(
+        [
+            TrackTag(track_id=track.id, tag_id=focus.id, source="ai", confidence=0.7),
+            TrackTag(track_id=track.id, tag_id=calm.id, source="ai", confidence=0.8),
+        ],
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/tracks/batch-tags",
+        json={"track_ids": [track.id], "add_tag_ids": [focus.id]},
+        headers=auth_headers(user),
+    )
+
+    assert response.status_code == 200
+    assert _track_tag_rows(db_session, track) == {
+        focus.id: ("user", 1.0),
+        calm.id: ("ai", 0.8),
+    }
 
 
 def test_cannot_associate_another_users_tag(

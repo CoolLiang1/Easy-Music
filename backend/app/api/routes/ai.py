@@ -24,7 +24,7 @@ from app.schemas.ai import (
 )
 from app.services import ai_intent, ai_tag_suggestions
 from app.services.ai_provider import AiProviderService
-from app.services.ai_client import OpenAiCompatibleClient
+from app.services.ai_client import build_ai_provider
 from app.services.ai_tag_search import AiTagSearchService
 from app.services.ai_tag_search_client import TavilyTagSearchClient
 
@@ -36,11 +36,7 @@ def _get_ai_provider() -> AiProviderService:
     configured, otherwise leave it without one so callers get a clear
     disabled / unconfigured / not-implemented result.
     """
-    settings = get_settings()
-    client = None
-    if settings.ai_enabled and settings.ai_api_key and settings.ai_model:
-        client = OpenAiCompatibleClient(settings)
-    return AiProviderService(settings, client=client)
+    return build_ai_provider(get_settings())
 
 
 def _get_ai_tag_search() -> AiTagSearchService:

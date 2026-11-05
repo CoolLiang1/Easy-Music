@@ -250,6 +250,41 @@ class AiTagSuggestionOutput(BaseModel):
     explanation: str | None = None
 
 
+class AiAutoTagOutput(BaseModel):
+    """One tag the provider assigns to one track in a batch auto-tag call.
+
+    Lenient on purpose: one malformed item must not discard a whole batch.
+    Confidence is clamped by the service.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    tag_id: int
+    confidence: float = 0.5
+
+
+class AiAutoTagTrackOutput(BaseModel):
+    """Tags the provider assigns to one track of the batch."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    track_id: int
+    tags: list[AiAutoTagOutput] = Field(default_factory=list)
+
+
+class AiAutoTagBatchOutput(BaseModel):
+    """Shape the AI must return for a batch auto-tag call.
+
+    Every ``track_id`` must be one of the tracks in the prompt and every
+    ``tag_id`` must come from the supplied catalogue; the service drops
+    anything else.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    tracks: list[AiAutoTagTrackOutput] = Field(default_factory=list)
+
+
 class TagSuggestionResponse(BaseModel):
     """Response for ``POST /api/ai/tracks/{track_id}/suggest-tags``.
 

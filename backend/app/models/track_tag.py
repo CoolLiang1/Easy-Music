@@ -3,6 +3,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
+# Track-tag provenance. Owner-chosen rows use USER_TAG_SOURCE; batch AI
+# auto-tagging writes AI_TAG_SOURCE rows with the AI confidence.
+USER_TAG_SOURCE = "user"
+AI_TAG_SOURCE = "ai"
+
 
 class TrackTag(Base):
     __tablename__ = "track_tags"
@@ -16,4 +21,4 @@ class TrackTag(Base):
         primary_key=True,
     )
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
-    source: Mapped[str] = mapped_column(String(50), default="user")
+    source: Mapped[str] = mapped_column(String(50), default=USER_TAG_SOURCE)

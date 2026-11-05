@@ -49,6 +49,8 @@ contain placeholders only, not production-ready secrets.
 | `AI_API_KEY` | No | No | AI provider API key. Leave empty unless testing or deploying AI features with a real provider. Never commit a real key. |
 | `AI_MODEL` | No | No | AI model identifier used by the provider client. |
 | `AI_BASE_URL` | No | No | Base URL for the OpenAI-compatible provider. |
+| `AI_AUTO_TAGGING_ENABLED` | No | No | When `true` and the AI provider is configured, the worker applies AI catalogue tags to ready tracks not yet auto-tagged, one batch of up to 10 tracks while its media queue is idle. Defaults to `false`. `python -m app.worker.autotag` works without it. |
+| `AI_AUTO_TAGGING_MIN_CONFIDENCE` | No | No | Lowest AI confidence (0.0-1.0) for an auto-applied tag. Defaults to `0.6`. Raising it affects later batches only; run `python -m app.worker.autotag --all` to re-tag existing tracks. |
 | `AI_TAG_SEARCH_ENABLED` | No | No | Enables optional Tavily search context for `POST /api/ai/tracks/{track_id}/suggest-tags` only. Defaults to `false`. |
 | `AI_TAG_SEARCH_PROVIDER` | No | No | Suggest-tags search provider. The first supported value is `tavily`. |
 | `AI_TAG_SEARCH_API_KEY` | No | No | Tavily Search API key for tag suggestions. Never commit a real key. |

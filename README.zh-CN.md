@@ -12,7 +12,7 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
 2026-11-04 从路线图同步。
 
 <!-- status-snapshot: 2026-11-04 -->
-<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented; Deploy update script=Implemented -->
+<!-- roadmap-statuses: MVP Phase 0-7=Accepted; V1.1 workflow enhancements=Accepted; V2 import and video=Accepted; V2.1 playlists=Accepted; V2.2 playback queue=Implemented; V2 Recommendation Foundation=Accepted; V2.4 tag taxonomy=Accepted; V2.5 AI Tag Suggestions=Accepted; First Ubuntu/domain/HTTPS production smoke=Implemented; UI optimization round 1=Implemented; Web UI redesign=Implemented; Android UI redesign=Implemented; Auth session renewal=Implemented; Playback loudness normalization=Implemented; AI auto-tagging=Implemented; Deploy update script=Implemented -->
 
 - MVP Phase 0 到 Phase 7 已实现，并完成本地验收。
 - V1.1 工作流改进、重复检测、封面编辑、高级推荐解释、冷门复活曲目、报告和 Android 快捷入口已实现并验收。
@@ -30,6 +30,8 @@ Easy Music 是一个自托管的个人云音乐系统，面向按场景听歌的
   [登录续期验收记录](docs/ACCEPTANCE/AUTH_SESSION_RENEWAL_ACCEPTANCE.md)。
 - 播放音量统一（服务端测量响度，并给每个播放 MP3 写入一个固定增益，附带老曲目回填命令）已实现，并通过后端测试、真实 ffmpeg 验证和生产环境回填；仍需所有者实际试听，见
   [音量统一验收记录](docs/ACCEPTANCE/PLAYBACK_LOUDNESS_NORMALIZATION_ACCEPTANCE.md)。
+- AI 自动打标签（worker 分批给未打标签的曲目套用已有标签，推荐时权重低于手动标签，附带老曲目回填命令）已实现，并通过后端测试；仍需用真实 AI 服务运行一次并由所有者检查结果，见
+  [自动打标签验收记录](docs/ACCEPTANCE/AI_AUTO_TAGGING_ACCEPTANCE.md)。
 - 仓库自带的生产更新脚本（`deploy/update.sh`，支持主机专属 compose 覆盖文件，数据库备份可直接恢复）已实现，恢复演练已通过；仍需在真实服务器上运行一次，见
   [更新脚本验收记录](docs/ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md)。
 
