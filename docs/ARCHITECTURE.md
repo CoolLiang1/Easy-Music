@@ -103,7 +103,9 @@ queues.
 - Apply records `ai_metadata_version` on every reviewed track, accepted or
   not, so it is offered once per version.
 - Clients show the artist under a title; album is kept in the data but not
-  shown in lists.
+  shown in lists. The Web track form edits only title, artist, and source
+  link. Album, content type, and cooldown stay in the data and the API;
+  cooldown is set by "tired" feedback, not by hand.
 
 ## Media Processing
 

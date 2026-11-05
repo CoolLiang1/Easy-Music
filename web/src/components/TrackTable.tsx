@@ -1,10 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import {
-  formatContentTypeLabel,
-  formatDuration,
-  formatShortDate,
-} from "../i18n/zh";
+import { formatDuration, formatShortDate } from "../i18n/zh";
 import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
 import { RouteLink } from "../routes/RouteLink";
 import { navigateTo } from "../routes/router";
@@ -133,9 +129,6 @@ export function TrackTable({
             <th className="hide-md" scope="col">
               标签
             </th>
-            <th className="hide-lg" scope="col">
-              类型
-            </th>
             <th className="col-num hide-sm" scope="col">
               时长
             </th>
@@ -218,7 +211,6 @@ export function TrackTable({
                     <span className="faint">—</span>
                   )}
                 </td>
-                <td className="hide-lg col-date">{formatContentTypeLabel(track.content_type)}</td>
                 <td className="col-num hide-sm">{track.duration_seconds === null ? "—" : formatDuration(track.duration_seconds)}</td>
                 <td className="hide-md col-date">{formatShortDate(track.created_at)}</td>
                 <td className="col-actions">
