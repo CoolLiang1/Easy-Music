@@ -1627,6 +1627,40 @@ editing UI. Verify:
 6. Provider disabled, unconfigured, or error states remain visible without
    crashing the page.
 
+## AI Auto-Tagging
+
+Batch auto-tagging applies existing catalogue tags to the owner's ready tracks
+that have not been auto-tagged yet. The Web Library page "AI 打标签" button
+uses these two endpoints; the worker and `python -m app.worker.autotag` use the
+same service.
+
+```powershell
+$status = Invoke-RestMethod `
+  -Uri "http://127.0.0.1:8000/api/ai/auto-tag/status" `
+  -Headers $headers
+$status.provider_status
+$status.pending_count
+
+$batch = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:8000/api/ai/auto-tag/next-batch" `
+  -Headers $headers
+$batch
+```
+
+Expected result:
+
+- Missing auth returns `401 Unauthorized` for both endpoints.
+- `pending_count` counts only the caller's `ready` tracks whose
+  `ai_tags_version` is missing or outdated.
+- Each `next-batch` call tags up to 5 tracks and returns `tagged_count`,
+  `applied_tag_count`, and `remaining_count`; call again until
+  `remaining_count` is `0`.
+- Disabled, unconfigured, or failing AI returns `200 OK` with that
+  `provider_status` (and `error` for failures) and changes nothing.
+- Applied tags come only from the caller's catalogue, are stored with
+  `source="ai"`, and never replace owner-chosen tags.
+
 ## Phase 6 AI Assistant V1 Closure
 
 Before accepting Phase 6, verify the AI endpoints with one local user and at

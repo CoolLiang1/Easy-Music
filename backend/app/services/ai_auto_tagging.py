@@ -21,14 +21,14 @@ import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.tag import Tag
 from app.models.track import Track
 from app.models.track_tag import AI_TAG_SOURCE, TrackTag
 from app.schemas.ai import AiAutoTagBatchOutput, AiProviderStatus
-from app.services.ai_json import STRUCTURED_JSON_MAX_TOKENS, complete_and_parse_json
+from app.services.ai_json import complete_and_parse_json
 from app.services.ai_provider import AiProviderService
 from app.services.ai_tag_suggestions import TAXONOMY_GUIDE_LINES
 
@@ -39,7 +39,14 @@ logger = logging.getLogger(__name__)
 # whose version is older.
 AI_AUTO_TAGGING_VERSION = 1
 DEFAULT_BATCH_SIZE = 10
+# Smaller batches for the Web button so each request returns in reasonable time
+# and progress updates often.
+WEB_BATCH_SIZE = 5
 MAX_AI_TAGS_PER_TRACK = 8
+# The JSON for a 10-track batch is well under 1k tokens, but reasoning models
+# count their hidden reasoning against max_tokens; use the request maximum.
+AUTO_TAG_MAX_TOKENS = 8192
+_TRUNCATED_ERROR_TYPE = "output_truncated"
 
 _VALID_GROUPS = ("scene", "type", "feature")
 
@@ -82,21 +89,60 @@ def list_tracks_needing_auto_tagging(
     *,
     include_current: bool = False,
     limit: int | None = None,
+    user_id: int | None = None,
 ) -> list[int]:
     """Return ids of ready tracks that have not been auto-tagged with the
-    current rule version (or every ready track when *include_current*)."""
+    current rule version (or every ready track when *include_current*),
+    optionally only those owned by *user_id*."""
     statement = select(Track.id).where(Track.status == "ready")
+    if user_id is not None:
+        statement = statement.where(Track.user_id == user_id)
     if not include_current:
-        statement = statement.where(
-            or_(
-                Track.ai_tags_version.is_(None),
-                Track.ai_tags_version < AI_AUTO_TAGGING_VERSION,
-            ),
-        )
+        statement = statement.where(_needs_auto_tagging())
     statement = statement.order_by(Track.id)
     if limit is not None:
         statement = statement.limit(limit)
     return list(db.scalars(statement))
+
+
+def count_tracks_needing_auto_tagging(db: Session, *, user_id: int) -> int:
+    """Number of the owner's ready tracks not yet auto-tagged."""
+    return db.scalar(
+        select(func.count(Track.id)).where(
+            Track.user_id == user_id,
+            Track.status == "ready",
+            _needs_auto_tagging(),
+        ),
+    ) or 0
+
+
+def auto_tag_next_owner_batch(
+    db: Session,
+    provider: AiProviderService,
+    *,
+    user_id: int,
+    min_confidence: float,
+    batch_size: int = WEB_BATCH_SIZE,
+) -> tuple[AutoTagBatchResult, int]:
+    """Auto-tag the owner's next untagged batch for an on-demand request.
+
+    Returns the batch result and how many of the owner's tracks still wait.
+    Used by the Web "auto-tag" button, which calls it repeatedly so no single
+    HTTP request has to cover the whole library.
+    """
+    track_ids = list_tracks_needing_auto_tagging(db, limit=batch_size, user_id=user_id)
+    if not track_ids:
+        result = AutoTagBatchResult(provider_status=provider.status)
+    else:
+        result = auto_tag_batch(db, provider, track_ids, min_confidence=min_confidence)
+    return result, count_tracks_needing_auto_tagging(db, user_id=user_id)
+
+
+def _needs_auto_tagging():
+    return or_(
+        Track.ai_tags_version.is_(None),
+        Track.ai_tags_version < AI_AUTO_TAGGING_VERSION,
+    )
 
 
 def auto_tag_tracks(
@@ -203,7 +249,31 @@ def _auto_tag_owner_tracks(
             error="The tag catalogue is empty; create scene/type/feature tags first.",
         )
     tags_by_id = {tag.id: tag for tag in tags}
+    return _tag_with_catalogue(
+        db,
+        provider,
+        tracks,
+        tags,
+        tags_by_id,
+        min_confidence=min_confidence,
+    )
 
+
+def _tag_with_catalogue(
+    db: Session,
+    provider: AiProviderService,
+    tracks: list[Track],
+    tags: list[Tag],
+    tags_by_id: dict[int, Tag],
+    *,
+    min_confidence: float,
+) -> AutoTagBatchResult:
+    """One provider call for *tracks*; on truncation, retry each half.
+
+    Reasoning models can spend the whole output budget before writing any
+    JSON. Smaller prompts need less reasoning, so a truncated batch is split
+    until it succeeds or a single track still truncates.
+    """
     track_ids = [track.id for track in tracks]
     owner_tag_ids, has_ai_rows = _load_existing_rows(db, track_ids)
 
@@ -213,10 +283,28 @@ def _auto_tag_owner_tracks(
         prompt,
         AiAutoTagBatchOutput,
         system_instruction=_SYSTEM_INSTRUCTION,
-        max_tokens=STRUCTURED_JSON_MAX_TOKENS,
+        max_tokens=AUTO_TAG_MAX_TOKENS,
         temperature=0.2,
     )
     if ai_output is None:
+        if completion.error_type == _TRUNCATED_ERROR_TYPE and len(tracks) > 1:
+            middle = len(tracks) // 2
+            combined = AutoTagBatchResult(provider_status=AiProviderStatus.OK)
+            for half in (tracks[:middle], tracks[middle:]):
+                part = _tag_with_catalogue(
+                    db,
+                    provider,
+                    half,
+                    tags,
+                    tags_by_id,
+                    min_confidence=min_confidence,
+                )
+                combined.tagged_track_ids.extend(part.tagged_track_ids)
+                combined.applied.update(part.applied)
+                if not part.ok:
+                    combined.provider_status = part.provider_status
+                    combined.error = part.error
+            return combined
         status = completion.provider_status
         if status == AiProviderStatus.OK:
             status = AiProviderStatus.ERROR

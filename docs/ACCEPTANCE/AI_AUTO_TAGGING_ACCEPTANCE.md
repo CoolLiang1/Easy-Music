@@ -14,6 +14,7 @@ Decision: Implemented
 - `tracks.ai_tags_version` and migration `20261104_0015`.
 - Confidence-weighted AI tag matching in recommendations.
 - Provenance-preserving manual tag edits.
+- Web Library "AI 打标签" button with auto-tag status and next-batch endpoints.
 
 ## Environment
 
@@ -35,6 +36,12 @@ Decision: Implemented
   `alembic upgrade head` against a temporary SQLite database
   - Result: `20261104_0015` applied, reverted, and re-applied;
     `tracks.ai_tags_version` present.
+- [x] Command: `.\.venv\Scripts\python.exe -m pytest tests/test_ai_auto_tagging.py`
+  and the full backend suite after the token-budget fix and Web endpoints
+  (`feature/web-ai-auto-tagging`, 2026-11-05)
+  - Result: 31 passed; full suite 428 passed, 2 skipped.
+- [x] Command: `npm run build` in `web/` (typecheck and Vite build)
+  - Result: passed.
 - [ ] Command: the same migration check against PostgreSQL 16
   - Result: not run; Docker was not running on the verification machine.
 
@@ -44,6 +51,25 @@ Decision: Implemented
   migrated SQLite database.
   - Expected: command loads, shows its options, and reports nothing to do.
   - Observed: as expected; dry-run printed `No tracks need AI auto-tagging.`
+- [x] Flow: first production run, `python -m app.worker.autotag` on the owner
+  server (57 tracks), 2026-11-05.
+  - Expected: batches tagged, or failures listed for retry.
+  - Observed: batch 1 of 6 failed with `output_truncated` ("Provider output
+    was truncated before message content was produced"); nothing was written.
+    Cause: the reasoning model used the whole 2048-token output budget.
+    Fix: 8192-token budget plus automatic batch splitting on truncation;
+    `tests/test_ai_auto_tagging.py` 27 passed, backend suite 424 passed,
+    2 skipped. The re-run after deploying the fix is the next item.
+- [x] Flow: Web Library button against a local SQLite stack (12 ready tracks,
+  one with an owner tag) and a fake OpenAI-compatible provider that truncates
+  any batch larger than 3 tracks, 2026-11-05.
+  - Expected: button shows the pending count, confirms, shows progress, tags
+    every track, keeps the owner tag, then disables itself.
+  - Observed: button read "AI 打标签（12）"; after confirming it showed
+    "停止（0/12）"; three `next-batch` calls (5, 5, 2 tracks; the 5-track
+    batches split after truncation) tagged all 12 tracks with the two
+    confident tags and dropped the 0.2-confidence one; track 01 kept its owner
+    tag; the button then disabled with "所有可播放音轨都已由 AI 打过标签".
 - [ ] Flow: real provider run, `python -m app.worker.autotag --limit 20`, on
   the owner library, followed by owner review of the printed tags.
   - Expected: mostly correct type tags; scene/feature tags plausible; failures

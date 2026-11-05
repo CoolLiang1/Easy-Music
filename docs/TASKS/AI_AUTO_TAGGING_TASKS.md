@@ -35,12 +35,16 @@ In scope:
   explanation penalty line naming the AI-inferred tags.
 - Manual tag edits keep the provenance of rows that stay; a tag the owner adds
   through batch editing is promoted to an owner tag.
+- Web trigger (owner request, 2026-11-05): an "AI 打标签" button on the Library
+  page backed by `GET /api/ai/auto-tag/status` and
+  `POST /api/ai/auto-tag/next-batch` (5 tracks per call, looped by the page,
+  stoppable). Works without the worker flag.
 
 Out of scope (later slices, only if real use shows they are needed):
 
 - Turning "not suitable for this scene" feedback into removal of AI tags.
 - A Web view for reviewing AI tags by tag.
-- Showing tag provenance in Web or Android (no API change in this slice).
+- Showing tag provenance in Web or Android.
 - Search-context enrichment for batch calls (cost per track is too high).
 - Audio analysis of any kind.
 
@@ -48,7 +52,8 @@ Out of scope (later slices, only if real use shows they are needed):
 
 - The existing per-track suggest-tags endpoint and its Web flow are unchanged;
   its taxonomy guide text is now shared with the batch prompt.
-- No API request/response shape change. Recommendation `reason` and
+- Two additive endpoints for the Web trigger; no existing request/response
+  shape changes. Android is unaffected. Recommendation `reason` and
   `explanation.penalties` may contain one additional entry for AI-weighted
   tags, using the existing `RecommendationExplanationPart` shape.
 - AI never creates tags, never selects tracks, and never touches owner rows.
@@ -72,6 +77,9 @@ Out of scope (later slices, only if real use shows they are needed):
 - [x] Backend tests for the service, worker hook, CLI, ranking, and tag sync.
 - [x] Architecture, environment, deployment, PRD, AGENTS, roadmap, and README
   updates.
+- [x] Batch token budget raised to 8192 with split-and-retry on truncation.
+- [x] Web trigger: auto-tag status and next-batch endpoints, Web API wrappers
+  and types, Library page button with progress and stop.
 - [ ] PostgreSQL migration check and a real-provider run on the owner library.
 
 ## Acceptance Criteria
@@ -114,8 +122,8 @@ N/A reasons:
 - `docs/DEVELOPMENT.md`: no setup or verification procedure change; the
   backfill command runs the same way against the local compose `worker` and is
   documented in `docs/DEPLOYMENT.md`.
-- `docs/API_MANUAL_TESTING.md`: no endpoint or request/response shape change;
-  only recommendation reason text can gain one line.
+- `docs/ENVIRONMENT.md` for the Web trigger: no new setting; it uses the
+  existing AI provider settings and `AI_AUTO_TAGGING_MIN_CONFIDENCE`.
 
 ## Progress Notes
 
@@ -124,3 +132,12 @@ N/A reasons:
   processed once per rule version, so removing a wrong AI tag is enough to keep
   it removed. Idle-worker batching was chosen over a per-upload job so uploads
   of many files share provider calls and media processing is never delayed.
+- 2026-11-05: First production run failed every batch with
+  `output_truncated`: the configured reasoning model spent the 2048-token
+  budget before writing JSON. Fixed on `fix/ai-auto-tagging-token-budget`:
+  batch calls request 8192 tokens, and a batch that still truncates is split in
+  half and retried down to single tracks.
+- 2026-11-05: Owner asked for a Web entry point. Added the Library page
+  button on the same branch (`feature/web-ai-auto-tagging`). The page calls
+  one 5-track batch per request and loops, instead of one long request or a
+  new job type, so progress is visible and each request stays short.

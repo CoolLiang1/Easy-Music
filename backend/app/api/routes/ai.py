@@ -17,12 +17,14 @@ from app.models.user import User
 from app.schemas.ai import (
     AiRecommendRequest,
     AiRecommendResponse,
+    AutoTagBatchResponse,
+    AutoTagStatusResponse,
     ParsedIntentResponse,
     ParseListeningIntentRequest,
     TagSuggestionRequest,
     TagSuggestionResponse,
 )
-from app.services import ai_intent, ai_tag_suggestions
+from app.services import ai_auto_tagging, ai_intent, ai_tag_suggestions
 from app.services.ai_provider import AiProviderService
 from app.services.ai_client import build_ai_provider
 from app.services.ai_tag_search import AiTagSearchService
@@ -152,6 +154,56 @@ def suggest_track_tags(
         track_id,
         include_new_tag_suggestions=payload.include_new_tag_suggestions,
         search_service=ai_tag_search,
+    )
+
+
+@router.get(
+    "/auto-tag/status",
+    response_model=AutoTagStatusResponse,
+)
+def auto_tag_status(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+) -> AutoTagStatusResponse:
+    """Report how many of the owner's ready tracks wait for AI auto-tagging."""
+    return AutoTagStatusResponse(
+        provider_status=ai_provider.status,
+        pending_count=ai_auto_tagging.count_tracks_needing_auto_tagging(
+            db,
+            user_id=current_user.id,
+        ),
+    )
+
+
+@router.post(
+    "/auto-tag/next-batch",
+    response_model=AutoTagBatchResponse,
+)
+def auto_tag_next_batch(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    ai_provider: Annotated[AiProviderService, Depends(_get_ai_provider)],
+) -> AutoTagBatchResponse:
+    """Apply AI catalogue tags to the owner's next few untagged tracks.
+
+    The AI only picks existing tag ids; applied rows are stored as AI-sourced
+    and never replace owner-chosen tags. Clients call this repeatedly until
+    ``remaining_count`` is 0. Provider failures return 200 with the status
+    and ``error`` so the client can stop and explain.
+    """
+    result, remaining = ai_auto_tagging.auto_tag_next_owner_batch(
+        db,
+        ai_provider,
+        user_id=current_user.id,
+        min_confidence=get_settings().ai_auto_tagging_min_confidence,
+    )
+    return AutoTagBatchResponse(
+        provider_status=result.provider_status,
+        tagged_count=len(result.tagged_track_ids),
+        applied_tag_count=result.applied_tag_count,
+        remaining_count=remaining,
+        error=result.error,
     )
 
 

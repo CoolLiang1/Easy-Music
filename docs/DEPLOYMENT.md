@@ -631,14 +631,16 @@ docker compose -f docker-compose.prod.yml --env-file .env.production   exec work
 docker compose -f docker-compose.prod.yml --env-file .env.production   exec worker python -m app.worker.autotag --limit 20
 ```
 
-If the result is acceptable, either run the command without `--limit` to tag
-the rest now, or set `AI_AUTO_TAGGING_ENABLED=true` in `.env.production` and
+If the result is acceptable, either run the command without `--limit` (or
+press "AI 打标签" on the Web Library page, which shows the pending count and
+tags in batches of 5) to tag the rest now, or set `AI_AUTO_TAGGING_ENABLED=true` in `.env.production` and
 recreate the worker (`up -d worker`) so it tags the rest, and every later
 upload, in the background. Each track is processed once; remove a wrong tag
 in the Web console and it stays removed. `--all` re-tags every track and
 brings back removed AI tags, so use it only after changing the catalogue or
 `AI_AUTO_TAGGING_MIN_CONFIDENCE`. A failed batch changes nothing; the worker
-logs it and retries after 10 minutes.
+logs it and retries after 10 minutes. If batches keep failing with
+`output_truncated`, try a smaller `--batch-size` or a non-reasoning model.
 
 When an update introduces session renewal (refresh tokens), install the
 matching Android APK before lowering `ACCESS_TOKEN_EXPIRE_MINUTES` in
