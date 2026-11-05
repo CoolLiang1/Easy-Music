@@ -6,6 +6,7 @@ import { Icon, type IconName } from "../components/ui/Icon";
 import { PlayerDeck } from "../components/WebAudioPlayer";
 import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
 import { RouteLink } from "../routes/RouteLink";
+import brandMarkUrl from "../assets/brand-mark.png";
 
 type AppLayoutProps = {
   children: ReactNode;
@@ -99,7 +100,7 @@ export function AppLayout({ children, onSignOut, path, title }: AppLayoutProps) 
         >
           <Icon name="menu" />
         </button>
-        <img alt="" className="brand-mark" src="/icons/pwa-192x192.png" />
+        <img alt="" className="brand-mark" src={brandMarkUrl} />
         <span className="topbar-title">{title}</span>
         <button
           aria-label={`播放队列，共 ${queueCount} 首`}
@@ -115,7 +116,7 @@ export function AppLayout({ children, onSignOut, path, title }: AppLayoutProps) 
 
       <aside aria-label="主导航" className="sidebar">
         <RouteLink className="sidebar-brand" to="/library">
-          <img alt="" className="brand-mark" src="/icons/pwa-192x192.png" />
+          <img alt="" className="brand-mark" src={brandMarkUrl} />
           <span>
             <span className="brand-name">Easy Music</span>
             <span className="brand-sub">私人曲库</span>
