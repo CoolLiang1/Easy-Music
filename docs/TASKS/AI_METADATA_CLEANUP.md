@@ -27,6 +27,9 @@ The list showed "未填写艺人/专辑" under nearly every track.
     content type, or cooldown, the detail header no longer shows type or
     album, and the library table drops the always-"歌曲" 类型 column. The data
     and API fields stay; saving the form leaves them unchanged.
+  - Owner follow-up (2026-11-05): the review page lists the pending tracks
+    before analysis (`status` now returns `pending_tracks`), and suggestions
+    fill into the same rows with per-row status and filters.
 - Out of scope:
   - Web search for artists. A live evaluation showed search made the model
     confidently pick the most popular song with the same name.

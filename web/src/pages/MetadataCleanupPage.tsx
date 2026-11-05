@@ -5,12 +5,14 @@ import { useAuth } from "../auth/AuthProvider";
 import { Callout, EmptyState, LoadingRows, PageHeader, getErrorMessage } from "../components/ui/common";
 import { Icon } from "../components/ui/Icon";
 import { useToast } from "../components/ui/Toast";
+import { formatDuration } from "../i18n/zh";
 import { RouteLink } from "../routes/RouteLink";
 import type {
   AiProviderStatus,
   MetadataChange,
   MetadataCleanupStatusResponse,
   MetadataSuggestion,
+  PendingMetadataTrack,
 } from "../types/ai";
 
 type ReviewRow = {
@@ -26,18 +28,22 @@ type StatusState =
   | { name: "ready"; status: MetadataCleanupStatusResponse }
   | { name: "error"; message: string };
 
+type RowState = "pending" | "analyzing" | "changed" | "unchanged";
+type Filter = "all" | "changed" | "pending";
+
 const PRESELECT_CONFIDENCE = 0.8;
+const BATCH_SIZE = 5;
 
 export function MetadataCleanupPage() {
   const { accessToken } = useAuth();
   const showToast = useToast();
   const [statusState, setStatusState] = useState<StatusState>({ name: "loading" });
-  const [rows, setRows] = useState<ReviewRow[]>([]);
+  const [reviews, setReviews] = useState<Record<number, ReviewRow>>({});
   const [reviewedIds, setReviewedIds] = useState<number[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [finished, setFinished] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
   const cursorRef = useRef<number | null>(null);
   const stopRef = useRef(false);
 
@@ -49,7 +55,7 @@ export function MetadataCleanupPage() {
     try {
       setStatusState({ name: "ready", status: await getMetadataCleanupStatus(accessToken) });
     } catch (error: unknown) {
-      setStatusState({ name: "error", message: getErrorMessage(error, "无法读取整理状态。") });
+      setStatusState({ name: "error", message: getErrorMessage(error, "无法读取待整理的音轨。") });
     }
   }, [accessToken]);
 
@@ -57,11 +63,52 @@ export function MetadataCleanupPage() {
     void loadStatus();
   }, [loadStatus]);
 
-  const pendingCount = statusState.name === "ready" ? statusState.status.pending_count : 0;
-  const providerStatus = statusState.name === "ready" ? statusState.status.provider_status : null;
+  const status = statusState.name === "ready" ? statusState.status : null;
+  const pendingTracks = useMemo(() => status?.pending_tracks ?? [], [status]);
+  const pendingCount = status?.pending_count ?? 0;
+  const providerStatus = status?.provider_status ?? null;
   const isRunning = progress !== null;
+  const reviewedSet = useMemo(() => new Set(reviewedIds), [reviewedIds]);
 
-  const selectedChanges = useMemo(() => buildChanges(rows), [rows]);
+  // While analysis runs, the next few unreviewed tracks are the ones in flight.
+  const analyzingIds = useMemo(() => {
+    if (!isRunning) return new Set<number>();
+    return new Set(
+      pendingTracks
+        .filter((track) => !reviewedSet.has(track.track_id))
+        .slice(0, BATCH_SIZE)
+        .map((track) => track.track_id),
+    );
+  }, [isRunning, pendingTracks, reviewedSet]);
+
+  const rowState = useCallback(
+    (trackId: number): RowState => {
+      if (reviews[trackId]) return "changed";
+      if (reviewedSet.has(trackId)) return "unchanged";
+      if (analyzingIds.has(trackId)) return "analyzing";
+      return "pending";
+    },
+    [analyzingIds, reviewedSet, reviews],
+  );
+
+  const counts = useMemo(() => {
+    const changed = Object.keys(reviews).length;
+    return {
+      all: pendingTracks.length,
+      changed,
+      pending: pendingTracks.filter((track) => !reviewedSet.has(track.track_id)).length,
+    };
+  }, [pendingTracks, reviewedSet, reviews]);
+
+  const visibleTracks = useMemo(() => {
+    if (filter === "changed") return pendingTracks.filter((track) => reviews[track.track_id]);
+    if (filter === "pending") return pendingTracks.filter((track) => !reviewedSet.has(track.track_id));
+    return pendingTracks;
+  }, [filter, pendingTracks, reviewedSet, reviews]);
+
+  const selectedChanges = useMemo(() => buildChanges(Object.values(reviews)), [reviews]);
+  const hasReview = reviewedIds.length > 0;
+  const remaining = Math.max(0, pendingCount - reviewedIds.length);
 
   const runAnalysis = async () => {
     if (!accessToken) return;
@@ -71,9 +118,8 @@ export function MetadataCleanupPage() {
     }
     stopRef.current = false;
     setAnalysisError(null);
-    setFinished(false);
     let done = reviewedIds.length;
-    let total = done + pendingCountAfterCursor(pendingCount, reviewedIds.length);
+    let total = Math.max(pendingCount, done);
     setProgress({ done, total });
     try {
       while (!stopRef.current) {
@@ -82,20 +128,18 @@ export function MetadataCleanupPage() {
           setAnalysisError(describeFailure(response.provider_status, response.error));
           break;
         }
-        if (response.next_after_id === null) {
-          setFinished(true);
-          break;
-        }
+        if (response.next_after_id === null) break;
         cursorRef.current = response.next_after_id;
-        setRows((current) => [...current, ...response.suggestions.map(toRow)]);
+        setReviews((current) => {
+          const next = { ...current };
+          for (const suggestion of response.suggestions) next[suggestion.track_id] = toRow(suggestion);
+          return next;
+        });
         setReviewedIds((current) => [...current, ...response.reviewed_track_ids]);
         done += response.reviewed_track_ids.length;
         total = Math.max(total, done + response.remaining_count);
         setProgress({ done, total });
-        if (response.remaining_count === 0) {
-          setFinished(true);
-          break;
-        }
+        if (response.remaining_count === 0) break;
       }
     } catch (error: unknown) {
       setAnalysisError(getErrorMessage(error, "AI 分析请求失败。"));
@@ -112,11 +156,9 @@ export function MetadataCleanupPage() {
         changes: selectedChanges,
         reviewed_track_ids: reviewedIds,
       });
-      showToast(`已更新 ${result.updated_count} 首音轨，${result.reviewed_count} 首标记为已整理。`);
-      setRows([]);
-      setReviewedIds([]);
-      setFinished(false);
-      cursorRef.current = null;
+      showToast(`已更新 ${result.updated_count} 首，${result.reviewed_count} 首已整理完毕。`);
+      resetReview();
+      setFilter("all");
       await loadStatus();
     } catch (error: unknown) {
       showToast(getErrorMessage(error, "保存失败。"), "error");
@@ -125,114 +167,110 @@ export function MetadataCleanupPage() {
     }
   };
 
-  const discard = () => {
-    setRows([]);
+  const resetReview = () => {
+    setReviews({});
     setReviewedIds([]);
-    setFinished(false);
     setAnalysisError(null);
     cursorRef.current = null;
   };
 
   const updateRow = (trackId: number, patch: Partial<ReviewRow>) => {
-    setRows((current) =>
-      current.map((row) => (row.suggestion.track_id === trackId ? { ...row, ...patch } : row)),
-    );
+    setReviews((current) => (current[trackId] ? { ...current, [trackId]: { ...current[trackId], ...patch } } : current));
   };
 
   const setAllSelected = (selected: boolean) => {
-    setRows((current) =>
-      current.map((row) => ({
-        ...row,
-        useTitle: selected && row.suggestion.title_changed,
-        useArtist: selected && row.suggestion.artist_changed,
-      })),
-    );
+    setReviews((current) => {
+      const next: Record<number, ReviewRow> = {};
+      for (const [id, row] of Object.entries(current)) {
+        next[Number(id)] = {
+          ...row,
+          useTitle: selected && row.suggestion.title_changed,
+          useArtist: selected && row.suggestion.artist_changed,
+        };
+      }
+      return next;
+    });
   };
 
-  const canAnalyze = providerStatus === "ok" && (isRunning || pendingCount > reviewedIds.length);
-  const hasReview = reviewedIds.length > 0;
+  const canAnalyze = providerStatus === "ok" && (isRunning || remaining > 0);
+  const percent = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
     <div className="page">
       <PageHeader
         actions={
-          <>
-            <button
-              className={hasReview ? "btn btn-secondary" : "btn btn-primary"}
-              disabled={!canAnalyze || isApplying}
-              onClick={() => void runAnalysis()}
-              title={providerStatus && providerStatus !== "ok" ? describeFailure(providerStatus, null) : undefined}
-              type="button"
-            >
-              <Icon className={progress ? "spin" : undefined} name="sparkle" size={16} />
-              {progress
-                ? `停止（${progress.done}/${progress.total}）`
-                : hasReview
-                  ? "继续分析"
-                  : "开始分析"}
-            </button>
-            {hasReview ? (
+          status && pendingCount > 0 ? (
+            <>
               <button
-                className="btn btn-primary"
-                disabled={isRunning || isApplying}
-                onClick={() => void applySelected()}
+                className={hasReview && !isRunning ? "btn btn-secondary" : "btn btn-primary"}
+                disabled={!canAnalyze || isApplying}
+                onClick={() => void runAnalysis()}
+                title={providerStatus && providerStatus !== "ok" ? describeFailure(providerStatus, null) : undefined}
                 type="button"
               >
-                <Icon name="check" size={16} />
-                {isApplying ? "正在保存…" : `应用选中（${selectedChanges.length}）`}
+                <Icon className={progress ? "spin" : undefined} name="sparkle" size={16} />
+                {progress
+                  ? "停止分析"
+                  : !hasReview
+                    ? `开始分析（${pendingCount}）`
+                    : remaining > 0
+                      ? `继续分析（${remaining}）`
+                      : "已全部分析"}
               </button>
-            ) : null}
-          </>
-        }
-        description="AI 根据当前标题推断干净的歌名和艺人。这里只是预览：勾选并点「应用选中」才会保存，可以直接修改建议值。拿不准的艺人会留空；可信度不高的建议默认不勾选。分析过的音轨在应用后不会再出现。"
-        meta={
-          statusState.name === "ready" ? (
-            <>
-              <span>
-                待整理 <strong>{pendingCount}</strong> 首
-              </span>
               {hasReview ? (
-                <span>
-                  已分析 <strong>{reviewedIds.length}</strong>，建议修改 <strong>{rows.length}</strong>
-                </span>
+                <button
+                  className="btn btn-primary"
+                  disabled={isRunning || isApplying}
+                  onClick={() => void applySelected()}
+                  type="button"
+                >
+                  <Icon name="check" size={16} />
+                  {isApplying ? "正在保存…" : `应用选中（${selectedChanges.length}）`}
+                </button>
               ) : null}
             </>
           ) : null
         }
+        description="AI 从杂乱的文件名里整理出歌名和艺人。结果先显示在下方列表里，勾选后点「应用选中」才会保存；拿不准的艺人保持空白。"
         title="整理标题与艺人"
       />
 
       {statusState.name === "loading" ? (
         <div className="card">
-          <LoadingRows rows={3} />
+          <LoadingRows rows={6} />
         </div>
       ) : null}
 
       {statusState.name === "error" ? (
-        <div className="card card-pad">
+        <div className="card card-pad stack">
           <Callout title="加载失败" tone="danger">
             {statusState.message}
           </Callout>
+          <div>
+            <button className="btn btn-secondary" onClick={() => void loadStatus()} type="button">
+              重试
+            </button>
+          </div>
         </div>
       ) : null}
 
-      {providerStatus && providerStatus !== "ok" ? (
-        <div className="card card-pad">
+      {providerStatus && providerStatus !== "ok" && pendingCount > 0 ? (
+        <div className="metadata-callout">
           <Callout title="AI 不可用" tone="warn">
-            {describeFailure(providerStatus, null)}
+            {describeFailure(providerStatus, null)} 下面仍列出待整理的音轨。
           </Callout>
         </div>
       ) : null}
 
       {analysisError ? (
-        <div className="card card-pad stack">
+        <div className="metadata-callout">
           <Callout title="分析中断" tone="danger">
             {analysisError} 已分析的结果仍保留，可以先应用，或点「继续分析」重试。
           </Callout>
         </div>
       ) : null}
 
-      {statusState.name === "ready" && !hasReview && !isRunning && pendingCount === 0 ? (
+      {status && pendingCount === 0 ? (
         <div className="card">
           <EmptyState
             action={
@@ -247,80 +285,138 @@ export function MetadataCleanupPage() {
         </div>
       ) : null}
 
-      {hasReview && rows.length === 0 && !isRunning ? (
-        <div className="card">
-          <EmptyState
-            compact
-            description={`已分析 ${reviewedIds.length} 首，AI 认为都不需要修改。点「应用选中」把它们标记为已整理。`}
-            icon="check"
-            title="没有需要修改的地方"
-          />
-        </div>
-      ) : null}
+      {status && pendingCount > 0 ? (
+        <>
+          <div className="toolbar">
+            <div aria-label="按状态筛选" className="segmented" role="tablist">
+              {(
+                [
+                  ["all", "全部"],
+                  ["changed", "建议修改"],
+                  ["pending", "待分析"],
+                ] as Array<[Filter, string]>
+              ).map(([value, label]) => (
+                <button
+                  aria-selected={filter === value}
+                  className={filter === value ? "segmented-item active" : "segmented-item"}
+                  key={value}
+                  onClick={() => setFilter(value)}
+                  role="tab"
+                  type="button"
+                >
+                  {label}
+                  <span className="count">{counts[value]}</span>
+                </button>
+              ))}
+            </div>
+            {progress ? (
+              <div className="metadata-progress" role="status">
+                <span>
+                  正在分析 {progress.done}/{progress.total}
+                </span>
+                <div className="progress">
+                  <span style={{ width: `${percent}%` }} />
+                </div>
+              </div>
+            ) : null}
+            {counts.changed > 0 && !progress ? (
+              <div className="row metadata-bulk">
+                <button className="btn btn-ghost btn-sm" onClick={() => setAllSelected(true)} type="button">
+                  全选建议
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setAllSelected(false)} type="button">
+                  全不选
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={resetReview} type="button">
+                  放弃本次结果
+                </button>
+              </div>
+            ) : null}
+          </div>
 
-      {rows.length > 0 ? (
-        <div className="card table-card">
-          <div className="card-header bordered">
-            <div>
-              <h2 className="card-title">建议修改</h2>
-              <p className="card-subtitle">
-                {finished ? "已分析全部待整理音轨。" : "可以随时停止，先应用已分析的部分。"}
-              </p>
-            </div>
-            <div className="row">
-              <button className="btn btn-ghost btn-sm" onClick={() => setAllSelected(true)} type="button">
-                全选
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setAllSelected(false)} type="button">
-                全不选
-              </button>
-              <button className="btn btn-ghost btn-sm" disabled={isRunning} onClick={discard} type="button">
-                放弃本次结果
-              </button>
-            </div>
+          <div className="card table-card">
+            {visibleTracks.length === 0 ? (
+              <EmptyState
+                compact
+                description={filter === "changed" ? "分析后需要修改的音轨会出现在这里。" : "所有音轨都已分析。"}
+                icon="check"
+                title={filter === "changed" ? "暂无建议修改" : "没有待分析的音轨"}
+              />
+            ) : (
+              <div className="table-scroll">
+                <table className="data-table metadata-table">
+                  <thead>
+                    <tr>
+                      <th className="col-num" scope="col">
+                        #
+                      </th>
+                      <th scope="col">标题</th>
+                      <th scope="col">艺人</th>
+                      <th className="col-num hide-sm" scope="col">
+                        时长
+                      </th>
+                      <th scope="col">状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleTracks.map((track, index) => (
+                      <MetadataRow
+                        index={index + 1}
+                        key={track.track_id}
+                        onChange={updateRow}
+                        review={reviews[track.track_id]}
+                        state={rowState(track.track_id)}
+                        track={track}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          <div className="table-scroll">
-            <table className="data-table metadata-table">
-              <thead>
-                <tr>
-                  <th scope="col">标题</th>
-                  <th scope="col">艺人</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <MetadataRow key={row.suggestion.track_id} onChange={updateRow} row={row} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          {pendingCount > pendingTracks.length ? (
+            <p className="field-hint" style={{ marginTop: 10 }}>
+              列表只显示前 {pendingTracks.length} 首；应用后会显示剩余的音轨。
+            </p>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
 }
 
 function MetadataRow({
+  index,
   onChange,
-  row,
+  review,
+  state,
+  track,
 }: {
+  index: number;
   onChange: (trackId: number, patch: Partial<ReviewRow>) => void;
-  row: ReviewRow;
+  review: ReviewRow | undefined;
+  state: RowState;
+  track: PendingMetadataTrack;
 }) {
-  const { suggestion } = row;
-  const id = suggestion.track_id;
+  const id = track.track_id;
+  const suggestion = review?.suggestion;
   return (
-    <tr>
+    <tr className={state === "analyzing" ? "is-analyzing" : undefined}>
+      <td className="col-num faint mono">{index}</td>
       <td>
         <div className="metadata-cell">
-          <RouteLink className="metadata-current" title="打开音轨详情" to={`/tracks/${encodeURIComponent(id)}`}>
-            {suggestion.current_title}
+          <RouteLink
+            className={suggestion?.title_changed ? "metadata-current is-old" : "metadata-current"}
+            title={track.title}
+            to={`/tracks/${encodeURIComponent(id)}`}
+          >
+            {track.title}
           </RouteLink>
-          {suggestion.title_changed ? (
+          {review && suggestion?.title_changed ? (
             <div className="metadata-edit">
               <input
-                aria-label={`采用新标题：${suggestion.current_title}`}
-                checked={row.useTitle}
+                aria-label={`采用新标题：${track.title}`}
+                checked={review.useTitle}
                 onChange={(event) => onChange(id, { useTitle: event.target.checked })}
                 type="checkbox"
               />
@@ -329,22 +425,22 @@ function MetadataRow({
                 className="input"
                 maxLength={255}
                 onChange={(event) => onChange(id, { title: event.target.value, useTitle: true })}
-                value={row.title}
+                value={review.title}
               />
             </div>
-          ) : (
-            <span className="faint metadata-same">标题不变</span>
-          )}
+          ) : null}
         </div>
       </td>
       <td>
         <div className="metadata-cell">
-          <span className="metadata-current">{suggestion.current_artist || "—"}</span>
-          {suggestion.artist_changed ? (
+          <span className={suggestion?.artist_changed ? "metadata-current is-old" : "metadata-current"}>
+            {track.artist || <span className="faint">—</span>}
+          </span>
+          {review && suggestion?.artist_changed ? (
             <div className="metadata-edit">
               <input
-                aria-label={`采用新艺人：${suggestion.current_title}`}
-                checked={row.useArtist}
+                aria-label={`采用新艺人：${track.title}`}
+                checked={review.useArtist}
                 onChange={(event) => onChange(id, { useArtist: event.target.checked })}
                 type="checkbox"
               />
@@ -353,28 +449,38 @@ function MetadataRow({
                 className="input"
                 maxLength={255}
                 onChange={(event) => onChange(id, { artist: event.target.value, useArtist: true })}
-                value={row.artist}
+                value={review.artist}
               />
-              <ConfidenceBadge
-                confidence={suggestion.artist_confidence}
-                replaces={Boolean(suggestion.current_artist)}
-              />
+              <ConfidenceBadge confidence={suggestion.artist_confidence} replaces={Boolean(track.artist)} />
             </div>
-          ) : (
-            <span className="faint metadata-same">
-              {suggestion.current_artist ? "艺人不变" : "AI 无法确定，保持空白"}
-            </span>
-          )}
+          ) : review && !track.artist ? (
+            <span className="faint metadata-note">AI 无法确定，保持空白</span>
+          ) : null}
         </div>
+      </td>
+      <td className="col-num hide-sm mono faint">{formatDuration(track.duration_seconds)}</td>
+      <td>
+        <StateBadge state={state} />
       </td>
     </tr>
   );
 }
 
+function StateBadge({ state }: { state: RowState }) {
+  if (state === "changed") return <span className="badge badge-signal">建议修改</span>;
+  if (state === "unchanged") return <span className="badge badge-ok">无需修改</span>;
+  if (state === "analyzing") return <span className="badge badge-info">分析中</span>;
+  return <span className="badge">待分析</span>;
+}
+
 function ConfidenceBadge({ confidence, replaces }: { confidence: number; replaces: boolean }) {
   const percent = Math.round(Math.max(0, Math.min(1, confidence)) * 100);
   if (replaces) {
-    return <span className="badge badge-warn plain" title="会替换已有艺人">替换 · {percent}%</span>;
+    return (
+      <span className="badge badge-warn plain" title="会替换已有艺人">
+        替换 · {percent}%
+      </span>
+    );
   }
   if (confidence >= PRESELECT_CONFIDENCE) {
     return <span className="badge badge-ok plain">可信 {percent}%</span>;
@@ -409,10 +515,6 @@ function buildChanges(rows: ReviewRow[]): MetadataChange[] {
     }
   }
   return changes;
-}
-
-function pendingCountAfterCursor(pending: number, alreadyReviewed: number): number {
-  return Math.max(0, pending - alreadyReviewed);
 }
 
 function describeFailure(status: AiProviderStatus, error: string | null): string {

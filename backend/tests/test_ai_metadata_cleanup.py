@@ -447,7 +447,13 @@ def test_review_flow_through_endpoints(api: tuple[TestClient, Any], db_session: 
     )
 
     status_response = client.get("/api/ai/metadata-cleanup/status", headers=auth(user))
-    assert status_response.json() == {"provider_status": "ok", "pending_count": 1}
+    assert status_response.json() == {
+        "provider_status": "ok",
+        "pending_count": 1,
+        "pending_tracks": [
+            {"track_id": track.id, "title": "Maroon 5 - Animals", "artist": None, "duration_seconds": 200},
+        ],
+    }
 
     batch = client.post("/api/ai/metadata-cleanup/next-batch", json={}, headers=auth(user)).json()
     assert batch["provider_status"] == "ok"
@@ -470,6 +476,29 @@ def test_review_flow_through_endpoints(api: tuple[TestClient, Any], db_session: 
     assert applied.json() == {"updated_count": 1, "reviewed_count": 1}
     status_response = client.get("/api/ai/metadata-cleanup/status", headers=auth(user))
     assert status_response.json()["pending_count"] == 0
+    assert status_response.json()["pending_tracks"] == []
+
+
+def test_status_lists_only_owner_pending_ready_tracks_in_order(
+    api: tuple[TestClient, Any],
+    db_session: Session,
+) -> None:
+    client, app = api
+    user = create_user(db_session)
+    other = create_user(db_session, "other")
+    first = create_track(db_session, user, "First", artist="A")
+    create_track(db_session, user, "Reviewed", ai_metadata_version=AI_METADATA_VERSION)
+    create_track(db_session, user, "Processing", status="processing")
+    create_track(db_session, other, "Foreign")
+    second = create_track(db_session, user, "Second")
+    install_provider(app, FakeClient(), ai_enabled=False)
+
+    body = client.get("/api/ai/metadata-cleanup/status", headers=auth(user)).json()
+
+    assert body["provider_status"] == "disabled"
+    assert body["pending_count"] == 2
+    assert [item["track_id"] for item in body["pending_tracks"]] == [first.id, second.id]
+    assert body["pending_tracks"][0]["artist"] == "A"
 
 
 def test_next_batch_reports_disabled_provider(api: tuple[TestClient, Any], db_session: Session) -> None:

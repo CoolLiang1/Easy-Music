@@ -93,9 +93,17 @@ export type AutoTagBatchResponse = {
   error: string | null;
 };
 
+export type PendingMetadataTrack = {
+  track_id: number;
+  title: string;
+  artist: string | null;
+  duration_seconds: number | null;
+};
+
 export type MetadataCleanupStatusResponse = {
   provider_status: AiProviderStatus;
   pending_count: number;
+  pending_tracks: PendingMetadataTrack[];
 };
 
 export type MetadataSuggestion = {
