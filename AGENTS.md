@@ -89,9 +89,10 @@ Useful mental map:
 - Respect the MVP non-goals unless explicitly asked otherwise: no multi-user
   expansion, social/discovery features, automatic Bilibili downloading, full
   ML recommendation system, full-library offline sync, or native Windows app.
-- Keep AI constrained. The LLM parses intent and suggests tags; rule-based
-  services select and rank tracks. Do not let AI bypass cooldown, recent-play,
-  feedback, or ownership checks.
+- Keep AI constrained. The LLM parses intent, suggests tags, and may apply
+  existing catalogue tags as `source="ai"` rows; rule-based services select
+  and rank tracks. Do not let AI create tags, change owner-chosen tags, or
+  bypass cooldown, recent-play, feedback, or ownership checks.
 - Keep media storage safe. Preserve path traversal protections and avoid
   exposing internal paths unless an existing API already does so intentionally.
 - Do not hard-code production hosts, usernames, passwords, API keys, bearer
@@ -201,6 +202,13 @@ Update this section when you discover something surprising.
   `regenerate_track_playback`, which keeps owner edits. Bump
   `LOUDNESS_VERSION` when the playback gain rule changes so the backfill
   command picks up old files.
+
+- `track_tags.source` carries meaning: `ai` rows are weighted below owner
+  rows in ranking and are the only rows auto-tagging may replace. Code that
+  rewrites a track's tags must keep the rows of tags that stay instead of
+  deleting and re-inserting them, or AI tags silently become owner tags. Bump
+  `AI_AUTO_TAGGING_VERSION` only when existing AI tags should be regenerated;
+  it re-adds AI tags the owner removed.
 
 ## Safety Rules
 

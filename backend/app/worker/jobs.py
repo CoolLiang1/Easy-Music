@@ -2,11 +2,21 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.media.ffmpeg import FFmpegError, extract_audio_from_video
 from app.media.paths import UnsafeMediaPathError, resolve_media_path, sanitize_filename
 from app.media.storage import MediaStorage
 from app.models.processing_job import ProcessingJob
 from app.models.track import Track
+from app.schemas.ai import AiProviderStatus
+from app.services.ai_auto_tagging import (
+    DEFAULT_BATCH_SIZE,
+    AutoTagBatchResult,
+    auto_tag_batch,
+    list_tracks_needing_auto_tagging,
+)
+from app.services.ai_client import build_ai_provider
+from app.services.ai_provider import AiProviderService
 from app.services.jobs import (
     AUDIO_PROCESSING_JOB_TYPE,
     VIDEO_EXTRACTION_JOB_TYPE,
@@ -19,6 +29,35 @@ from app.services.processing import TrackProcessingError, process_track
 
 class VideoExtractionError(RuntimeError):
     pass
+
+
+def auto_tag_next_batch(
+    db: Session,
+    *,
+    settings: Settings | None = None,
+    provider: AiProviderService | None = None,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> AutoTagBatchResult | None:
+    """Auto-tag one batch of not-yet-tagged ready tracks.
+
+    Returns ``None`` when auto-tagging is switched off or nothing is waiting,
+    so the idle worker loop stays quiet.
+    """
+    settings = settings or get_settings()
+    if not settings.ai_auto_tagging_enabled:
+        return None
+    provider = provider or build_ai_provider(settings)
+    if provider.status != AiProviderStatus.OK:
+        return None
+    track_ids = list_tracks_needing_auto_tagging(db, limit=batch_size)
+    if not track_ids:
+        return None
+    return auto_tag_batch(
+        db,
+        provider,
+        track_ids,
+        min_confidence=settings.ai_auto_tagging_min_confidence,
+    )
 
 
 def process_one_track(

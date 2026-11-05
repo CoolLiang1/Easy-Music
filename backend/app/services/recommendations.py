@@ -9,7 +9,7 @@ from app.models.feedback_event import FeedbackEvent
 from app.models.playback_event import PlaybackEvent
 from app.models.tag import Tag
 from app.models.track import Track
-from app.models.track_tag import TrackTag
+from app.models.track_tag import AI_TAG_SOURCE, TrackTag
 from app.models.user import User
 from app.schemas.recommendation import (
     RecommendationExplanation,
@@ -29,6 +29,9 @@ TAG_MATCH_WEIGHTS = {
     "type": 2.0,
     "feature": 2.0,
 }
+# AI-applied tags count at weight * confidence * this factor, so a confident
+# AI guess still ranks below the same tag chosen by the owner.
+AI_TAG_MATCH_FACTOR = 0.8
 LIKED_BOOST = 1.0
 ACTIVE_COOLDOWN_SOFT_PENALTY = 5.0
 RECENT_PLAYBACK_WINDOWS = (
@@ -167,7 +170,7 @@ def recommend_tracks_with_context(
             continue
 
         scored = _ScoredTrack(track=track)
-        _score_tag_matches(scored, request, track_tags.get(track.id, set()), tags_by_id)
+        _score_tag_matches(scored, request, track_tags.get(track.id, {}), tags_by_id)
         _score_liked(scored)
         _score_active_cooldown(scored, cooldown_until, ranking_time, request.cooldown_mode)
         _score_playlist_signals(
@@ -208,12 +211,26 @@ def _load_track_tags(
     db: Session,
     track_ids: list[int],
     tags_by_id: dict[int, Tag],
-) -> dict[int, set[int]]:
-    track_tags: dict[int, set[int]] = {}
+) -> dict[int, dict[int, float]]:
+    """Return, per track, each tag id mapped to its match multiplier.
+
+    Owner tags count fully (1.0). AI-applied tags count at their confidence
+    times ``AI_TAG_MATCH_FACTOR``.
+    """
+    track_tags: dict[int, dict[int, float]] = {}
     for track_tag in db.scalars(select(TrackTag).where(TrackTag.track_id.in_(track_ids))):
         if track_tag.tag_id in tags_by_id:
-            track_tags.setdefault(track_tag.track_id, set()).add(track_tag.tag_id)
+            track_tags.setdefault(track_tag.track_id, {})[track_tag.tag_id] = _tag_multiplier(
+                track_tag,
+            )
     return track_tags
+
+
+def _tag_multiplier(track_tag: TrackTag) -> float:
+    if track_tag.source != AI_TAG_SOURCE:
+        return 1.0
+    confidence = track_tag.confidence if track_tag.confidence is not None else 0.0
+    return min(max(confidence, 0.0), 1.0) * AI_TAG_MATCH_FACTOR
 
 
 def _load_latest_playback_events(
@@ -273,7 +290,7 @@ def _load_playlist_signals_by_track(
 def _score_tag_matches(
     scored: _ScoredTrack,
     request: RecommendationRequest,
-    track_tag_ids: set[int],
+    track_tag_multipliers: dict[int, float],
     tags_by_id: dict[int, Tag],
 ) -> None:
     request_groups = {
@@ -281,18 +298,26 @@ def _score_tag_matches(
         "type": request.type_tag_ids,
         "feature": request.feature_tag_ids,
     }
+    ai_tag_names: list[str] = []
+    ai_discount = 0.0
     for group, requested_ids in request_groups.items():
         matching_ids = [
             tag_id
             for tag_id in _unique_ids(requested_ids)
-            if tag_id in track_tag_ids
+            if tag_id in track_tag_multipliers
             and tag_id in tags_by_id
             and tags_by_id[tag_id].group == group
         ]
         if not matching_ids:
             continue
 
-        scored.score += TAG_MATCH_WEIGHTS[group] * len(matching_ids)
+        weight = TAG_MATCH_WEIGHTS[group]
+        for tag_id in matching_ids:
+            multiplier = track_tag_multipliers[tag_id]
+            scored.score += weight * multiplier
+            if multiplier < 1.0:
+                ai_tag_names.append(tags_by_id[tag_id].name)
+                ai_discount += weight * (1.0 - multiplier)
         scored.matched[group] = [
             RecommendationExplanationTag(
                 id=tag_id,
@@ -301,6 +326,14 @@ def _score_tag_matches(
             )
             for tag_id in matching_ids
         ]
+
+    if ai_tag_names:
+        scored.penalties.append(
+            RecommendationExplanationPart(
+                label=f"AI-inferred tags weighted lower: {', '.join(ai_tag_names)}",
+                score_delta=-round(ai_discount, 2),
+            ),
+        )
 
 
 def _score_liked(scored: _ScoredTrack) -> None:

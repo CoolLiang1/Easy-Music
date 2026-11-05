@@ -13,7 +13,7 @@ from app.models.playlist import PlaylistTrack
 from app.models.processing_job import ProcessingJob
 from app.models.tag import Tag
 from app.models.track import Track
-from app.models.track_tag import TrackTag
+from app.models.track_tag import USER_TAG_SOURCE, TrackTag
 from app.models.user import User
 from app.schemas.track import (
     TrackBatchDelete,
@@ -116,13 +116,42 @@ def update_track(db: Session, user: User, track: Track, payload: TrackUpdate) ->
         setattr(track, field, value)
 
     if unique_tag_ids is not None:
-        db.execute(delete(TrackTag).where(TrackTag.track_id == track.id))
-        for tag_id in unique_tag_ids:
-            db.add(TrackTag(track_id=track.id, tag_id=tag_id))
+        _sync_track_tags(db, track.id, set(unique_tag_ids))
 
     db.commit()
     db.refresh(track)
     return track
+
+
+def _sync_track_tags(
+    db: Session,
+    track_id: int,
+    desired_tag_ids: set[int],
+    *,
+    owner_chosen_tag_ids: set[int] | None = None,
+) -> None:
+    """Make the track's tags equal *desired_tag_ids*.
+
+    Tags that stay keep their row, so an AI-applied tag keeps its source and
+    confidence when the owner saves an unrelated change. New tags are stored
+    as owner tags. Tags in *owner_chosen_tag_ids* that are currently AI rows
+    are promoted to owner tags, because the owner picked them explicitly.
+    """
+    owner_chosen = owner_chosen_tag_ids or set()
+    existing = {
+        row.tag_id: row
+        for row in db.scalars(select(TrackTag).where(TrackTag.track_id == track_id))
+    }
+    for tag_id, row in existing.items():
+        if tag_id not in desired_tag_ids:
+            db.delete(row)
+        elif tag_id in owner_chosen and row.source != USER_TAG_SOURCE:
+            row.source = USER_TAG_SOURCE
+            row.confidence = 1.0
+    for tag_id in sorted(desired_tag_ids - existing.keys()):
+        db.add(
+            TrackTag(track_id=track_id, tag_id=tag_id, source=USER_TAG_SOURCE, confidence=1.0),
+        )
 
 
 def update_track_cover(
@@ -213,9 +242,12 @@ def batch_update_track_tags(
         )
         next_tag_ids = (current_tag_ids - set(remove_tag_ids)) | set(add_tag_ids)
 
-        db.execute(delete(TrackTag).where(TrackTag.track_id == track.id))
-        for tag_id in sorted(next_tag_ids):
-            db.add(TrackTag(track_id=track.id, tag_id=tag_id))
+        _sync_track_tags(
+            db,
+            track.id,
+            next_tag_ids,
+            owner_chosen_tag_ids=set(add_tag_ids),
+        )
 
         results.append(TrackBatchTagResult(track_id=track.id, status="updated"))
         updated_tracks.append(track)

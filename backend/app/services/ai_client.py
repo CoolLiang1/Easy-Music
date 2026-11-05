@@ -13,10 +13,13 @@ import os
 import socket
 import urllib.error
 import urllib.request
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.core.config import Settings
 from app.schemas.ai import AiCompletionRequest, AiCompletionResult
+
+if TYPE_CHECKING:
+    from app.services.ai_provider import AiProviderService
 
 _TIMEOUT_SECONDS = 60
 _NETWORK_ATTEMPTS = 2
@@ -175,3 +178,15 @@ def _read_error_body(exc: urllib.error.HTTPError) -> str:
         return str(error)
     except Exception:
         return exc.reason or f"HTTP {exc.code}"
+
+
+def build_ai_provider(settings: Settings) -> "AiProviderService":
+    """Construct the provider facade, attaching a real client only when the
+    settings allow a call, so callers get disabled / unconfigured results
+    otherwise. Shared by API routes and the worker."""
+    from app.services.ai_provider import AiProviderService
+
+    client = None
+    if settings.ai_enabled and settings.ai_api_key and settings.ai_model:
+        client = OpenAiCompatibleClient(settings)
+    return AiProviderService(settings, client=client)

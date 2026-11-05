@@ -618,6 +618,28 @@ if any track fails; rerun it to retry only unfinished tracks. Android tracks
 cached before regeneration keep the old audio until they are removed from
 the cache and cached again.
 
+### AI Auto-Tagging
+
+With the AI provider configured (`AI_ENABLED`, `AI_API_KEY`, `AI_MODEL`), the
+worker can apply tags from the owner's catalogue to tracks automatically. AI
+tags are stored as AI-sourced, count less than owner tags in recommendations,
+and never replace owner tags. Try a small sample first and read the printed
+tags:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production   exec worker python -m app.worker.autotag --dry-run
+docker compose -f docker-compose.prod.yml --env-file .env.production   exec worker python -m app.worker.autotag --limit 20
+```
+
+If the result is acceptable, either run the command without `--limit` to tag
+the rest now, or set `AI_AUTO_TAGGING_ENABLED=true` in `.env.production` and
+recreate the worker (`up -d worker`) so it tags the rest, and every later
+upload, in the background. Each track is processed once; remove a wrong tag
+in the Web console and it stays removed. `--all` re-tags every track and
+brings back removed AI tags, so use it only after changing the catalogue or
+`AI_AUTO_TAGGING_MIN_CONFIDENCE`. A failed batch changes nothing; the worker
+logs it and retries after 10 minutes.
+
 When an update introduces session renewal (refresh tokens), install the
 matching Android APK before lowering `ACCESS_TOKEN_EXPIRE_MINUTES` in
 `.env.production`; an older APK cannot renew and would ask for a login each
