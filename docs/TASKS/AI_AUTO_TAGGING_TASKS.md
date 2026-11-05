@@ -80,6 +80,8 @@ Out of scope (later slices, only if real use shows they are needed):
 - [x] Batch token budget raised to 8192 with split-and-retry on truncation.
 - [x] Web trigger: auto-tag status and next-batch endpoints, Web API wrappers
   and types, Library page button with progress and stop.
+- [x] Tolerant per-item parsing of provider tag output (suggest-tags and
+  auto-tagging).
 - [ ] PostgreSQL migration check and a real-provider run on the owner library.
 
 ## Acceptance Criteria
@@ -134,10 +136,18 @@ N/A reasons:
   of many files share provider calls and media processing is never delayed.
 - 2026-11-05: First production run failed every batch with
   `output_truncated`: the configured reasoning model spent the 2048-token
-  budget before writing JSON. Fixed on `fix/ai-auto-tagging-token-budget`:
+  budget before writing JSON. Fixed on `feature/web-ai-auto-tagging`:
   batch calls request 8192 tokens, and a batch that still truncates is split in
   half and retried down to single tracks.
 - 2026-11-05: Owner asked for a Web entry point. Added the Library page
   button on the same branch (`feature/web-ai-auto-tagging`). The page calls
   one 5-track batch per request and loops, instead of one long request or a
   new job type, so progress is visible and each request stays short.
+- 2026-11-05: Owner saw the per-track suggest-tags panel fail with
+  `extra_forbidden`: the model wrote `{"tag_id:12": 0, ...}`, copying the
+  prompt's `id:12` notation, and the strict schema rejected the whole
+  response. Fixed on `fix/ai-tag-output-parsing` in the shared provider
+  schemas: an id written into the key is repaired, extra keys are ignored,
+  confidence is clamped, and any item that still fails validation is dropped
+  on its own. This applies to both suggest-tags and batch auto-tagging; every
+  surviving id is still checked against the owner's catalogue.

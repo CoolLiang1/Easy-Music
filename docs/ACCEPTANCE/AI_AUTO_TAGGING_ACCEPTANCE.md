@@ -42,6 +42,12 @@ Decision: Implemented
   - Result: 31 passed; full suite 428 passed, 2 skipped.
 - [x] Command: `npm run build` in `web/` (typecheck and Vite build)
   - Result: passed.
+- [x] Command: `.\.venv\Scripts\python.exe -m pytest` (backend) after the
+  tolerant-parsing fix (`fix/ai-tag-output-parsing`, 2026-11-05)
+  - Result: 430 passed, 2 skipped. The two new regression tests (suggest-tags
+    with `{"tag_id:12": 0, ...}`, a clamped confidence, and junk items; a batch
+    with an id-in-key track and tags) fail on the previous schema and pass on
+    the fix.
 - [ ] Command: the same migration check against PostgreSQL 16
   - Result: not run; Docker was not running on the verification machine.
 

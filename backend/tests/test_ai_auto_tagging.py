@@ -278,6 +278,45 @@ def test_invented_foreign_and_out_of_batch_ids_are_dropped(
     assert "Foreign" not in client.prompts[0]
 
 
+def test_malformed_items_are_repaired_or_dropped_not_fatal(
+    db_session: Session,
+    library: dict[str, Any],
+) -> None:
+    first = create_track(db_session, library["user"], "First")
+    second = create_track(db_session, library["user"], "Second")
+    client = FakeClient(
+        AiCompletionResult.ok(
+            json.dumps(
+                {
+                    "tracks": [
+                        {
+                            "track_id": first.id,
+                            "tags": [
+                                {f"tag_id:{library['study'].id}": 0, "confidence": 0.8},
+                                {"confidence": 0.9},
+                                "junk",
+                            ],
+                        },
+                        {f"track_id:{second.id}": 0, "tags": [{"tag_id": library["calm"].id, "confidence": 0.7}]},
+                        {"tags": []},
+                    ],
+                },
+            ),
+        ),
+    )
+
+    result = auto_tag_batch(
+        db_session,
+        make_provider(client),
+        [first.id, second.id],
+        min_confidence=0.6,
+    )
+
+    assert result.ok
+    assert tag_rows(db_session, first) == {library["study"].id: ("ai", 0.8)}
+    assert tag_rows(db_session, second) == {library["calm"].id: ("ai", 0.7)}
+
+
 def test_owner_tags_are_never_changed_or_duplicated(
     db_session: Session,
     library: dict[str, Any],
