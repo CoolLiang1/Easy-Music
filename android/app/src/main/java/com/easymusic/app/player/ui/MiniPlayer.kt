@@ -70,7 +70,7 @@ fun MiniPlayer(
         color = colors.deck,
         contentColor = colors.onDeck,
         shape = MaterialTheme.shapes.medium,
-        shadowElevation = 6.dp,
+        shadowElevation = 2.dp,
     ) {
         Column {
             Row(
@@ -115,7 +115,7 @@ fun MiniPlayer(
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (uiState.status == PlaybackStatus.Error) {
-                            MaterialTheme.colorScheme.errorContainer
+                            MaterialTheme.colorScheme.error
                         } else {
                             colors.onDeckMuted
                         },
@@ -127,20 +127,20 @@ fun MiniPlayer(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(colors.onDeck),
+                        .background(colors.signal),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (uiState.status == PlaybackStatus.Buffering) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = colors.deck,
+                            color = colors.onSignal,
                         )
                     } else {
                         IconButton(
                             onClick = if (uiState.isPlaying) onPause else onPlay,
                             enabled = uiState.isPlaying || track.isReady,
-                            colors = IconButtonDefaults.iconButtonColors(contentColor = colors.deck),
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = colors.onSignal),
                         ) {
                             Icon(
                                 imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,

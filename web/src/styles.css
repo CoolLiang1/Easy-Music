@@ -1,33 +1,34 @@
 /* ==========================================================================
    Easy Music Web — design tokens
-   Ink is the UI base colour; amber is reserved for "what is playing now".
+   Warm paper and brown ink from the app icon; the icon's orange is reserved
+   for "what is playing now" (including the light-orange player deck).
    Tag groups (场景 / 类型 / 特点) carry one hue each across every screen.
    ========================================================================== */
 
 :root {
-  --ink: #15303a;
-  --ink-2: #21434e;
-  --ink-3: #2e5562;
-  --paper: #f1f2ee;
+  --ink: #3b2619;
+  --ink-2: #4e3424;
+  --ink-3: #6a4a35;
+  --paper: #fbf7f0;
   --surface: #ffffff;
-  --surface-2: #f7f8f5;
-  --surface-3: #eceee8;
-  --line: #e0e3dc;
-  --line-strong: #c8cdc4;
-  --text: #15303a;
-  --text-2: #4b5e65;
-  --text-3: #7b898d;
+  --surface-2: #f7f1e8;
+  --surface-3: #efe6d9;
+  --line: #ebe1d3;
+  --line-strong: #d8c9b4;
+  --text: #2b1d16;
+  --text-2: #6e5b4c;
+  --text-3: #8f7a68;
 
-  --signal: #f0a43a;
-  --signal-soft: #fdf1dd;
-  --signal-ink: #8a5a10;
+  --signal: #dd733f;
+  --signal-soft: #fbe7da;
+  --signal-ink: #a04a1f;
 
-  --scene: #23708a;
-  --scene-soft: #e1eef2;
-  --type: #7a4e9a;
-  --type-soft: #efe8f5;
-  --feature: #3d7a4f;
-  --feature-soft: #e3efe6;
+  --scene: #2e6e78;
+  --scene-soft: #e2efee;
+  --type: #8a4c70;
+  --type-soft: #f4e6ee;
+  --feature: #506b28;
+  --feature-soft: #eaf0dd;
 
   --ok: #2f7d4f;
   --ok-soft: #e2f1e7;
@@ -41,10 +42,18 @@
   --radius-sm: 6px;
   --radius: 8px;
   --radius-lg: 12px;
-  --shadow-1: 0 1px 2px rgb(21 48 58 / 6%);
-  --shadow-2: 0 6px 20px rgb(21 48 58 / 8%), 0 1px 3px rgb(21 48 58 / 6%);
-  --shadow-3: 0 18px 48px rgb(21 48 58 / 18%), 0 2px 6px rgb(21 48 58 / 8%);
-  --focus: 0 0 0 3px rgb(240 164 58 / 45%);
+  --shadow-1: 0 1px 2px rgb(43 29 22 / 6%);
+  --shadow-2: 0 6px 20px rgb(43 29 22 / 8%), 0 1px 3px rgb(43 29 22 / 6%);
+  --shadow-3: 0 18px 48px rgb(43 29 22 / 18%), 0 2px 6px rgb(43 29 22 / 8%);
+  --focus: 0 0 0 3px rgb(221 115 63 / 40%);
+
+  --deck: #fbeadd;
+  --deck-line: #f2d6c2;
+  --on-deck: var(--text);
+  --on-deck-2: #7e5a45;
+  --deck-hover: rgb(160 74 31 / 10%);
+  --deck-track: rgb(160 74 31 / 18%);
+  --deck-disabled: #c9ae98;
 
   --font-sans:
     "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
@@ -128,7 +137,7 @@ p {
 }
 
 ::selection {
-  background: rgb(240 164 58 / 35%);
+  background: rgb(221 115 63 / 35%);
 }
 
 .visually-hidden {
@@ -172,7 +181,7 @@ p {
   color: var(--scene);
   font-weight: 600;
   text-decoration: underline;
-  text-decoration-color: rgb(35 112 138 / 35%);
+  text-decoration-color: rgb(46 110 120 / 35%);
   text-underline-offset: 3px;
 }
 
@@ -565,7 +574,7 @@ code {
 }
 
 .btn-signal:hover:not(:disabled) {
-  background: #f4b55c;
+  background: #e8875a;
 }
 
 .btn-sm {
@@ -634,8 +643,8 @@ code {
   place-items: center;
   border: 0;
   border-radius: 999px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--surface-3);
+  color: var(--ink);
   padding: 0;
   transition:
     transform 0.12s ease,
@@ -643,23 +652,30 @@ code {
 }
 
 .play-btn:hover:not(:disabled) {
-  background: var(--ink-3);
+  background: var(--line-strong);
   transform: scale(1.06);
 }
 
 .play-btn:disabled {
-  background: var(--surface-3);
+  background: var(--surface-2);
   color: var(--text-3);
 }
 
 .play-btn.lg {
   width: 48px;
   height: 48px;
+  background: var(--ink);
+  color: #fff;
 }
 
-.play-btn.is-current {
+.play-btn.lg:hover:not(:disabled) {
+  background: var(--ink-3);
+}
+
+.play-btn.is-current,
+.play-btn.is-current:hover:not(:disabled) {
   background: var(--signal);
-  color: var(--ink);
+  color: #fff;
 }
 
 /* ==========================================================================
@@ -721,7 +737,7 @@ code {
 .textarea:focus {
   border-color: var(--ink-3);
   outline: none;
-  box-shadow: 0 0 0 3px rgb(35 112 138 / 16%);
+  box-shadow: 0 0 0 3px rgb(46 110 120 / 16%);
 }
 
 .input:disabled,
@@ -837,7 +853,7 @@ code {
   height: 16px;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 1px 2px rgb(21 48 58 / 30%);
+  box-shadow: 0 1px 2px rgb(43 29 22 / 30%);
   transition: transform 0.14s ease;
 }
 
@@ -1479,7 +1495,7 @@ code {
 }
 
 .data-table tr.is-selected td {
-  background: #f3f7f8;
+  background: #f7f1e8;
 }
 
 .data-table tr.is-playing td {
@@ -1684,7 +1700,7 @@ a.track-cell-title:hover {
 }
 
 .selection-bar .btn-ghost {
-  color: #dbe5e8;
+  color: #eadbc8;
 }
 
 .selection-bar .btn-ghost:hover:not(:disabled) {
@@ -1727,10 +1743,10 @@ a.track-cell-title:hover {
   grid-template-columns: minmax(200px, 1fr) minmax(320px, 1.6fr) minmax(200px, 1fr);
   align-items: center;
   gap: 20px;
-  background: var(--ink);
-  color: #fff;
+  border-top: 1px solid var(--deck-line);
+  background: var(--deck);
+  color: var(--on-deck);
   padding: 0 20px;
-  box-shadow: 0 -8px 24px rgb(21 48 58 / 18%);
 }
 
 .deck-track {
@@ -1741,7 +1757,7 @@ a.track-cell-title:hover {
 }
 
 .deck-track .cover {
-  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  box-shadow: 0 2px 6px rgb(43 29 22 / 18%);
 }
 
 .deck-meta {
@@ -1769,14 +1785,14 @@ a.track-cell-title:hover {
 
 .deck-sub {
   overflow: hidden;
-  color: #a9bec4;
+  color: var(--on-deck-2);
   font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .deck-sub.error {
-  color: #ffb3b9;
+  color: var(--danger);
   white-space: normal;
 }
 
@@ -1801,17 +1817,17 @@ a.track-cell-title:hover {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #d3dfe2;
+  color: var(--text-2);
   padding: 0;
 }
 
 .deck-btn:hover:not(:disabled) {
-  background: rgb(255 255 255 / 10%);
-  color: #fff;
+  background: var(--deck-hover);
+  color: var(--text);
 }
 
 .deck-btn:disabled {
-  color: #5f7d86;
+  color: var(--deck-disabled);
   cursor: not-allowed;
 }
 
@@ -1822,8 +1838,8 @@ a.track-cell-title:hover {
   place-items: center;
   border: 0;
   border-radius: 999px;
-  background: #fff;
-  color: var(--ink);
+  background: var(--signal);
+  color: #fff;
   padding: 0;
   transition: transform 0.12s ease;
 }
@@ -1847,7 +1863,7 @@ a.track-cell-title:hover {
 
 .deck-time {
   min-width: 38px;
-  color: #a9bec4;
+  color: var(--on-deck-2);
   font-family: var(--font-mono);
   font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
@@ -1871,14 +1887,14 @@ a.track-cell-title:hover {
     to right,
     var(--signal) 0,
     var(--signal) var(--progress),
-    rgb(255 255 255 / 22%) var(--progress)
+    var(--deck-track) var(--progress)
   );
 }
 
 .range::-moz-range-track {
   height: 4px;
   border-radius: 999px;
-  background: rgb(255 255 255 / 22%);
+  background: var(--deck-track);
 }
 
 .range::-moz-range-progress {
@@ -1894,8 +1910,8 @@ a.track-cell-title:hover {
   border: 0;
   border-radius: 999px;
   appearance: none;
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+  background: var(--signal-ink);
+  box-shadow: 0 1px 3px rgb(43 29 22 / 30%);
   opacity: 0;
   transition: opacity 0.12s ease;
 }
@@ -1905,7 +1921,7 @@ a.track-cell-title:hover {
   height: 12px;
   border: 0;
   border-radius: 999px;
-  background: #fff;
+  background: var(--signal-ink);
   opacity: 0;
 }
 
@@ -1954,8 +1970,8 @@ a.track-cell-title:hover {
   right: -2px;
   min-width: 16px;
   border-radius: 999px;
-  background: var(--signal);
-  color: var(--ink);
+  background: var(--signal-ink);
+  color: #fff;
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 700;
@@ -1967,7 +1983,7 @@ a.track-cell-title:hover {
 .deck-source {
   margin-right: 6px;
   overflow: hidden;
-  color: #a9bec4;
+  color: var(--on-deck-2);
   font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1986,7 +2002,7 @@ a.track-cell-title:hover {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgb(14 30 36 / 38%);
+  background: rgb(27 19 15 / 38%);
   animation: fade 0.14s ease-out;
 }
 
@@ -2160,7 +2176,7 @@ a.track-cell-title:hover {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgb(14 30 36 / 42%);
+  background: rgb(27 19 15 / 42%);
   animation: fade 0.14s ease-out;
 }
 
@@ -2350,7 +2366,7 @@ a.track-cell-title:hover {
   width: 24px;
   height: 24px;
   margin: -2px -4px 0 0;
-  color: #a9bec4;
+  color: #c9b39e;
 }
 
 .toast .icon-btn:hover {
@@ -2368,8 +2384,8 @@ a.track-cell-title:hover {
   place-items: center;
   padding: 32px 20px;
   background:
-    radial-gradient(circle at 18% 12%, rgb(240 164 58 / 14%), transparent 38%),
-    radial-gradient(circle at 85% 90%, rgb(35 112 138 / 14%), transparent 42%),
+    radial-gradient(circle at 18% 12%, rgb(221 115 63 / 14%), transparent 38%),
+    radial-gradient(circle at 85% 90%, rgb(46 110 120 / 14%), transparent 42%),
     var(--paper);
 }
 
@@ -3376,7 +3392,7 @@ details.disclosure > .disclosure-body {
 
 .prompt-box:focus-within {
   border-color: var(--ink-3);
-  box-shadow: 0 0 0 3px rgb(35 112 138 / 14%);
+  box-shadow: 0 0 0 3px rgb(46 110 120 / 14%);
 }
 
 .prompt-box textarea {
@@ -3642,7 +3658,7 @@ details.disclosure > .disclosure-body {
     inset: 0;
     z-index: 64;
     display: block;
-    background: rgb(14 30 36 / 38%);
+    background: rgb(27 19 15 / 38%);
   }
 
   .nav-item.active::before {
@@ -3658,7 +3674,7 @@ details.disclosure > .disclosure-body {
     align-items: center;
     gap: 8px;
     border-bottom: 1px solid var(--line);
-    background: rgb(241 242 238 / 92%);
+    background: rgb(251 247 240 / 92%);
     padding: 0 10px;
     backdrop-filter: blur(10px);
   }
@@ -3723,7 +3739,7 @@ details.disclosure > .disclosure-body {
     left: 0;
     display: block;
     height: 3px;
-    background: rgb(255 255 255 / 14%);
+    background: var(--deck-track);
   }
 
   .deck-mobile-progress span {

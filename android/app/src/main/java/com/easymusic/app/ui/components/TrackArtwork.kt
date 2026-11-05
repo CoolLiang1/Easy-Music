@@ -97,13 +97,13 @@ private fun firstGlyph(title: String): String {
 }
 
 private val placeholderPalette = listOf(
-    Color(0xFF23708A) to Color(0xFF15303A),
-    Color(0xFF7A4E9A) to Color(0xFF3B2A55),
-    Color(0xFF3D7A4F) to Color(0xFF1E3F2C),
-    Color(0xFFC07A26) to Color(0xFF6B3F12),
-    Color(0xFF2B5F9E) to Color(0xFF18325A),
-    Color(0xFF9A4E5E) to Color(0xFF4F2530),
-    Color(0xFF4F6F78) to Color(0xFF263A40),
+    Color(0xFFDD733F) to Color(0xFF9A512F),
+    Color(0xFF2E6E78) to Color(0xFF1D474E),
+    Color(0xFF8A4C70) to Color(0xFF552D45),
+    Color(0xFF506B28) to Color(0xFF33461A),
+    Color(0xFFB5862F) to Color(0xFF6E4F17),
+    Color(0xFF9A512F) to Color(0xFF5A2E1A),
+    Color(0xFF6E5B4C) to Color(0xFF3B2619),
 )
 
 private fun placeholderBrush(seed: String): Brush {
