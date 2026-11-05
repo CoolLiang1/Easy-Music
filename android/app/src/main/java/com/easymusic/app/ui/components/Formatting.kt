@@ -27,13 +27,11 @@ fun Long.formatBytes(): String =
         else -> "$this B"
     }
 
-fun trackSubtitle(artist: String?, album: String?, fallback: String = "未填写艺人"): String =
-    listOfNotNull(artist, album)
-        .filter { it.isNotBlank() }
-        .joinToString(separator = " · ")
-        .ifBlank { fallback }
+/** Artist line under a track title. Album is not shown: the owner identifies tracks by artist. */
+fun trackSubtitle(artist: String?, fallback: String = "未填写艺人"): String =
+    artist?.trim().orEmpty().ifBlank { fallback }
 
-fun TrackResponse.subtitle(): String = trackSubtitle(artist, album)
+fun TrackResponse.subtitle(): String = trackSubtitle(artist)
 
 fun formatTrackStatus(status: String): String =
     when (status.lowercase()) {

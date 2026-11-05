@@ -570,7 +570,7 @@ export function PlaylistsPage() {
                                             <TrackStatusBadge status={track.status} />{" "}
                                           </>
                                         ) : null}
-                                        {trackSubtitle(track) || <span className="faint">未填写艺人</span>}
+                                        {trackSubtitle(track)}
                                       </span>
                                     </div>
                                   </div>
@@ -732,7 +732,7 @@ function TrackPicker({
                 <TrackCover size={34} track={track} />
                 <span className="track-cell-text">
                   <span className="track-cell-title">{track.title || "未命名音轨"}</span>
-                  <span className="track-cell-sub">{trackSubtitle(track) || "未填写艺人"}</span>
+                  <span className="track-cell-sub">{trackSubtitle(track)}</span>
                 </span>
                 <span className="mono faint">{formatDuration(track.duration_seconds)}</span>
               </button>

@@ -329,7 +329,7 @@ function ReportTrack({
           {track.title || "未命名音轨"}
         </RouteLink>
         <span className="track-cell-sub">
-          {[track.artist || "未填写艺人", track.album, formatDuration(track.duration_seconds)]
+          {[track.artist || "未填写艺人", formatDuration(track.duration_seconds)]
             .filter(Boolean)
             .join(" · ")}
         </span>

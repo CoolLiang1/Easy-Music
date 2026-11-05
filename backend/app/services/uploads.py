@@ -5,6 +5,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.media.storage import MediaStorage
+from app.media.titles import clean_filename_title
 from app.models.track import Track
 from app.models.user import User
 from app.services.duplicate_signals import (
@@ -72,7 +73,7 @@ def create_uploaded_track(
     upload_format = validate_upload_file(file)
     filename = file.filename or f"upload.{upload_format}"
     title = Path(filename.replace("\\", "/")).name
-    title = Path(title).stem or "Untitled Upload"
+    title = clean_filename_title(Path(title).stem) or "Untitled Upload"
 
     track = Track(
         user_id=user.id,

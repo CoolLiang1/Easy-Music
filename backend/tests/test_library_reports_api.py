@@ -210,7 +210,6 @@ def test_library_report_returns_read_only_cleanup_sections(
     )
     assert missing_issue["reasons"] == [
         "Missing artist.",
-        "Missing album.",
         "Missing duration.",
         "Missing cover.",
     ]

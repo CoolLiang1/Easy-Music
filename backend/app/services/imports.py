@@ -5,6 +5,7 @@ import shutil
 from sqlalchemy import select
 from app.core.config import Settings, get_settings
 from app.media.storage import MediaStorage
+from app.media.titles import clean_filename_title
 from app.models.import_batch import ImportBatch, ImportItem
 from app.models.track import Track
 from app.models.user import User
@@ -304,7 +305,7 @@ class ImportRootPolicy:
 
             track = Track(
                 user_id=user.id,
-                title=source.stem or "Untitled Import",
+                title=clean_filename_title(source.stem) or "Untitled Import",
                 content_type="song",
                 status="uploading",
                 format=extension.removeprefix("."),
@@ -387,7 +388,7 @@ class ImportRootPolicy:
 
             track = Track(
                 user_id=user.id,
-                title=source.stem or "Untitled Import",
+                title=clean_filename_title(source.stem) or "Untitled Import",
                 content_type="song",
                 status="uploading",
                 format=upload_format,

@@ -142,8 +142,6 @@ def _missing_metadata_reasons(track: Track) -> list[str]:
         reasons.append("Missing title.")
     if not track.artist:
         reasons.append("Missing artist.")
-    if not track.album:
-        reasons.append("Missing album.")
     if track.duration_seconds is None:
         reasons.append("Missing duration.")
     if not track.cover_path:

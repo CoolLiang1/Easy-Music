@@ -3862,3 +3862,48 @@ details.disclosure > .disclosure-body {
     transform: scaleY(0.6);
   }
 }
+
+/* ==========================================================================
+   Metadata clean-up review
+   ========================================================================== */
+
+.metadata-table td {
+  vertical-align: top;
+  min-width: 260px;
+}
+
+.metadata-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metadata-current {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.metadata-edit .input {
+  flex: 1;
+  min-height: 32px;
+  padding: 5px 9px;
+}
+
+.metadata-edit .badge {
+  flex: none;
+}
+
+.metadata-same {
+  font-size: 0.82rem;
+  line-height: 32px;
+}

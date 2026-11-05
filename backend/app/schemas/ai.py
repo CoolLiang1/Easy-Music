@@ -429,6 +429,125 @@ class AutoTagBatchResponse(BaseModel):
     error: str | None = None
 
 
+class AiMetadataTrackOutput(BaseModel):
+    """Clean title and artist the provider proposes for one track.
+
+    Lenient on purpose: one malformed item must not discard a whole batch.
+    The service trims, length-limits, and confidence-gates the values.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    track_id: int
+    title: str | None = None
+    artist: str | None = None
+    artist_confidence: float = 0.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _repair_track_id(cls, data: Any) -> Any:
+        return _repair_id_key(data, "track_id")
+
+    @field_validator("title", "artist", mode="before")
+    @classmethod
+    def _blank_non_strings(cls, value: Any) -> Any:
+        return value if isinstance(value, str) else None
+
+    @field_validator("artist_confidence", mode="before")
+    @classmethod
+    def _default_confidence(cls, value: Any) -> Any:
+        return 0.0 if value is None else value
+
+
+class AiMetadataBatchOutput(BaseModel):
+    """Shape the AI must return for a metadata clean-up batch."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tracks: list[AiMetadataTrackOutput] = Field(default_factory=list)
+
+    @field_validator("tracks", mode="before")
+    @classmethod
+    def _drop_bad_tracks(cls, value: Any) -> Any:
+        return _keep_valid_items(value, AiMetadataTrackOutput)
+
+
+class MetadataCleanupStatusResponse(BaseModel):
+    """Response for ``GET /api/ai/metadata-cleanup/status``."""
+
+    provider_status: AiProviderStatus
+    pending_count: int
+
+
+class MetadataCleanupBatchRequest(BaseModel):
+    """Request for ``POST /api/ai/metadata-cleanup/next-batch``.
+
+    ``after_id`` is the ``next_after_id`` of the previous call, so a review
+    session walks the pending tracks once without anything being saved.
+    """
+
+    after_id: int | None = Field(default=None, ge=0)
+
+
+class MetadataSuggestion(BaseModel):
+    """One track whose title or artist the AI would change.
+
+    ``*_selected`` is the suggested default for the review list: title
+    changes and confident artists for tracks without one are pre-selected.
+    """
+
+    track_id: int
+    current_title: str
+    current_artist: str | None = None
+    suggested_title: str
+    suggested_artist: str | None = None
+    artist_confidence: float
+    title_changed: bool
+    artist_changed: bool
+    title_selected: bool
+    artist_selected: bool
+
+
+class MetadataCleanupBatchResponse(BaseModel):
+    """Response for ``POST /api/ai/metadata-cleanup/next-batch``.
+
+    Nothing is saved. ``reviewed_track_ids`` lists every track the AI looked
+    at, including those with no suggested change; send them back to
+    ``apply`` so they are not offered again. ``next_after_id`` is the last
+    track id of the batch, or null when nothing was pending. A failed batch
+    reports ``error``; retry it with the same ``after_id``.
+    """
+
+    provider_status: AiProviderStatus
+    suggestions: list[MetadataSuggestion] = Field(default_factory=list)
+    reviewed_track_ids: list[int] = Field(default_factory=list)
+    next_after_id: int | None = None
+    remaining_count: int
+    error: str | None = None
+
+
+class MetadataChange(BaseModel):
+    """Accepted values for one track; omitted fields are left unchanged."""
+
+    track_id: int
+    title: str | None = Field(default=None, max_length=255)
+    artist: str | None = Field(default=None, max_length=255)
+
+
+class MetadataCleanupApplyRequest(BaseModel):
+    """Request for ``POST /api/ai/metadata-cleanup/apply``."""
+
+    changes: list[MetadataChange] = Field(default_factory=list, max_length=1000)
+    reviewed_track_ids: list[int] = Field(default_factory=list, max_length=5000)
+
+
+class MetadataCleanupApplyResponse(BaseModel):
+    """Response for ``POST /api/ai/metadata-cleanup/apply``."""
+
+    updated_count: int
+    reviewed_count: int
+
+
 class TagSuggestionResponse(BaseModel):
     """Response for ``POST /api/ai/tracks/{track_id}/suggest-tags``.
 
