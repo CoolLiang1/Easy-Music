@@ -15,7 +15,7 @@ import { MenuButton, type MenuEntry } from "../components/ui/Menu";
 import { useToast } from "../components/ui/Toast";
 import { TrackCover } from "../components/ui/TrackCover";
 import { PlayButton, isReadyTrack } from "../components/WebAudioPlayer";
-import { formatContentTypeLabel, formatDateTime, formatDuration } from "../i18n/zh";
+import { formatDateTime, formatDuration } from "../i18n/zh";
 import { usePlaybackQueue } from "../player/PlaybackQueueProvider";
 import { RouteLink } from "../routes/RouteLink";
 import { navigateTo } from "../routes/router";
@@ -262,8 +262,6 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
         <TrackCover eager size={200} track={track} />
         <div>
           <div className="detail-kicker">
-            <span>{formatContentTypeLabel(track.content_type)}</span>
-            <span aria-hidden="true">·</span>
             <span className="mono">{formatDuration(track.duration_seconds)}</span>
             <TrackStatusBadge status={track.status} />
           </div>
@@ -272,7 +270,6 @@ export function TrackDetailPage({ trackId }: TrackDetailPageProps) {
           </h1>
           <p className="detail-artist">
             {track.artist ? <strong>{track.artist}</strong> : <span className="faint">未填写艺人</span>}
-            {track.album ? <> · {track.album}</> : null}
           </p>
 
           <div className="detail-actions">
