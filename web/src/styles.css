@@ -3972,3 +3972,55 @@ details.disclosure > .disclosure-body {
 .metadata-note {
   font-size: 0.8rem;
 }
+
+/* ==========================================================================
+   Cover search review
+   ========================================================================== */
+
+.cover-search-table td {
+  vertical-align: middle;
+}
+
+.cover-search-table td:nth-child(2) {
+  min-width: 240px;
+}
+
+.cover-search-table td:nth-child(3) {
+  width: 48%;
+  min-width: 280px;
+}
+
+.cover-candidate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.cover-candidate img {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  object-fit: cover;
+}
+
+.cover-candidate-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  font-size: 0.82rem;
+}
+
+.cover-candidate-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cover-candidate-title {
+  color: var(--text);
+  font-weight: 560;
+}

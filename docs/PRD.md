@@ -83,6 +83,8 @@ The owner uses Easy Music daily to:
 
 - Automatic downloading from Bilibili or any other site, including
   extracting audio from a pasted URL.
+  Owner-reviewed cover images from the iTunes Search API are the one
+  exception (off by default).
 - Multiple users, sharing, social features, or public discovery.
 - A native Windows desktop client.
 - Full offline sync of the whole library.

@@ -31,6 +31,8 @@ Android player. Current status and open work are in
   listening requests, per-track tag suggestions, batch auto-tagging from
   your own tag catalogue, and reviewed title/artist clean-up for tracks named
   after messy file names. AI never chooses tracks. It is off unless configured.
+- Automatic covers from embedded artwork, plus optional reviewed cover lookup
+  through the iTunes Search API (off unless `COVER_SEARCH_ENABLED=true`).
 - Production Docker Compose deployment behind Caddy HTTPS, with an update
   script and database backups.
 

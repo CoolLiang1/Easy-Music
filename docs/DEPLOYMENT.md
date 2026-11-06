@@ -629,6 +629,16 @@ docker compose -f docker-compose.prod.yml --env-file .env.production \
 Tracks whose file has no embedded picture keep the generated artwork.
 Rerunning is harmless.
 
+### Online Cover Search
+
+Optional. To look up covers for tracks that have an artist but no cover, set
+`COVER_SEARCH_ENABLED=true` in `.env.production` and recreate the API
+(`up -d api`). The server then sends track titles and artists to Apple's
+public iTunes Search API, and downloads only the covers you accept on the Web
+page 查找封面. Run 标题与艺人 first so tracks have artists. Searching is slow
+on purpose (Apple allows about 20 requests a minute): roughly 3–7 seconds per
+track. Covers you uploaded are never replaced.
+
 ### AI Auto-Tagging
 
 With the AI provider configured (`AI_ENABLED`, `AI_API_KEY`, `AI_MODEL`), the
