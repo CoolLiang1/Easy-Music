@@ -222,20 +222,47 @@ def create_track(db: Session, user: User, title: str, artist: str | None = "Arti
     return track
 
 
-def test_pending_tracks_need_an_artist_and_no_cover(db_session: Session) -> None:
+def test_lists_every_coverless_track_but_auto_searches_only_new_ones(db_session: Session) -> None:
     user = create_user(db_session)
     other = create_user(db_session, "other")
     first = create_track(db_session, user, "A")
-    create_track(db_session, user, "No artist", artist=None)
-    create_track(db_session, user, "Blank artist", artist="  ")
+    no_artist = create_track(db_session, user, "No artist", artist=None)
+    blank = create_track(db_session, user, "Blank artist", artist="  ")
     create_track(db_session, user, "Has cover", cover_path="covers/x.jpg")
-    create_track(db_session, user, "Reviewed", cover_search_version=COVER_SEARCH_VERSION)
+    searched = create_track(db_session, user, "Searched", cover_search_version=COVER_SEARCH_VERSION)
     create_track(db_session, user, "Processing", status="processing")
     create_track(db_session, other, "Foreign")
 
-    assert [t.id for t in cover_search.list_pending_tracks(db_session, user_id=user.id)] == [first.id]
+    listed = cover_search.list_coverless_tracks(db_session, user_id=user.id)
+    assert [t.id for t in listed] == [first.id, no_artist.id, blank.id, searched.id]
+    assert [cover_search.is_searched(t) for t in listed] == [False, False, False, True]
+    assert cover_search.count_coverless_tracks(db_session, user_id=user.id) == 4
     assert count_pending_tracks(db_session, user_id=user.id) == 1
     assert count_tracks_without_artist(db_session, user_id=user.id) == 2
+
+
+def test_search_by_id_searches_again_and_skips_unsearchable_tracks(db_session: Session) -> None:
+    user = create_user(db_session)
+    other = create_user(db_session, "other")
+    searched = create_track(db_session, user, "Lemon", "米津玄師", cover_search_version=COVER_SEARCH_VERSION)
+    no_artist = create_track(db_session, user, "No artist", artist=None)
+    has_cover = create_track(db_session, user, "Has cover", cover_path="covers/x.jpg")
+    foreign = create_track(db_session, other, "Lemon", "米津玄師")
+    client = FakeClient({"JP": [item("Lemon", "米津玄師")]})
+
+    result = cover_search.search_tracks_by_id(
+        db_session,
+        client,
+        user_id=user.id,
+        track_ids=[foreign.id, has_cover.id, no_artist.id, searched.id],
+        batch_size=10,
+    )
+
+    assert result.status == "ok"
+    assert result.reviewed_track_ids == [searched.id]
+    assert [s.track_id for s in result.suggestions] == [searched.id]
+    assert len(client.calls) == 1
+    assert cover_search.search_tracks_by_id(db_session, None, user_id=user.id, track_ids=[searched.id]).status == "disabled"
 
 
 def test_batches_walk_by_cursor_and_save_nothing(db_session: Session) -> None:
@@ -371,15 +398,19 @@ def test_status_reports_disabled_search(api: tuple[TestClient, Any], db_session:
     client, app = api
     user = create_user(db_session)
     track = create_track(db_session, user, "Lemon", "米津玄師")
-    create_track(db_session, user, "Unknown", artist=None)
+    unknown = create_track(db_session, user, "Unknown", artist=None)
     app.dependency_overrides[_get_cover_search_client] = lambda: None
 
     body = client.get("/api/covers/search/status", headers=auth(user)).json()
 
     assert body == {
         "enabled": False,
+        "coverless_count": 2,
         "pending_count": 1,
-        "pending_tracks": [{"track_id": track.id, "title": "Lemon", "artist": "米津玄師", "duration_seconds": None}],
+        "tracks": [
+            {"track_id": track.id, "title": "Lemon", "artist": "米津玄師", "duration_seconds": None, "searched": False},
+            {"track_id": unknown.id, "title": "Unknown", "artist": "", "duration_seconds": None, "searched": False},
+        ],
         "skipped_without_artist": 1,
     }
     batch = client.post("/api/covers/search/next-batch", json={}, headers=auth(user)).json()
@@ -418,5 +449,15 @@ def test_review_flow_through_endpoints(
     assert applied == {"updated_count": 1, "failed_count": 0, "reviewed_count": 2}
     status = client.get("/api/covers/search/status", headers=auth(user)).json()
     assert status["pending_count"] == 0
+    # The track without a saved cover stays listed, marked as searched.
+    assert [(t["track_id"], t["searched"]) for t in status["tracks"]] == [(uncertain.id, True)]
     cover = client.get(f"/api/tracks/{track.id}/cover", headers=auth(user))
     assert cover.status_code == 200 and cover.content == JPEG
+
+    again = client.post(
+        "/api/covers/search/next-batch",
+        json={"track_ids": [uncertain.id, track.id]},
+        headers=auth(user),
+    ).json()
+    assert again["status"] == "ok" and again["reviewed_track_ids"] == [uncertain.id]
+    assert again["next_after_id"] is None and again["remaining_count"] == 0

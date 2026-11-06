@@ -192,16 +192,20 @@ Needs `COVER_SEARCH_ENABLED=true` and network access to `itunes.apple.com`.
 
 ```powershell
 $status = Invoke-RestMethod -Uri "$api/api/covers/search/status" -Headers $headers
-$status.enabled; $status.pending_count; $status.skipped_without_artist
+$status.enabled; $status.coverless_count; $status.pending_count; $status.skipped_without_artist
+$status.tracks | Format-Table track_id, title, artist, searched
 $batch = Invoke-RestMethod -Method Post -Uri "$api/api/covers/search/next-batch" `
   -Headers $headers -ContentType "application/json" -Body '{"after_id": null}'
 $batch.candidates | Format-Table track_id, confidence, selected, track_name, artist_name
 ```
 
-Expected: `status` lists ready tracks that have an artist and no cover.
-`next-batch` searches up to 3 of them (a few seconds per track because of the
-iTunes rate limit) and saves nothing. To save, send the accepted candidates and
-every reviewed id:
+Expected: `status.tracks` lists every ready track without a cover; `searched`
+is true for tracks already searched without a saved cover, and `artist` is
+empty for tracks that cannot be searched. `next-batch` searches up to 3
+never-searched tracks with an artist (a few seconds per track because of the
+iTunes rate limit) and saves nothing. To search specific tracks again, send
+`{"track_ids": [...]}` instead of `after_id`. To save, send the accepted
+candidates and every reviewed id:
 
 ```powershell
 $body = @{
@@ -214,7 +218,9 @@ Invoke-RestMethod -Method Post -Uri "$api/api/covers/search/apply" -Headers $hea
 
 Expected: `updated_count` covers are downloaded and served by
 `GET /api/tracks/{id}/cover`. A URL outside `https://*.mzstatic.com` or a
-non-image download counts in `failed_count` and the track stays pending. With
+non-image download counts in `failed_count` and the track stays unsearched.
+Reviewed tracks without a new cover stay in `status.tracks` with `searched`
+true. With
 the flag off, `status.enabled` is `false` and `next-batch` returns
 `status: "disabled"`.
 
