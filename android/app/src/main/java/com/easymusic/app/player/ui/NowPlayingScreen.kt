@@ -259,6 +259,7 @@ private fun NowPlayingHero(
         TrackArtwork(
             trackId = track.id,
             title = track.title,
+            artist = track.artist,
             coverPath = track.coverPath,
             coverVersion = track.updatedAt,
             size = 240.dp,
@@ -543,6 +544,7 @@ private fun QueueRow(
         TrackArtwork(
             trackId = item.track.id,
             title = item.track.title,
+            artist = item.track.artist,
             coverPath = item.track.coverPath,
             coverVersion = item.track.updatedAt,
             size = 40.dp,

@@ -85,6 +85,7 @@ fun MiniPlayer(
                 TrackArtwork(
                     trackId = track.id,
                     title = track.title,
+                    artist = track.artist,
                     coverPath = track.coverPath,
                     coverVersion = track.updatedAt,
                     size = 42.dp,

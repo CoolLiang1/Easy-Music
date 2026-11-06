@@ -323,7 +323,7 @@ function ReportTrack({
 }) {
   return (
     <>
-      <TrackCover size={36} track={{ cover_path: null, id: track.id, title: track.title }} />
+      <TrackCover size={36} track={{ artist: track.artist, cover_path: null, id: track.id, title: track.title }} />
       <div className="list-row-main">
         <RouteLink className="track-cell-title" to={`/tracks/${encodeURIComponent(track.id)}`}>
           {track.title || "未命名音轨"}
