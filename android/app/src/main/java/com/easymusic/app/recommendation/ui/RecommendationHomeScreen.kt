@@ -573,6 +573,7 @@ private fun ResultCard(
                 TrackArtwork(
                     trackId = track.id,
                     title = track.title,
+                    artist = track.artist,
                     coverPath = track.coverPath,
                     coverVersion = track.updatedAt,
                     size = if (isPrimary) 72.dp else 52.dp,

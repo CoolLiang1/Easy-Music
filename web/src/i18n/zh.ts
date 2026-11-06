@@ -144,7 +144,6 @@ const backendReasonLabels: Record<string, string> = {
   "Backend processing is still running.": "后台仍在处理",
   "Cooldown has already expired.": "冷却时间已过",
   "Missing artist.": "缺少艺人",
-  "Missing cover.": "缺少封面",
   "Missing duration.": "缺少时长",
   "Missing title.": "缺少标题",
   "Processing failed.": "处理失败",

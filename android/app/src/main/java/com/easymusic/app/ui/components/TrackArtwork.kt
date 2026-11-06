@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -19,6 +18,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -51,6 +54,7 @@ fun TrackArtwork(
     coverPath: String? = null,
     coverVersion: String? = null,
     size: Dp = 48.dp,
+    artist: String? = null,
 ) {
     val context = LocalContext.current
     val cacheKey = coverPath?.let { "$trackId:$it:${coverVersion.orEmpty()}" }
@@ -67,7 +71,7 @@ fun TrackArtwork(
         modifier = modifier
             .size(size)
             .clip(shape)
-            .background(placeholderBrush(title.ifBlank { trackId.toString() })),
+            .drawBehind { drawPlaceholderArtwork(artist?.trim()?.ifBlank { null } ?: title.ifBlank { trackId.toString() }) },
         contentAlignment = Alignment.Center,
     ) {
         val loaded = image
@@ -89,11 +93,18 @@ fun TrackArtwork(
     }
 }
 
-private fun firstGlyph(title: String): String {
+/** First letter or digit of the title, skipping brackets and symbols such as 【. */
+internal fun firstGlyph(title: String): String {
     val trimmed = title.trim()
-    if (trimmed.isEmpty()) return "♪"
-    val codePoint = trimmed.codePointAt(0)
-    return String(Character.toChars(codePoint)).uppercase()
+    var index = 0
+    while (index < trimmed.length) {
+        val codePoint = trimmed.codePointAt(index)
+        if (Character.isLetterOrDigit(codePoint)) {
+            return String(Character.toChars(codePoint)).uppercase()
+        }
+        index += Character.charCount(codePoint)
+    }
+    return "♪"
 }
 
 private val placeholderPalette = listOf(
@@ -104,13 +115,40 @@ private val placeholderPalette = listOf(
     Color(0xFFB5862F) to Color(0xFF6E4F17),
     Color(0xFF9A512F) to Color(0xFF5A2E1A),
     Color(0xFF6E5B4C) to Color(0xFF3B2619),
+    Color(0xFF3F5F8A) to Color(0xFF263A57),
+    Color(0xFFA3434A) to Color(0xFF65262B),
 )
 
-private fun placeholderBrush(seed: String): Brush {
+/**
+ * Generated artwork for tracks without a cover: colour from the artist (or the
+ * title), plus a seeded record-groove pattern. Keep in step with Web
+ * `TrackCover.tsx` `placeholderArtwork`.
+ */
+private fun DrawScope.drawPlaceholderArtwork(seed: String) {
+    val hash = placeholderHash(seed)
+    val (from, to) = placeholderPalette[Math.floorMod(hash, placeholderPalette.size)]
+    drawRect(Brush.linearGradient(listOf(from, to), start = Offset.Zero, end = Offset(size.width, size.height)))
+
+    val center = Offset(
+        size.width * (25 + Math.floorMod(hash ushr 3, 50)) / 100f,
+        size.height * (25 + Math.floorMod(hash ushr 9, 50)) / 100f,
+    )
+    val edge = size.minDimension
+    val groove = Color.White.copy(alpha = 0.09f)
+    val step = edge * 0.045f
+    var radius = step
+    val reach = edge * 1.5f
+    while (radius < reach) {
+        drawCircle(color = groove, radius = radius, center = center, style = Stroke(width = edge * 0.012f))
+        radius += step
+    }
+    drawCircle(color = Color.White.copy(alpha = 0.2f), radius = edge * 0.07f, center = center)
+}
+
+internal fun placeholderHash(seed: String): Int {
     var hash = 0
     seed.forEach { char -> hash = hash * 31 + char.code }
-    val (from, to) = placeholderPalette[Math.floorMod(hash, placeholderPalette.size)]
-    return Brush.linearGradient(listOf(from, to))
+    return hash
 }
 
 /** Small in-memory cover cache; covers are fetched with the stored bearer token. */

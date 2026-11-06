@@ -355,6 +355,7 @@ private fun LibraryTrackRow(
     TrackListRow(
         trackId = track.id,
         title = track.title,
+        artist = track.artist,
         subtitle = listOfNotNull(
             track.subtitle(),
             track.durationSeconds?.formatDuration(),
