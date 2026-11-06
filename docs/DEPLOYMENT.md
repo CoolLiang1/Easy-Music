@@ -612,6 +612,23 @@ if any track fails; rerun it to retry only unfinished tracks. Android tracks
 cached before regeneration keep the old audio until they are removed from
 the cache and cached again.
 
+### Automatic Covers
+
+New uploads get their embedded artwork, or a video frame, as the cover
+automatically. For tracks uploaded before that, run the backfill once. It
+only reads originals and only fills tracks without a cover, so covers you
+uploaded are kept:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec worker python -m app.worker.covers --dry-run
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec worker python -m app.worker.covers
+```
+
+Tracks whose file has no embedded picture keep the generated artwork.
+Rerunning is harmless.
+
 ### Online Cover Search
 
 Optional. To look up covers for tracks that have an artist but no cover, set

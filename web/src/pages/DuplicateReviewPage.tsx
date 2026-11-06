@@ -121,7 +121,7 @@ export function DuplicateReviewPage() {
                     <div className="row" style={{ flexWrap: "nowrap", gap: 10 }}>
                       <TrackCover
                         size={40}
-                        track={{ cover_path: null, id: candidate.id, title: candidate.title }}
+                        track={{ artist: candidate.artist, cover_path: null, id: candidate.id, title: candidate.title }}
                       />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <RouteLink

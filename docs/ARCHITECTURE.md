@@ -50,7 +50,7 @@ Python 3.12, FastAPI, SQLAlchemy, Alembic, PostgreSQL, FFmpeg/ffprobe.
   metadata clean-up).
 - `media/` owns storage paths, path-safety checks, filename title clean-up,
   FFmpeg and ffprobe wrappers, and streaming responses.
-- `worker/` runs the job loop and the `renormalize` and `autotag` backfills.
+- `worker/` runs the job loop and the `renormalize`, `autotag`, and `covers` backfills.
 
 ### Data Model
 
@@ -152,7 +152,10 @@ queues.
 2. Extract metadata with ffprobe.
 3. Measure loudness and write the gain-adjusted playback MP3 (below).
 4. Store the normalized metadata key and playback SHA-256.
-5. Extract an embedded cover if there is one.
+5. If the track has no cover, extract embedded artwork (first picture stream,
+   JPEG up to 800 px). Video uploads instead get a frame 20% in (at most 60 s),
+   taken before the temporary video is deleted. A missing picture is not an
+   error, and an owner-uploaded cover is never replaced.
 6. Mark the track `ready`, or `failed` with a message.
 7. Later, while the job queue is idle and `AI_AUTO_TAGGING_ENABLED` is true,
    the worker auto-tags up to 10 ready tracks per provider call. A failed
@@ -163,6 +166,13 @@ Web Library "AI 打标签" button, which calls `POST /api/ai/auto-tag/next-batch
 repeatedly (5 tracks per call) until nothing is pending. Every path uses the
 same service with an 8192-token output budget; a batch whose output is
 truncated is split in half and retried.
+
+Tracks without a cover get generated artwork on Web and Android: colour from
+the artist (else the title), the first letter or digit of the title, and a
+seeded record-groove pattern. Web `TrackCover.tsx` and Android
+`TrackArtwork.kt` use the same hash so a track looks the same on both.
+`python -m app.worker.covers` extracts embedded artwork for existing tracks
+without a cover.
 
 Duplicate signals are advisory: they never block an upload or delete, merge,
 or hide a track. A cover replaced from the Web changes only the cover, never

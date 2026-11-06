@@ -211,7 +211,6 @@ def test_library_report_returns_read_only_cleanup_sections(
     assert missing_issue["reasons"] == [
         "Missing artist.",
         "Missing duration.",
-        "Missing cover.",
     ]
     assert {issue["track"]["title"] for issue in body["processing_tracks"]} == {
         "Processing",

@@ -39,6 +39,7 @@ fun TrackListRow(
     modifier: Modifier = Modifier,
     coverPath: String? = null,
     coverVersion: String? = null,
+    artist: String? = null,
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
     highlighted: Boolean = false,
@@ -82,6 +83,7 @@ fun TrackListRow(
             TrackArtwork(
                 trackId = trackId,
                 title = title,
+                artist = artist,
                 coverPath = coverPath,
                 coverVersion = coverVersion,
                 size = 48.dp,

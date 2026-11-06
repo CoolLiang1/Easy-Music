@@ -31,6 +31,7 @@ the slice's acceptance record and move the row to History.
 | Warm theme from the app icon | Implemented | [task](TASKS/WARM_THEME_TASKS.md) | Owner check on Web and on the real phone (light, dark, mini player). |
 | App icon redesign | Implemented | [task](TASKS/APP_ICON_REDESIGN.md) | Check the launcher icon on the real phone and the Web icons in daily use. |
 | AI metadata clean-up | Implemented | [task](TASKS/AI_METADATA_CLEANUP.md) | Owner runs 标题与艺人 on the production library and reviews the suggestions. |
+| Automatic covers | Implemented | [task](TASKS/AUTO_COVERS.md) | Run the cover backfill on the server; owner look at generated covers on Web and phone. |
 | Online cover search | Implemented | [task](TASKS/COVER_SEARCH.md) | Enable `COVER_SEARCH_ENABLED` on the server, run 查找封面, spot-check the covers. |
 | Deploy update script | Implemented | [task](TASKS/DEPLOY_UPDATE_SCRIPT_TASKS.md) / [acceptance](ACCEPTANCE/DEPLOY_UPDATE_SCRIPT_ACCEPTANCE.md) | First run on the real server. |
 | First Ubuntu production smoke | Implemented | [acceptance](ACCEPTANCE/UBUNTU_PRODUCTION_SMOKE_ACCEPTANCE.md) | Record the server's Ubuntu release (`lsb_release -a`); production has run since. |

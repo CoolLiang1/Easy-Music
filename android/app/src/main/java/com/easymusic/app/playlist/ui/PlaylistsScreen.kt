@@ -304,6 +304,7 @@ private fun PlaylistDetail(
                 TrackArtwork(
                     trackId = coverTrack?.id ?: playlist.id,
                     title = coverTrack?.title ?: playlist.name,
+                    artist = coverTrack?.artist,
                     coverPath = coverTrack?.coverPath,
                     coverVersion = coverTrack?.updatedAt,
                     size = 112.dp,
@@ -403,6 +404,7 @@ private fun PlaylistDetail(
                 TrackListRow(
                     trackId = track.id,
                     title = track.title,
+                    artist = track.artist,
                     subtitle = listOfNotNull(track.subtitle(), track.durationSeconds?.formatDuration()).joinToString(" · "),
                     coverPath = track.coverPath,
                     coverVersion = track.updatedAt,

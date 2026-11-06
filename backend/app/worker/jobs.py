@@ -3,7 +3,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.media.ffmpeg import FFmpegError, extract_audio_from_video
+from app.media.ffmpeg import FFmpegError, MediaProcessingError, extract_audio_from_video, extract_cover_image
+from app.media.metadata import extract_metadata
 from app.media.paths import UnsafeMediaPathError, resolve_media_path, sanitize_filename
 from app.media.storage import MediaStorage
 from app.models.processing_job import ProcessingJob
@@ -24,6 +25,7 @@ from app.services.jobs import (
     mark_job_failed,
     mark_job_succeeded,
 )
+from app.services.covers import attach_extracted_cover, video_frame_seek_seconds
 from app.services.processing import TrackProcessingError, process_track
 
 
@@ -145,6 +147,9 @@ def _process_video_extraction_job(
     # Record the extracted audio as the track original.
     track.original_file_path = storage.relative_media_path(destination)
     track.status = "processing"
+    # The extracted audio has no artwork; a video frame is the cover when
+    # the track has none. Must happen before the temp video is deleted.
+    _attach_video_frame_cover(track, temp_video_path, storage)
     db.commit()
 
     # Temp video lifecycle: delete the exact temp file after successful extraction.
@@ -157,6 +162,20 @@ def _process_video_extraction_job(
     # Run standard audio processing (metadata, playback MP3, duplicate signals).
     # process_track handles its own failure and marks the track failed internally.
     process_track(db, track.id, storage)
+
+
+def _attach_video_frame_cover(track: Track, video_path: Path, storage: MediaStorage) -> None:
+    try:
+        duration = extract_metadata(video_path, settings=storage.settings).duration_seconds
+    except MediaProcessingError:
+        duration = None
+    attach_extracted_cover(
+        track,
+        video_path,
+        storage,
+        extractor=extract_cover_image,
+        seek_seconds=video_frame_seek_seconds(duration),
+    )
 
 
 def _existing_original_path(track: Track, storage: MediaStorage) -> Path | None:

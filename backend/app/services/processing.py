@@ -10,6 +10,7 @@ from app.media.ffmpeg import (
     MediaProcessingError,
     SubprocessRunner,
     compute_playback_gain_db,
+    extract_cover_image,
     generate_mp3_playback,
     measure_loudness,
 )
@@ -17,11 +18,11 @@ from app.media.metadata import MediaMetadata, extract_metadata
 from app.media.paths import resolve_media_path
 from app.media.storage import MediaStorage
 from app.models.track import Track
+from app.services.covers import CoverExtractor, attach_extracted_cover
 from app.services.duplicate_signals import (
     build_normalized_metadata_key,
     collect_file_duplicate_signal,
 )
-
 
 MetadataExtractor = Callable[..., MediaMetadata]
 PlaybackGenerator = Callable[..., None]
@@ -46,6 +47,7 @@ def process_track(
     metadata_extractor: MetadataExtractor = extract_metadata,
     playback_generator: PlaybackGenerator = generate_mp3_playback,
     loudness_measurer: LoudnessMeasurer = measure_loudness,
+    cover_extractor: CoverExtractor = extract_cover_image,
     runner: SubprocessRunner | None = None,
 ) -> Track:
     track = db.scalar(select(Track).where(Track.id == track_id))
@@ -80,6 +82,14 @@ def process_track(
             runner=runner,
         )
 
+        # Embedded artwork becomes the cover only when the track has none.
+        attach_extracted_cover(
+            track,
+            original_path,
+            storage,
+            extractor=cover_extractor,
+            runner=runner,
+        )
         _apply_metadata(track, metadata)
         track.normalized_metadata_key = build_normalized_metadata_key(
             title=track.title,

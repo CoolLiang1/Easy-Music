@@ -157,6 +157,68 @@ def extract_audio_from_video(
         )
 
 
+# Longest edge of an extracted cover; larger artwork is scaled down.
+COVER_MAX_EDGE_PX = 800
+
+
+def extract_cover_image(
+    source_path: str | Path,
+    destination_path: str | Path,
+    *,
+    settings: Settings | None = None,
+    runner: SubprocessRunner | None = None,
+    seek_seconds: float | None = None,
+) -> bool:
+    """Write the first picture stream of *source_path* as a JPEG cover.
+
+    For audio files this is the embedded artwork (ID3 APIC, MP4 covr, FLAC
+    picture). For a video, pass *seek_seconds* to grab a frame from that
+    point. Best effort: returns False when the file has no picture stream or
+    ffmpeg fails, and leaves nothing behind at *destination_path*.
+    """
+    active_settings = settings or get_settings()
+    destination = Path(destination_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = destination.with_name(f"{destination.stem}.partial{destination.suffix}")
+
+    args = [active_settings.ffmpeg_path, "-y", "-v", "error"]
+    if seek_seconds is not None and seek_seconds > 0:
+        args.extend(["-ss", f"{seek_seconds:.2f}"])
+    args.extend(
+        [
+            "-i",
+            str(source_path),
+            "-map",
+            "0:v:0",
+            "-an",
+            "-frames:v",
+            "1",
+            "-vf",
+            f"scale='min({COVER_MAX_EDGE_PX},iw)':'min({COVER_MAX_EDGE_PX},ih)':force_original_aspect_ratio=decrease",
+            "-q:v",
+            "3",
+            "-f",
+            "image2",
+            "-c:v",
+            "mjpeg",
+            str(partial),
+        ]
+    )
+
+    try:
+        result = _run_media_command(args, runner=runner)
+    except FileNotFoundError:
+        partial.unlink(missing_ok=True)
+        return False
+
+    if result.returncode != 0 or not partial.is_file() or partial.stat().st_size == 0:
+        partial.unlink(missing_ok=True)
+        return False
+
+    os.replace(partial, destination)
+    return True
+
+
 @dataclass(frozen=True)
 class LoudnessMeasurement:
     integrated_lufs: float | None

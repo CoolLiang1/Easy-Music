@@ -56,6 +56,7 @@ Worker commands, from `backend/` with the same environment:
 | `python -m app.worker --loop --poll-interval 5` | Keep processing; also `WORKER_LOOP=true`. |
 | `python -m app.worker --track-id 1` | Process one track's job. |
 | `python -m app.worker.renormalize [--dry-run] [--track-id N \| --all]` | Regenerate playback MP3s whose loudness rule is out of date. |
+| `python -m app.worker.covers [--dry-run] [--track-id N]` | Extract embedded artwork as covers for tracks without one. |
 | `python -m app.worker.autotag [--dry-run] [--limit N] [--track-id N \| --all]` | Apply AI catalogue tags; prints what it applied. |
 
 Use `.\.venv\Scripts\python.exe` in place of `python` if the virtual

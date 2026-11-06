@@ -29,7 +29,7 @@ and [docs/README.md](docs/README.md) says which document owns what.
 | Business logic | `backend/app/services/` | Recommendation, AI, imports, playlists, uploads, processing. |
 | Models and migrations | `backend/app/models/`, `backend/alembic/versions/` | Every schema change needs a migration. |
 | Media and FFmpeg | `backend/app/media/` | Storage paths and path-traversal checks. |
-| Worker and backfills | `backend/app/worker/` | Job loop, `autotag`, `renormalize`. |
+| Worker and backfills | `backend/app/worker/` | Job loop, `autotag`, `renormalize`, `covers`. |
 | Backend tests | `backend/tests/` | SQLite in-memory, fake AI clients. |
 | Web | `web/src/` | `api/` typed wrappers, `types/`, `pages/`, `player/`. |
 | Android | `android/app/src/main/java/com/easymusic/app/` | Per feature: `data/`, `domain/`, `ui/`. |
