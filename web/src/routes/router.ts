@@ -5,6 +5,7 @@ export type AppRoute =
   | { name: "aiAssistant" }
   | { name: "duplicates" }
   | { name: "metadataCleanup" }
+  | { name: "coverSearch" }
   | { name: "imports" }
   | { name: "reports" }
   | { name: "library" }
@@ -49,6 +50,10 @@ export function getRoute(path: string): AppRoute {
 
   if (normalizedPath === "/metadata") {
     return { name: "metadataCleanup" };
+  }
+
+  if (normalizedPath === "/covers") {
+    return { name: "coverSearch" };
   }
 
   if (normalizedPath === "/reports") {

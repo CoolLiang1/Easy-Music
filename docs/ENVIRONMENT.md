@@ -52,6 +52,7 @@ and both examples together.
 | `AI_TAG_SEARCH_BASE_URL` | No | No | Tavily-compatible base URL. Defaults to `https://api.tavily.com`. |
 | `AI_TAG_SEARCH_MAX_RESULTS` | No | No | Maximum search summaries included in the AI tag suggestion prompt. Defaults to `5`; supported maximum is `5`. |
 | `AI_TAG_SEARCH_CACHE_DAYS` | No | No | Number of days to reuse cached search summaries. Defaults to `30`; set `0` to disable cache reuse. |
+| `COVER_SEARCH_ENABLED` | No | No | `true` enables the 查找封面 page: titles and artists are sent to the public iTunes Search API and accepted covers are downloaded from Apple. Defaults to `false`. |
 | `CADDY_DOMAIN` | No | Yes | Public HTTPS domain used by the production Caddy service. |
 | `CADDY_HTTP_PORT` | No | No | Host port published to Caddy container port 80. Defaults to `80`. |
 | `CADDY_HTTPS_PORT` | No | No | Host port published to Caddy container port 443. Defaults to `443`; use a reachable high port such as `25443` only with a matching public Web origin. |

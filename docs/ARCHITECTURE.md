@@ -58,7 +58,7 @@ Python 3.12, FastAPI, SQLAlchemy, Alembic, PostgreSQL, FFmpeg/ffprobe.
 | --- | --- | --- |
 | `users` | The owner account. | Created once by `app.auth.initial_user`. |
 | `refresh_tokens` | SHA-256 hashes of refresh tokens. | Never the token itself. |
-| `tracks` | Metadata, media file references, status, liked flag, cooldown, duplicate signals, loudness, AI-tagging, and AI-metadata versions. | Status is `uploading`, `processing`, `ready`, or `failed`. |
+| `tracks` | Metadata, media file references, status, liked flag, cooldown, duplicate signals, loudness, AI-tagging, AI-metadata, and cover-search versions. | Status is `uploading`, `processing`, `ready`, or `failed`. |
 | `tags`, `track_tags` | Owner tag catalogue in groups `scene`, `type`, `feature`; track links with `source` and `confidence`. | See tag provenance below. |
 | `playlists`, `playlist_tracks` | Manual ordered playlists. | Only the owner's tracks; adding twice is a no-op. |
 | `playback_events`, `feedback_events` | Listening history and feedback from both clients. | Idempotent on `client_event_id`. |
@@ -87,6 +87,23 @@ queues.
   id written into a key such as `"tag_id:12"` is repaired, extra keys are
   ignored, confidence is clamped to 0-1, and an item that still fails
   validation is dropped without discarding the rest of the response.
+
+### Online Cover Search
+
+- Off unless `COVER_SEARCH_ENABLED` is true. The page 查找封面 sends a track's
+  title and artist to the public iTunes Search API (JP store, then US), at
+  most one request every 3.2 s; nothing else leaves the server.
+- Only ready tracks with an artist and no cover are searched; a title alone
+  matched the wrong song in testing.
+- A candidate is a `match` (pre-selected) only when the title is the same,
+  the artist matches, and the release is not a Live, remix, cover, or similar
+  variant; anything else is `uncertain` and unchecked.
+- Search saves nothing. `POST /api/covers/search/apply` downloads accepted
+  images only from `https://*.mzstatic.com` without following redirects,
+  caps them at 5 MB, checks the JPEG or PNG signature, and writes them only
+  to the owner's tracks that still have no cover. Every reviewed track gets
+  `cover_search_version`; a failed download leaves the track to be offered
+  again.
 
 ### Title And Artist Clean-Up
 
@@ -223,6 +240,7 @@ logout, and streams opened with a signed stream URL. `GET /health` is public.
 | `/recommendations` | `recommendations.py` | Structured recommendations and revived tracks. |
 | `/library/reports` | `library_reports.py` | Read-only organization reports. |
 | `/ai` | `ai.py` | Intent parsing, AI recommendation, per-track tag suggestions, on-demand auto-tagging (`auto-tag/status`, `auto-tag/next-batch`), reviewed title/artist clean-up (`metadata-cleanup/status`, `metadata-cleanup/next-batch`, `metadata-cleanup/apply`). |
+| `/covers/search` | `covers.py` | Owner-reviewed online cover search (`status`, `next-batch`, `apply`). |
 
 ### Sessions
 

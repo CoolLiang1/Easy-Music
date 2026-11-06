@@ -81,7 +81,10 @@ needs the owner's explicit agreement.
   filesystem paths in new API fields.
 - Import roots are an allowlist, disabled when empty. Import never browses
   arbitrary paths and never moves, renames, deletes, or modifies source files.
-  Nothing downloads from external sites.
+  Nothing downloads from external sites, with one owner-approved exception:
+  `services/cover_search.py` may fetch cover images from Apple's artwork CDN
+  (`*.mzstatic.com`, HTTPS, no redirects) after the owner accepts them, behind
+  `COVER_SEARCH_ENABLED`. Do not add other downloads.
 
 ### Android
 

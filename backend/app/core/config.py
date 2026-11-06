@@ -108,6 +108,9 @@ class Settings(BaseSettings):
         ge=0,
         validation_alias="AI_TAG_SEARCH_CACHE_DAYS",
     )
+    # Online cover lookup through the public iTunes Search API. Sends track
+    # titles and artists to Apple; covers are saved only after owner review.
+    cover_search_enabled: bool = Field(default=False, validation_alias="COVER_SEARCH_ENABLED")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

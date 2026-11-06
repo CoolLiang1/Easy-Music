@@ -186,6 +186,38 @@ Expected: `updated_count` counts tracks whose title or artist changed and
 unconfigured, or failing, `next-batch` returns `200` with that
 `provider_status` and no suggestions.
 
+## Online Cover Search
+
+Needs `COVER_SEARCH_ENABLED=true` and network access to `itunes.apple.com`.
+
+```powershell
+$status = Invoke-RestMethod -Uri "$api/api/covers/search/status" -Headers $headers
+$status.enabled; $status.pending_count; $status.skipped_without_artist
+$batch = Invoke-RestMethod -Method Post -Uri "$api/api/covers/search/next-batch" `
+  -Headers $headers -ContentType "application/json" -Body '{"after_id": null}'
+$batch.candidates | Format-Table track_id, confidence, selected, track_name, artist_name
+```
+
+Expected: `status` lists ready tracks that have an artist and no cover.
+`next-batch` searches up to 3 of them (a few seconds per track because of the
+iTunes rate limit) and saves nothing. To save, send the accepted candidates and
+every reviewed id:
+
+```powershell
+$body = @{
+  choices = @($batch.candidates | Where-Object selected | ForEach-Object { @{ track_id = $_.track_id; artwork_url = $_.artwork_url } })
+  reviewed_track_ids = $batch.reviewed_track_ids
+} | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Method Post -Uri "$api/api/covers/search/apply" -Headers $headers `
+  -ContentType "application/json" -Body $body
+```
+
+Expected: `updated_count` covers are downloaded and served by
+`GET /api/tracks/{id}/cover`. A URL outside `https://*.mzstatic.com` or a
+non-image download counts in `failed_count` and the track stays pending. With
+the flag off, `status.enabled` is `false` and `next-batch` returns
+`status: "disabled"`.
+
 ## Imports
 
 Needs `IMPORT_ALLOWED_ROOTS` set (see [DEVELOPMENT.md](DEVELOPMENT.md#optional-features)).

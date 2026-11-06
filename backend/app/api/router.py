@@ -4,6 +4,7 @@ from sqlalchemy import text
 from app.api.routes import (
     ai,
     auth,
+    covers,
     duplicates,
     feedback_events,
     imports,
@@ -20,6 +21,7 @@ from app.db.session import engine
 api_router = APIRouter()
 api_router.include_router(ai.router, prefix="/api")
 api_router.include_router(auth.router, prefix="/api")
+api_router.include_router(covers.router, prefix="/api")
 api_router.include_router(duplicates.router, prefix="/api")
 api_router.include_router(feedback_events.router, prefix="/api")
 api_router.include_router(imports.router, prefix="/api")

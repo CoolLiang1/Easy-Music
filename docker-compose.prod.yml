@@ -99,6 +99,7 @@ services:
       AI_TAG_SEARCH_BASE_URL: ${AI_TAG_SEARCH_BASE_URL:-https://api.tavily.com}
       AI_TAG_SEARCH_MAX_RESULTS: ${AI_TAG_SEARCH_MAX_RESULTS:-5}
       AI_TAG_SEARCH_CACHE_DAYS: ${AI_TAG_SEARCH_CACHE_DAYS:-30}
+      COVER_SEARCH_ENABLED: ${COVER_SEARCH_ENABLED:-false}
     volumes:
       - ${MEDIA_HOST_ORIGINALS:-./media/originals}:/app/media/originals
       - ${MEDIA_HOST_PLAYBACK:-./media/playback}:/app/media/playback

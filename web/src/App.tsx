@@ -8,6 +8,7 @@ import { AppLayout } from "./layout/AppLayout";
 import { AiAssistantPage } from "./pages/AiAssistantPage";
 import { DuplicateReviewPage } from "./pages/DuplicateReviewPage";
 import { MetadataCleanupPage } from "./pages/MetadataCleanupPage";
+import { CoverSearchPage } from "./pages/CoverSearchPage";
 import { ImportPage } from "./pages/ImportPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { LibraryReportsPage } from "./pages/LibraryReportsPage";
@@ -28,6 +29,7 @@ const routeTitles: Record<AppRoute["name"], string> = {
   library: "曲库",
   login: "登录",
   metadataCleanup: "整理标题与艺人",
+  coverSearch: "查找封面",
   notFound: "页面不存在",
   playlists: "歌单",
   recommendations: "推荐",
@@ -78,6 +80,7 @@ function SignedInApp({ path, route, title }: { path: string; route: AppRoute; ti
       {route.name === "playlists" ? <PlaylistsPage /> : null}
       {route.name === "duplicates" ? <DuplicateReviewPage /> : null}
       {route.name === "metadataCleanup" ? <MetadataCleanupPage /> : null}
+      {route.name === "coverSearch" ? <CoverSearchPage /> : null}
       {route.name === "imports" ? <ImportPage /> : null}
       {route.name === "reports" ? <LibraryReportsPage /> : null}
       {route.name === "upload" ? <UploadPage /> : null}
