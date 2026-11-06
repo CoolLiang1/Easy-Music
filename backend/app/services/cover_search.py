@@ -12,8 +12,9 @@ the owner on 2026-11-06. Rules:
   redirects, size-capped, JPEG/PNG signature checked) and only for the
   owner's tracks that still have no cover. Owner-uploaded covers are never
   replaced.
-* ``tracks.cover_search_version`` marks reviewed tracks so each is offered
-  once per version.
+* ``tracks.cover_search_version`` marks searched tracks. The automatic run
+  searches each track once per version; the owner can search a coverless
+  track again by id at any time.
 """
 
 from __future__ import annotations
@@ -234,19 +235,29 @@ def _needs_search():
     return or_(Track.cover_search_version.is_(None), Track.cover_search_version < COVER_SEARCH_VERSION)
 
 
+def _coverless_filter(user_id: int):
+    return (Track.user_id == user_id, Track.status == "ready", Track.cover_path.is_(None))
+
+
+def _searchable_filter(user_id: int):
+    return (*_coverless_filter(user_id), Track.artist.is_not(None), func.trim(Track.artist) != "")
+
+
 def _pending_filter(user_id: int):
-    return (
-        Track.user_id == user_id,
-        Track.status == "ready",
-        Track.cover_path.is_(None),
-        Track.artist.is_not(None),
-        func.trim(Track.artist) != "",
-        _needs_search(),
-    )
+    return (*_searchable_filter(user_id), _needs_search())
 
 
-def list_pending_tracks(db: Session, *, user_id: int, limit: int = MAX_PENDING_LISTED) -> list[Track]:
-    return list(db.scalars(select(Track).where(*_pending_filter(user_id)).order_by(Track.id).limit(limit)))
+def is_searched(track: Track) -> bool:
+    return track.cover_search_version is not None and track.cover_search_version >= COVER_SEARCH_VERSION
+
+
+def list_coverless_tracks(db: Session, *, user_id: int, limit: int = MAX_PENDING_LISTED) -> list[Track]:
+    """Every ready track of the owner that still has no cover, searched or not."""
+    return list(db.scalars(select(Track).where(*_coverless_filter(user_id)).order_by(Track.id).limit(limit)))
+
+
+def count_coverless_tracks(db: Session, *, user_id: int) -> int:
+    return db.scalar(select(func.count(Track.id)).where(*_coverless_filter(user_id))) or 0
 
 
 def count_pending_tracks(db: Session, *, user_id: int, after_id: int | None = None) -> int:
@@ -286,6 +297,39 @@ def search_next_batch(
     if not tracks:
         return CoverBatchResult(status="ok"), None, 0
 
+    result = _search_tracks(tracks, client)
+    if result.status == "error" and not result.reviewed_track_ids:
+        return result, after_id, count_pending_tracks(db, user_id=user_id, after_id=after_id)
+    next_after_id = result.reviewed_track_ids[-1] if result.reviewed_track_ids else tracks[-1].id
+    remaining = count_pending_tracks(db, user_id=user_id, after_id=next_after_id)
+    return result, next_after_id, remaining
+
+
+def search_tracks_by_id(
+    db: Session,
+    client: CoverSearchClient | None,
+    *,
+    user_id: int,
+    track_ids: Sequence[int],
+    batch_size: int = BATCH_SIZE,
+) -> CoverBatchResult:
+    """Search the given coverless tracks again, searched before or not. Saves nothing.
+
+    Other users' tracks, tracks that have a cover, and tracks without an
+    artist are ignored.
+    """
+    if client is None:
+        return CoverBatchResult(status="disabled")
+    wanted = list(dict.fromkeys(track_ids))[: max(1, batch_size)]
+    if not wanted:
+        return CoverBatchResult(status="ok")
+    tracks = list(
+        db.scalars(select(Track).where(*_searchable_filter(user_id), Track.id.in_(wanted)).order_by(Track.id)),
+    )
+    return _search_tracks(tracks, client)
+
+
+def _search_tracks(tracks: Sequence[Track], client: CoverSearchClient) -> CoverBatchResult:
     result = CoverBatchResult(status="ok")
     for track in tracks:
         try:
@@ -298,12 +342,7 @@ def search_next_batch(
         result.reviewed_track_ids.append(track.id)
         if candidate is not None:
             result.suggestions.append(CoverSuggestion(track_id=track.id, candidate=candidate))
-
-    if result.status == "error" and not result.reviewed_track_ids:
-        return result, after_id, count_pending_tracks(db, user_id=user_id, after_id=after_id)
-    next_after_id = result.reviewed_track_ids[-1] if result.reviewed_track_ids else tracks[-1].id
-    remaining = count_pending_tracks(db, user_id=user_id, after_id=next_after_id)
-    return result, next_after_id, remaining
+    return result
 
 
 ArtworkDownloader = Any  # callable(url: str) -> bytes

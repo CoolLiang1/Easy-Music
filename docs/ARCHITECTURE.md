@@ -93,8 +93,11 @@ queues.
 - Off unless `COVER_SEARCH_ENABLED` is true. The page 查找封面 sends a track's
   title and artist to the public iTunes Search API (JP store, then US), at
   most one request every 3.2 s; nothing else leaves the server.
-- Only ready tracks with an artist and no cover are searched; a title alone
-  matched the wrong song in testing.
+- The page lists every ready track without a cover, with its state (never
+  searched, searched without a saved cover, or missing an artist), and lets
+  the owner upload a cover per row. Only tracks with an artist are searched;
+  a title alone matched the wrong song in testing. A track can be searched
+  again at any time by id (`next-batch` with `track_ids`).
 - A candidate is a `match` (pre-selected) only when the title is the same,
   the artist matches, and the release is not a Live, remix, cover, or similar
   variant; anything else is `uncertain` and unchecked.
@@ -102,8 +105,8 @@ queues.
   images only from `https://*.mzstatic.com` without following redirects,
   caps them at 5 MB, checks the JPEG or PNG signature, and writes them only
   to the owner's tracks that still have no cover. Every reviewed track gets
-  `cover_search_version`; a failed download leaves the track to be offered
-  again.
+  `cover_search_version`, which only marks it as searched; it stays listed
+  until it has a cover. A failed download leaves the track unmarked.
 
 ### Title And Artist Clean-Up
 

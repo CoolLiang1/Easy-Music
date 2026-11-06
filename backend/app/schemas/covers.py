@@ -3,26 +3,43 @@
 from pydantic import BaseModel, Field
 
 
-class PendingCoverTrack(BaseModel):
-    """A ready track with an artist and no cover, waiting for a cover search."""
+class CoverlessTrack(BaseModel):
+    """A ready track without a cover.
+
+    ``searched`` is true once a search ran for it and was reviewed without a
+    saved cover. An empty ``artist`` means the track cannot be searched.
+    """
 
     track_id: int
     title: str
     artist: str
     duration_seconds: int | None = None
+    searched: bool
 
 
 class CoverSearchStatusResponse(BaseModel):
-    """Response for ``GET /api/covers/search/status``."""
+    """Response for ``GET /api/covers/search/status``.
+
+    ``tracks`` lists every coverless track (oldest first, capped at 2000);
+    ``coverless_count`` is their total. ``pending_count`` counts those with an
+    artist that were never searched; ``skipped_without_artist`` those without
+    an artist.
+    """
 
     enabled: bool
+    coverless_count: int
     pending_count: int
-    pending_tracks: list[PendingCoverTrack] = Field(default_factory=list)
+    tracks: list[CoverlessTrack] = Field(default_factory=list)
     skipped_without_artist: int
 
 
 class CoverSearchBatchRequest(BaseModel):
+    """Search the next never-searched tracks after ``after_id``, or, when
+    ``track_ids`` is given, exactly those coverless tracks again (at most 3
+    are searched)."""
+
     after_id: int | None = Field(default=None, ge=0)
+    track_ids: list[int] | None = Field(default=None, max_length=10)
 
 
 class CoverCandidateResponse(BaseModel):

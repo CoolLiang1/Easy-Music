@@ -15,7 +15,10 @@ search and upload a cover per track, and asked for an online lookup.
 - In scope:
   - Owner-reviewed lookup through the public iTunes Search API on a new Web
     page 查找封面 (`/covers`): list, search, preview, apply.
-  - Only tracks with an artist and no cover. Owner covers are never replaced.
+  - The page lists every track without a cover, so the owner sees what is
+    still missing: never searched, searched but not found, or missing an
+    artist. Each row can be searched again or given an uploaded cover.
+  - Only tracks with an artist are searched. Owner covers are never replaced.
   - Matching tuned on the owner's titles: exact title plus artist, original
     releases preferred over Live/remix/cover/ensemble variants; everything
     else is shown as 待确认 and left unchecked.
@@ -32,10 +35,12 @@ search and upload a cover per track, and asked for an online lookup.
   passed to the API service in `docker-compose.prod.yml` (checked with
   `docker compose config --quiet` against `.env.production.example`).
 - Data model: `tracks.cover_search_version` (migration `20261106_0017`).
-- API (additive; Android unaffected): `GET /api/covers/search/status`,
-  `POST /api/covers/search/next-batch` (3 tracks per call, cursor `after_id`,
-  saves nothing), `POST /api/covers/search/apply`.
-- Web: page 查找封面 under 整理.
+- API (additive; Android unaffected): `GET /api/covers/search/status`
+  (every coverless track with `searched`), `POST /api/covers/search/next-batch`
+  (3 tracks per call, cursor `after_id` over never-searched tracks, or
+  `track_ids` to search again; saves nothing), `POST /api/covers/search/apply`.
+- Web: page 查找封面 under 整理, with filters 全部 / 找到封面 / 待查找 /
+  未找到 / 缺艺人 and per-row 再查 and 上传封面 (the existing cover upload).
 - One-time owner step: set `COVER_SEARCH_ENABLED=true` on the server, recreate
   the API, open 查找封面, search, review, apply.
 
@@ -56,6 +61,11 @@ Automated:
   ("Infinity" for "To the Infinity Castle"). Apply downloaded 20 covers
   (600×600 JPEG, ~95 KB) and the library showed them.
 - PostgreSQL migration not run (single nullable column).
+- [x] After the owner's first look (searched tracks vanished from the page):
+  browser check on a local test library. After apply and reload, a searched
+  track without a cover stays listed as 未找到; 再查 searches it again; an
+  uploaded cover removes the row; tracks without an artist are listed as
+  缺艺人.
 
 Owner checks:
 
@@ -68,3 +78,7 @@ Owner checks:
   covers; tracks without an artist only produced guesses, so they are not
   searched. Chinese artists written in traditional script or romanised
   (陳奕迅, Jay Chou) show as 待确认.
+- 2026-11-06: The owner asked for every coverless track to stay listed, not
+  only unsearched ones, to know which still need a cover. Searching again
+  with an unchanged title and artist usually returns the same result; it
+  helps after the title or artist was corrected.

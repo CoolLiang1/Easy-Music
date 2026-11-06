@@ -10,11 +10,12 @@ export function getCoverSearchStatus(accessToken: string) {
   return apiRequest<CoverSearchStatusResponse>("/api/covers/search/status", { accessToken });
 }
 
-export function coverSearchNextBatch(accessToken: string, afterId: number | null) {
+/** Search the given coverless tracks (at most 3 per call), searched before or not. Saves nothing. */
+export function coverSearchTracks(accessToken: string, trackIds: number[]) {
   return apiRequest<CoverSearchBatchResponse>("/api/covers/search/next-batch", {
     method: "POST",
     accessToken,
-    body: { after_id: afterId },
+    body: { track_ids: trackIds },
   });
 }
 

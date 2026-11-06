@@ -1,14 +1,18 @@
-export type PendingCoverTrack = {
+export type CoverlessTrack = {
   track_id: number;
   title: string;
+  /** Empty when the track has no artist and cannot be searched. */
   artist: string;
   duration_seconds: number | null;
+  /** A search already ran for it without a saved cover. */
+  searched: boolean;
 };
 
 export type CoverSearchStatusResponse = {
   enabled: boolean;
+  coverless_count: number;
   pending_count: number;
-  pending_tracks: PendingCoverTrack[];
+  tracks: CoverlessTrack[];
   skipped_without_artist: number;
 };
 

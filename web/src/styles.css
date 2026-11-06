@@ -3986,8 +3986,13 @@ details.disclosure > .disclosure-body {
 }
 
 .cover-search-table td:nth-child(3) {
-  width: 48%;
-  min-width: 280px;
+  width: 40%;
+  min-width: 260px;
+}
+
+.cover-row-actions .btn.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .cover-candidate {
